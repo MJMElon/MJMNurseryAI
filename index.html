@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MJM Nursery AI - Dashboard</title>
+    <title>MJM Nursery AI - Main Page</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -51,7 +51,6 @@
         .fade-enter { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Slow Healing Emoji Style */
         .nature-critter { position: absolute; font-size: 1.5rem; pointer-events: none; opacity: 0; z-index: 50; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); animation: floatSlow 8s ease-in-out forwards; }
         @keyframes floatSlow { 
             0% { transform: translate(0, 0) scale(0.6) rotate(-10deg); opacity: 0; } 
@@ -81,7 +80,6 @@
                     </div>
                 </div>
             </div>
-            <div id="logo-animation-zone" class="absolute inset-0 pointer-events-none z-50"></div>
 
             <div id="standard-auth-fields" class="space-y-4 text-left relative z-40">
                 <div id="signup-fields" class="hidden">
@@ -218,8 +216,11 @@
 
         // Slow Healing Emoji Logic
         const healingEmojis = ["🌿", "🍃", "🌱", "🪴", "🌳", "🌤️", "⛅️", "🦋", "🐌", "🐞", "🐢", "🍓", "🍵", "🌸", "🦦"];
-        function spawnHealingEmoji(zoneId) {
-            const zone = document.getElementById(zoneId);
+        function spawnHealingEmoji() {
+            // ONLY SPAWN EMOJIS IF DASHBOARD IS VISIBLE (USER LOGGED IN)
+            if(dashboardScreen.classList.contains('hidden')) return;
+
+            const zone = document.getElementById('title-animation-zone');
             if (!zone || document.hidden) return;
             
             const el = document.createElement('div');
@@ -236,8 +237,7 @@
             setTimeout(() => { if(zone.contains(el)) zone.removeChild(el); }, 8500);
         }
         
-        setInterval(() => spawnHealingEmoji('logo-animation-zone'), 1200);
-        setInterval(() => spawnHealingEmoji('title-animation-zone'), 1200);
+        setInterval(spawnHealingEmoji, 1200);
 
         toggleBtn.addEventListener('click', () => {
             const isLogin = (mainBtn.innerText === 'LOGIN');
