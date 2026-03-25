@@ -74,22 +74,25 @@
 
         <div class="glass-panel p-8 rounded-[2.5rem] min-h-[600px] relative z-30 shadow-xl">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b-2 border-slate-100 pb-6">
-                <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg w-full md:w-auto">Borang Akuan (BA) Verified List</h2>
+                <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg w-full md:w-auto">Borang Akuan (BA) List</h2>
                 <div class="relative w-full md:w-96 relative z-40">
                     <svg class="w-4 h-4 absolute left-3 top-3 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <input type="text" id="f-ba-global" oninput="renderBATable()" class="filter-input w-full pl-10" placeholder="Search BA Customer or DO...">
+                    <input type="text" id="f-ba-global" oninput="renderBATable()" class="filter-input w-full pl-10" placeholder="Search BA No, Customer, AL or DO...">
                 </div>
             </div>
 
             <div class="overflow-x-auto relative z-30">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full text-left border-collapse min-w-[1200px]">
                     <thead>
                         <tr class="text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b-2 border-slate-100 pb-2">
-                            <th class="p-4 font-black">Linked DO Number</th>
-                            <th class="p-4 font-black">BA Extracted Customer</th>
+                            <th class="p-4 font-black">BA Number</th>
+                            <th class="p-4 font-black">Customer Name</th>
+                            <th class="p-4 font-black">Linked DO Numbers</th>
+                            <th class="p-4 font-black text-blue-700">Linked AL Number</th>
                             <th class="p-4 font-black text-center text-yellow-700">BA Qty</th>
-                            <th class="p-4 font-black text-center text-emerald-700">DO Qty</th>
+                            <th class="p-4 font-black text-center text-emerald-700">Total DO Qty</th>
                             <th class="p-4 font-black text-center">Match Status</th>
+                            <th class="p-4 font-black text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="ba-records-tbody" class="text-sm font-semibold text-slate-700"></tbody>
@@ -106,17 +109,18 @@
                 <button onclick="closeModal('ba-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
-            <div id="ba-drop-zone" class="drop-zone border-yellow-300 hover:border-yellow-500 bg-yellow-50/30 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer h-32 group mb-6 relative">
+            <div id="ba-drop-zone" class="drop-zone border-yellow-300 hover:border-yellow-500 bg-yellow-50/30 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer h-32 group mb-6 relative z-20">
                 <svg class="w-10 h-10 text-yellow-400 group-hover:text-yellow-500 mb-3 transition-colors pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <span class="text-sm font-bold text-yellow-600 uppercase tracking-widest text-center pointer-events-none">Drag & Drop Multiple BA Forms Here</span>
                 <input type="file" id="ba-file-input" class="hidden" accept="image/*,application/pdf" multiple>
             </div>
 
             <div class="overflow-x-auto w-full">
-                <table class="w-full text-left border-collapse min-w-[800px]">
+                <table class="w-full text-left border-collapse min-w-[1100px]">
                     <thead>
                         <tr class="text-[9px] uppercase tracking-[0.2em] text-slate-400 border-b-2 border-yellow-100 pb-2">
                             <th class="p-3 w-16">Doc</th>
+                            <th class="p-3 w-28">BA Number</th>
                             <th class="p-3 w-48">BA Extracted Customer</th>
                             <th class="p-3 w-24 text-yellow-600">BA Qty</th>
                             <th class="p-3 min-w-[200px]">Extracted DO Numbers</th>
@@ -126,7 +130,7 @@
                         </tr>
                     </thead>
                     <tbody id="bulk-ba-tbody">
-                    </tbody>
+                        </tbody>
                 </table>
             </div>
 
@@ -137,6 +141,178 @@
         </div>
     </div>
 
+    <div id="manage-ba-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeModal('manage-ba-modal')"></div>
+        <div class="bg-white rounded-[32px] p-8 w-full max-w-4xl shadow-2xl max-h-[95vh] overflow-y-auto border-4 border-yellow-500 relative z-10">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Manage BA Records</h3>
+                    <p id="manage-ba-status-badge" class="text-xs font-bold px-3 py-1 rounded-full inline-block mt-2"></p>
+                </div>
+                <button onclick="closeModal('manage-ba-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+
+            <input type="hidden" id="mng-ba-original-name">
+
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">BA Number (Editable)</label>
+                        <input type="text" id="mng-ba-num" class="input-style mt-1 font-black text-yellow-700 focus:border-yellow-500">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Customer Name (Editable)</label>
+                        <input type="text" id="mng-ba-name" class="input-style mt-1 text-slate-800 focus:border-yellow-500 font-bold uppercase">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Linked DO Numbers</label>
+                    <input type="text" id="mng-ba-dos" class="input-style mt-1 text-emerald-700 font-bold" disabled>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">BA Quantity (Editable)</label>
+                        <input type="number" id="mng-ba-qty" class="input-style mt-1 font-black focus:border-yellow-500 text-yellow-600" oninput="recheckMngBAStatus()">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Checked DO Quantity</label>
+                        <input type="number" id="mng-ba-do-qty" class="input-style mt-1 font-black text-emerald-600 bg-slate-50" disabled>
+                    </div>
+                </div>
+
+                <div id="mng-ba-nursery-summary" class="mb-4"></div>
+
+                <div class="mt-6 pt-4 border-t border-slate-100">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">BA Document Attached Documentation</label>
+                    
+                    <div id="mng-ba-upload-container" class="hidden relative">
+                        <div id="mng-ba-drop-zone" class="border-2 border-dashed border-yellow-300 bg-yellow-50/50 rounded-xl p-8 text-center cursor-pointer hover:bg-yellow-50 transition-colors relative group">
+                            <svg class="w-8 h-8 text-yellow-400 mx-auto mb-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                            <span class="text-sm font-bold text-yellow-700 pointer-events-none">Drag & Drop Borang Akuan (BA) Form Here to Scan & Link</span>
+                            <input type="file" id="mng-ba-file" class="hidden" accept="image/*,application/pdf">
+                        </div>
+                        <div id="mng-ba-scan-status" class="absolute inset-0 flex items-center justify-center font-black uppercase tracking-widest text-xs drop-shadow-md z-30 text-yellow-800 bg-yellow-50/90 hidden rounded-xl animate-pulse">Scanning BA Form...</div>
+                    </div>
+
+                    <div id="mng-ba-image-container" class="hidden flex gap-2 relative z-20">
+                        <button onclick="viewAttachedBADocument()" class="flex-1 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 p-3 rounded-xl text-xs font-bold uppercase tracking-widest flex justify-center items-center gap-2 border border-yellow-200">
+                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            View Attached Document
+                        </button>
+                        <button onclick="removeBAImage()" class="bg-red-50 text-red-500 p-3 rounded-xl hover:bg-red-100 font-bold border border-red-100 relative z-20">✕</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 pt-8 mt-6 border-t border-slate-100 relative z-40">
+                <button onclick="closeModal('manage-ba-modal')" class="flex-1 p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                <button onclick="saveManageBA()" class="flex-1 p-4 rounded-2xl btn-ba shadow-lg text-xs uppercase tracking-widest relative z-40">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ba-overwrite-confirm-modal" class="hidden fixed inset-0 bg-slate-900/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-[32px] p-10 w-full max-w-xl shadow-2xl border-4 border-yellow-500 relative space-y-5">
+            <h4 class="text-xl font-black text-rose-600 tracking-tight uppercase flex items-center gap-3">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                AI Scan Amendment Required
+            </h4>
+            <p class="text-sm font-semibold text-slate-600">The AI scan found differences in the Borang Akuan (BA) form. Please confirm if you wish to amend the existing data before saving.</p>
+            
+            <table class="w-full text-left text-xs border-separate border-spacing-y-2">
+                <thead>
+                    <tr class="text-[9px] uppercase tracking-widest text-slate-400">
+                        <th class="pl-2">Field</th>
+                        <th>Original Data</th>
+                        <th class="text-yellow-700 font-black">AI Scanned Data</th>
+                    </tr>
+                </thead>
+                <tbody class="font-bold">
+                    <tr id="cf-row-num" class="bg-slate-50 rounded-lg">
+                        <td class="p-3 text-slate-500 uppercase tracking-wider font-black text-[9px]">BA Number</td>
+                        <td id="cf-old-num" class="p-3 text-slate-800"></td>
+                        <td id="cf-new-num" class="p-3 text-yellow-700"></td>
+                    </tr>
+                    <tr id="cf-row-name" class="bg-slate-50 rounded-lg">
+                        <td class="p-3 text-slate-500 uppercase tracking-wider font-black text-[9px]">Customer</td>
+                        <td id="cf-old-name" class="p-3 text-slate-800 uppercase"></td>
+                        <td id="cf-new-name" class="p-3 text-yellow-700 uppercase"></td>
+                    </tr>
+                    <tr id="cf-row-qty" class="bg-slate-50 rounded-lg">
+                        <td class="p-3 text-slate-500 uppercase tracking-wider font-black text-[9px]">Quantity</td>
+                        <td id="cf-old-qty" class="p-3 text-slate-800"></td>
+                        <td id="cf-new-qty" class="p-3 text-yellow-700 font-black text-lg"></td>
+                    </tr>
+                    <tr id="cf-row-dos" class="bg-slate-50 rounded-lg">
+                        <td class="p-3 text-slate-500 uppercase tracking-wider font-black text-[9px]">Linked DOs</td>
+                        <td id="cf-old-dos" class="p-3 text-slate-800"></td>
+                        <td id="cf-new-dos" class="p-3 text-yellow-700 font-black"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="flex gap-4 pt-6 mt-4 relative z-40">
+                <button onclick="rejectAIOverwrite()" class="flex-1 p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Keep Original</button>
+                <button onclick="acceptAIOverwrite()" class="flex-1 p-4 rounded-2xl btn-ba shadow-md text-xs uppercase tracking-widest">Accept AI Amendments</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="manage-al-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeModal('manage-al-modal')"></div>
+        <div class="bg-white rounded-[32px] p-8 w-full max-w-5xl shadow-2xl max-h-[95vh] overflow-y-auto border-4 border-blue-500 relative z-10">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Review AL Details</h3>
+                    <p id="manage-al-status-badge" class="text-xs font-bold px-3 py-1 rounded-full inline-block mt-2"></p>
+                </div>
+                <button onclick="closeModal('manage-al-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">AL Number</label><input type="text" id="mng-al-num" class="input-style mt-1 font-black text-blue-700" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Customer Name</label><input type="text" id="mng-al-name" class="input-style mt-1" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Order #</label><input type="text" id="mng-al-order" class="input-style mt-1" disabled></div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Order Qty</label><input type="text" id="mng-al-qty" class="input-style mt-1" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Current Balance</label><input type="text" id="mng-al-bal" class="input-style mt-1 font-black text-rose-500" disabled></div>
+            </div>
+            <div class="flex gap-4 pt-8 mt-6 border-t border-slate-100 relative z-40">
+                <button onclick="closeModal('manage-al-modal')" class="flex-1 p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="manage-do-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeModal('manage-do-modal')"></div>
+        <div class="bg-white rounded-[32px] p-8 w-full max-w-3xl shadow-2xl max-h-[95vh] overflow-y-auto border-4 border-emerald-500 relative z-10">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Review DO Details</h3>
+                </div>
+                <button onclick="closeModal('manage-do-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">DO Number</label><input type="text" id="mng-do-num" class="input-style mt-1 font-black text-emerald-700" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Linked AL Number</label><input type="text" id="mng-do-al" class="input-style mt-1" disabled></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Delivery Qty</label><input type="text" id="mng-do-qty" class="input-style mt-1 font-black" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Customer / Remark</label><input type="text" id="mng-do-remark" class="input-style mt-1" disabled></div>
+            </div>
+            <div class="flex gap-4 pt-8 mt-6 border-t border-slate-100 relative z-40">
+                <button onclick="closeModal('manage-do-modal')" class="flex-1 p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox-modal" class="hidden fixed inset-0 bg-slate-900/95 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
+        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white hover:text-red-400 bg-white/10 rounded-full p-3 transition-colors relative z-[110]">
+            <svg class="w-8 h-8 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <div id="lightbox-content" class="w-full h-full max-w-4xl max-h-[90vh] flex justify-center items-center"></div>
+    </div>
+
     <script>
         const _k1 = 'AIzaSyCvSAVEeOa_';
         const _k2 = 'PkZxRKDJkYz3hqzdgvbGIyQ';
@@ -145,16 +321,10 @@
         async function analyzeImageWithGemini(base64Image, mimeType, prompt) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
             const base64Data = base64Image.split(',')[1];
-            
-            const payload = {
-                contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: mimeType || "image/jpeg", data: base64Data } } ] }],
-                generationConfig: { responseMimeType: "application/json" }
-            };
-
+            const payload = { contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: mimeType || "image/jpeg", data: base64Data } } ] }], generationConfig: { responseMimeType: "application/json" } };
             const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error?.message || "Gemini API Error");
-            
             let rawText = data.candidates[0].content.parts[0].text;
             rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
             return JSON.parse(rawText);
@@ -165,27 +335,16 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let globalDOs = [];
-        window.extractedBulkBAs = {}; 
-
-        const healingEmojis = ["🌿", "🍃", "🌱", "🪴", "🌳", "🌤️", "⛅️", "🦋", "🐌", "🐞", "🐢", "🍓", "🍵", "🌸", "🦦"];
-        function spawnHealingEmoji() {
-            const zone = document.getElementById('title-animation-zone');
-            if (!zone || document.hidden) return;
-            const el = document.createElement('div');
-            el.className = 'nature-critter';
-            el.innerText = healingEmojis[Math.floor(Math.random() * healingEmojis.length)];
-            el.style.left = (35 + Math.random() * 30) + '%'; 
-            el.style.top = (35 + Math.random() * 30) + '%';
-            el.style.setProperty('--tx', (Math.random() - 0.5) * 300 + 'px'); 
-            el.style.setProperty('--ty', (Math.random() - 0.5) * 150 - 50 + 'px');
-            zone.appendChild(el);
-            setTimeout(() => { if(zone.contains(el)) zone.removeChild(el); }, 8500);
-        }
-        setInterval(spawnHealingEmoji, 1200);
+        let globalALs = [];
 
         async function fetchData() {
-            const { data: doData } = await _supabase.from('do_records').select('*').order('created_at', { ascending: false });
+            const [{ data: alData }, { data: doData }] = await Promise.all([
+                _supabase.from('al_orders').select('*'),
+                _supabase.from('do_records').select('*').order('created_at', { ascending: false })
+            ]);
+            globalALs = alData || [];
             globalDOs = doData || [];
+            checkUrlParamsForModal(); 
             renderBATable();
         }
 
@@ -194,17 +353,41 @@
             const tbody = document.getElementById('ba-records-tbody');
             tbody.innerHTML = '';
             
-            const dosWithBA = globalDOs.filter(d => d.ba_raw_name || d.ba_raw_qty);
-            const filtered = dosWithBA.filter(d => 
-                !search || 
-                (d.do_number||'').toLowerCase().includes(search) || 
-                (d.ba_raw_name||'').toLowerCase().includes(search)
-            );
+            let baGroups = {};
+            globalDOs.filter(d => d.ba_raw_name || d.ba_number).forEach(d => {
+                let key = d.ba_number || d.ba_raw_name;
+                if (!baGroups[key]) {
+                    baGroups[key] = {
+                        ba_number: d.ba_number || '-',
+                        ba_raw_name: d.ba_raw_name || 'Unknown',
+                        ba_raw_qty: d.ba_raw_qty || 0,
+                        ba_image_url: d.ba_image_url || null,
+                        do_records: [],
+                        total_do_qty: 0,
+                        al_numbers: new Set()
+                    };
+                }
+                baGroups[key].do_records.push(d);
+                baGroups[key].total_do_qty += (d.total_qty || 0);
+                if(d.ba_image_url) baGroups[key].ba_image_url = d.ba_image_url; 
+                if(d.al_number) baGroups[key].al_numbers.add(d.al_number);
+            });
 
-            filtered.forEach(doRec => {
-                const baQty = doRec.ba_raw_qty || 0;
-                const doQty = doRec.total_qty || 0;
-                const isMatched = doRec.status === 'Verified' && baQty === doQty;
+            let baList = Object.values(baGroups);
+
+            if (search) {
+                baList = baList.filter(ba => 
+                    (ba.ba_number||'').toLowerCase().includes(search) ||
+                    (ba.ba_raw_name||'').toLowerCase().includes(search) || 
+                    Array.from(ba.al_numbers).some(al => al.toLowerCase().includes(search)) ||
+                    ba.do_records.some(d => d.do_number && d.do_number.toLowerCase().includes(search))
+                );
+            }
+
+            baList.forEach(ba => {
+                const isMatched = (ba.ba_raw_qty === ba.total_do_qty) && ba.ba_raw_qty > 0;
+                const doNumbersStr = ba.do_records.map(d => `<button onclick="openManageDOModal('${d.id}')" class="hover:underline cursor-pointer">${d.do_number}</button>`).join(', ');
+                const alNumbersStr = Array.from(ba.al_numbers).map(al => `<button onclick="openManageALModal('${al}')" class="text-xs font-bold px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 cursor-pointer">${al}</button>`).join(' ');
                 
                 let matchBadge = isMatched ? 
                     '<span class="px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded">Fully Matched</span>' :
@@ -212,17 +395,321 @@
 
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                        <td class="p-4 text-emerald-700 font-black">${doRec.do_number}</td>
-                        <td class="p-4 font-bold uppercase text-slate-800">${doRec.ba_raw_name}</td>
-                        <td class="p-4 text-center font-black text-yellow-600 text-lg">${baQty}</td>
-                        <td class="p-4 text-center font-black text-emerald-600 text-lg">${doQty}</td>
+                        <td class="p-4 font-black text-yellow-700">${ba.ba_number}</td>
+                        <td class="p-4 font-bold uppercase text-slate-800">${ba.ba_raw_name}</td>
+                        <td class="p-4 text-emerald-700 font-semibold text-xs">${doNumbersStr}</td>
+                        <td class="p-4 flex flex-wrap gap-1">${alNumbersStr}</td>
+                        <td class="p-4 text-center font-black text-yellow-600 text-lg">${ba.ba_raw_qty}</td>
+                        <td class="p-4 text-center font-black text-emerald-600 text-lg">${ba.total_do_qty}</td>
                         <td class="p-4 text-center">${matchBadge}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="openManageBAModal('${encodeURIComponent(ba.ba_number === '-' ? ba.ba_raw_name : ba.ba_number)}')" class="text-yellow-700 uppercase text-[10px] font-bold px-4 py-2 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors relative z-40">Manage / View</button>
+                        </td>
                     </tr>
                 `);
             });
             
-            if(filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">No BA forms have been linked to DOs yet. Upload some above!</td></tr>';
+            if(baList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">No BA forms have been created yet. Upload some above!</td></tr>';
+            }
+        }
+
+        // --- CROSS-POLLINATED MODAL FUNCTIONS ---
+        function openManageALModal(al_number) {
+            const order = globalALs.find(o => o.al_number === al_number);
+            if(!order) return alert("AL details not found in database.");
+            document.getElementById('mng-al-num').value = order.al_number || '';
+            document.getElementById('mng-al-name').value = order.customer_name || '';
+            document.getElementById('mng-al-order').value = order.order_number || '';
+            document.getElementById('mng-al-qty').value = order.quantity_ordered || 0;
+            document.getElementById('mng-al-bal').value = order.balance_quantity || 0;
+            document.getElementById('manage-al-modal').classList.remove('hidden');
+        }
+
+        function openManageDOModal(id) {
+            const doRec = globalDOs.find(d => String(d.id) === String(id));
+            if(!doRec) return;
+            document.getElementById('mng-do-num').value = doRec.do_number || '';
+            document.getElementById('mng-do-al').value = doRec.al_number || '';
+            document.getElementById('mng-do-qty').value = doRec.total_qty || 0;
+            document.getElementById('mng-do-remark').value = doRec.remark || '';
+            document.getElementById('manage-do-modal').classList.remove('hidden');
+        }
+
+        // --- MANAGE BA MODAL LOGIC WITH DRAG & DROP & AI CONFIRMATION ---
+        let currentMngBaImage = null;
+        let currentMngBaType = null;
+        let pendingAiAmendedData = null; 
+
+        function openManageBAModal(encodedKey) {
+            const baKey = decodeURIComponent(encodedKey);
+            const groupedDOs = globalDOs.filter(d => d.ba_number === baKey || d.ba_raw_name === baKey);
+            if(!groupedDOs.length) return;
+
+            const baRec = groupedDOs[0]; 
+            const doNums = groupedDOs.map(d => d.do_number).join(', ');
+            const existingImage = groupedDOs.find(d => d.ba_image_url)?.ba_image_url || null;
+
+            document.getElementById('mng-ba-original-name').value = baKey; 
+            document.getElementById('mng-ba-num').value = baRec.ba_number || '-';
+            document.getElementById('mng-ba-name').value = baRec.ba_raw_name || 'Unknown';
+            document.getElementById('mng-ba-dos').value = doNums;
+            document.getElementById('mng-ba-qty').value = baRec.ba_raw_qty || 0;
+
+            currentMngBaImage = existingImage;
+
+            const docContainer = document.getElementById('mng-ba-image-container');
+            const emptyDocContainer = document.getElementById('mng-ba-upload-container');
+
+            if (existingImage) {
+                docContainer.classList.remove('hidden');
+                emptyDocContainer.classList.add('hidden');
+                currentMngBaType = existingImage.startsWith('data:application/pdf') ? 'pdf' : 'image';
+            } else {
+                docContainer.classList.add('hidden');
+                emptyDocContainer.classList.remove('hidden');
+            }
+
+            recalculateMngBADOs(); 
+            document.getElementById('manage-ba-modal').classList.remove('hidden');
+        }
+
+        function recalculateMngBADOs() {
+            const doStr = document.getElementById('mng-ba-dos').value;
+            const doList = doStr.split(',').map(s=>s.trim()).filter(s=>s);
+            let sum = 0;
+            let nurserySummary = { 'U': {}, 'N': {}, 'B': {}, 'OTHER': {} };
+
+            doList.forEach(num => {
+                const match = globalDOs.find(d => d.do_number && d.do_number.includes(num));
+                if(match) { 
+                    sum += (match.total_qty || 0); 
+                    for(let i=1; i<=5; i++) {
+                        let plot = match[`plot_${i}`];
+                        let breed = match[`breed_${i}`] || 'Unknown Breed';
+                        let qty = parseInt(match[`qty_${i}`]) || 0;
+                        if(plot && qty > 0) {
+                            let prefix = plot.trim().charAt(0).toUpperCase();
+                            let category = ['U','N','B'].includes(prefix) ? prefix : 'OTHER';
+                            if(!nurserySummary[category][breed]) nurserySummary[category][breed] = 0;
+                            nurserySummary[category][breed] += qty;
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('mng-ba-do-qty').value = sum;
+
+            let summaryHtml = '<h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 mt-4">Nursery & Breed Breakdown Summary</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+            const labels = {'U': 'Nursery U', 'N': 'Nursery N', 'B': 'Nursery B', 'OTHER': 'Other Plots'};
+            const colors = {'U': 'text-blue-600 bg-blue-50 border-blue-200', 'N': 'text-emerald-600 bg-emerald-50 border-emerald-200', 'B': 'text-purple-600 bg-purple-50 border-purple-200', 'OTHER': 'text-slate-600 bg-slate-100 border-slate-200'};
+            let hasNurseryData = false;
+            for(let cat in nurserySummary) {
+                if(Object.keys(nurserySummary[cat]).length > 0) {
+                    hasNurseryData = true;
+                    summaryHtml += `<div class="p-3 rounded-lg border ${colors[cat]}"><div class="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">${labels[cat]}</div><ul class="space-y-1">`;
+                    for(let breed in nurserySummary[cat]) {
+                        summaryHtml += `<li class="flex justify-between text-xs font-bold text-slate-700"><span>${breed}</span> <span>${nurserySummary[cat][breed]}</span></li>`;
+                    }
+                    summaryHtml += `</ul></div>`;
+                }
+            }
+            summaryHtml += '</div>';
+            if(!hasNurseryData) summaryHtml = '<div class="text-xs text-slate-400 italic mt-2">No plot/breed data found in linked DOs.</div>';
+            document.getElementById('mng-ba-nursery-summary').innerHTML = summaryHtml;
+
+            recheckMngBAStatus();
+        }
+
+        function recheckMngBAStatus() {
+            const baQty = parseInt(document.getElementById('mng-ba-qty').value) || 0;
+            const doQty = parseInt(document.getElementById('mng-ba-do-qty').value) || 0;
+            const badge = document.getElementById('manage-ba-status-badge');
+            if (baQty === doQty && baQty > 0) {
+                badge.innerText = "FULLY MATCHED";
+                badge.className = "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block bg-emerald-100 text-emerald-700";
+            } else {
+                badge.innerText = "QTY MISMATCH";
+                badge.className = "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block bg-rose-100 text-rose-700";
+            }
+        }
+
+        async function handleMngBAScan(file) {
+            if (!file.type.startsWith('image/') && file.type !== 'application/pdf') return alert("Please upload an image or PDF file.");
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Data = e.target.result;
+                currentMngBaImage = base64Data; 
+                currentMngBaType = file.type.includes('pdf') ? 'pdf' : 'image';
+
+                const scanStatus = document.getElementById('mng-ba-scan-status');
+                scanStatus.classList.remove('hidden');
+                
+                try {
+                    const prompt = `This is a collection form, often marked 'Borang Akuan' or 'BA'. Extract STRICTLY as raw JSON: {"baNumber": "", "customerName": "", "baQuantity": integer, "doNumbers": ["", ""]}`;
+                    const extractedData = await analyzeImageWithGemini(base64Data, file.type, prompt);
+                    
+                    const doArr = extractedData.doNumbers || [];
+                    extractedData.newDos = doArr.join(', ');
+                    pendingAiAmendedData = extractedData; 
+
+                    const oldNum = document.getElementById('mng-ba-num').value;
+                    const oldName = document.getElementById('mng-ba-name').value;
+                    const oldQty = document.getElementById('mng-ba-qty').value;
+                    const oldDos = document.getElementById('mng-ba-dos').value;
+
+                    const newNum = extractedData.baNumber || '-';
+                    const newName = extractedData.customerName || 'Unknown';
+                    const newQty = extractedData.baQuantity || 0;
+                    const newDosStr = extractedData.newDos;
+
+                    if (oldNum !== newNum || oldName.toLowerCase() !== newName.toLowerCase() || parseInt(oldQty) !== newQty || oldDos !== newDosStr) {
+                        openOverwriteConfirmModal(oldNum, oldName, oldQty, oldDos, newNum, newName, newQty, newDosStr);
+                    } else {
+                        completeMngBAUploadSuccess();
+                    }
+                    
+                } catch (err) {
+                    console.error(err);
+                    alert("AI Scanning Failed: " + err.message);
+                    removeBAImage(); 
+                } finally {
+                    scanStatus.classList.add('hidden');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function openOverwriteConfirmModal(oldNum, oldName, oldQty, oldDos, newNum, newName, newQty, newDosStr) {
+            document.getElementById('cf-old-num').innerText = oldNum;
+            document.getElementById('cf-old-name').innerText = oldName;
+            document.getElementById('cf-old-qty').innerText = oldQty;
+            document.getElementById('cf-old-dos').innerText = oldDos;
+
+            document.getElementById('cf-new-num').innerText = newNum;
+            document.getElementById('cf-new-name').innerText = newName;
+            document.getElementById('cf-new-qty').innerText = newQty;
+            document.getElementById('cf-new-dos').innerText = newDosStr;
+
+            document.getElementById('cf-row-num').style.backgroundColor = (oldNum !== newNum) ? '#fef2f2' : '';
+            document.getElementById('cf-row-name').style.backgroundColor = (oldName.toLowerCase() !== newName.toLowerCase()) ? '#fef2f2' : '';
+            document.getElementById('cf-row-qty').style.backgroundColor = (parseInt(oldQty) !== newQty) ? '#fef2f2' : '';
+            document.getElementById('cf-row-dos').style.backgroundColor = (oldDos !== newDosStr) ? '#fef2f2' : '';
+
+            document.getElementById('ba-overwrite-confirm-modal').classList.remove('hidden');
+        }
+
+        function acceptAIOverwrite() {
+            if(pendingAiAmendedData) {
+                document.getElementById('mng-ba-num').value = pendingAiAmendedData.baNumber || '-';
+                document.getElementById('mng-ba-name').value = pendingAiAmendedData.customerName || 'Unknown';
+                document.getElementById('mng-ba-qty').value = pendingAiAmendedData.baQuantity || 0;
+                document.getElementById('mng-ba-dos').value = pendingAiAmendedData.newDos || '';
+                recalculateMngBADOs(); 
+            }
+            closeConfirmationModals();
+            completeMngBAUploadSuccess();
+        }
+
+        function rejectAIOverwrite() {
+            closeConfirmationModals();
+            completeMngBAUploadSuccess();
+        }
+
+        function closeConfirmationModals() {
+            document.getElementById('ba-overwrite-confirm-modal').classList.add('hidden');
+            pendingAiAmendedData = null; 
+        }
+
+        function completeMngBAUploadSuccess() {
+            document.getElementById('mng-ba-upload-container').classList.add('hidden');
+            document.getElementById('mng-ba-image-container').classList.remove('hidden');
+        }
+
+        function setupMngBADragAndDrop() {
+            const zone = document.getElementById('mng-ba-drop-zone');
+            const input = document.getElementById('mng-ba-file');
+            if(!zone || !input) return;
+
+            zone.onclick = () => input.click();
+            zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+            zone.ondragleave = () => zone.classList.remove('dragover'); 
+            zone.ondrop = (e) => { 
+                e.preventDefault(); zone.classList.remove('dragover'); 
+                if (e.dataTransfer.files.length) handleMngBAScan(e.dataTransfer.files[0]); 
+            };
+            input.onchange = (e) => { 
+                if (e.target.files.length) handleMngBAScan(e.target.files[0]); 
+                input.value = '';
+            };
+        }
+
+        function removeBAImage() {
+            currentMngBaImage = null;
+            document.getElementById('mng-ba-file').value = '';
+            document.getElementById('mng-ba-image-container').classList.add('hidden');
+            document.getElementById('mng-ba-upload-container').classList.remove('hidden');
+        }
+
+        function viewAttachedBADocument() {
+            if(!currentMngBaImage) return;
+            const content = document.getElementById('lightbox-content');
+            if(currentMngBaType === 'pdf') {
+                content.innerHTML = `<embed src="${currentMngBaImage}" type="application/pdf" class="w-full h-full rounded-lg shadow-2xl bg-white rounded-xl shadow-inner">`;
+            } else {
+                content.innerHTML = `<img src="${currentMngBaImage}" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10">`;
+            }
+            document.getElementById('lightbox-modal').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').classList.add('hidden');
+            document.getElementById('lightbox-content').innerHTML = ''; 
+        }
+
+        async function saveManageBA() {
+            const originalKey = document.getElementById('mng-ba-original-name').value;
+            const newNum = document.getElementById('mng-ba-num').value.trim();
+            const newName = document.getElementById('mng-ba-name').value.trim();
+            const newQty = parseInt(document.getElementById('mng-ba-qty').value) || 0;
+            const doQty = parseInt(document.getElementById('mng-ba-do-qty').value) || 0;
+            const newStatus = (newQty === doQty && newQty > 0) ? 'Verified' : 'Unverified';
+
+            const newDos = document.getElementById('mng-ba-dos').value.split(',').map(s=>s.trim()).filter(s=>s);
+
+            const btn = event.target;
+            btn.innerText = 'SAVING...'; btn.disabled = true;
+
+            // 1. Clear BA details from ALL DOs previously linked to this BA key
+            await _supabase.from('do_records').update({
+                ba_number: null, ba_raw_name: null, ba_raw_qty: null, ba_image_url: null, status: 'Delivered'
+            }).or(`ba_number.eq.${originalKey},ba_raw_name.eq.${originalKey}`);
+
+            // 2. Set BA details to the explicitly listed new DOs
+            for(let num of newDos) {
+                const match = globalDOs.find(d => d.do_number && d.do_number.includes(num));
+                if(match) {
+                    await _supabase.from('do_records').update({
+                        ba_number: newNum === '-' ? null : newNum,
+                        ba_raw_name: newName,
+                        ba_raw_qty: newQty,
+                        ba_image_url: currentMngBaImage,
+                        status: newStatus
+                    }).eq('id', match.id);
+                }
+            }
+
+            closeModal('manage-ba-modal');
+            fetchData();
+        }
+
+        // --- NEW: INTERLOCKING PARAMETER CHECK ---
+        function checkUrlParamsForModal() {
+            const params = new URLSearchParams(window.location.search);
+            const manageBaKey = params.get('manageBA');
+            if (manageBaKey && globalDOs.length > 0) {
+                setTimeout(() => openManageBAModal(manageBaKey), 300);
             }
         }
 
@@ -235,7 +722,11 @@
         }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
+        window.extractedBulkBAs = {}; 
+
         function setupDragAndDrop() {
+            setupMngBADragAndDrop(); 
+
             const mainZone = document.getElementById('main-drop-zone');
             const mainInput = document.getElementById('main-file-input');
             if(mainZone && mainInput) {
@@ -291,12 +782,7 @@
                     window.extractedBulkBAs[rowId] = { base64: base64Data, matchedIds: [] }; 
 
                     try {
-                        const prompt = `This is a collection form, often marked 'Borang Akuan' or 'BA'. Extract STRICTLY as raw JSON: 
-                        1. baCustomerName (PRIORITY: Extract the Company Name first. If no company name, extract the personal name), 
-                        2. baQuantity (integer, total unit collection quantity), 
-                        3. doNumbers (an array of strings found under 'No. Invois / Nota Penghantaran'). 
-                        Return JSON format: {"baCustomerName": "", "baQuantity": 0, "doNumbers": ["", ""]}`;
-                        
+                        const prompt = `This is a collection form, often marked 'Borang Akuan' or 'BA'. Extract STRICTLY as raw JSON: {"baNumber": "", "baCustomerName": "", "baQuantity": 0, "doNumbers": ["", ""]}`;
                         const extractedData = await analyzeImageWithGemini(base64Data, file.type, prompt);
                         
                         const doArr = extractedData.doNumbers || [];
@@ -311,15 +797,15 @@
 
                         document.getElementById(rowId).innerHTML = `
                             <td class="p-3">${docPreview}</td>
-                            <td class="p-3"><input type="text" id="name_${rowId}" value="${extractedData.baCustomerName || ''}" class="input-style text-[10px] p-2 w-full text-purple-700 font-bold"></td>
+                            <td class="p-3"><input type="text" id="num_${rowId}" value="${extractedData.baNumber || ''}" class="input-style text-[10px] p-2 w-full text-yellow-800 font-bold"></td>
+                            <td class="p-3"><input type="text" id="name_${rowId}" value="${extractedData.baCustomerName || ''}" class="input-style text-[10px] p-2 w-full text-purple-700 font-bold uppercase"></td>
                             <td class="p-3"><input type="number" id="qty_${rowId}" value="${extractedData.baQuantity || 0}" oninput="recalcBASum('${rowId}')" class="input-style text-[10px] p-2 w-full font-black text-center text-yellow-600"></td>
                             <td class="p-3"><input type="text" id="dos_${rowId}" value="${doString}" oninput="recalcBASum('${rowId}')" class="input-style text-[10px] p-2 w-full" placeholder="e.g. 02886, 02411"></td>
                             <td class="p-3 text-center"><div id="sum_${rowId}" class="text-xl font-black">0</div></td>
-                            <td class="p-3"><div id="al_link_${rowId}" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded w-full truncate">Detecting AL...</div></td>
                             <td class="p-3 text-right"><button onclick="document.getElementById('${rowId}').remove(); delete window.extractedBulkBAs['${rowId}'];" class="text-red-400 hover:text-red-600 font-bold">✕</button></td>
                         `;
 
-                        recalcBASum(rowId);
+                        recalcBASum(rowId); 
                     } catch (err) {
                         document.getElementById(rowId).innerHTML = `
                             <td class="p-3 text-center text-red-500 font-bold text-[10px]" colspan="7">Failed to scan ${file.name}.</td>
@@ -337,14 +823,12 @@
             
             let sum = 0;
             let matchedIds = [];
-            let linkedALs = new Set();
             
             doList.forEach(num => {
                 const match = globalDOs.find(d => d.do_number && d.do_number.includes(num));
                 if(match && !matchedIds.includes(match.id)) { 
                     sum += match.total_qty; 
                     matchedIds.push(match.id); 
-                    if(match.al_number) linkedALs.add(match.al_number);
                 }
             });
             
@@ -355,15 +839,6 @@
                 sumEl.className = 'text-xl font-black text-emerald-600';
             } else {
                 sumEl.className = 'text-xl font-black text-rose-500';
-            }
-            
-            const alLinkEl = document.getElementById(`al_link_${rowId}`);
-            if(linkedALs.size > 0) {
-                alLinkEl.innerText = Array.from(linkedALs).join(', ');
-                alLinkEl.className = 'text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded w-full truncate';
-            } else {
-                alLinkEl.innerText = 'No DO Matched';
-                alLinkEl.className = 'text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded w-full truncate';
             }
 
             window.extractedBulkBAs[rowId].matchedIds = matchedIds;
@@ -379,16 +854,13 @@
                 if(row.innerHTML.includes('Scanning') || row.innerHTML.includes('Failed')) continue; 
                 
                 const rId = row.id;
-                const baName = document.getElementById(`name_${rId}`).value || 'Unknown';
+                const baNum = document.getElementById(`num_${rId}`).value.trim();
+                const baName = document.getElementById(`name_${rId}`).value.trim() || 'Unknown';
                 const baQty = parseInt(document.getElementById(`qty_${rId}`).value) || 0;
                 const baImage = window.extractedBulkBAs[rId].base64 || null;
                 const matchedIds = window.extractedBulkBAs[rId].matchedIds || [];
 
-                if(matchedIds.length === 0) {
-                    alert(`⚠️ Cannot link BA for ${baName}: No matching DO numbers were found in the database. Please make sure the DO is uploaded first.`);
-                    row.classList.add('bg-red-50');
-                    continue; 
-                }
+                if(matchedIds.length === 0) continue; 
 
                 const currentSum = parseInt(document.getElementById(`sum_${rId}`).innerText) || 0;
                 let newStatus = 'Unverified';
@@ -403,6 +875,7 @@
 
                 for(let doId of matchedIds) {
                     const { error: err } = await _supabase.from('do_records').update({ 
+                        ba_number: baNum === '' ? null : baNum,
                         ba_raw_name: baName, 
                         ba_raw_qty: baQty, 
                         ba_image_url: baImage,
@@ -410,11 +883,7 @@
                     }).eq('id', doId);
 
                     if (err) {
-                        if(err.message.includes("ba_raw_name")) {
-                            alert("⚠️ Database Error: Make sure 'ba_raw_name' (text), 'ba_raw_qty' (numeric), and 'ba_image_url' (text) columns exist in your 'do_records' table!");
-                        } else {
-                            alert("Database error: " + err.message);
-                        }
+                        alert("Database error: " + err.message);
                     }
                 }
                 row.remove(); 
@@ -426,7 +895,7 @@
             
             if(document.querySelectorAll('#bulk-ba-tbody tr').length === 0) {
                 closeModal('ba-modal');
-                if(successCount > 0) alert(`Successfully linked ${successCount} BA forms to your DOs & ALs!`);
+                if(successCount > 0) alert(`Successfully linked ${successCount} BA forms!`);
             }
         }
 
