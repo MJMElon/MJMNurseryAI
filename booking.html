@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Order Monitoring - MJM Nursery AI</title>
+    <title>AL Management - MJM Nursery AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
@@ -14,32 +14,16 @@
         .input-style { border: 1px solid #e2e8f0; background-color: rgba(255, 255, 255, 0.8); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-weight: 600; transition: all 0.2s; }
         .input-style:focus { background-color: #ffffff; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); border-color: #3b82f6; }
         .input-style:disabled { background-color: #f1f5f9; color: #64748b; cursor: not-allowed; border-color: transparent;}
-        
         .btn-al { background: linear-gradient(to right, #2563eb, #3b82f6); color: white; font-weight: bold; padding: 12px 24px; border-radius: 15px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s; box-shadow: 0 4px 10px -2px rgba(59, 130, 246, 0.4); border: none; }
         .btn-al:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5); }
-        
         .drop-zone { border: 2px dashed #94a3b8; transition: all 0.2s ease; cursor: pointer; }
         .drop-zone.dragover { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); transform: scale(1.01); }
-        .scanner-container { position: relative; overflow: hidden; border-radius: 12px; display: none; }
-        .scanner-laser { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #3b82f6; box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0.5); opacity: 0; z-index: 10; }
-        .scanning .scanner-laser { opacity: 1; animation: scan 2s ease-in-out infinite; }
-        @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
-        .scanning-overlay { position: absolute; inset: 0; background: rgba(59, 130, 246, 0.1); z-index: 5; display: none; }
-        .scanning .scanning-overlay { display: block; }
-        
         .filter-input { padding: 10px 14px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 13px; background-color: #ffffff; font-weight: 600; outline: none; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .filter-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-
         .tab-btn { padding: 12px 24px; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; border-radius: 16px; transition: all 0.3s; color: #64748b; background: transparent; text-align: center; display: flex; align-items: center; justify-content: center; white-space: nowrap;}
         .tab-btn.active-al { background: #3b82f6; color: white; box-shadow: 0 4px 10px -2px rgba(59, 130, 246, 0.4); }
-
         .nature-critter { position: absolute; font-size: 1.5rem; pointer-events: none; opacity: 0; z-index: 50; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); animation: floatSlow 8s ease-in-out forwards; }
-        @keyframes floatSlow { 
-            0% { transform: translate(0, 0) scale(0.6) rotate(-10deg); opacity: 0; } 
-            20% { opacity: 0.9; } 
-            80% { opacity: 0.9; } 
-            100% { transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(10deg); opacity: 0; } 
-        }
+        @keyframes floatSlow { 0% { transform: translate(0, 0) scale(0.6) rotate(-10deg); opacity: 0; } 20% { opacity: 0.9; } 80% { opacity: 0.9; } 100% { transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(10deg); opacity: 0; } }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 relative">
@@ -50,8 +34,7 @@
         <div class="glass-panel p-6 rounded-[2rem] flex flex-col items-center gap-4 relative overflow-hidden border-l-[12px] border-blue-500" id="main-title-panel">
             <div class="flex flex-col md:flex-row w-full items-center justify-between z-30 relative gap-4">
                 <button onclick="window.location.href='index.html'" class="text-[10px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-widest bg-slate-100 hover:bg-slate-200 px-5 py-3 rounded-xl transition-colors flex items-center gap-2 self-start md:self-auto shadow-sm relative z-40">
-                    <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                    Back to main page
+                    <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg> Back to main page
                 </button>
                 <h1 class="text-2xl md:text-3xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-800 via-indigo-600 to-blue-500 drop-shadow-sm pb-1 text-center relative z-40" style="word-spacing: 0.2em;">Customer Order Monitoring</h1>
                 <div class="hidden md:block w-[130px] relative z-40"></div>
@@ -74,8 +57,7 @@
             </div>
             
             <button onclick="openALModal()" class="btn-al text-xs tracking-widest min-w-max flex items-center gap-3 relative z-40">
-                <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                Add New AL
+                <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add New AL
             </button>
         </div>
 
@@ -123,7 +105,7 @@
         <div class="bg-white rounded-[32px] p-6 md:p-10 w-full max-w-[95vw] shadow-2xl max-h-[95vh] overflow-y-auto border-4 border-blue-500 relative z-10">
             <div class="flex justify-between items-center mb-6 border-b pb-4">
                 <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Bulk Record Approval Letters</h3>
-                <button onclick="closeModal('al-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeModal('al-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div id="al-drop-zone" class="drop-zone border-blue-300 hover:border-blue-500 bg-blue-50/30 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer h-32 group mb-6 relative z-20">
@@ -148,8 +130,7 @@
                             <th class="p-3 w-10 text-right">Del</th>
                         </tr>
                     </thead>
-                    <tbody id="bulk-al-tbody">
-                        </tbody>
+                    <tbody id="bulk-al-tbody"></tbody>
                 </table>
             </div>
 
@@ -167,8 +148,9 @@
                 <div>
                     <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Review AL Details</h3>
                     <p id="manage-status-badge" class="text-xs font-bold px-3 py-1 rounded-full inline-block mt-2"></p>
+                    <p id="verified-info-text" class="text-[10px] font-bold text-slate-400 mt-2 hidden"></p>
                 </div>
-                <button onclick="closeModal('manage-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeModal('manage-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <input type="hidden" id="edit-id">
@@ -191,7 +173,7 @@
                 
                 <div id="mng-al-image-container" class="hidden mt-4 pt-4 border-t border-slate-100">
                     <button onclick="viewAttachedDocumentAL()" class="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 p-3 rounded-xl text-xs font-bold uppercase tracking-widest flex justify-center items-center gap-2 border border-blue-200">
-                        <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> 
                         View Attached AL Document
                     </button>
                 </div>
@@ -218,342 +200,546 @@
             </div>
 
             <div class="flex flex-wrap gap-4 pt-8 mt-6 border-t border-slate-100 relative z-40">
+                <button onclick="closeModal('manage-modal')" class="flex-1 p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 relative z-40">Close</button>
                 <button onclick="enableEditMode()" class="flex-1 p-4 rounded-2xl bg-amber-100 text-amber-700 font-bold text-xs uppercase tracking-widest hover:bg-amber-200 shadow-sm relative z-40">Unlock & Edit Details</button>
-                <button onclick="verifyAL()" id="verify-btn" class="flex-1 p-4 rounded-2xl bg-indigo-100 text-indigo-700 font-bold text-xs uppercase tracking-widest hover:bg-indigo-200 shadow-sm relative z-40">Admin Verify AL</button>
                 <button onclick="cancelAL()" id="cancel-btn" class="flex-1 p-4 rounded-2xl bg-red-100 text-red-700 font-bold text-xs uppercase tracking-widest hover:bg-red-200 shadow-sm border border-red-300 relative z-40">Cancel AL</button>
+                <button onclick="verifyAL()" id="verify-btn" class="flex-1 p-4 rounded-2xl bg-indigo-100 text-indigo-700 font-bold text-xs uppercase tracking-widest hover:bg-indigo-200 shadow-sm relative z-40">Admin Verify AL</button>
                 <button onclick="saveEditAL()" id="save-edit-btn" class="hidden w-full p-4 rounded-2xl btn-al text-xs tracking-widest mt-2 relative z-40">Save Changes Securely</button>
             </div>
         </div>
     </div>
 
+    <div id="manage-ba-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeModal('manage-ba-modal')"></div>
+        <div class="bg-white rounded-[32px] p-8 w-full max-w-4xl shadow-2xl max-h-[95vh] overflow-y-auto border-4 border-yellow-500 relative z-10">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Review BA Details</h3>
+                    <p id="mng-ba-status-badge" class="text-xs font-bold px-3 py-1 rounded-full inline-block mt-2"></p>
+                </div>
+                <button onclick="closeModal('manage-ba-modal')" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2"><svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="grid grid-cols-3 gap-4">
+                    <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">BA Number</label><input type="text" id="mng-ba-num-ro" class="input-style mt-1 font-black text-yellow-700" disabled></div>
+                    <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Customer Name</label><input type="text" id="mng-ba-name-ro" class="input-style mt-1 font-bold uppercase" disabled></div>
+                    <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">BA Quantity</label><input type="text" id="mng-ba-qty-ro" class="input-style mt-1 font-black text-yellow-600" disabled></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Linked DO Numbers</label><input type="text" id="mng-ba-dos-ro" class="input-style mt-1 font-bold text-emerald-700" disabled></div>
+                    <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Total DO Quantity</label><input type="text" id="mng-ba-do-qty-ro" class="input-style mt-1 font-black text-emerald-600" disabled></div>
+                </div>
+                <div id="mng-ba-image-container-ro" class="hidden mt-4 pt-4 border-t border-slate-100">
+                    <button onclick="viewAttachedDocumentBA()" class="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 p-3 rounded-xl text-xs font-bold uppercase tracking-widest flex justify-center items-center gap-2 border border-blue-200 shadow-sm relative z-40">
+                        <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> View Attached BA Document
+                    </button>
+                </div>
+            </div>
+            <div class="flex gap-4 pt-8 mt-6 border-t border-slate-100 relative z-40">
+                <button onclick="closeModal('manage-ba-modal')" class="w-full p-4 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 relative z-40">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="lightbox-modal" class="hidden fixed inset-0 bg-slate-900/95 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
-        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white hover:text-red-400 bg-white/10 rounded-full p-3 transition-colors relative z-[110]">
-            <svg class="w-8 h-8 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-        <div id="lightbox-content" class="w-full h-full max-w-4xl max-h-[90vh] flex justify-center items-center rounded-xl overflow-hidden shadow-2xl"></div>
+        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white hover:text-red-400 bg-white/10 rounded-full p-3 transition-colors relative z-[110]"><svg class="w-8 h-8 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        <div id="lightbox-content" class="w-full h-full max-w-4xl max-h-[90vh] flex justify-center items-center rounded-xl overflow-hidden shadow-2xl bg-white"></div>
     </div>
 
     <script>
-        const _k1 = 'AIzaSyCvSAVEeOa_';
-        const _k2 = 'PkZxRKDJkYz3hqzdgvbGIyQ';
+        const _k1 = 'AIzaSyCvSAVEeOa_'; 
+        const _k2 = 'PkZxRKDJkYz3hqzdgvbGIyQ'; 
         const GEMINI_API_KEY = _k1 + _k2; 
         
-        async function analyzeImageWithGemini(base64Image, mimeType, prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
-            const base64Data = base64Image.split(',')[1];
-            const payload = { contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: mimeType || "image/jpeg", data: base64Data } } ] }], generationConfig: { responseMimeType: "application/json" } };
-            const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error?.message || "Gemini API Error");
-            let rawText = data.candidates[0].content.parts[0].text;
-            rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            return JSON.parse(rawText);
+        async function analyzeImageWithGemini(base64Image, mimeType, prompt) { 
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`; 
+            const base64Data = base64Image.split(',')[1]; 
+            const payload = { contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: mimeType || "image/jpeg", data: base64Data } } ] }], generationConfig: { responseMimeType: "application/json" } }; 
+            const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); 
+            const data = await response.json(); 
+            if (!response.ok) throw new Error(data.error?.message || "Gemini API Error"); 
+            let rawText = data.candidates[0].content.parts[0].text; 
+            rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim(); 
+            return JSON.parse(rawText); 
         }
 
         const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let globalALs = []; let globalDOs = [];
-        let currentViewImageAL = null; let currentViewTypeAL = null;
+        let globalALs = []; 
+        let globalDOs = []; 
+        let currentViewImageAL = null; 
+        let currentViewTypeAL = null; 
         window.extractedBulkALs = {};
 
-        const healingEmojis = ["🌿", "🍃", "🌱", "🪴", "🌳", "🌤️", "⛅️", "🦋", "🐌", "🐞", "🐢", "🍓", "🍵", "🌸", "🦦"];
-        function spawnHealingEmoji() {
-            const zone = document.getElementById('title-animation-zone');
-            if (!zone || document.hidden) return;
-            const el = document.createElement('div');
-            el.className = 'nature-critter';
-            el.innerText = healingEmojis[Math.floor(Math.random() * healingEmojis.length)];
+        function spawnHealingEmoji() { 
+            const zone = document.getElementById('title-animation-zone'); 
+            if (!zone || document.hidden) return; 
+            const el = document.createElement('div'); 
+            el.className = 'nature-critter'; 
+            const emojis = ["🌿", "🍃", "🌱", "🪴", "🌳", "🌤️", "⛅️", "🦋", "🐌", "🐞", "🐢", "🍓", "🍵", "🌸", "🦦"]; 
+            el.innerText = emojis[Math.floor(Math.random() * emojis.length)]; 
             el.style.left = (35 + Math.random() * 30) + '%'; 
-            el.style.top = (35 + Math.random() * 30) + '%';
+            el.style.top = (35 + Math.random() * 30) + '%'; 
             el.style.setProperty('--tx', (Math.random() - 0.5) * 300 + 'px'); 
-            el.style.setProperty('--ty', (Math.random() - 0.5) * 150 - 50 + 'px');
-            zone.appendChild(el);
-            setTimeout(() => { if(zone.contains(el)) zone.removeChild(el); }, 8500);
+            el.style.setProperty('--ty', (Math.random() - 0.5) * 150 - 50 + 'px'); 
+            zone.appendChild(el); 
+            setTimeout(() => { if(zone.contains(el)) zone.removeChild(el); }, 8500); 
         }
         setInterval(spawnHealingEmoji, 1200);
 
-        async function fetchData() {
-            const [{ data: alData }, { data: doData }] = await Promise.all([
-                _supabase.from('al_orders').select('*').order('created_at', { ascending: false }),
-                _supabase.from('do_records').select('*')
-            ]);
-            
-            globalDOs = doData || [];
-            let cumulMap = {};
-            globalDOs.forEach(d => {
-                const isCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'));
-                if(!cumulMap[d.al_number]) cumulMap[d.al_number] = 0;
-                if(!isCancelled) { cumulMap[d.al_number] += (d.total_qty || 0); }
-            });
+        function formatDateDisplay(dateString) {
+            if(!dateString || dateString === '-') return '-';
+            const d = new Date(dateString); 
+            if(isNaN(d)) return dateString;
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
 
-            globalALs = (alData || []).map(al => {
-                const cumul = cumulMap[al.al_number] || 0;
-                return { ...al, _cumul: cumul, _calc_balance: al.quantity_ordered - cumul };
-            });
+        async function fetchData() { 
+            const [{ data: alData }, { data: doData }] = await Promise.all([ 
+                _supabase.from('al_orders').select('*').order('created_at', { ascending: false }), 
+                _supabase.from('do_records').select('*') 
+            ]); 
             
-            checkUrlParamsForModal(); // Handle interlocking inbound links
-            renderTable();
+            globalDOs = doData || []; 
+            let cumulMap = {}; 
+            
+            globalDOs.forEach(d => { 
+                const isCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]')); 
+                if(!cumulMap[d.al_number]) cumulMap[d.al_number] = 0; 
+                if(!isCancelled) { cumulMap[d.al_number] += (d.total_qty || 0); } 
+            }); 
+            
+            globalALs = (alData || []).map(al => { 
+                const cumul = cumulMap[al.al_number] || 0; 
+                return { ...al, _cumul: cumul, _calc_balance: al.quantity_ordered - cumul }; 
+            }); 
+            
+            checkUrlParamsForModal(); 
+            renderTable(); 
         }
 
         function renderTable() {
-            const search = document.getElementById('f-global').value.toLowerCase();
-            const fStatus = document.getElementById('f-status').value;
-            const tbody = document.getElementById('al-orders-tbody');
+            const search = document.getElementById('f-global').value.toLowerCase(); 
+            const fStatus = document.getElementById('f-status').value; 
+            const tbody = document.getElementById('al-orders-tbody'); 
             tbody.innerHTML = '';
             
             const filtered = globalALs.filter(o => 
-                (!search || (o.al_number||'').toLowerCase().includes(search) || (o.order_number||'').toLowerCase().includes(search) || (o.customer_name||'').toLowerCase().includes(search)) &&
-                (!fStatus || (o.status || 'Unverified') === fStatus)
+                (!search || (o.al_number||'').toLowerCase().includes(search) || (o.order_number||'').toLowerCase().includes(search) || (o.customer_name||'').toLowerCase().includes(search)) && 
+                (!fStatus || (o.status || 'Unverified') === fStatus) 
             );
-
+            
             filtered.forEach(order => {
-                const date = new Date(order.order_date).toLocaleDateString('en-GB');
-                const stat = order.status || 'Unverified';
-                const isCancelled = stat === 'Cancelled' || (order.remark && order.remark.includes('[CANCELLED]'));
+                const displayDate = formatDateDisplay(order.order_date); 
+                const stat = order.status || 'Unverified'; 
+                const isCancelled = stat === 'Cancelled' || (order.remark && order.remark.includes('[CANCELLED]')); 
                 
                 let statColor = 'bg-rose-100 text-rose-700'; 
-                if (stat === 'Verified') statColor = 'bg-blue-100 text-blue-700';
-                if (isCancelled) statColor = 'bg-red-600 text-white';
-
+                if (stat === 'Verified') statColor = 'bg-blue-100 text-blue-700'; 
+                if (isCancelled) statColor = 'bg-red-600 text-white'; 
+                
                 const rowClass = isCancelled ? 'bg-red-50/70 border-b border-red-200' : 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
                 
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr class="${rowClass}">
-                        <td class="p-4 ${isCancelled ? 'text-red-500 font-bold' : 'text-slate-500'}">${date}</td>
+                        <td class="p-4 ${isCancelled ? 'text-red-500 font-bold' : 'text-slate-500'}">${displayDate}</td>
                         <td class="p-4 ${isCancelled ? 'text-red-700' : 'text-blue-700'} font-bold">${order.al_number}</td>
                         <td class="p-4 ${isCancelled ? 'text-red-500 line-through' : ''}">${order.order_number || '-'}</td>
-                        <td class="p-4 uppercase font-bold ${isCancelled ? 'text-red-800' : 'text-slate-800'}">
-                            ${order.customer_name || 'Unknown'} 
-                            ${isCancelled ? `<br><span class="text-[10px] text-red-500 font-black tracking-widest">${order.remark || ''}</span>` : ''}
-                        </td>
+                        <td class="p-4 uppercase font-bold ${isCancelled ? 'text-red-800' : 'text-slate-800'}">${order.customer_name || 'Unknown'} ${isCancelled ? `<br><span class="text-[10px] text-red-500 font-black tracking-widest">${order.remark || ''}</span>` : ''}</td>
                         <td class="p-4 text-center font-bold ${isCancelled ? 'text-red-500' : 'text-slate-600'}">${order.quantity_ordered}</td>
                         <td class="p-4 text-center font-bold ${isCancelled ? 'text-red-400' : 'text-indigo-500'}">${order._cumul}</td>
                         <td class="p-4 text-center font-black ${isCancelled ? 'text-red-400' : (order._calc_balance > 0 ? 'text-rose-500' : 'text-emerald-500')}">${order._calc_balance}</td>
                         <td class="p-4 text-center"><span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statColor}">${isCancelled ? 'Cancelled' : stat}</span></td>
-                        <td class="p-4 text-right">
-                            <button onclick="openManageModal('${order.id}')" class="text-blue-700 uppercase text-[10px] font-bold px-4 py-2 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors relative z-40">Manage / View</button>
-                        </td>
+                        <td class="p-4 text-right"><button onclick="openManageModal('${order.id}')" class="text-blue-700 uppercase text-[10px] font-bold px-4 py-2 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors relative z-40">Manage / View</button></td>
                     </tr>
                 `);
             });
         }
 
         function openManageModal(id) {
-            const order = globalALs.find(o => String(o.id) === String(id));
+            const order = globalALs.find(o => String(o.id) === String(id)); 
             if(!order) return;
-
+            
+            let rawRemark = order.remark || '';
+            let verifyInfo = '';
+            const vMatch = rawRemark.match(/\[VERIFIED by (.*?) on (.*?)\]/);
+            if (vMatch) {
+                verifyInfo = `Verified by <span class="text-indigo-500 font-black">${vMatch[1]}</span> on ${vMatch[2]}`;
+                rawRemark = rawRemark.replace(vMatch[0], '').trim();
+            }
+            const cMatch = rawRemark.match(/\[CANCELLED\]\s*(.*)/);
+            if (cMatch) {
+                rawRemark = rawRemark.replace(/\[CANCELLED\]\s*/, '').trim();
+            }
+            
             document.getElementById('edit-id').value = order.id; 
-            document.getElementById('edit-al').value = order.al_number || '';
-            document.getElementById('edit-date').value = order.order_date ? order.order_date.split('T')[0] : '';
+            document.getElementById('edit-al').value = order.al_number || ''; 
+            document.getElementById('edit-date').value = order.order_date ? order.order_date.split('T')[0] : ''; 
             document.getElementById('edit-name').value = order.customer_name || ''; 
-            document.getElementById('edit-order').value = order.order_number || '';
+            document.getElementById('edit-order').value = order.order_number || ''; 
             document.getElementById('edit-qty').value = order.quantity_ordered || 0; 
-            document.getElementById('edit-bal').value = order._calc_balance || 0;
-            document.getElementById('edit-remark').value = order.remark || '';
-
-            const isCancelled = order.status === 'Cancelled' || (order.remark && order.remark.includes('[CANCELLED]'));
+            document.getElementById('edit-bal').value = order._calc_balance || 0; 
+            document.getElementById('edit-remark').value = rawRemark;
+            
+            const isCancelled = order.status === 'Cancelled' || (order.remark && order.remark.includes('[CANCELLED]')); 
             const stat = isCancelled ? 'Cancelled' : (order.status || 'Unverified');
             
-            document.getElementById('manage-status-badge').innerText = stat;
-            let statClass = 'bg-rose-100 text-rose-700';
-            if (stat === 'Verified') statClass = 'bg-blue-100 text-blue-700';
-            if (stat === 'Cancelled') statClass = 'bg-red-600 text-white';
-            document.getElementById('manage-status-badge').className = `text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block ${statClass}`;
-
-            document.querySelectorAll('.edit-field').forEach(el => el.disabled = true); 
-            document.getElementById('save-edit-btn').classList.add('hidden');
-            document.getElementById('verify-btn').style.display = (stat === 'Verified' || stat === 'Cancelled') ? 'none' : 'block';
-            document.getElementById('cancel-btn').style.display = stat === 'Cancelled' ? 'none' : 'block';
-
-            const docContainer = document.getElementById('mng-al-image-container');
-            if(order.image_url) {
-                docContainer.classList.remove('hidden');
-                currentViewImageAL = order.image_url;
-                currentViewTypeAL = order.image_url.startsWith('data:application/pdf') ? 'pdf' : 'image';
-            } else {
-                docContainer.classList.add('hidden');
-                currentViewImageAL = null;
-            }
-
-            const historyBody = document.getElementById('al-do-history-tbody');
-            historyBody.innerHTML = '';
+            document.getElementById('manage-status-badge').innerText = stat; 
+            let statClass = 'bg-rose-100 text-rose-700'; 
+            if (stat === 'Verified') statClass = 'bg-blue-100 text-blue-700'; 
+            if (stat === 'Cancelled') statClass = 'bg-red-600 text-white'; 
             
-            // COMPLETE DOCUMENTATION HISTORTY: DO List + cumm/balance + associated BA attached record
+            document.getElementById('manage-status-badge').className = `text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block ${statClass}`;
+            
+            const vInfoEl = document.getElementById('verified-info-text');
+            if (stat === 'Verified' && verifyInfo) {
+                vInfoEl.innerHTML = verifyInfo;
+                vInfoEl.style.display = 'block';
+            } else {
+                vInfoEl.style.display = 'none';
+            }
+            
+            document.querySelectorAll('.edit-field').forEach(el => el.disabled = true); 
+            document.getElementById('save-edit-btn').classList.add('hidden'); 
+            document.getElementById('verify-btn').style.display = (stat === 'Verified' || stat === 'Cancelled') ? 'none' : 'block'; 
+            document.getElementById('cancel-btn').style.display = stat === 'Cancelled' ? 'none' : 'block';
+            
+            const docContainer = document.getElementById('mng-al-image-container'); 
+            if(order.image_url) { 
+                docContainer.classList.remove('hidden'); 
+                currentViewImageAL = order.image_url; 
+                currentViewTypeAL = order.image_url.startsWith('data:application/pdf') ? 'pdf' : 'image'; 
+            } else { 
+                docContainer.classList.add('hidden'); 
+                currentViewImageAL = null; 
+            }
+            
+            const historyBody = document.getElementById('al-do-history-tbody'); 
+            historyBody.innerHTML = ''; 
             let linkedDOs = globalDOs.filter(d => d.al_number === order.al_number).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
             
-            if(linkedDOs.length === 0) {
-                historyBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-400 italic">No deliveries recorded yet.</td></tr>';
-            } else {
-                let runningCumul = 0;
+            if(linkedDOs.length === 0) { 
+                historyBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-400 italic">No deliveries recorded yet.</td></tr>'; 
+            } else { 
+                let runningCumul = 0; 
                 linkedDOs.forEach(d => { 
-                    const dCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'));
+                    const dCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]')); 
                     if(!dCancelled) runningCumul += (d.total_qty || 0); 
                     d._modalCumul = runningCumul; 
-                });
+                }); 
                 
-                linkedDOs.reverse().forEach(d => {
-                    const dCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'));
-                    const date = d.delivery_date ? new Date(d.delivery_date).toLocaleDateString('en-GB') : '-';
-                    let plots = [];
-                    for(let i=1; i<=5; i++) { if(d[`plot_${i}`]) plots.push(`${d[`plot_${i}`]} (${d[`qty_${i}`]} ${d[`breed_${i}`]||''})`); }
-                    const sourceText = plots.length > 0 ? plots.join(', ') : '-';
-                    const bal = order.quantity_ordered - d._modalCumul;
-                    const rowColor = dCancelled ? 'bg-red-50/50 opacity-70 border-b border-red-200' : 'border-b border-emerald-100 hover:bg-emerald-100/50';
-
-                    // INTERLOCKING: BA Column Logic
-                    let baHtml = '<span class="text-slate-400 italic">Not Linked</span>';
-                    const hasBa = d.ba_raw_name || d.ba_number;
-
-                    if (hasBa) {
-                        const baKey = d.ba_number || d.ba_raw_name;
-                        const isBaMatched = (d.status === 'Verified') || (d.remark && d.remark.includes('[BA MATCHED]'));
-                        
-                        baHtml = `<a href="ba.html?manageBA=${encodeURIComponent(baKey)}" class="group font-black uppercase text-[11px] flex items-center gap-1.5 ${isBaMatched ? 'text-emerald-700' : 'text-amber-800'}" title="Click to View BA Documentation">
-                                    <svg class="w-3.5 h-3.5 ${isBaMatched ? 'text-emerald-500' : 'text-amber-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    <span class="group-hover:underline">${baKey}</span>
-                                 </a>`;
+                linkedDOs.reverse().forEach(d => { 
+                    const dCancelled = d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]')); 
+                    const displayDate = formatDateDisplay(d.delivery_date); 
+                    
+                    let plots = []; 
+                    for(let i=1; i<=5; i++) { 
+                        if(d[`plot_${i}`]) plots.push(`${d[`plot_${i}`]} (${d[`qty_${i}`]} ${d[`breed_${i}`]||''})`); 
+                    } 
+                    const sourceText = plots.length > 0 ? plots.join(', ') : '-'; 
+                    const bal = order.quantity_ordered - d._modalCumul; 
+                    const rowColor = dCancelled ? 'bg-red-50/50 opacity-70 border-b border-red-200' : 'border-b border-emerald-100 hover:bg-emerald-100/50'; 
+            
+                    const docUrl = d.image_url || ''; 
+                    let doNumHtml = `<span class="font-black ${dCancelled ? 'text-red-600 line-through' : 'text-blue-600'}">${d.do_number}</span>`;
+                    
+                    if(docUrl) { 
+                        doNumHtml = `<button onclick="openStandaloneDoc('${docUrl}')" class="font-black hover:underline ${dCancelled ? 'text-red-600 line-through' : 'text-blue-600'}">${d.do_number}</button>`; 
                     }
 
-                    historyBody.insertAdjacentHTML('beforeend', `
-                        <tr class="${rowColor}">
-                            <td class="py-3 pl-2 font-black ${dCancelled ? 'text-red-600 line-through' : 'text-blue-600'}">${d.do_number}</td>
-                            <td class="py-3 text-slate-500">${date}</td>
-                            <td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td>
-                            <td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${d.total_qty || 0}</td>
-                            <td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${bal}</td>
-                            <td class="py-3">${baHtml}</td>
-                            <td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td>
-                        </tr>
-                    `);
-                });
+                    let baHtml = '<span class="text-slate-400 italic">Not Linked</span>'; 
+                    const hasBa = d.ba_raw_name || d.ba_number; 
+                    if (hasBa) { 
+                        const baKey = d.ba_number || d.ba_raw_name; 
+                        const isBaMatched = (d.status === 'Verified') || (d.remark && d.remark.includes('[BA MATCHED]')); 
+                        baHtml = `<button onclick="openManageBAModal('${encodeURIComponent(baKey)}')" class="font-bold text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded text-[10px] uppercase tracking-wider hover:bg-yellow-100 transition-colors cursor-pointer" title="View BA Details">${baKey}</button>`; 
+                    } 
+                    
+                    historyBody.insertAdjacentHTML('beforeend', `<tr class="${rowColor}"><td class="py-3 pl-2">${doNumHtml}</td><td class="py-3 text-slate-500">${displayDate}</td><td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td><td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${d.total_qty || 0}</td><td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${bal}</td><td class="py-3">${baHtml}</td><td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td></tr>`); 
+                }); 
             }
             document.getElementById('manage-modal').classList.remove('hidden');
         }
 
-        // --- NEW: INTERLOCKING PARAMETER CHECK ---
-        function checkUrlParamsForModal() {
-            const params = new URLSearchParams(window.location.search);
-            const manageAlNumber = params.get('manageAL');
+        // BA CROSS-MODULE POPUP FROM AL PAGE
+        let currentViewImageBA = null;
+        function viewAttachedDocumentBA() { if(!currentViewImageBA) return; openStandaloneDoc(currentViewImageBA); }
+
+        function openManageBAModal(encodedKey) {
+            const baKey = decodeURIComponent(encodedKey); 
+            const groupedDOs = globalDOs.filter(d => d.ba_number === baKey || d.ba_raw_name === baKey); 
+            if(!groupedDOs.length) return alert("BA details not found in database.");
             
-            if (manageAlNumber && globalALs.length > 0) {
-                const order = globalALs.find(o => o.al_number === manageAlNumber);
-                if (order) {
-                    // Ensure data is loaded before opening modal
-                    setTimeout(() => openManageModal(order.id), 300);
-                }
+            const baRec = groupedDOs[0]; 
+            const totalDoQty = groupedDOs.reduce((sum, d) => sum + (parseInt(d.total_qty) || 0), 0); 
+            const doNums = groupedDOs.map(d => d.do_number).join(', '); 
+            const existingImage = groupedDOs.find(d => d.ba_image_url)?.ba_image_url || null;
+            
+            document.getElementById('mng-ba-num-ro').value = baRec.ba_number && baRec.ba_number !== '-' ? baRec.ba_number : ''; 
+            document.getElementById('mng-ba-name-ro').value = baRec.ba_raw_name || ''; 
+            document.getElementById('mng-ba-qty-ro').value = baRec.ba_raw_qty || 0; 
+            document.getElementById('mng-ba-dos-ro').value = doNums; 
+            document.getElementById('mng-ba-do-qty-ro').value = totalDoQty;
+            
+            const baQty = parseInt(baRec.ba_raw_qty) || 0;
+            const badge = document.getElementById('mng-ba-status-badge');
+            if (baQty === totalDoQty && baQty > 0) { 
+                badge.innerText = "FULLY MATCHED"; 
+                badge.className = "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block bg-emerald-100 text-emerald-700"; 
+            } else { 
+                badge.innerText = "QTY MISMATCH"; 
+                badge.className = "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mt-2 inline-block bg-rose-100 text-rose-700"; 
             }
+            
+            const docContainer = document.getElementById('mng-ba-image-container-ro');
+            if (existingImage) { 
+                docContainer.classList.remove('hidden'); 
+                currentViewImageBA = existingImage; 
+            } else { 
+                docContainer.classList.add('hidden'); 
+                currentViewImageBA = null; 
+            }
+            
+            document.getElementById('manage-ba-modal').classList.remove('hidden');
         }
 
-        function viewAttachedDocumentAL() {
-            if(!currentViewImageAL) return;
+        function checkUrlParamsForModal() { 
+            const params = new URLSearchParams(window.location.search); 
+            const manageAlNumber = params.get('manageAL'); 
+            if (manageAlNumber && globalALs.length > 0) { 
+                const order = globalALs.find(o => o.al_number === manageAlNumber); 
+                if (order) setTimeout(() => openManageModal(order.id), 300); 
+            } 
+        }
+
+        function viewAttachedDocumentAL() { 
+            if(!currentViewImageAL) return; 
+            openStandaloneDoc(currentViewImageAL); 
+        }
+        
+        function viewBulkDoc(rowId) {
+            const docData = window.extractedBulkALs[rowId];
+            if (docData) openStandaloneDoc(docData);
+        }
+
+        function openStandaloneDoc(url) {
             const content = document.getElementById('lightbox-content');
-            if(currentViewTypeAL === 'pdf') {
-                content.innerHTML = `<embed src="${currentViewImageAL}" type="application/pdf" class="w-full h-full bg-white">`;
-            } else {
-                content.innerHTML = `<img src="${currentViewImageAL}" class="max-w-full max-h-[90vh] object-contain">`;
+            if(url.startsWith('data:application/pdf')) { 
+                content.innerHTML = `<embed src="${url}" type="application/pdf" class="w-full h-full bg-white rounded-xl shadow-inner">`; 
+            } else { 
+                content.innerHTML = `<img src="${url}" class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl">`; 
             }
             document.getElementById('lightbox-modal').classList.remove('hidden');
         }
 
-        function openALModal() { document.getElementById('al-modal').classList.remove('hidden'); document.getElementById('bulk-al-tbody').innerHTML = ''; window.extractedBulkALs = {}; document.getElementById('main-file-input').value = ''; document.getElementById('al-file-input').value = ''; }
+        function openALModal() { 
+            document.getElementById('al-modal').classList.remove('hidden'); 
+            document.getElementById('bulk-al-tbody').innerHTML = ''; 
+            window.extractedBulkALs = {}; 
+            document.getElementById('main-file-input').value = ''; 
+            document.getElementById('al-file-input').value = ''; 
+        }
+        
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         function closeLightbox() { document.getElementById('lightbox-modal').classList.add('hidden'); document.getElementById('lightbox-content').innerHTML = '';  }
-        function enableEditMode() { document.querySelectorAll('.edit-field').forEach(el => el.disabled = false); document.getElementById('save-edit-btn').classList.remove('hidden'); }
-
-        async function verifyAL() {
-            if(prompt("Enter Admin PIN to Verify (Hint: 8888)") !== "8888") return alert("Access Denied.");
-            const { error } = await _supabase.from('al_orders').update({ status: 'Verified' }).eq('id', document.getElementById('edit-id').value);
-            if(error) alert(error.message); else { alert("AL Verified successfully!"); closeModal('manage-modal'); fetchData(); }
+        
+        function enableEditMode() { 
+            const pin = prompt("Enter Master PIN to unlock editing:");
+            if (pin !== "8888") return alert("Access Denied: Incorrect Master PIN.");
+            document.querySelectorAll('.edit-field').forEach(el => el.disabled = false); 
+            document.getElementById('save-edit-btn').classList.remove('hidden'); 
         }
 
-        async function cancelAL() {
-            const reason = prompt("State the reason for cancelling this Approval Letter:");
-            if (!reason) return;
-            if (prompt("Type 'CANCEL' in all caps to confirm deletion:") !== 'CANCEL') return alert("Cancellation aborted.");
-            const { error } = await _supabase.from('al_orders').update({ status: 'Cancelled', remark: '[CANCELLED] ' + reason }).eq('id', document.getElementById('edit-id').value);
-            if(error) alert(error.message); else { alert("AL Cancelled successfully!"); closeModal('manage-modal'); fetchData(); }
-        }
-
-        async function saveEditAL() {
-            const newQty = parseInt(document.getElementById('edit-qty').value) || 0;
+        async function verifyAL() { 
+            const pin = prompt("Enter Admin PIN to Verify:");
+            if (pin !== "8888") return alert("Access Denied: Incorrect Master PIN."); 
+            
+            const { data: { session } } = await _supabase.auth.getSession();
+            const email = session?.user?.email || 'Admin';
+            
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'});
+            
+            const verifyText = `[VERIFIED by ${email} on ${dateStr}]`;
+            
             const orderId = document.getElementById('edit-id').value;
-            const order = globalALs.find(o => String(o.id) === String(orderId));
+            let existingRemark = document.getElementById('edit-remark').value.trim();
+            const newRemark = `${verifyText} ${existingRemark}`.trim();
+            
+            const { error } = await _supabase.from('al_orders').update({ status: 'Verified', remark: newRemark }).eq('id', orderId); 
+            if(error) alert(error.message); else { alert("AL Verified successfully!"); closeModal('manage-modal'); fetchData(); } 
+        }
+        
+        async function cancelAL() { 
+            const pin = prompt("Enter Master PIN to Cancel AL:");
+            if (pin !== "8888") return alert("Access Denied: Incorrect Master PIN.");
+            
+            const reason = prompt("State the reason for cancelling this Approval Letter:"); 
+            if (!reason) return; 
+            
+            try {
+                const orderId = document.getElementById('edit-id').value;
+                const { error } = await _supabase.from('al_orders').update({ status: 'Cancelled', remark: '[CANCELLED] ' + reason }).eq('id', orderId); 
+                
+                if(error) { alert("Database Error: " + error.message); } 
+                else { alert("AL Cancelled successfully!"); closeModal('manage-modal'); fetchData(); } 
+            } catch(err) {
+                alert("Error: " + err.message);
+            }
+        }
+        
+        async function saveEditAL() { 
+            const newQty = parseInt(document.getElementById('edit-qty').value) || 0; 
+            const orderId = document.getElementById('edit-id').value; 
+            const order = globalALs.find(o => String(o.id) === String(orderId)); 
             const cumul = order._cumul || 0; 
-            const newBalance = newQty - cumul;
-            let editPo = document.getElementById('edit-order').value || '';
-            if (editPo && !editPo.startsWith('#')) editPo = '#' + editPo;
-            const { error } = await _supabase.from('al_orders').update({ order_date: document.getElementById('edit-date').value, customer_name: document.getElementById('edit-name').value, order_number: editPo, quantity_ordered: newQty, balance_quantity: newBalance, remark: document.getElementById('edit-remark').value }).eq('id', orderId);
-            if(error) alert(error.message); else { closeModal('manage-modal'); fetchData(); }
+            const newBalance = newQty - cumul; 
+            let editPo = document.getElementById('edit-order').value || ''; 
+            if (editPo && !editPo.startsWith('#')) editPo = '#' + editPo; 
+            
+            let finalRemark = document.getElementById('edit-remark').value.trim();
+            if (order.status === 'Verified' && order.remark && order.remark.includes('[VERIFIED by')) {
+                const vMatch = order.remark.match(/\[VERIFIED by .*? on .*?\]/);
+                if (vMatch) finalRemark = `${vMatch[0]} ${finalRemark}`.trim();
+            } else if (order.status === 'Cancelled' && order.remark && order.remark.includes('[CANCELLED]')) {
+                finalRemark = `[CANCELLED] ${finalRemark}`.trim();
+            }
+            
+            const { error } = await _supabase.from('al_orders').update({ 
+                order_date: document.getElementById('edit-date').value, 
+                customer_name: document.getElementById('edit-name').value, 
+                order_number: editPo, 
+                quantity_ordered: newQty, 
+                balance_quantity: newBalance, 
+                remark: finalRemark 
+            }).eq('id', orderId); 
+            
+            if(error) alert(error.message); else { 
+                alert("Changes saved successfully!");
+                document.querySelectorAll('.edit-field').forEach(el => el.disabled = true);
+                document.getElementById('save-edit-btn').classList.add('hidden');
+                fetchData(); 
+            } 
         }
 
-        function setupDragAndDrop() {
-            const mainZone = document.getElementById('main-drop-zone');
-            const mainInput = document.getElementById('main-file-input');
-            if(mainZone && mainInput) {
-                mainZone.onclick = () => mainInput.click(); mainZone.ondragover = (e) => { e.preventDefault(); mainZone.classList.add('dragover'); }; mainZone.ondragleave = () => mainZone.classList.remove('dragover'); 
-                mainZone.ondrop = (e) => { e.preventDefault(); mainZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { openALModal(); handleBulkUpload(e.dataTransfer.files); } };
-                mainInput.onchange = (e) => { if (e.target.files.length) { openALModal(); handleBulkUpload(e.target.files); } mainInput.value = ''; };
-            }
-            const zone = document.getElementById('al-drop-zone');
-            const input = document.getElementById('al-file-input');
-            if(!zone || !input) return;
-            zone.onclick = () => input.click(); zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); }; zone.ondragleave = () => zone.classList.remove('dragover'); 
-            zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleBulkUpload(e.dataTransfer.files); };
-            input.onchange = (e) => { if (e.target.files.length) handleBulkUpload(e.target.files); input.value = ''; };
+        function setupDragAndDrop() { 
+            const mainZone = document.getElementById('main-drop-zone'); 
+            const mainInput = document.getElementById('main-file-input'); 
+            if(mainZone && mainInput) { 
+                mainZone.onclick = () => mainInput.click(); 
+                mainZone.ondragover = (e) => { e.preventDefault(); mainZone.classList.add('dragover'); }; 
+                mainZone.ondragleave = () => mainZone.classList.remove('dragover'); 
+                mainZone.ondrop = (e) => { e.preventDefault(); mainZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { openALModal(); handleBulkUpload(e.dataTransfer.files); } }; 
+                mainInput.onchange = (e) => { if (e.target.files.length) { openALModal(); handleBulkUpload(e.target.files); } mainInput.value = ''; }; 
+            } 
+            
+            const zone = document.getElementById('al-drop-zone'); 
+            const input = document.getElementById('al-file-input'); 
+            if(!zone || !input) return; 
+            
+            zone.onclick = () => input.click(); 
+            zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); }; 
+            zone.ondragleave = () => zone.classList.remove('dragover'); 
+            zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleBulkUpload(e.dataTransfer.files); }; 
+            input.onchange = (e) => { if (e.target.files.length) handleBulkUpload(e.target.files); input.value = ''; }; 
         }
 
         async function handleBulkUpload(files) {
             const tbody = document.getElementById('bulk-al-tbody');
             for (let file of files) {
                 if (!file.type.startsWith('image/') && file.type !== 'application/pdf') continue;
-                const rowId = 'row_' + Math.random().toString(36).substring(2, 9); const reader = new FileReader();
+                const rowId = 'row_' + Math.random().toString(36).substring(2, 9); 
+                const reader = new FileReader();
                 tbody.insertAdjacentHTML('beforeend', `<tr id="${rowId}" class="border-b border-blue-100 bg-blue-50/30"><td class="p-3 text-center" colspan="10"><span class="text-xs font-bold text-blue-600 animate-pulse">Scanning AL ${file.name}...</span></td></tr>`);
+                
                 reader.onload = async (e) => {
                     const base64Data = e.target.result; window.extractedBulkALs[rowId] = base64Data;
                     try {
-                        const prompt = `Extract details STRICTLY as raw JSON (no markdown): {"customerName": "", "orderNumber": "", "orderDate": "", "productName": "", "quantity": 0, "price": 0.0}`;
+                        const prompt = `Extract details STRICTLY as raw JSON (no markdown): {"customerName": "", "orderNumber": "", "orderDate": "YYYY-MM-DD", "productName": "", "quantity": 0, "unit_price": 0.0}. CRITICAL: For 'unit_price', extract the UNIT SELLING PRICE (Harga Seunit). Do NOT extract the total order amount. If only Total Price is shown, you MUST DIVIDE the Total Price by the Quantity to get the Unit Price. Ensure orderDate uses ONLY YYYY-MM-DD format (Example: 2026-03-25).`;
                         const extractedData = await analyzeImageWithGemini(base64Data, file.type, prompt);
-                        let oDate = extractedData.orderDate || ''; if (oDate.match(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/)) { const parts = oDate.split(/[\/\-]/); oDate = `${parts[2]}-${parts[1]}-${parts[0]}`; }
+                        
+                        let oDate = extractedData.orderDate || ''; 
+                        if(oDate) { 
+                            let pDate = new Date(oDate); 
+                            if(!isNaN(pDate)) oDate = pDate.toISOString().split('T')[0]; 
+                            else if (oDate.includes('/')) { let parts = oDate.split('/'); if(parts[2] && parts[2].length === 4) oDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`; } 
+                        }
+                        
                         let extractedPo = extractedData.orderNumber || ''; if (extractedPo && !extractedPo.startsWith('#')) extractedPo = '#' + extractedPo;
+                        
+                        let docPreview = file.type.includes('pdf') ? `<button onclick="viewBulkDoc('${rowId}')" class="w-8 h-8 bg-red-100 text-red-500 rounded flex items-center justify-center text-[8px] font-bold hover:bg-red-200 transition-colors">PDF</button>` : `<button onclick="viewBulkDoc('${rowId}')"><img src="${base64Data}" class="w-8 h-8 object-cover rounded shadow-sm hover:opacity-80"></button>`;
+                        
                         document.getElementById(rowId).innerHTML = `
-                            <td class="p-3">${file.type.includes('pdf') ? '<div class="w-8 h-8 bg-red-100 text-red-500 rounded flex items-center justify-center text-[8px] font-bold">PDF</div>' : `<img src="${base64Data}" class="w-8 h-8 object-cover rounded shadow-sm">`}</td>
+                            <td class="p-3">${docPreview}</td>
                             <td class="p-3"><span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">Auto on Save</span></td>
                             <td class="p-3"><input type="date" id="date_${rowId}" value="${oDate}" class="input-style text-[10px] p-2 w-full"></td>
                             <td class="p-3"><input type="text" id="cust_${rowId}" value="${extractedData.customerName || ''}" class="input-style text-[10px] p-2 w-full font-bold text-blue-800"></td>
                             <td class="p-3"><input type="text" id="po_${rowId}" value="${extractedPo}" class="input-style text-[10px] p-2 w-full"></td>
                             <td class="p-3"><input type="text" id="prod_${rowId}" value="${extractedData.productName || ''}" class="input-style text-[10px] p-2 w-full"></td>
                             <td class="p-3"><input type="number" id="qty_${rowId}" value="${extractedData.quantity || 0}" class="input-style text-[10px] p-2 w-full font-black text-center text-blue-600"></td>
-                            <td class="p-3"><input type="number" step="0.01" id="price_${rowId}" value="${extractedData.price || 0}" class="input-style text-[10px] p-2 w-full font-bold text-center"></td>
+                            <td class="p-3"><input type="number" step="0.01" id="price_${rowId}" value="${extractedData.unit_price || 0}" class="input-style text-[10px] p-2 w-full font-bold text-center"></td>
                             <td class="p-3"><input type="text" id="remark_${rowId}" value="Scanned via AI" class="input-style text-[10px] p-2 w-full"></td>
                             <td class="p-3 text-right"><button onclick="document.getElementById('${rowId}').remove(); delete window.extractedBulkALs['${rowId}'];" class="text-red-400 hover:text-red-600 font-bold">✕</button></td>
                         `;
-                    } catch (err) { document.getElementById(rowId).innerHTML = `<td class="p-3 text-center text-red-500 font-bold text-[10px]" colspan="10">Failed to scan ${file.name}.</td>`; }
-                }; reader.readAsDataURL(file);
+                    } catch (err) { 
+                        document.getElementById(rowId).innerHTML = `<td class="p-3 text-center text-red-500 font-bold text-[10px]" colspan="10">Failed to scan ${file.name}.</td>`; 
+                    }
+                }; 
+                reader.readAsDataURL(file);
             }
         }
 
         async function saveBulkAL() {
-            const btn = document.getElementById('save-bulk-al-btn'); btn.innerText = 'SAVING ALL...'; btn.disabled = true; const rows = document.querySelectorAll('#bulk-al-tbody tr'); let successCount = 0; let currentPrefix = ''; let nextSeq = 1;
+            const btn = document.getElementById('save-bulk-al-btn'); btn.innerText = 'SAVING ALL...'; btn.disabled = true; 
+            const rows = document.querySelectorAll('#bulk-al-tbody tr'); let successCount = 0; let currentPrefix = ''; let nextSeq = 1;
+            
             for (let row of rows) {
                 if(row.innerHTML.includes('Scanning') || row.innerHTML.includes('Failed')) continue; 
-                const rId = row.id; let poOrder = document.getElementById(`po_${rId}`).value || ''; if (poOrder && !poOrder.startsWith('#')) poOrder = '#' + poOrder;
+                
+                const rId = row.id; 
+                let poOrder = document.getElementById(`po_${rId}`).value || ''; if (poOrder && !poOrder.startsWith('#')) poOrder = '#' + poOrder;
                 const orderDate = document.getElementById(`date_${rId}`).value || new Date().toISOString().split('T')[0];
-                const custName = document.getElementById(`cust_${rId}`).value || 'Unknown'; const qty = parseInt(document.getElementById(`qty_${rId}`).value) || 0;
-                const price = parseFloat(document.getElementById(`price_${rId}`).value) || 0; const prodName = document.getElementById(`prod_${rId}`).value || '';
-                const remark = document.getElementById(`remark_${rId}`).value || ''; const base64Image = window.extractedBulkALs[rId] || null;
+                const custName = document.getElementById(`cust_${rId}`).value || 'Unknown'; 
+                const qty = parseInt(document.getElementById(`qty_${rId}`).value) || 0;
+                const price = parseFloat(document.getElementById(`price_${rId}`).value) || 0; 
+                const prodName = document.getElementById(`prod_${rId}`).value || '';
+                const remark = document.getElementById(`remark_${rId}`).value || ''; 
+                const base64Image = window.extractedBulkALs[rId] || null;
+                
                 if(qty <= 0) continue; 
-                if(poOrder) { const existing = globalALs.find(a => a.order_number === poOrder && a.status !== 'Cancelled'); if(existing) { alert(`Order Number ${poOrder} already exists! Skipping.`); row.classList.replace('bg-blue-50/30', 'bg-red-50'); continue; } }
-                const d = new Date(orderDate); const prefix = `AL-${String(d.getFullYear()).slice(-2)}${String(d.getMonth() + 1).padStart(2, '0')}-`;
-                if (prefix !== currentPrefix) { currentPrefix = prefix; const monthOrders = globalALs.filter(o => o.al_number && o.al_number.startsWith(prefix)); nextSeq = monthOrders.length > 0 ? Math.max(...monthOrders.map(o => parseInt(o.al_number.split('-')[2]) || 0)) + 1 : 1; }
+                
+                if(poOrder) { 
+                    const existing = globalALs.find(a => a.order_number === poOrder && a.status !== 'Cancelled'); 
+                    if(existing) { alert(`Order Number ${poOrder} already exists! Skipping.`); row.classList.replace('bg-blue-50/30', 'bg-red-50'); continue; } 
+                }
+                
+                const d = new Date(orderDate); 
+                const prefix = `AL-${String(d.getFullYear()).slice(-2)}${String(d.getMonth() + 1).padStart(2, '0')}-`;
+                if (prefix !== currentPrefix) { 
+                    currentPrefix = prefix; 
+                    const monthOrders = globalALs.filter(o => o.al_number && o.al_number.startsWith(prefix)); 
+                    nextSeq = monthOrders.length > 0 ? Math.max(...monthOrders.map(o => parseInt(o.al_number.split('-')[2]) || 0)) + 1 : 1; 
+                }
                 const genALNumber = `${prefix}${String(nextSeq).padStart(4, '0')}`; nextSeq++;
+                
                 let payload = { al_number: genALNumber, order_date: new Date(orderDate).toISOString(), customer_name: custName, order_number: poOrder, product_name: prodName, quantity_ordered: qty, balance_quantity: qty, price_per_unit: price, status: 'Unverified', remark: remark, image_url: base64Image };
                 const { error: err } = await _supabase.from('al_orders').insert([payload]);
-                if (!err) { globalALs.push({...payload, id: Math.random()}); row.remove(); successCount++; } else { if(err.message.includes('image_url')) { alert("⚠️ Please add 'image_url' (text) column to Supabase table."); } else { alert("Database Error: " + err.message); } }
-            } fetchData(); btn.innerText = 'Save All ALs'; btn.disabled = false;
+                
+                if (!err) { 
+                    globalALs.push({...payload, id: Math.random()}); row.remove(); successCount++; 
+                } else { 
+                    if(err.message.includes('image_url')) { alert("⚠️ Please add 'image_url' (text) column to Supabase table."); } 
+                    else { alert("Database Error: " + err.message); } 
+                }
+            } 
+            fetchData(); btn.innerText = 'Save All ALs'; btn.disabled = false;
             if(document.querySelectorAll('#bulk-al-tbody tr').length === 0) { closeModal('al-modal'); alert(`Successfully saved ${successCount} Approval Letters!`); } else { alert("Saved some records. Review remaining rows in red."); }
         }
+        
         setupDragAndDrop(); _supabase.auth.getSession().then(({ data: { session } }) => { if (!session) window.location.href = 'index.html'; else fetchData(); });
     </script>
 </body>
