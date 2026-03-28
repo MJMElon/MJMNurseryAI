@@ -13,10 +13,16 @@
         .glass-panel { background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(24px); border: 1px solid #ffffff; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1); border-l: 12px solid #a855f7; }
         .input-style { border: 1px solid #cbd5e1; background-color: #ffffff; padding: 10px; border-radius: 8px; outline: none; width: 100%; font-weight: 600; transition: all 0.2s; }
         .input-style:focus { border-color: #a855f7; box-shadow: 0 0 0 3px rgba(168,85,247,0.2); }
+        .input-style:disabled { background-color: #f1f5f9; color: #64748b; cursor: not-allowed; border-color: transparent;}
         .btn-purple { background: linear-gradient(to right, #9333ea, #a855f7); color: white; font-weight: bold; padding: 12px 24px; border-radius: 15px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s; box-shadow: 0 4px 10px -2px rgba(168, 85, 247, 0.4); border: none; }
         .btn-purple:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.5); }
-        .nav-btn { display: block; width: 100%; text-align: left; padding: 16px 24px; border-radius: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12px; transition: all 0.2s; color: #64748b; margin-bottom: 8px;}
-        .nav-btn.active { background-color: #a855f7; color: white; box-shadow: 0 4px 10px -2px rgba(168, 85, 247, 0.4); }
+        input[type="file"]::file-selector-button { border: none; background: #f3e8ff; color: #9333ea; font-weight: bold; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-right: 10px; transition: background 0.2s; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;}
+        
+        /* Global Mapper Styles */
+        #mapper-scroll-area { width: 100%; height: 100%; overflow: hidden; background: #1e293b; border-radius: 12px; position: relative; }
+        #mapper-workspace { position: absolute; top: 0; left: 0; display: inline-block; box-shadow: 0 0 30px rgba(0,0,0,0.5); transform-origin: 0 0; }
+        #mapper-bg { display: block; max-width: 90vw; max-height: 80vh; pointer-events: none; user-select: none; }
+        #mapper-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 10; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 relative">
@@ -26,64 +32,219 @@
         
         <div class="glass-panel p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden" id="main-title-panel">
             <button onclick="window.location.href='index.html'" class="text-[10px] font-bold text-slate-500 hover:text-purple-700 uppercase tracking-widest bg-slate-100 hover:bg-slate-200 px-5 py-3 rounded-xl transition-colors flex items-center gap-2 self-start md:self-auto">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                Back to main page
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg> Back to main page
             </button>
             <h1 class="text-2xl md:text-3xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-800 via-fuchsia-600 to-purple-500 drop-shadow-sm pb-1 text-center" style="word-spacing: 0.2em;">System Configuration</h1>
             <div class="hidden md:block w-[130px]"></div>
         </div>
 
-        <div class="flex flex-col xl:flex-row gap-6">
+        <div class="space-y-12">
             
-            <div class="w-full xl:w-1/3 flex flex-col gap-6">
-                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-fuchsia-400">
-                    <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Breeds</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="new-breed-name" class="input-style text-xs" placeholder="Breed Name">
-                        <button onclick="addBreed()" class="btn-purple !px-4 text-xs tracking-widest">+ Add</button>
-                    </div>
-                    <ul id="breeds-list" class="space-y-2 max-h-[250px] overflow-y-auto pr-2"></ul>
+            <section>
+                <div class="flex items-center gap-3 mb-6 border-b-2 border-slate-200 pb-2">
+                    <span class="text-2xl">🌍</span>
+                    <h2 class="text-xl font-black text-slate-800 uppercase tracking-widest">Master Data</h2>
                 </div>
-
-                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-emerald-400">
-                    <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Batches</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="new-batch-name" class="input-style text-xs uppercase" placeholder="Batch Name">
-                        <button onclick="addBatch()" class="btn-purple !bg-emerald-600 !px-4 text-xs tracking-widest">+ Add</button>
-                    </div>
-                    <ul id="batches-list" class="space-y-2 max-h-[250px] overflow-y-auto pr-2"></ul>
-                </div>
-            </div>
-
-            <div class="w-full xl:w-2/3 flex flex-col gap-6">
                 
-                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-blue-500">
-                    <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Nurseries & Licenses</h2>
-                    <div class="flex flex-col md:flex-row gap-2 mb-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                        <input type="text" id="new-nursery-name" class="input-style text-xs uppercase" placeholder="Nursery Name (UNN 1)">
-                        <input type="text" id="new-nursery-license" class="input-style text-xs uppercase" placeholder="License Number">
-                        <button onclick="addNursery()" class="btn-purple !bg-blue-600 !px-6 text-xs tracking-widest">+ Add Nursery</button>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-fuchsia-400">
+                        <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Breeds</h2>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="new-breed-name" class="input-style text-xs" placeholder="Breed Name">
+                            <button onclick="addBreed(event)" class="btn-purple !px-4 text-xs tracking-widest">+ Add</button>
+                        </div>
+                        <ul id="breeds-list" class="space-y-2 max-h-[250px] overflow-y-auto pr-2"></ul>
                     </div>
-                    <ul id="nurseries-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2"></ul>
+
+                    <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-emerald-400">
+                        <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Batches</h2>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="new-batch-name" class="input-style text-xs uppercase" placeholder="Batch Name">
+                            <button onclick="addBatch(event)" class="btn-purple !bg-emerald-600 !px-4 text-xs tracking-widest">+ Add</button>
+                        </div>
+                        <ul id="batches-list" class="space-y-2 max-h-[250px] overflow-y-auto pr-2"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="flex items-center gap-3 mb-6 border-b-2 border-slate-200 pb-2">
+                    <span class="text-2xl">🏢</span>
+                    <h2 class="text-xl font-black text-slate-800 uppercase tracking-widest">Facility Management</h2>
                 </div>
 
-                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-purple-500 flex-1">
-                    <div class="flex justify-between items-center border-b-2 border-slate-100 pb-4 mb-4">
-                        <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg">Manage Plots</h2>
-                        <select id="nursery-filter" class="input-style text-xs w-1/3 !py-2" onchange="renderFilteredPlots()">
-                            <option value="">All Nurseries</option>
-                        </select>
+                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-blue-500">
+                    <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg border-b-2 border-slate-100 pb-4 mb-4">Manage Nurseries & Base Maps</h2>
+                    <div class="flex flex-col gap-4 mb-6 bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <input type="text" id="new-nursery-name" class="input-style text-xs uppercase flex-1" placeholder="Nursery Name (e.g. UNN 1)">
+                            <input type="text" id="new-nursery-license" class="input-style text-xs uppercase flex-1" placeholder="License Number">
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-4 items-center">
+                            <div class="flex-1 w-full">
+                                <label class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block ml-1">Upload Nursery Base Map (Optional)</label>
+                                <input type="file" id="new-nursery-image-file" class="input-style text-xs w-full !p-1.5" accept="image/*">
+                            </div>
+                            <button onclick="addNursery(event)" class="btn-purple !bg-blue-600 !px-8 !py-4 text-xs tracking-widest w-full md:w-auto mt-4 md:mt-0">+ Create Nursery</button>
+                        </div>
+                    </div>
+                    <ul id="nurseries-list" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[300px] overflow-y-auto pr-2"></ul>
+                </div>
+            </section>
+
+            <section>
+                <div class="flex items-center gap-3 mb-6 border-b-2 border-amber-200 pb-2">
+                    <span class="text-2xl">🌱</span>
+                    <h2 class="text-xl font-black text-amber-800 uppercase tracking-widest">Pre-Nursery Settings</h2>
+                </div>
+
+                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-amber-400 flex-1">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-slate-100 pb-4 mb-4 gap-4">
+                        <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg">Manage Trays & Live Map Linking</h2>
+                        <div class="flex gap-2 w-full md:w-1/3">
+                            <select id="tray-nursery-filter" class="input-style text-xs flex-1 !py-2" onchange="renderFilteredTrays()">
+                                <option value="">All Nurseries</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <div class="flex flex-col md:flex-row gap-2 mb-4 bg-purple-50 p-4 rounded-xl border border-purple-100">
-                        <select id="plot-nursery-select" class="input-style text-xs flex-1 font-bold text-slate-700"></select>
-                        <input type="text" id="new-plot-name" class="input-style text-xs flex-1 uppercase" placeholder="Plot Name (U1)">
-                        <button onclick="addPlot()" class="btn-purple !px-6 text-xs tracking-widest">+ Add Plot</button>
+                    <div class="flex flex-col md:flex-row gap-3 mb-6 bg-amber-50 p-5 rounded-2xl border border-amber-100">
+                        <select id="tray-nursery-select" class="input-style text-xs flex-1 font-bold text-slate-700"></select>
+                        <input type="text" id="new-tray-name" class="input-style text-xs flex-1 uppercase" placeholder="Tray Name / ID (e.g. T-001)">
+                        <button onclick="addTray(event)" class="btn-purple !bg-amber-500 !px-8 text-xs tracking-widest w-full md:w-auto shadow-amber-500/30">+ Add Tray</button>
                     </div>
-                    <ul id="plots-list" class="grid grid-cols-1 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto pr-2"></ul>
+                    <ul id="trays-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-h-[350px] overflow-y-auto pr-2"></ul>
+                </div>
+            </section>
+
+            <section>
+                <div class="flex items-center gap-3 mb-6 border-b-2 border-indigo-200 pb-2">
+                    <span class="text-2xl">🌿</span>
+                    <h2 class="text-xl font-black text-indigo-800 uppercase tracking-widest">Main Nursery Settings</h2>
+                </div>
+
+                <div class="glass-panel p-8 rounded-[2.5rem] shadow-xl border-l-[8px] border-indigo-500 flex-1">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-slate-100 pb-4 mb-4 gap-4">
+                        <h2 class="font-black text-slate-800 uppercase tracking-widest text-lg">Manage Plots & Live Map Linking</h2>
+                        <div class="flex gap-2 w-full md:w-1/3">
+                            <select id="nursery-filter" class="input-style text-xs flex-1 !py-2" onchange="renderFilteredPlots()">
+                                <option value="">All Nurseries</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row gap-3 mb-6 bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                        <select id="plot-nursery-select" class="input-style text-xs flex-1 font-bold text-slate-700"></select>
+                        <input type="text" id="new-plot-name" class="input-style text-xs flex-1 uppercase" placeholder="Plot Name (e.g. PLOT-A)">
+                        <button onclick="addPlot(event)" class="btn-purple !bg-indigo-500 !px-8 text-xs tracking-widest w-full md:w-auto shadow-indigo-500/30">+ Add Plot</button>
+                    </div>
+                    <ul id="plots-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto pr-2"></ul>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div id="global-mapper-modal" class="hidden fixed inset-0 bg-slate-900/95 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="absolute inset-0 z-0" onclick="closeGlobalMapper()"></div>
+        <div class="glass-panel p-2 md:p-6 rounded-[2.5rem] w-full max-w-[98vw] shadow-2xl relative z-10 border-yellow-500 border-l-[12px] flex flex-col h-[95vh]">
+            
+            <div class="flex justify-between items-center mb-4 px-4">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-800 uppercase tracking-widest">Global Shape Mapper</h3>
+                    <p class="text-xs font-bold text-slate-500 uppercase mt-1">Nursery: <span id="mapper-nursery-label" class="text-yellow-600 font-black"></span></p>
+                </div>
+                <button onclick="closeGlobalMapper()" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-3 w-10 h-10 flex items-center justify-center shadow-sm border border-slate-200">✕</button>
+            </div>
+            
+            <div class="flex flex-col md:flex-row flex-1 gap-4 overflow-hidden h-full relative">
+                
+                <div class="flex-1 relative border border-slate-300 rounded-xl overflow-hidden bg-slate-800">
+                    
+                    <div class="absolute top-4 left-4 flex gap-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-slate-200">
+                        <button id="tool-pan" onclick="setMapperMode('pan')" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs border border-slate-300 transition-colors shadow-inner flex items-center gap-2">✋ Pan Map</button>
+                        <div class="w-px bg-slate-300 mx-1"></div>
+                        <button id="tool-draw" onclick="setMapperMode('draw')" class="px-4 py-2 hover:bg-slate-100 text-slate-600 font-bold rounded-lg text-xs border border-transparent transition-colors flex items-center gap-2">✏️ Draw</button>
+                        <button id="tool-edit" onclick="setMapperMode('edit')" class="px-4 py-2 hover:bg-slate-100 text-slate-600 font-bold rounded-lg text-xs transition-colors border border-transparent flex items-center gap-2">🖱️ Edit</button>
+                        <div class="w-px bg-slate-300 mx-1"></div>
+                        <button onclick="zoomMap(0.2)" class="px-4 py-2 hover:bg-slate-200 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-colors" title="Zoom In">🔍 +</button>
+                        <button onclick="zoomMap(-0.2)" class="px-4 py-2 hover:bg-slate-200 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-colors" title="Zoom Out">🔍 -</button>
+                    </div>
+
+                    <div id="mapper-scroll-area" onmousedown="startMapPan(event)">
+                        <div id="mapper-workspace">
+                            <img id="mapper-bg" alt="Map">
+                            <svg id="mapper-svg" viewBox="0 0 100 100" preserveAspectRatio="none" onclick="svgClick(event)"></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full md:w-80 bg-white rounded-2xl border border-slate-200 shadow-inner flex flex-col overflow-hidden relative z-20">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h4 class="font-black text-slate-700 uppercase tracking-widest text-sm">Select Plot</h4>
+                    </div>
+                    <div id="mapper-sidebar-list" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+                    
+                    <div id="mapper-controls" class="p-4 bg-yellow-50 border-t-2 border-yellow-200 hidden flex-col gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+                        <p class="text-[11px] font-black text-yellow-800 uppercase tracking-widest text-center">Active: <span id="active-draw-name" class="text-rose-600 text-sm"></span></p>
+                        
+                        <p id="edit-instructions" class="text-[10px] font-bold text-blue-600 bg-blue-50 p-2 rounded text-center border border-blue-200 leading-tight">
+                            Select a tool from the map toolbar to begin.
+                        </p>
+
+                        <button onclick="clearActiveShape()" class="w-full p-3 rounded-xl bg-white text-rose-500 border border-rose-200 font-bold text-[10px] uppercase tracking-widest hover:bg-rose-50 shadow-sm mt-1 transition-colors">🗑️ Clear Shape</button>
+                        <button id="save-shape-btn" onclick="saveActiveShape()" class="w-full p-4 rounded-xl btn-purple !bg-yellow-500 !text-yellow-900 font-black text-xs uppercase tracking-widest shadow-md transition-transform hover:scale-[1.02]">💾 Save Shape</button>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="edit-nursery-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeEditNurseryModal()"></div>
+        <div class="glass-panel p-8 rounded-[2rem] w-full max-w-xl shadow-2xl relative z-10 border-blue-500 border-l-[12px]">
+            <div class="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4">
+                <h3 class="text-xl font-black text-slate-800 uppercase tracking-widest">Edit Nursery Profile</h3>
+                <button onclick="closeEditNurseryModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2 w-8 h-8 flex items-center justify-center">✕</button>
+            </div>
+            <input type="hidden" id="edit-nursery-id">
+            <div class="space-y-4">
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nursery Name (Locked)</label><input type="text" id="edit-nursery-name" class="input-style text-xs uppercase" disabled></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">License Number</label><input type="text" id="edit-nursery-license" class="input-style text-xs uppercase"></div>
+                <div><label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Update Map Background</label><div id="current-map-container" class="flex gap-2 items-center mb-2"><button id="view-current-map-btn" onclick="viewAttachedMap()" class="flex-1 bg-blue-50 text-blue-600 p-2 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-blue-200 hidden">👁️ View Current Map</button></div><input type="file" id="edit-nursery-image-file" class="input-style text-xs !p-1.5" accept="image/*"></div>
+            </div>
+            <div class="flex gap-4 pt-6 mt-6 border-t border-slate-100"><button onclick="closeEditNurseryModal()" class="flex-1 p-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">Cancel</button><button id="save-nursery-btn" onclick="saveEditNursery()" class="flex-1 p-3 rounded-xl btn-purple !bg-blue-600 text-xs tracking-widest">Save Changes</button></div>
+        </div>
+    </div>
+
+    <div id="edit-plot-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 z-0" onclick="closeEditPlotModal()"></div>
+        <div class="glass-panel p-8 rounded-[2rem] w-full max-w-xl shadow-2xl relative z-10 border-indigo-500 border-l-[12px]">
+            <div class="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4">
+                <h3 class="text-xl font-black text-slate-800 uppercase tracking-widest">Edit Plot Details</h3>
+                <button onclick="closeEditPlotModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 rounded-full p-2 w-8 h-8 flex items-center justify-center">✕</button>
+            </div>
+            <input type="hidden" id="edit-plot-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nursery</label>
+                    <select id="edit-plot-nursery" class="input-style text-xs font-bold text-slate-700"></select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Plot Name</label>
+                    <input type="text" id="edit-plot-name" class="input-style text-xs uppercase">
+                </div>
+            </div>
+            <div class="flex gap-4 pt-8 mt-6 border-t border-slate-100">
+                <button onclick="closeEditPlotModal()" class="flex-1 p-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                <button onclick="saveEditPlot()" id="save-plot-btn" class="flex-1 p-3 rounded-xl btn-purple !bg-indigo-500 text-xs tracking-widest">Update Plot</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox-modal" class="hidden fixed inset-0 bg-slate-900/95 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
+        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white hover:text-red-400 bg-white/10 rounded-full p-3 z-[160]"><svg class="w-8 h-8 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        <div id="lightbox-content" class="w-full h-full max-w-4xl max-h-[90vh] flex justify-center items-center"></div>
     </div>
 
     <script>
@@ -91,158 +252,560 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let globalBreeds = []; 
-        let globalPlots = []; 
-        let globalNurseries = []; 
-        let globalBatches = [];
+        let globalBreeds = []; let globalPlots = []; let globalNurseries = []; let globalBatches = []; let globalTrays = [];
+        let currentEditingMapImage = null; 
 
+        // FETCH DATA
         async function fetchData() {
             try {
-                // Fetch all data without strict DB ordering to allow human-natural sorting in JS
-                const [breedRes, plotRes, nursRes, batchRes] = await Promise.all([
+                const [breedRes, plotRes, nursRes, batchRes, trayRes] = await Promise.all([
                     _supabase.from('breeds').select('*').order('name'),
                     _supabase.from('plots').select('*'),
                     _supabase.from('nurseries').select('*').order('name'),
-                    _supabase.from('batches').select('*')
+                    _supabase.from('batches').select('*'),
+                    _supabase.from('trays').select('*').order('tray_name')
                 ]);
+                
+                if (breedRes.error) throw breedRes.error;
+                if (plotRes.error) throw plotRes.error;
+                if (nursRes.error) throw nursRes.error;
 
                 globalBreeds = breedRes.data || [];
                 globalPlots = plotRes.data || [];
                 globalNurseries = nursRes.data || [];
                 globalBatches = batchRes.data || [];
+                globalTrays = trayRes.data || []; 
                 
-                // NATURAL SORTING LOGIC: Fixes U10 coming before U2.
                 globalPlots.sort((a, b) => {
-                    // Sort primarily by Nursery name
                     let nursCompare = a.nursery_name.localeCompare(b.nursery_name);
                     if (nursCompare !== 0) return nursCompare;
-                    // Sort secondarily by Plot name (using natural numeric sorting)
                     return a.plot_name.localeCompare(b.plot_name, undefined, { numeric: true, sensitivity: 'base' });
                 });
+                globalBatches.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+                globalTrays.sort((a, b) => a.tray_name.localeCompare(b.tray_name, undefined, { numeric: true, sensitivity: 'base' }));
 
-                // DESCENDING NATURAL SORT FOR BATCHES
-                globalBatches.sort((a, b) => {
-                    return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' });
-                });
-
-                renderBreeds(); 
-                renderBatches(); 
-                renderNurseries(); 
+                renderBreeds(); renderBatches(); renderNurseries(); 
                 populateNurseryFilters(); 
-                renderFilteredPlots();
-            } catch(err) {
-                alert("Database Error: Ensure tables are set up with RLS allowed!");
-                console.error(err);
+                renderFilteredPlots(); renderFilteredTrays();
+            } catch(err) { 
+                alert("Database Connection Error:\n\n" + err.message + "\n\n(Did you remember to create the 'trays' table in Supabase?)");
+                console.error(err); 
             }
         }
 
-        function renderBreeds() {
-            const list = document.getElementById('breeds-list'); list.innerHTML = '';
-            if(globalBreeds.length === 0) return list.innerHTML = '<div class="text-xs text-slate-400 italic text-center p-4">No breeds added.</div>';
-            globalBreeds.forEach(item => {
-                list.insertAdjacentHTML('beforeend', `
-                    <li class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm font-bold text-slate-700 shadow-sm">
-                        ${item.name} 
-                        <button onclick="deleteItem('breeds', '${item.id}')" class="text-red-400 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors">✕</button>
-                    </li>
-                `);
-            });
+        // --- GLOBAL MAPPER LOGIC WITH PAN, ZOOM & EDIT ---
+        let mapperPlots = []; let activeMapPlotId = null; let currentPoly = [];
+        let mapZoom = 1; let panX = 0; let panY = 0;
+        let mapMode = 'pan'; // 'pan', 'draw' or 'edit'
+        
+        let isPanning = false; let panStartX, panStartY;
+        let isDraggingPoint = -1; let isDraggingPoly = false; let dragStartX, dragStartY;
+
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+
+        function openGlobalMapperDirect(nursName) {
+            document.getElementById('nursery-filter').value = nursName;
+            renderFilteredPlots();
+
+            const nursery = globalNurseries.find(n => n.name === nursName);
+            if(!nursery || !nursery.map_image_url) return;
+
+            document.getElementById('mapper-nursery-label').innerText = nursName;
+            document.getElementById('mapper-bg').src = nursery.map_image_url;
+            mapperPlots = globalPlots.filter(p => p.nursery_name === nursName);
+            activeMapPlotId = null; currentPoly = [];
+            
+            mapZoom = 1; panX = 0; panY = 0;
+            updateMapTransform();
+            setMapperMode('pan');
+            
+            document.getElementById('mapper-controls').classList.add('hidden');
+            renderMapperSidebar(); renderMapperSVG();
+            document.getElementById('global-mapper-modal').classList.remove('hidden');
         }
 
-        function renderBatches() {
-            const list = document.getElementById('batches-list'); list.innerHTML = '';
-            if(globalBatches.length === 0) return list.innerHTML = '<div class="text-xs text-slate-400 italic text-center p-4">No batches added.</div>';
-            globalBatches.forEach(item => {
-                list.insertAdjacentHTML('beforeend', `
-                    <li class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm font-bold text-slate-700 shadow-sm">
-                        ${item.name} 
-                        <button onclick="deleteItem('batches', '${item.id}')" class="text-red-400 hover:text-red-600 bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors">✕</button>
-                    </li>
-                `);
-            });
+        function closeGlobalMapper() { document.getElementById('global-mapper-modal').classList.add('hidden'); }
+
+        function setMapperMode(mode) {
+            mapMode = mode;
+            
+            const activeClass = 'px-4 py-2 bg-yellow-100 text-yellow-700 font-bold rounded-lg text-xs border border-yellow-400 shadow-inner flex items-center gap-2 transition-colors';
+            const inactiveClass = 'px-4 py-2 hover:bg-slate-100 text-slate-600 font-bold rounded-lg text-xs border border-transparent flex items-center gap-2 transition-colors';
+            
+            document.getElementById('tool-pan').className = mode === 'pan' ? activeClass.replace('yellow', 'blue') : inactiveClass;
+            document.getElementById('tool-draw').className = mode === 'draw' ? activeClass : inactiveClass;
+            document.getElementById('tool-edit').className = mode === 'edit' ? activeClass : inactiveClass;
+            
+            const scrollArea = document.getElementById('mapper-scroll-area');
+            if (mode === 'pan') scrollArea.style.cursor = 'grab';
+            else if (mode === 'draw') scrollArea.style.cursor = 'crosshair';
+            else scrollArea.style.cursor = 'default';
+            
+            const instructions = document.getElementById('edit-instructions');
+            if(instructions) {
+                if (mode === 'pan') instructions.innerHTML = 'Click and drag the map to look around.';
+                else if (mode === 'draw') instructions.innerHTML = 'Click the map to drop points. Connect the dots to form a shape.';
+                else if (mode === 'edit') instructions.innerHTML = 'Right-click a dot to delete it.<br>Drag the shape or dots to move them.';
+            }
+            
+            renderMapperSVG();
         }
 
-        function renderNurseries() {
-            const list = document.getElementById('nurseries-list'); list.innerHTML = '';
-            if(globalNurseries.length === 0) return list.innerHTML = '<div class="text-xs text-slate-400 italic text-center p-4">No nurseries added.</div>';
-            globalNurseries.forEach(item => {
+        function zoomMap(delta) {
+            mapZoom += delta;
+            if(mapZoom < 0.5) mapZoom = 0.5;
+            if(mapZoom > 5) mapZoom = 5;
+            updateMapTransform();
+        }
+
+        function updateMapTransform() { document.getElementById('mapper-workspace').style.transform = `translate(${panX}px, ${panY}px) scale(${mapZoom})`; }
+
+        function startMapPan(e) {
+            if (mapMode !== 'pan') return;
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            document.getElementById('mapper-scroll-area').style.cursor = 'grabbing';
+        }
+
+        function renderMapperSidebar() {
+            const list = document.getElementById('mapper-sidebar-list'); list.innerHTML = '';
+            mapperPlots.forEach(p => {
+                const isMapped = p.map_top && p.map_top.startsWith('[');
+                const isActive = p.id === activeMapPlotId;
                 list.insertAdjacentHTML('beforeend', `
-                    <li class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
-                        <div class="flex flex-col">
-                            <span class="text-blue-700 uppercase tracking-widest font-black text-sm">${item.name}</span>
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Lic: ${item.license || 'N/A'}</span>
+                    <div onclick="activateMapPlot('${p.id}')" class="p-3 rounded-xl cursor-pointer border-2 transition-all ${isActive ? 'border-yellow-500 bg-yellow-50 shadow-md transform scale-[1.02]' : 'border-slate-100 bg-white hover:border-yellow-300'}">
+                        <div class="flex justify-between items-center">
+                            <span class="font-black text-sm text-slate-700">${p.plot_name}</span>
+                            <span class="text-[10px] font-bold px-2 py-1 rounded ${isMapped ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-500'}">${isMapped ? 'Mapped' : 'Empty'}</span>
                         </div>
-                        <button onclick="deleteItem('nurseries', '${item.id}')" class="text-red-400 hover:bg-red-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
-                    </li>
+                    </div>
                 `);
             });
         }
 
+        function activateMapPlot(id) {
+            activeMapPlotId = id;
+            const p = mapperPlots.find(x => String(x.id) === String(id));
+            document.getElementById('active-draw-name').innerText = p.plot_name;
+            document.getElementById('mapper-controls').classList.remove('hidden');
+            document.getElementById('mapper-controls').classList.add('flex');
+            
+            if(p && p.map_top && p.map_top.startsWith('[')) {
+                try { currentPoly = JSON.parse(p.map_top); } catch(e) { currentPoly = []; }
+            } else { currentPoly = []; }
+            
+            setMapperMode('draw');
+            renderMapperSidebar(); renderMapperSVG();
+        }
+
+        function svgClick(e) {
+            if (mapMode === 'draw' && activeMapPlotId) {
+                const rect = document.getElementById('mapper-svg').getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                currentPoly.push({x, y});
+                renderMapperSVG();
+            }
+        }
+
+        function startPointDrag(e, idx) {
+            if (mapMode !== 'edit') return;
+            e.stopPropagation(); e.preventDefault();
+            isDraggingPoint = idx;
+        }
+
+        function startShapeDrag(e) {
+            if (mapMode !== 'edit') return;
+            e.stopPropagation(); e.preventDefault();
+            isDraggingPoly = true;
+            const rect = document.getElementById('mapper-svg').getBoundingClientRect();
+            dragStartX = ((e.clientX - rect.left) / rect.width) * 100;
+            dragStartY = ((e.clientY - rect.top) / rect.height) * 100;
+        }
+
+        function handleGlobalMouseMove(e) {
+            if (isPanning) {
+                const dx = e.clientX - panStartX; const dy = e.clientY - panStartY;
+                panX += dx; panY += dy; panStartX = e.clientX; panStartY = e.clientY;
+                updateMapTransform(); return;
+            }
+
+            if (isDraggingPoint !== -1) {
+                const svgRect = document.getElementById('mapper-svg').getBoundingClientRect();
+                let currX = ((e.clientX - svgRect.left) / svgRect.width) * 100;
+                let currY = ((e.clientY - svgRect.top) / svgRect.height) * 100;
+                currentPoly[isDraggingPoint].x = Math.max(0, Math.min(100, currX));
+                currentPoly[isDraggingPoint].y = Math.max(0, Math.min(100, currY));
+                renderMapperSVG();
+            } else if (isDraggingPoly) {
+                const svgRect = document.getElementById('mapper-svg').getBoundingClientRect();
+                let currX = ((e.clientX - svgRect.left) / svgRect.width) * 100;
+                let currY = ((e.clientY - svgRect.top) / svgRect.height) * 100;
+                const dx = currX - dragStartX; const dy = currY - dragStartY;
+                currentPoly.forEach(pt => {
+                    pt.x = Math.max(0, Math.min(100, pt.x + dx));
+                    pt.y = Math.max(0, Math.min(100, pt.y + dy));
+                });
+                dragStartX = currX; dragStartY = currY;
+                renderMapperSVG();
+            }
+        }
+
+        function handleGlobalMouseUp(e) {
+            if (isPanning) { isPanning = false; if(mapMode === 'pan') document.getElementById('mapper-scroll-area').style.cursor = 'grab'; }
+            isDraggingPoint = -1; isDraggingPoly = false;
+        }
+
+        function deletePoint(e, idx) {
+            e.preventDefault(); e.stopPropagation();
+            if (mapMode !== 'edit') return;
+            if (currentPoly.length <= 3) return alert("A shape must have at least 3 points!");
+            currentPoly.splice(idx, 1); renderMapperSVG();
+        }
+
+        function clearActiveShape() { currentPoly = []; renderMapperSVG(); }
+
+        function renderMapperSVG() {
+            const svg = document.getElementById('mapper-svg'); let html = '';
+            mapperPlots.forEach(p => {
+                if(p.id === activeMapPlotId) return;
+                if(p.map_top && p.map_top.startsWith('[')) {
+                    try {
+                        const pts = JSON.parse(p.map_top); const ptsStr = pts.map(pt => `${pt.x},${pt.y}`).join(' ');
+                        html += `<polygon points="${ptsStr}" fill="rgba(59, 130, 246, 0.4)" stroke="#3b82f6" stroke-width="0.3"/>`;
+                        const cx = pts.reduce((s, pt) => s + pt.x, 0) / pts.length; const cy = pts.reduce((s, pt) => s + pt.y, 0) / pts.length;
+                        html += `<text x="${cx}" y="${cy}" fill="white" font-weight="900" font-family="Outfit, sans-serif" font-size="2" text-anchor="middle" dominant-baseline="middle" style="text-shadow: 0px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${p.plot_name}</text>`;
+                    } catch(e) {}
+                }
+            });
+
+            if(activeMapPlotId && currentPoly.length > 0) {
+                const ptsStr = currentPoly.map(pt => `${pt.x},${pt.y}`).join(' ');
+                const polyCursor = mapMode === 'edit' ? 'move' : 'crosshair';
+                html += `<polygon points="${ptsStr}" fill="rgba(250, 204, 21, 0.5)" stroke="#facc15" stroke-width="0.5" style="cursor: ${polyCursor}" onmousedown="startShapeDrag(event)"/>`;
+                
+                const pointCursor = mapMode === 'edit' ? 'pointer' : 'crosshair';
+                currentPoly.forEach((pt, i) => {
+                    html += `<circle cx="${pt.x}" cy="${pt.y}" r="0.8" fill="white" stroke="#facc15" stroke-width="0.3" style="cursor: ${pointCursor}" onmousedown="startPointDrag(event, ${i})" ondblclick="deletePoint(event, ${i})" oncontextmenu="deletePoint(event, ${i})"/>`;
+                    if(i === 0) html += `<circle cx="${pt.x}" cy="${pt.y}" r="1.5" fill="#ef4444" pointer-events="none"/>`; 
+                });
+            }
+            svg.innerHTML = html;
+        }
+
+        async function saveActiveShape() {
+            if(!activeMapPlotId) return;
+            if(currentPoly.length > 0 && currentPoly.length < 3) return alert("A custom shape must have at least 3 points!");
+            
+            const btn = document.getElementById('save-shape-btn'); btn.innerText = 'SAVING...'; btn.disabled = true;
+            const polyStr = currentPoly.length > 0 ? JSON.stringify(currentPoly) : null;
+            
+            try {
+                const {error} = await _supabase.from('plots').update({ map_top: polyStr }).eq('id', activeMapPlotId);
+                if(error) throw error;
+                
+                const p = mapperPlots.find(x => String(x.id) === String(activeMapPlotId)); if(p) p.map_top = polyStr;
+                const gp = globalPlots.find(x => String(x.id) === String(activeMapPlotId)); if(gp) gp.map_top = polyStr;
+                
+                renderMapperSidebar(); renderFilteredPlots(); alert("Shape Saved Successfully!");
+            } catch(e) { alert("Database Save Error: " + e.message); } finally { btn.innerText = '💾 Save Shape'; btn.disabled = false; }
+        }
+
+        function openEditPlotModal(id) {
+            const plot = globalPlots.find(p => String(p.id) === String(id));
+            if(!plot) return;
+            document.getElementById('edit-plot-id').value = plot.id;
+            document.getElementById('edit-plot-name').value = plot.plot_name;
+            
+            const select = document.getElementById('edit-plot-nursery'); select.innerHTML = '';
+            globalNurseries.forEach(n => {
+                const opt = document.createElement('option'); opt.value = n.name; opt.innerText = n.name;
+                if(n.name === plot.nursery_name) opt.selected = true; select.appendChild(opt);
+            });
+            document.getElementById('edit-plot-modal').classList.remove('hidden');
+        }
+        function closeEditPlotModal() { document.getElementById('edit-plot-modal').classList.add('hidden'); }
+        
+        async function saveEditPlot() {
+            const id = document.getElementById('edit-plot-id').value;
+            const name = document.getElementById('edit-plot-name').value.trim().toUpperCase();
+            const nursery = document.getElementById('edit-plot-nursery').value;
+            if(!name) return alert("Plot Name required.");
+            const btn = document.getElementById('save-plot-btn'); btn.innerText = 'UPDATING...'; btn.disabled = true;
+
+            const { error } = await _supabase.from('plots').update({ plot_name: name, nursery_name: nursery }).eq('id', id);
+            if(error) alert(error.message); else { closeEditPlotModal(); fetchData(); }
+            btn.innerText = 'Update Plot'; btn.disabled = false;
+        }
+
+        // --- CORE UI RENDERING ---
         function populateNurseryFilters() {
+            // Plot Dropdowns
             const filterSelect = document.getElementById('nursery-filter'); 
             const plotNurserySelect = document.getElementById('plot-nursery-select');
-            
             filterSelect.innerHTML = '<option value="">All Nurseries</option>'; 
             plotNurserySelect.innerHTML = '<option value="">Assign to Nursery...</option>';
             
-            const uniqueNurseries = [...new Set(globalPlots.map(p => p.nursery_name))];
-            uniqueNurseries.forEach(n => filterSelect.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`));
-            globalNurseries.forEach(n => plotNurserySelect.insertAdjacentHTML('beforeend', `<option value="${n.name}">${n.name}</option>`));
+            // Tray Dropdowns
+            const trayFilterSelect = document.getElementById('tray-nursery-filter'); 
+            const trayNurserySelect = document.getElementById('tray-nursery-select');
+            trayFilterSelect.innerHTML = '<option value="">All Nurseries</option>'; 
+            trayNurserySelect.innerHTML = '<option value="">Assign to Nursery...</option>';
+
+            globalNurseries.forEach(n => {
+                filterSelect.insertAdjacentHTML('beforeend', `<option value="${n.name}">${n.name}</option>`);
+                plotNurserySelect.insertAdjacentHTML('beforeend', `<option value="${n.name}">${n.name}</option>`);
+                
+                trayFilterSelect.insertAdjacentHTML('beforeend', `<option value="${n.name}">${n.name}</option>`);
+                trayNurserySelect.insertAdjacentHTML('beforeend', `<option value="${n.name}">${n.name}</option>`);
+            });
         }
+        
+        function renderBreeds() {
+            const list = document.getElementById('breeds-list'); list.innerHTML = '';
+            globalBreeds.forEach(item => list.insertAdjacentHTML('beforeend', `<li class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-fuchsia-300">${item.name}<button onclick="deleteItem('breeds', '${item.id}')" class="text-red-400 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors">✕</button></li>`));
+        }
+        function renderBatches() {
+            const list = document.getElementById('batches-list'); list.innerHTML = '';
+            globalBatches.forEach(item => list.insertAdjacentHTML('beforeend', `<li class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-emerald-300">${item.name}<button onclick="deleteItem('batches', '${item.id}')" class="text-red-400 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors">✕</button></li>`));
+        }
+        function renderNurseries() {
+            const list = document.getElementById('nurseries-list'); list.innerHTML = '';
+            globalNurseries.forEach(item => {
+                let mapBadge = item.map_image_url ? '<span class="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded shadow-inner uppercase font-bold ml-2">Map Linked</span>' : '';
+                let mapBtn = item.map_image_url ? `<button onclick="openGlobalMapperDirect('${item.name}')" class="text-yellow-600 hover:bg-yellow-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors" title="Map Plots"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg></button>` : '';
 
+                list.insertAdjacentHTML('beforeend', `
+                <li class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm transition-all hover:border-blue-300 hover:shadow-md">
+                    <div class="flex flex-col">
+                        <div class="flex items-center"><span class="text-blue-700 uppercase tracking-widest font-black text-sm">${item.name}</span>${mapBadge}</div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Lic: ${item.license || 'N/A'}</span>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        ${mapBtn}
+                        <button onclick="openEditNurseryModal('${item.id}')" class="text-blue-500 hover:bg-blue-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors" title="Edit Nursery"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                        <button onclick="deleteItem('nurseries', '${item.id}')" class="text-red-400 hover:bg-red-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors" title="Delete Nursery">✕</button>
+                    </div>
+                </li>`);
+            });
+        }
         function renderFilteredPlots() {
-            const filterVal = document.getElementById('nursery-filter').value; 
-            const list = document.getElementById('plots-list'); list.innerHTML = '';
-            
+            const filterVal = document.getElementById('nursery-filter').value; const list = document.getElementById('plots-list'); list.innerHTML = '';
             let filtered = filterVal ? globalPlots.filter(p => p.nursery_name === filterVal) : globalPlots;
-
-            if(filtered.length === 0) return list.innerHTML = '<div class="text-xs text-slate-400 italic text-center p-4 col-span-3">No plots found.</div>';
-
+            
+            filtered.forEach(item => {
+                let mappedStatus = (item.map_top && item.map_top.startsWith('[')) ? `<span class="text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded shadow-sm font-bold ml-2">📍 Mapped</span>` : '';
+                list.insertAdjacentHTML('beforeend', `
+                    <li class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm transition-all hover:border-indigo-300 hover:shadow-md">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-100 px-2 py-1 rounded shadow-inner">${item.nursery_name}</span>
+                                <span class="text-base font-black text-slate-800">${item.plot_name}</span>
+                            </div>
+                            <div class="flex items-center">${mappedStatus}</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openEditPlotModal('${item.id}')" class="text-blue-500 hover:bg-blue-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                            <button onclick="deleteItem('plots', '${item.id}')" class="text-red-400 hover:bg-red-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+                        </div>
+                    </li>
+                `);
+            });
+        }
+        function renderFilteredTrays() {
+            const filterVal = document.getElementById('tray-nursery-filter').value; 
+            const list = document.getElementById('trays-list'); list.innerHTML = '';
+            let filtered = filterVal ? globalTrays.filter(t => t.nursery_name === filterVal) : globalTrays;
+            
             filtered.forEach(item => {
                 list.insertAdjacentHTML('beforeend', `
-                    <li class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm font-bold text-slate-700 shadow-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[9px] text-purple-600 font-black uppercase tracking-widest bg-purple-100 px-2 py-1 rounded">${item.nursery_name}</span> 
-                            <span class="text-base">${item.plot_name}</span>
-                        </div> 
-                        <button onclick="deleteItem('plots', '${item.id}')" class="text-red-400 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors">✕</button>
+                    <li class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm transition-all hover:border-amber-300 hover:shadow-md">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] text-amber-600 font-black uppercase tracking-widest bg-amber-100 px-2 py-1 rounded shadow-inner">${item.nursery_name || 'Global'}</span>
+                            </div>
+                            <span class="text-base font-black text-slate-800">${item.tray_name}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="deleteItem('trays', '${item.id}')" class="text-red-400 hover:bg-red-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+                        </div>
                     </li>
                 `);
             });
         }
 
-        async function addBreed() {
-            const name = document.getElementById('new-breed-name').value.trim(); if(!name) return;
-            await _supabase.from('breeds').insert([{ name }]); 
-            document.getElementById('new-breed-name').value = ''; fetchData(); 
+        function openEditNurseryModal(id) {
+            const nursery = globalNurseries.find(n => String(n.id) === String(id));
+            if(!nursery) return;
+            document.getElementById('edit-nursery-id').value = nursery.id;
+            document.getElementById('edit-nursery-name').value = nursery.name;
+            document.getElementById('edit-nursery-license').value = nursery.license || '';
+            document.getElementById('edit-nursery-image-file').value = '';
+            currentEditingMapImage = nursery.map_image_url || null;
+            const viewBtn = document.getElementById('view-current-map-btn');
+            if(currentEditingMapImage) viewBtn.classList.remove('hidden'); else viewBtn.classList.add('hidden');
+            document.getElementById('edit-nursery-modal').classList.remove('hidden');
+        }
+        function viewAttachedMap() { if(!currentEditingMapImage) return; const content = document.getElementById('lightbox-content'); content.innerHTML = `<img src="${currentEditingMapImage}" class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl">`; document.getElementById('lightbox-modal').classList.remove('hidden'); }
+        function closeLightbox() { document.getElementById('lightbox-modal').classList.add('hidden'); document.getElementById('lightbox-content').innerHTML = ''; }
+        function closeEditNurseryModal() { document.getElementById('edit-nursery-modal').classList.add('hidden'); }
+        
+        async function saveEditNursery() {
+            const btn = document.getElementById('save-nursery-btn'); const id = document.getElementById('edit-nursery-id').value; const license = document.getElementById('edit-nursery-license').value.trim().toUpperCase(); const fileInput = document.getElementById('edit-nursery-image-file');
+            if(!license) return alert("Provide license.");
+            btn.innerText = 'SAVING...'; btn.disabled = true;
+            let payload = { license };
+            try {
+                if (fileInput.files.length > 0) payload.map_image_url = await getBase64(fileInput.files[0]);
+                const { error } = await _supabase.from('nurseries').update(payload).eq('id', id);
+                if (error) alert("DB Error: " + error.message); else { alert("Nursery updated!"); closeEditNurseryModal(); fetchData(); }
+            } catch (err) { alert("Error: " + err.message); }
+            btn.innerText = 'SAVE CHANGES'; btn.disabled = false;
         }
 
-        async function addBatch() {
-            const name = document.getElementById('new-batch-name').value.trim().toUpperCase(); if(!name) return;
-            await _supabase.from('batches').insert([{ name }]); 
-            document.getElementById('new-batch-name').value = ''; fetchData(); 
+        // AUTO-COMPRESSOR
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image(); img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1600; const MAX_HEIGHT = 1600;
+                        let width = img.width; let height = img.height;
+
+                        if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                    img.onerror = error => reject(error);
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+        
+        async function addBreed(event) { 
+            const name = document.getElementById('new-breed-name').value.trim(); 
+            if(!name) return; 
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+            
+            try {
+                const { error } = await _supabase.from('breeds').insert([{ name }]); 
+                if (error) throw error;
+                document.getElementById('new-breed-name').value = ''; 
+                fetchData();
+            } catch (err) {
+                alert("Database Error:\n" + err.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        async function addBatch(event) { 
+            const name = document.getElementById('new-batch-name').value.trim().toUpperCase(); 
+            if(!name) return; 
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+            
+            try {
+                const { error } = await _supabase.from('batches').insert([{ name }]); 
+                if (error) throw error;
+                document.getElementById('new-batch-name').value = ''; 
+                fetchData();
+            } catch (err) {
+                alert("Database Error:\n" + err.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        // Add Tray logic
+        async function addTray(event) {
+            const nursery = document.getElementById('tray-nursery-select').value; 
+            const trayName = document.getElementById('new-tray-name').value.trim().toUpperCase();
+            if(!nursery || !trayName) return alert("Select a Nursery and provide a Tray Name.");
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+
+            try {
+                const { error } = await _supabase.from('trays').insert([{ nursery_name: nursery, tray_name: trayName }]);
+                if (error) throw error;
+                document.getElementById('new-tray-name').value = ''; 
+                fetchData();
+            } catch (err) {
+                alert("Database Error (Check if 'trays' table is created and RLS is allowed):\n\n" + err.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
 
-        async function addNursery() {
-            const name = document.getElementById('new-nursery-name').value.trim().toUpperCase(); 
-            const license = document.getElementById('new-nursery-license').value.trim().toUpperCase();
+        async function addNursery(event) {
+            const name = document.getElementById('new-nursery-name').value.trim().toUpperCase(); const license = document.getElementById('new-nursery-license').value.trim().toUpperCase(); const fileInput = document.getElementById('new-nursery-image-file');
             if(!name || !license) return alert("Provide Nursery Name and License.");
-            await _supabase.from('nurseries').insert([{ name, license }]);
-            document.getElementById('new-nursery-name').value = ''; document.getElementById('new-nursery-license').value = ''; fetchData(); 
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+            
+            let payload = { name, license };
+            try {
+                if (fileInput.files.length > 0) payload.map_image_url = await getBase64(fileInput.files[0]);
+                const { error } = await _supabase.from('nurseries').insert([payload]);
+                if (error) throw error;
+                fetchData();
+            } catch (err) { 
+                alert("Error:\n" + err.message); 
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
-
-        async function addPlot() {
-            const nursery = document.getElementById('plot-nursery-select').value; 
-            const plot = document.getElementById('new-plot-name').value.trim().toUpperCase();
+        
+        async function addPlot(event) {
+            const nursery = document.getElementById('plot-nursery-select').value; const plot = document.getElementById('new-plot-name').value.trim().toUpperCase();
             if(!nursery || !plot) return alert("Select a Nursery and provide a Plot Name.");
-            await _supabase.from('plots').insert([{ nursery_name: nursery, plot_name: plot }]);
-            document.getElementById('new-plot-name').value = ''; fetchData(); 
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+            
+            try {
+                const { error } = await _supabase.from('plots').insert([{ nursery_name: nursery, plot_name: plot }]);
+                if (error) throw error;
+                document.getElementById('new-plot-name').value = ''; 
+                fetchData();
+            } catch (err) {
+                alert("Database Error:\n" + err.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
-
-        async function deleteItem(table, id) {
-            if(!confirm(`Are you sure you want to delete this item?`)) return;
-            await _supabase.from(table).delete().eq('id', id);
-            fetchData();
+        
+        async function deleteItem(table, id) { 
+            if(!confirm(`Delete this item?`)) return; 
+            await _supabase.from(table).delete().eq('id', id); 
+            fetchData(); 
         }
 
         _supabase.auth.getSession().then(({ data: { session } }) => { if (!session) window.location.href = 'index.html'; else fetchData(); });
