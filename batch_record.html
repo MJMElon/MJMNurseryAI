@@ -36,7 +36,7 @@
         
         <div class="glass-panel p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden !border-[#3d2610]">
             <button onclick="window.location.href='index.html'" class="text-[10px] font-bold text-[#8a7a68] hover:text-[#3d2610] uppercase tracking-widest bg-[#f8f4ec] hover:bg-[#e8dcc8] px-5 py-3 rounded-xl transition-colors flex items-center gap-2 shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg> Dashboard
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg> Back to main page
             </button>
             <h1 class="text-2xl md:text-3xl font-black uppercase tracking-widest text-[#3d2610] drop-shadow-sm pb-1 text-center" style="word-spacing: 0.2em;">Batch Info</h1>
             <div class="hidden md:block w-[130px]"></div>
@@ -111,12 +111,13 @@
                                 <th>Planted Qty</th>
                                 <th style="min-width: 180px;">Current Stage</th>
                                 <th>Survival %</th>
+                                <th>Culling Rate %</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ledger-body">
                             <tr>
-                                <td colspan="7" class="text-center p-16 text-[#8a7a68] font-bold animate-pulse uppercase tracking-widest text-xs">Loading seedling list...</td>
+                                <td colspan="8" class="text-center p-16 text-[#8a7a68] font-bold animate-pulse uppercase tracking-widest text-xs">Loading seedling list...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -180,7 +181,7 @@
 
             } catch(e) { 
                 console.error("Data load error:", e);
-                document.getElementById('ledger-body').innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-600 font-bold">Error connecting to database. Verify Supabase policies.</td></tr>`;
+                document.getElementById('ledger-body').innerHTML = `<tr><td colspan="8" class="text-center p-10 text-red-600 font-bold">Error connecting to database. Verify Supabase policies.</td></tr>`;
             }
         }
 
@@ -269,7 +270,7 @@
 
             if(displayBatches.length === 0) {
                 const emptyMsg = currentListTab === 'active' ? "No active batches in the nursery." : "No completed batches yet.";
-                body.innerHTML = `<tr><td colspan="7" class="text-center p-16 text-[#8a7a68] font-bold">${emptyMsg}</td></tr>`;
+                body.innerHTML = `<tr><td colspan="8" class="text-center p-16 text-[#8a7a68] font-bold">${emptyMsg}</td></tr>`;
                 return;
             }
 
@@ -296,6 +297,7 @@
                             </div>
                         </td>
                         <td class="${survColor} font-black text-sm">${survRate}</td>
+                        <td class="text-[#c07820] font-black text-sm">${b.mockCullRate}%</td>
                         <td>
                             <button onclick="window.location.href='batch_detail.html?id=${b.batch_name}'" class="px-4 py-2 rounded-xl bg-white border border-[#e8dcc8] text-[#4a7a2e] font-bold text-[10px] uppercase tracking-widest hover:bg-[#6aa83c] hover:text-white hover:border-[#6aa83c] transition-colors shadow-sm flex items-center gap-2">
                                 👁️ View
