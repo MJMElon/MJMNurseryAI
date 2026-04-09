@@ -3,344 +3,558 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MJM Nursery AI - Dashboard</title>
+    <title>MJM Nursery AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f8fafc; margin: 0; font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
-        .bg-pattern { position: fixed; inset: 0; background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 24px 24px; z-index: -2; opacity: 0.5; }
-        .fibre-optics { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-        .spark { position: absolute; background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent); }
-        .h-1 { width: 150px; height: 1px; top: 20%; left: -150px; animation: passH 8s linear infinite; }
-        .h-2 { width: 200px; height: 1px; top: 60%; left: -200px; animation: passH 12s linear infinite 4s; }
-        .h-3 { width: 100px; height: 1px; top: 80%; left: -100px; animation: passH 6s linear infinite 2s; }
-        .v-1 { height: 150px; width: 1px; left: 30%; top: -150px; background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.4), transparent); animation: passV 10s linear infinite 1s; }
-        .v-2 { height: 200px; width: 1px; left: 75%; top: -200px; background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.4), transparent); animation: passV 14s linear infinite 5s; }
-        @keyframes passH { 0% { transform: translateX(0vw); } 100% { transform: translateX(120vw); } }
-        @keyframes passV { 0% { transform: translateY(0vh); } 100% { transform: translateY(120vh); } }
-        
-        .glass-panel { background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid #ffffff; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
-        .glass-card { background-color: rgba(255, 255, 255, 0.5); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); transition: all 0.2s ease; }
-        .input-style { border: 1px solid #e2e8f0; background-color: rgba(255, 255, 255, 0.5); transition: all 0.15s ease-in-out; }
-        .input-style:focus { background-color: #ffffff; outline: none; box-shadow: 0 0 0 2px #10b981; }
-        
-        .btn-primary { background: linear-gradient(to right, #059669, #22c55e); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); transition: all 0.15s ease-in-out; border: none; cursor: pointer; }
-        .btn-primary:hover { background: linear-gradient(to right, #047857, #16a34a); box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -4px rgba(16, 185, 129, 0.3); transform: translateY(-1px); }
-        
-        @keyframes lightning-strike {
-            0% { transform: translate(-180px, -20px) scale(0.5) rotate(-45deg); opacity: 0; }
-            2% { opacity: 1; filter: drop-shadow(0 0 10px #10b981) brightness(2); }
-            4% { transform: translate(-120px, 30px) scale(1.2) rotate(20deg); opacity: 0; }
-            6% { opacity: 1; filter: drop-shadow(0 0 15px #10b981) brightness(2.5); }
-            8% { transform: translate(-60px, -30px) scale(0.8) rotate(-10deg); opacity: 0; }
-            10% { opacity: 1; filter: drop-shadow(0 0 15px #10b981) brightness(2.5); }
-            12% { transform: translate(0px, 20px) scale(1.4) rotate(45deg); opacity: 0; }
-            14% { opacity: 1; filter: drop-shadow(0 0 20px #34d399) brightness(3); }
-            16% { transform: translate(110px, 0px) scale(2.5) rotate(90deg); opacity: 1; filter: drop-shadow(0 0 40px #fff) brightness(4); } 
-            18% { transform: translate(110px, 0px) scale(3.5); opacity: 0; } 
-            100% { opacity: 0; }
-        }
-        @keyframes ai-box-explosion {
-            0%, 14% { opacity: 0.4; transform: scale(1); filter: brightness(1); }
-            16% { opacity: 1; transform: scale(1.3); filter: brightness(2); background-color: #34d399; }
-            25%, 100% { opacity: 0.4; transform: scale(1); filter: brightness(1); background-color: #34d399; }
-        }
-        .flying-leaf { position: absolute; top: 50%; left: 50%; margin-top: -12px; margin-left: -12px; color: #10b981; animation: lightning-strike 3s linear infinite; z-index: 30; pointer-events: none; }
-        .ai-explosion-glow { animation: ai-box-explosion 3s linear infinite; }
-        .fade-enter { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        * { font-family: 'Outfit', system-ui, sans-serif; }
+        body { background-color: #050a0e; margin: 0; overflow-x: hidden; }
 
-        .nature-critter { position: absolute; font-size: 1.5rem; pointer-events: none; opacity: 0; z-index: 50; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); animation: floatSlow 8s ease-in-out forwards; }
-        @keyframes floatSlow { 
-            0% { transform: translate(0, 0) scale(0.6) rotate(-10deg); opacity: 0; } 
-            20% { opacity: 0.9; } 
-            80% { opacity: 0.9; } 
-            100% { transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(10deg); opacity: 0; } 
-        }
+        .auth-bg { position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 50% 40%,#0a1a12 0%,#050a0e 70%); }
+        .grid-lines { position:fixed;inset:0;z-index:1;pointer-events:none;
+            background-image:linear-gradient(rgba(16,185,129,.04)1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.04)1px,transparent 1px);
+            background-size:60px 60px; }
+
+        @keyframes scan{0%{top:-4px}100%{top:100%}}
+        .scan-beam{position:fixed;left:0;right:0;height:3px;z-index:2;pointer-events:none;
+            background:linear-gradient(90deg,transparent,rgba(16,185,129,.6),transparent);
+            box-shadow:0 0 20px 4px rgba(16,185,129,.3);animation:scan 6s linear infinite;}
+
+        @keyframes hBeam{0%{transform:translateX(-100%);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateX(100vw);opacity:0}}
+        @keyframes vBeam{0%{transform:translateY(-100%);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(100vh);opacity:0}}
+        .beam{position:fixed;pointer-events:none;z-index:2;}
+        .beam-h{height:1px;left:0;right:0;background:linear-gradient(90deg,transparent 0%,rgba(16,185,129,.8)30%,#a7f3d0 50%,rgba(16,185,129,.8)70%,transparent 100%);box-shadow:0 0 8px 2px rgba(16,185,129,.5);}
+        .beam-v{width:1px;top:0;bottom:0;background:linear-gradient(180deg,transparent 0%,rgba(16,185,129,.8)30%,#a7f3d0 50%,rgba(16,185,129,.8)70%,transparent 100%);box-shadow:0 0 8px 2px rgba(16,185,129,.5);}
+        .bh1{top:28%;animation:hBeam 7s linear infinite;}
+        .bh2{top:61%;animation:hBeam 11s linear infinite 3.5s;}
+        .bh3{top:82%;animation:hBeam 8s linear infinite 1.2s;}
+        .bv1{left:22%;animation:vBeam 9s linear infinite .8s;}
+        .bv2{left:55%;animation:vBeam 13s linear infinite 4s;}
+        .bv3{left:78%;animation:vBeam 10s linear infinite 2s;}
+
+        .corner{position:absolute;width:18px;height:18px;pointer-events:none;}
+        .corner-tl{top:16px;left:16px;border-top:2px solid #10b981;border-left:2px solid #10b981;}
+        .corner-tr{top:16px;right:16px;border-top:2px solid #10b981;border-right:2px solid #10b981;}
+        .corner-bl{bottom:16px;left:16px;border-bottom:2px solid #10b981;border-left:2px solid #10b981;}
+        .corner-br{bottom:16px;right:16px;border-bottom:2px solid #10b981;border-right:2px solid #10b981;}
+
+        @keyframes crossH{0%{transform:scaleX(0);opacity:0}30%{transform:scaleX(1);opacity:1}70%{transform:scaleX(1);opacity:1}100%{transform:scaleX(0);opacity:0}}
+        @keyframes crossV{0%{transform:scaleY(0);opacity:0}30%{transform:scaleY(1);opacity:1}70%{transform:scaleY(1);opacity:1}100%{transform:scaleY(0);opacity:0}}
+        @keyframes pulseGlow{0%,100%{text-shadow:0 0 20px rgba(52,211,153,.4),0 0 60px rgba(16,185,129,.2)}50%{text-shadow:0 0 40px rgba(52,211,153,.9),0 0 100px rgba(16,185,129,.5)}}
+        @keyframes aiFlicker{0%,95%,100%{opacity:1;box-shadow:0 0 20px rgba(16,185,129,.6)}96%{opacity:.6}97%{opacity:1}98%{opacity:.4;box-shadow:0 0 40px rgba(16,185,129,1)}}
+
+        .logo-title{font-size:clamp(2rem,5vw,3rem);font-weight:900;color:#ecfdf5;letter-spacing:.04em;animation:pulseGlow 4s ease-in-out infinite;}
+        .logo-cross-h{position:absolute;left:0;right:0;height:1px;top:50%;background:linear-gradient(90deg,transparent,#34d399,#a7f3d0,#34d399,transparent);transform-origin:center;animation:crossH 3s ease-in-out infinite;box-shadow:0 0 8px #34d399;}
+        .logo-cross-v{position:absolute;top:0;bottom:0;width:1px;left:50%;background:linear-gradient(180deg,transparent,#34d399,#a7f3d0,#34d399,transparent);transform-origin:center;animation:crossV 3s ease-in-out infinite;box-shadow:0 0 8px #34d399;}
+        .ai-badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 16px;border-radius:10px;background:linear-gradient(135deg,#059669,#10b981);color:white;font-size:22px;font-weight:900;letter-spacing:.12em;border:1px solid #34d399;animation:aiFlicker 5s infinite;position:relative;}
+        .ai-badge::before{content:'';position:absolute;inset:-3px;border-radius:13px;background:radial-gradient(ellipse,rgba(52,211,153,.4),transparent 70%);animation:pulseGlow 2s ease-in-out infinite;}
+
+        .auth-card{background:rgba(5,20,12,.88);backdrop-filter:blur(24px);border:1px solid rgba(52,211,153,.2);box-shadow:0 0 0 1px rgba(16,185,129,.1),0 40px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);}
+        .auth-input{background:rgba(255,255,255,.05);border:1px solid rgba(52,211,153,.2);color:#ecfdf5;border-radius:14px;padding:14px 18px;width:100%;font-size:14px;font-weight:600;outline:none;transition:all .2s;box-sizing:border-box;}
+        .auth-input::placeholder{color:rgba(167,243,208,.4);}
+        .auth-input:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15);background:rgba(255,255,255,.08);}
+        .auth-btn{width:100%;padding:14px;background:linear-gradient(135deg,#059669,#10b981);color:white;font-weight:900;font-size:12px;letter-spacing:.15em;text-transform:uppercase;border:none;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px rgba(16,185,129,.35);transition:all .2s;}
+        .auth-btn:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(16,185,129,.45);}
+
+        /* Dashboard */
+        .dash-bg{background:#f1f5f9;min-height:100vh;}
+        .dash-card{background:white;border-radius:20px;border:1px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,.06);}
+        .metric-card{border-radius:20px;padding:24px;border:1px solid #e2e8f0;background:white;transition:all .2s;}
+        .metric-card:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);transform:translateY(-2px);}
+
+        .gear-slider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);outline:none;cursor:pointer;}
+        .gear-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:white;border:3px solid #1e293b;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:grab;}
+
+        .month-pill{display:flex;flex-direction:column;align-items:center;padding:10px 14px;border-radius:14px;min-width:72px;}
+        .month-pill.current{background:#ecfdf5;border:2px solid #10b981;color:#065f46;}
+        .month-pill.future{background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;}
+        .month-pill.past{background:#f1f5f9;border:1px solid #e2e8f0;color:#94a3b8;}
+
+        .fade-enter{animation:fadeIn .4s ease-out;}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+        .nature-critter{position:absolute;font-size:1.5rem;pointer-events:none;opacity:0;z-index:50;animation:floatSlow 8s ease-in-out forwards;}
+        @keyframes floatSlow{0%{transform:translate(0,0) scale(.6) rotate(-10deg);opacity:0}20%{opacity:.9}80%{opacity:.9}100%{transform:translate(var(--tx),var(--ty)) scale(1.2) rotate(10deg);opacity:0}}
+        .no-scrollbar::-webkit-scrollbar{display:none;}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4 md:p-8 relative">
-    
-    <div class="bg-pattern"></div>
-    <div class="fibre-optics">
-        <div class="spark h-1"></div><div class="spark h-2"></div><div class="spark h-3"></div>
-        <div class="spark v-1"></div><div class="spark v-2"></div>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none" class="min-h-screen flex items-center justify-center p-4 relative">
+    <div class="auth-bg"></div>
+    <div class="grid-lines"></div>
+    <div class="scan-beam"></div>
+    <div class="beam beam-h bh1"></div><div class="beam beam-h bh2"></div><div class="beam beam-h bh3"></div>
+    <div class="beam beam-v bv1"></div><div class="beam beam-v bv2"></div><div class="beam beam-v bv3"></div>
+
+    <div class="auth-card rounded-[2.5rem] w-full max-w-md p-10 relative z-10">
+        <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+
+        <div class="flex flex-col items-center mb-10">
+            <!-- Title with cross lightning -->
+            <div class="relative w-full flex items-center justify-center mb-3" style="height:90px;">
+                <div class="logo-cross-h"></div>
+                <div class="logo-cross-v"></div>
+                <div class="logo-title z-10 relative text-center px-4" style="font-size:clamp(2.2rem,6vw,3.2rem);line-height:1.1;">
+                    MJM<br>
+                    <span style="font-size:0.55em;letter-spacing:0.3em;color:#34d399;font-weight:900;display:block;margin-top:2px;">NURSERY</span>
+                </div>
+            </div>
+            <!-- AI badge -->
+            <div class="ai-badge mt-1">AI</div>
+            <!-- Tagline below badge -->
+            <p class="text-[11px] font-black text-emerald-500 uppercase tracking-[0.35em] mt-5 text-center">The future is here</p>
+        </div>
+
+        <div id="standard-auth-fields" class="space-y-3">
+            <div id="signup-fields" class="hidden"><input type="text" id="user-name" placeholder="Full Name" class="auth-input mb-3"></div>
+            <input type="email" id="email" placeholder="Email Address" class="auth-input">
+            <input type="password" id="password" placeholder="Password" class="auth-input">
+            <button id="main-auth-btn" class="auth-btn mt-2">Login</button>
+            <div class="flex justify-between items-center pt-2">
+                <button id="forgot-password-btn" class="text-[10px] font-bold text-emerald-600/70 hover:text-emerald-400 uppercase tracking-widest bg-transparent border-none cursor-pointer transition-colors">Forgot Password?</button>
+                <button id="toggle-auth-btn" class="text-[10px] font-bold text-slate-400 hover:text-emerald-400 uppercase tracking-widest bg-transparent border-none cursor-pointer transition-colors">Create Account</button>
+            </div>
+        </div>
+        <div id="recovery-auth-fields" class="hidden space-y-3">
+            <div class="text-center text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-4">Create New Password</div>
+            <input type="password" id="new-password" placeholder="Enter New Password" class="auth-input">
+            <button id="update-password-btn" class="auth-btn mt-2">Save Password</button>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD SCREEN -->
+<div id="dashboard-screen" style="display:none" class="dash-bg fade-enter">
+    <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-black text-xs">AI</div>
+            <span class="font-black text-slate-800 uppercase tracking-widest text-sm">MJM Nursery AI</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="welcome-text" class="text-xs font-bold text-slate-400 hidden md:block"></span>
+            <button id="logout-btn" onclick="handleLogout()" class="text-[10px] font-bold text-slate-500 hover:text-red-500 uppercase tracking-widest bg-slate-50 px-4 py-2 rounded-full border border-slate-200 cursor-pointer transition-colors">Sign Out</button>
+        </div>
     </div>
 
-    <div id="auth-screen" class="flex items-center justify-center min-h-screen w-full relative hidden">
-        <div class="glass-panel p-10 rounded-[3rem] w-full max-w-md text-center z-10 relative">
-            <div class="flex justify-center items-center mb-10 relative w-full" id="logo-panel">
-                <svg class="flying-leaf w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-                <div class="flex items-center font-black text-4xl text-[#1b4332] tracking-tight z-20">
-                    <span class="italic mr-3">MJM Nursery</span>
-                    <div class="relative group flex items-center justify-center">
-                        <div class="ai-explosion-glow absolute -inset-2 bg-emerald-400 rounded-xl blur opacity-40"></div>
-                        <span class="relative px-4 py-2 text-[24px] bg-emerald-500 text-white rounded-xl border border-emerald-300 uppercase tracking-[0.1em] font-black shadow-[0_0_15px_rgba(16,185,129,0.5)] z-10">AI</span>
-                    </div>
-                </div>
-            </div>
+    <div class="max-w-[1400px] mx-auto px-6 py-8 space-y-8">
 
-            <div id="standard-auth-fields" class="space-y-4 text-left relative z-40">
-                <div id="signup-fields" class="hidden">
-                    <input type="text" id="user-name" placeholder="Full Name" class="w-full p-4 input-style rounded-2xl outline-none font-semibold box-border mb-4">
-                </div>
-                <input type="email" id="email" placeholder="Email Address" class="w-full p-4 input-style rounded-2xl outline-none font-semibold box-border mb-4">
-                <input type="password" id="password" placeholder="Password" class="w-full p-4 input-style rounded-2xl outline-none font-semibold box-border mb-4">
-                <button id="main-auth-btn" class="w-full btn-primary text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg">LOGIN</button>
-                <div class="mt-6 text-center space-y-2">
-                    <button id="forgot-password-btn" class="text-[10px] bg-transparent border-none cursor-pointer font-bold text-slate-400 hover:text-emerald-700 uppercase tracking-widest transition-colors">Forgot Password?</button>
-                    <div class="block">
-                        <button id="toggle-auth-btn" class="w-full bg-transparent border-none cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-bold mt-2 text-[10px] uppercase tracking-widest">Create Account</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="recovery-auth-fields" class="hidden space-y-4 text-left relative z-40">
-                <div class="text-center text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-4">Create New Password</div>
-                <input type="password" id="new-password" placeholder="Enter New Password" class="w-full p-4 input-style rounded-2xl outline-none font-semibold box-border mb-4">
-                <button id="update-password-btn" class="w-full btn-primary text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg">Save Password</button>
-            </div>
-        </div>
-        <div class="absolute bottom-10 left-0 w-full text-center pointer-events-none">
-            <span class="text-[10px] font-bold text-slate-400/50 uppercase tracking-[0.5em]">The future is here</span>
-        </div>
-    </div>
-
-    <div id="dashboard-screen" class="hidden w-full max-w-[1400px] mx-auto z-10 space-y-8 fade-enter py-8">
-        <div class="glass-panel p-6 rounded-[2rem] flex justify-between items-center relative" id="title-panel">
-            <div class="flex items-center gap-4 relative z-20">
-                <div class="px-4 py-2 bg-emerald-500 text-white rounded-xl uppercase tracking-widest font-black text-[10px] shadow-lg flex items-center gap-2">
-                    <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                    MJM Nursery AI
-                </div>
-                <h1 class="text-xl font-black text-emerald-900 uppercase tracking-widest hidden md:block">System Overview</h1>
-            </div>
-            
-            <div class="flex items-center gap-3 relative z-20">
-                <span id="welcome-text" class="text-xs font-bold text-slate-500 hidden md:block mr-2">Welcome, User</span>
-                <button id="logout-btn" class="text-[10px] font-bold text-slate-500 hover:text-red-500 uppercase tracking-widest bg-white/50 px-5 py-3 rounded-full border border-slate-200 cursor-pointer transition-colors">Sign Out</button>
-            </div>
-            <div id="title-animation-zone" class="absolute inset-0 pointer-events-none z-50 overflow-visible"></div>
-        </div>
-        
+        <!-- Dashboard -->
         <div>
-            <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Business Line Status</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="glass-card p-6 rounded-[1.5rem] relative overflow-hidden group hover:border-blue-400 transition-all">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-blue-100/40 rounded-full blur-xl group-hover:scale-110 transition-transform"></div>
-                    <div class="flex justify-between items-start mb-4 relative z-10">
-                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg></div>
-                        <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-wider">Active</span>
+            <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-5">📊 Nursery Dashboard</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+
+                <!-- Matured seedlings -->
+                <div class="metric-card border-l-4 border-emerald-500 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full blur-2xl"></div>
+                    <div class="flex items-center gap-2 mb-3 relative z-10">
+                        <div class="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Matured Seedlings</span>
                     </div>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Bookings</p>
-                    <h3 class="text-3xl font-black text-slate-800 mt-1 relative z-10">142</h3>
+                    <div class="text-5xl font-black text-emerald-600 mb-1 relative z-10" id="stat-matured">—</div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Seedlings ≥ 12 months old</div>
+                    <div class="mt-3 flex items-center gap-2 relative z-10">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Ready for sale consideration</span>
+                    </div>
                 </div>
-                <div class="glass-card p-6 rounded-[1.5rem] relative overflow-hidden group hover:border-yellow-400 transition-all">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-yellow-100/40 rounded-full blur-xl group-hover:scale-110 transition-transform"></div>
-                    <div class="flex justify-between items-start mb-4 relative z-10">
-                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
-                        <span class="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full uppercase tracking-wider animate-pulse">Pending</span>
+
+                <!-- Orders -->
+                <div class="metric-card border-l-4 border-blue-500 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full blur-2xl"></div>
+                    <div class="flex items-center gap-2 mb-3 relative z-10">
+                        <div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Orders</span>
+                        <span class="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase shrink-0" id="current-month-label">This Month</span>
                     </div>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Awaiting Collection</p>
-                    <h3 class="text-3xl font-black text-slate-800 mt-1 relative z-10">28</h3>
+                    <div class="text-5xl font-black text-blue-600 mb-1 relative z-10" id="stat-orders-current">—</div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Confirmed orders this month</div>
+                    <div class="mt-3 flex items-center gap-2 relative z-10">
+                        <svg class="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Future months: <span id="stat-orders-future" class="font-black">—</span> qty</span>
+                    </div>
                 </div>
-                <div class="glass-card p-6 rounded-[1.5rem] relative overflow-hidden group hover:border-purple-400 transition-all">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-purple-100/40 rounded-full blur-xl group-hover:scale-110 transition-transform"></div>
-                    <div class="flex justify-between items-start mb-4 relative z-10">
-                        <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg></div>
-                        <span class="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-wider">Healthy</span>
+
+                <!-- Available stock -->
+                <div class="metric-card border-l-4 border-purple-500 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-full blur-2xl"></div>
+                    <div class="flex items-center gap-2 mb-3 relative z-10">
+                        <div class="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available for Sales</span>
                     </div>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Stock</p>
-                    <h3 class="text-3xl font-black text-slate-800 mt-1 relative z-10">4,892</h3>
+                    <div class="text-5xl font-black text-purple-600 mb-1 relative z-10" id="stat-available">—</div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">At <span id="gearing-display" class="text-purple-600 font-black">1.0×</span> gearing</div>
+                    <div class="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Base stock: <span id="stat-base-stock" class="text-slate-600 font-black">—</span></div>
                 </div>
-                <div class="glass-card p-6 rounded-[1.5rem] bg-gradient-to-br from-emerald-600 to-green-500 text-white border-none shadow-xl relative overflow-hidden group hover:shadow-emerald-500/30 transition-shadow">
-                    <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform"></div>
-                    <div class="flex justify-between items-start mb-4 relative z-10">
-                        <div class="p-3 bg-white/20 rounded-xl backdrop-blur-sm"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg></div>
+
+            </div>
+
+            <!-- Gearing control -->
+            <div class="dash-card p-6 mb-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-black text-slate-800 uppercase tracking-widest text-sm">⚙️ Gearing Power</h3>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sellable qty = Stock × Gearing. 1.0 = exact, 1.5 = sell 50% more, 2.0 = sell double</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest whitespace-nowrap">1.0×</span>
+                            <input type="range" id="gearing-slider" class="gear-slider flex-1" min="10" max="20" step="1" value="10">
+                            <span class="text-[10px] font-black text-red-500 uppercase tracking-widest whitespace-nowrap">2.0×</span>
+                        </div>
+                        <div class="flex justify-between text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1">
+                            <span>Conservative</span><span>Moderate</span><span>Aggressive</span>
+                        </div>
                     </div>
-                    <p class="text-[10px] font-bold text-emerald-100 uppercase tracking-widest relative z-10">Weekly Revenue</p>
-                    <h3 class="text-3xl font-black mt-1 relative z-10">RM 12.4k</h3>
+                    <div class="flex items-stretch gap-4 shrink-0">
+                        <div class="bg-slate-50 rounded-2xl p-5 text-center border border-slate-200 min-w-[110px]">
+                            <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Gearing</div>
+                            <div class="text-3xl font-black text-slate-800" id="gearing-value">1.0×</div>
+                            <div id="gearing-badge" class="mt-1 text-[9px] font-black text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5 uppercase tracking-wider">Stable</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-2xl p-5 text-center border border-purple-100 min-w-[140px]">
+                            <div class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">Sellable Qty</div>
+                            <div class="text-3xl font-black text-purple-700" id="gearing-sellable">—</div>
+                            <div class="text-[9px] font-bold text-purple-400 uppercase tracking-widest mt-1">vs orders: <span id="gearing-vs-orders" class="text-slate-600 font-black">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order timeline -->
+            <div class="dash-card p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-slate-800 uppercase tracking-widest text-sm">Order Timeline</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current & upcoming months — ordered qty per month</p>
+                    </div>
+                </div>
+                <div id="order-timeline" class="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                    <div class="text-[11px] text-slate-400 font-bold m-auto py-4">Loading order data...</div>
                 </div>
             </div>
         </div>
 
+        <!-- System Modules -->
         <div>
-            <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">System Modules</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                
-                <a href="batch_record.html" class="block w-full text-left glass-panel border-indigo-400 p-8 rounded-[2rem] relative overflow-hidden group cursor-pointer hover:border-indigo-500 hover:shadow-indigo-500/20 hover:shadow-xl transition-all duration-300 decoration-transparent">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-400/10 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
-                    <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all shadow-sm"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg></div>
-                    <h3 class="font-black text-xl text-indigo-900 uppercase tracking-widest mb-2">Batch Record &<br>Reception</h3>
-                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Log incoming seed shipments to the master inventory ledger.</p>
-                    <div class="mt-6 flex items-center text-[10px] font-bold text-indigo-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                        Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+            <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-5">🧩 System Modules</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <a href="batch_record.html" class="block dash-card p-7 group hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100 transition-all duration-300 decoration-transparent border border-transparent">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-5 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     </div>
+                    <h3 class="font-black text-lg text-indigo-900 uppercase tracking-widest mb-2">Batch Records<br><span style="font-size:0.7em;opacity:0.7">(Life of Seedling)</span></h3>
+                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Track seed batches through every lifecycle stage from reception to sale.</p>
+                    <div class="mt-5 flex items-center text-[10px] font-bold text-indigo-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
                 </a>
-
-                <a href="delivery.html" class="block w-full text-left glass-panel p-8 rounded-[2rem] relative overflow-hidden group cursor-pointer hover:border-emerald-400 hover:shadow-emerald-500/20 hover:shadow-xl transition-all duration-300 decoration-transparent">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
-                    <div class="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-sm"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>
-                    <h3 class="font-black text-xl text-emerald-900 uppercase tracking-widest mb-2">Booking &<br>Collection</h3>
-                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Manage customer reservations, AL generation, and DO pickups.</p>
-                    <div class="mt-6 flex items-center text-[10px] font-bold text-emerald-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                        Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                <a href="delivery.html" class="block dash-card p-7 group hover:border-emerald-400 hover:shadow-xl hover:shadow-emerald-100 transition-all duration-300 decoration-transparent border border-transparent">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-5 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     </div>
+                    <h3 class="font-black text-lg text-emerald-900 uppercase tracking-widest mb-2">Customer Order<br>Management</h3>
+                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Orders, Approval Letters, Delivery Orders, L3 Forms.</p>
+                    <div class="mt-5 flex items-center text-[10px] font-bold text-emerald-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
                 </a>
-
-                <a href="inventory_map.html" class="block w-full text-left glass-panel border-blue-400 p-8 rounded-[2rem] relative overflow-hidden group cursor-pointer hover:border-blue-500 hover:shadow-blue-500/20 hover:shadow-xl transition-all duration-300 decoration-transparent">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
-                    <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-sm"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                    <h3 class="font-black text-xl text-blue-900 uppercase tracking-widest mb-2">Operation &<br>Stock Inventory</h3>
-                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Nursery tasks, interactive map, and active batch inventory.</p>
-                    <div class="mt-6 flex items-center text-[10px] font-bold text-blue-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                        Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                <a href="inventory_map.html" class="block dash-card p-7 group hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100 transition-all duration-300 decoration-transparent border border-transparent">
+                    <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-5 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
                     </div>
+                    <h3 class="font-black text-lg text-blue-900 uppercase tracking-widest mb-2">Stock Sales<br>Analysis</h3>
+                    <p class="text-xs text-slate-500 font-semibold leading-relaxed">Nursery map, stock levels and sales performance analytics.</p>
+                    <div class="mt-5 flex items-center text-[10px] font-bold text-blue-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
                 </a>
-
-                <a href="settings.html" class="block w-full text-left glass-panel border-purple-400 p-8 rounded-[2rem] relative overflow-hidden group cursor-pointer hover:border-purple-500 hover:shadow-purple-500/20 hover:shadow-xl transition-all duration-300 decoration-transparent">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-purple-400/10 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
-                    <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-6 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white transition-all shadow-sm"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                    <h3 class="font-black text-xl text-purple-900 uppercase tracking-widest mb-2">System<br>Settings</h3>
+                <a href="settings.html" class="block dash-card p-7 group hover:border-purple-400 hover:shadow-xl hover:shadow-purple-100 transition-all duration-300 decoration-transparent border border-transparent">
+                    <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-5 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <h3 class="font-black text-lg text-purple-900 uppercase tracking-widest mb-2">System<br>Settings</h3>
                     <p class="text-xs text-slate-500 font-semibold leading-relaxed">Configure nurseries, plots, breeds, and inventory master data.</p>
-                    <div class="mt-6 flex items-center text-[10px] font-bold text-purple-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                        Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                    </div>
+                    <div class="mt-5 flex items-center text-[10px] font-bold text-purple-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">Enter Module <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
                 </a>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<script>
+    const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const authScreen = document.getElementById('auth-screen');
-        const dashboardScreen = document.getElementById('dashboard-screen');
-        const mainBtn = document.getElementById('main-auth-btn');
-        const toggleBtn = document.getElementById('toggle-auth-btn');
-        const signupFields = document.getElementById('signup-fields');
-        const logoutBtn = document.getElementById('logout-btn');
-        const forgotPasswordBtn = document.getElementById('forgot-password-btn');
-        const updatePasswordBtn = document.getElementById('update-password-btn');
-        const welcomeText = document.getElementById('welcome-text');
-        
-        const standardFields = document.getElementById('standard-auth-fields');
-        const recoveryFields = document.getElementById('recovery-auth-fields');
-        const passwordField = document.getElementById('password');
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    const authScreen     = document.getElementById('auth-screen');
+    const dashScreen     = document.getElementById('dashboard-screen');
+    const mainBtn        = document.getElementById('main-auth-btn');
+    const toggleBtn      = document.getElementById('toggle-auth-btn');
+    const signupFields   = document.getElementById('signup-fields');
+    const forgotBtn      = document.getElementById('forgot-password-btn');
+    const updatePwBtn    = document.getElementById('update-password-btn');
+    const welcomeText    = document.getElementById('welcome-text');
+    const standardFields = document.getElementById('standard-auth-fields');
+    const recoveryFields = document.getElementById('recovery-auth-fields');
 
-        let isRecoveringPassword = window.location.hash.includes('type=recovery');
+    // ── Show / hide helpers (bypass Tailwind hidden/flex conflict entirely) ──
+    function showAuth() {
+        dashScreen.style.display = 'none';
+        authScreen.style.display = 'flex';
+    }
+    function showDash() {
+        authScreen.style.display = 'none';
+        dashScreen.style.display = 'block';
+    }
 
-        // Slow Healing Emoji Logic - ONLY WHEN LOGGED IN
-        const healingEmojis = ["🌿", "🍃", "🌱", "🪴", "🌳", "🌤️", "⛅️", "🦋", "🐌", "🐞", "🐢", "🍓", "🍵", "🌸", "🦦"];
-        function spawnHealingEmoji() {
-            if(dashboardScreen.classList.contains('hidden')) return;
+    // ── State ─────────────────────────────────────────────────────────────────
+    let isSignUpMode = false;   // tracks Create Account vs Login mode
+    let isRecovering = window.location.hash.includes('type=recovery');
+    let isLoggingOut = false;   // prevents onAuthStateChange from interfering during logout
+    let baseStock = 0;
+    let currentOrdersQty = 0;
 
-            const zone = document.getElementById('title-animation-zone');
-            if (!zone || document.hidden) return;
-            
-            const el = document.createElement('div');
-            el.className = 'nature-critter';
-            el.innerText = healingEmojis[Math.floor(Math.random() * healingEmojis.length)];
-            
-            el.style.left = (35 + Math.random() * 30) + '%'; 
-            el.style.top = (35 + Math.random() * 30) + '%';
-            
-            el.style.setProperty('--tx', (Math.random() - 0.5) * 300 + 'px'); 
-            el.style.setProperty('--ty', (Math.random() - 0.5) * 150 - 50 + 'px');
-            
-            zone.appendChild(el);
-            setTimeout(() => { if(zone.contains(el)) zone.removeChild(el); }, 8500);
+    // ── Sign Out ──────────────────────────────────────────────────────────────
+    window.handleLogout = async function() {
+        isLoggingOut = true;
+        const btn = document.getElementById('logout-btn');
+        if (btn) { btn.innerText = 'Signing Out…'; btn.disabled = true; }
+
+        // Clear session from localStorage first so nothing lingers
+        Object.keys(localStorage).forEach(k => {
+            if (k.startsWith('sb-')) localStorage.removeItem(k);
+        });
+
+        try { await _supabase.auth.signOut({ scope: 'local' }); } catch(e) { /* ignore */ }
+
+        // Always go back to login regardless of API result
+        showAuth();
+        resetAuthForm();
+        if (btn) { btn.innerText = 'Sign Out'; btn.disabled = false; }
+        isLoggingOut = false;
+    };
+
+    // ── Reset auth form to Login state ───────────────────────────────────────
+    function resetAuthForm() {
+        isSignUpMode = false;
+        signupFields.classList.add('hidden');
+        mainBtn.innerText = 'Login';
+        toggleBtn.innerText = 'Create Account';
+        forgotBtn.style.display = 'inline-block';
+        document.getElementById('email').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('user-name').value = '';
+    }
+
+    // ── Toggle Login ↔ Create Account ─────────────────────────────────────────
+    toggleBtn.addEventListener('click', () => {
+        isSignUpMode = !isSignUpMode;
+        if (isSignUpMode) {
+            signupFields.classList.remove('hidden');
+            mainBtn.innerText = 'Sign Up';
+            toggleBtn.innerText = 'Back to Login';
+            forgotBtn.style.display = 'none';
+        } else {
+            signupFields.classList.add('hidden');
+            mainBtn.innerText = 'Login';
+            toggleBtn.innerText = 'Create Account';
+            forgotBtn.style.display = 'inline-block';
         }
-        
-        setInterval(spawnHealingEmoji, 1200);
+    });
 
-        toggleBtn.addEventListener('click', () => {
-            const isLogin = (mainBtn.innerText === 'LOGIN');
-            if (isLogin) { 
-                signupFields.classList.remove('hidden');
-                passwordField.classList.remove('hidden');
-                mainBtn.innerText = 'SIGN UP';
-                toggleBtn.innerText = 'Back to Login';
-                forgotPasswordBtn.style.display = 'none';
-            } else { 
+    // ── Login / Sign Up button ────────────────────────────────────────────────
+    mainBtn.addEventListener('click', async () => {
+        const email = document.getElementById('email').value.trim();
+        const pw    = document.getElementById('password').value;
+        if (!email || !pw) return alert('Please enter email and password.');
+
+        mainBtn.innerText = 'Processing…';
+        mainBtn.disabled = true;
+
+        if (isSignUpMode) {
+            const name = document.getElementById('user-name').value.trim();
+            const { error } = await _supabase.auth.signUp({
+                email, password: pw,
+                options: { data: { full_name: name } }
+            });
+            if (error) {
+                alert('Signup Error: ' + error.message);
+                mainBtn.innerText = 'Sign Up';
+            } else {
+                alert('Account created! You can now log in.');
+                // Go back to login mode cleanly — do NOT call toggleBtn.click()
+                isSignUpMode = false;
                 signupFields.classList.add('hidden');
-                passwordField.classList.remove('hidden');
-                mainBtn.innerText = 'LOGIN';
+                mainBtn.innerText = 'Login';
                 toggleBtn.innerText = 'Create Account';
-                forgotPasswordBtn.style.display = 'inline-block';
+                forgotBtn.style.display = 'inline-block';
             }
-        });
+        } else {
+            const { error } = await _supabase.auth.signInWithPassword({ email, password: pw });
+            if (error) {
+                alert('Login Error: ' + error.message);
+                mainBtn.innerText = 'Login';
+            }
+            // On success, onAuthStateChange will call showDash()
+        }
 
-        mainBtn.addEventListener('click', async (e) => {
-            e.preventDefault(); 
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            if (!email || !password) return alert("Please enter both your email and password.");
+        mainBtn.disabled = false;
+    });
 
-            const originalText = mainBtn.innerText;
-            mainBtn.innerText = 'PROCESSING...';
-            mainBtn.disabled = true;
+    // ── Forgot Password ───────────────────────────────────────────────────────
+    forgotBtn.addEventListener('click', async () => {
+        const email = document.getElementById('email').value.trim();
+        if (!email) return alert('Enter your email first.');
+        forgotBtn.innerText = 'Sending…';
+        const { error } = await _supabase.auth.resetPasswordForEmail(email);
+        if (error) alert('Error: ' + error.message);
+        else alert('Reset link sent! Check your inbox.');
+        forgotBtn.innerText = 'Forgot Password?';
+    });
 
-            if (originalText === 'SIGN UP') {
-                const fullName = document.getElementById('user-name').value.trim();
-                const { error } = await _supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
-                mainBtn.innerText = originalText;
-                mainBtn.disabled = false;
-                if (error) alert("Signup Error: " + error.message);
-                else { alert("Account Created! You may log in now."); toggleBtn.click(); }
+    // ── Update Password (recovery flow) ──────────────────────────────────────
+    updatePwBtn.addEventListener('click', async () => {
+        const pw = document.getElementById('new-password').value;
+        if (!pw || pw.length < 6) return alert('Password must be at least 6 characters.');
+        updatePwBtn.innerText = 'Updating…';
+        const { error } = await _supabase.auth.updateUser({ password: pw });
+        if (error) {
+            alert('Error: ' + error.message);
+            updatePwBtn.innerText = 'Save Password';
+        } else {
+            alert('Password updated! Please log in.');
+            isRecovering = false;
+            window.location.hash = '';
+            recoveryFields.classList.add('hidden');
+            standardFields.classList.remove('hidden');
+            showAuth();
+        }
+    });
+
+    // ── Auth state listener ───────────────────────────────────────────────────
+    _supabase.auth.onAuthStateChange(async (event, session) => {
+        // Never interfere while we're intentionally logging out
+        if (isLoggingOut) return;
+
+        if (event === 'PASSWORD_RECOVERY') {
+            isRecovering = true;
+            showAuth();
+            standardFields.classList.add('hidden');
+            recoveryFields.classList.remove('hidden');
+            return;
+        }
+
+        if (event === 'SIGNED_OUT' || !session) {
+            showAuth();
+            return;
+        }
+
+        if (session) {
+            showDash();
+            welcomeText.innerText = `Welcome, ${session.user.user_metadata?.full_name || session.user.email}`;
+            await loadDashboard();
+        }
+    });
+
+    // ── Dashboard data ────────────────────────────────────────────────────────
+    async function loadDashboard() {
+        const now = new Date();
+        const cm = now.getMonth();
+        const cy = now.getFullYear();
+        document.getElementById('current-month-label').innerText = now.toLocaleString('en-MY', { month: 'long', year: 'numeric' });
+
+        try {
+            const cutoff = new Date(now);
+            cutoff.setMonth(cutoff.getMonth() - 12);
+            const { data: recLogs } = await _supabase.from('inventory_logs')
+                .select('quantity_change,created_at')
+                .eq('transaction_type','Seeds_Received')
+                .lte('created_at', cutoff.toISOString());
+
+            baseStock = (recLogs || []).reduce((s, l) => s + (l.quantity_change || 0), 0);
+            document.getElementById('stat-matured').innerText = baseStock.toLocaleString();
+
+            let ordersData = [];
+            const { data: bookings } = await _supabase.from('bookings')
+                .select('quantity,booking_date,collection_date')
+                .order('booking_date', { ascending: true });
+
+            if (bookings && bookings.length > 0) {
+                ordersData = bookings.map(b => ({ qty: b.quantity || 0, date: new Date(b.collection_date || b.booking_date) }));
             } else {
-                const { error } = await _supabase.auth.signInWithPassword({ email, password });
-                if (error) alert("Login Error: " + error.message);
-                mainBtn.innerText = originalText;
-                mainBtn.disabled = false;
+                const { data: salesLogs } = await _supabase.from('inventory_logs')
+                    .select('quantity_change,created_at')
+                    .in('transaction_type',['Sales','Booking','Order'])
+                    .order('created_at',{ascending:true});
+                ordersData = (salesLogs || []).map(l => ({ qty: Math.abs(l.quantity_change || 0), date: new Date(l.created_at) }));
             }
-        });
 
-        forgotPasswordBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value.trim();
-            if (!email) return alert("Please enter your email address first.");
-            forgotPasswordBtn.innerText = 'SENDING LINK...';
-            const { error } = await _supabase.auth.resetPasswordForEmail(email);
-            if (error) alert("Error: " + error.message);
-            else alert("Password reset link sent! Check your email inbox.");
-            forgotPasswordBtn.innerText = 'FORGOT PASSWORD?';
-        });
+            currentOrdersQty = ordersData.filter(o => o.date.getMonth() === cm && o.date.getFullYear() === cy).reduce((s, o) => s + o.qty, 0);
+            document.getElementById('stat-orders-current').innerText = currentOrdersQty.toLocaleString();
 
-        updatePasswordBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const newPassword = document.getElementById('new-password').value;
-            if (!newPassword || newPassword.length < 6) return alert("Password must be at least 6 characters.");
-            updatePasswordBtn.innerText = 'UPDATING...';
-            const { error } = await _supabase.auth.updateUser({ password: newPassword });
-            if (error) { alert("Error: " + error.message); updatePasswordBtn.innerText = 'SAVE PASSWORD'; } 
-            else { alert("Password updated! Logging you in..."); window.location.href = window.location.pathname; }
-        });
+            const endOfCurrentMonth = new Date(cy, cm + 1, 0);
+            const futureQty = ordersData.filter(o => o.date > endOfCurrentMonth).reduce((s, o) => s + o.qty, 0);
+            document.getElementById('stat-orders-future').innerText = futureQty.toLocaleString();
 
-        logoutBtn.addEventListener('click', async () => {
-            await _supabase.auth.signOut();
-            window.location.reload();
-        });
+            buildTimeline(ordersData, cm, cy);
+        } catch(e) {
+            console.warn('Dashboard load error:', e);
+            ['stat-matured','stat-orders-current','stat-orders-future'].forEach(id => {
+                document.getElementById(id).innerText = '—';
+            });
+        }
+        updateGearing();
+    }
 
-        _supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'PASSWORD_RECOVERY') isRecoveringPassword = true;
-            if (isRecoveringPassword) {
-                authScreen.classList.remove('hidden'); dashboardScreen.classList.add('hidden');
-                standardFields.classList.add('hidden'); recoveryFields.classList.remove('hidden');
-                return; 
-            }
-            if (session) {
-                authScreen.classList.add('hidden'); dashboardScreen.classList.remove('hidden');
-                const name = session.user.user_metadata?.full_name || session.user.email;
-                welcomeText.innerText = `Welcome, ${name}`;
-            } else {
-                authScreen.classList.remove('hidden'); dashboardScreen.classList.add('hidden');
-            }
-        });
-    </script>
+    function buildTimeline(ordersData, cm, cy) {
+        const container = document.getElementById('order-timeline');
+        container.innerHTML = '';
+        for (let offset = -1; offset <= 5; offset++) {
+            const d = new Date(cy, cm + offset, 1);
+            const qty = ordersData.filter(o => o.date.getMonth() === d.getMonth() && o.date.getFullYear() === d.getFullYear()).reduce((s, o) => s + o.qty, 0);
+            const type = offset < 0 ? 'past' : offset === 0 ? 'current' : 'future';
+            const qtyColor = type === 'current' ? '#065f46' : type === 'future' ? '#2563eb' : '#94a3b8';
+            const pill = document.createElement('div');
+            pill.className = `month-pill ${type} shrink-0`;
+            pill.innerHTML = `
+                <span style="font-size:9px;letter-spacing:.08em;font-weight:700">${d.toLocaleString('en-MY',{month:'short'})} ${d.getFullYear()}</span>
+                <span style="font-size:20px;font-weight:900;margin:5px 0;color:${qtyColor}">${qty > 0 ? qty.toLocaleString() : '—'}</span>
+                <span style="font-size:8px;letter-spacing:.06em;font-weight:700">${type === 'current' ? '● NOW' : type === 'future' ? '↑ UPCOMING' : 'PAST'}</span>
+            `;
+            container.appendChild(pill);
+        }
+    }
+
+    function updateGearing() {
+        const g = parseInt(document.getElementById('gearing-slider').value) / 10;
+        const sellable = Math.round(baseStock * g);
+        const diff = currentOrdersQty > 0 ? (sellable >= currentOrdersQty ? '+' + (sellable - currentOrdersQty).toLocaleString() : '-' + (currentOrdersQty - sellable).toLocaleString()) : '—';
+        document.getElementById('gearing-display').innerText   = g.toFixed(1) + '×';
+        document.getElementById('gearing-value').innerText     = g.toFixed(1) + '×';
+        document.getElementById('gearing-sellable').innerText  = sellable.toLocaleString();
+        document.getElementById('gearing-vs-orders').innerText = diff;
+        document.getElementById('stat-available').innerText    = sellable.toLocaleString();
+        document.getElementById('stat-base-stock').innerText   = baseStock.toLocaleString();
+        const badge = document.getElementById('gearing-badge');
+        if (g <= 1.2)      { badge.innerText = 'Conservative'; badge.className = 'mt-1 text-[9px] font-black text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5 uppercase tracking-wider'; }
+        else if (g <= 1.6) { badge.innerText = 'Moderate';     badge.className = 'mt-1 text-[9px] font-black text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 uppercase tracking-wider'; }
+        else               { badge.innerText = 'Aggressive';   badge.className = 'mt-1 text-[9px] font-black text-red-600 bg-red-50 rounded-full px-2 py-0.5 uppercase tracking-wider'; }
+    }
+
+    document.getElementById('gearing-slider').addEventListener('input', updateGearing);
+</script>
 </body>
 </html>
