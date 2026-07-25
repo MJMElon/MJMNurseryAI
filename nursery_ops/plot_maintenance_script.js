@@ -52,11 +52,18 @@ function getPlotQty(n, p){
 function setPlotQty(n, p, v){
   if (!plotQtyOverrides[n]) plotQtyOverrides[n] = {};
   plotQtyOverrides[n][p] = Math.max(0, +v || 0);
-  // TODO(supabase): upsert plot-qty override (nursery n, plot p) = value
+  if (_supabase) {
+    _supabase.from('nops_maint_plot_qty')
+      .upsert({ nursery: n, plot: p, qty: plotQtyOverrides[n][p], updated_at: new Date().toISOString() }, { onConflict: 'nursery,plot' })
+      .then(({ error }) => { if (error) console.warn('[maint] plot-qty save failed:', error.message); });
+  }
 }
 function resetPlotQty(n){
   delete plotQtyOverrides[n];
-  // TODO(supabase): delete plot-qty overrides for nursery n
+  if (_supabase) {
+    _supabase.from('nops_maint_plot_qty').delete().eq('nursery', n)
+      .then(({ error }) => { if (error) console.warn('[maint] plot-qty reset failed:', error.message); });
+  }
 }
 const COVERAGE_PER_PUMP = 800; // standard spray coverage (seedlings per pump)
 const CHEMICAL_COVERAGE = { // overrides for chemicals with different cover-per-pump
@@ -226,6 +233,14 @@ function migrateInterrowShape(s, plots) {
 ════════════════════════════ */
 let appState       = {};
 
+/* ── Supabase (shared MJM AI database; tables prefixed nops_maint_) ──
+   Loaded via ../shared/shared_supabase.js in nursery_ops_maintenance.html. */
+const _supabase = (typeof supabase !== 'undefined' && typeof SHARED_SUPA_URL !== 'undefined')
+  ? supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY)
+  : null;
+let dbStateCache = {};   // `${nursery}_${month}` → saved schedule payload
+let _dbReady     = false; // guards writes until the initial DB load lands
+
 /* ════════════════════════════
    PERSISTENCE LAYER
    localStorage removed 2026-07-21 — data now lives in memory for the session
@@ -250,8 +265,12 @@ function persistState(n, m) {
     interrow:       s.interrow,
     _savedPd:       s._savedPd,
   };
-  void _payload;   // in-memory only for now
-  // TODO(supabase): await db.from('schedule_state').upsert({ nursery:n, month:m, ..._payload })
+  dbStateCache[stateKey(n, m)] = JSON.parse(JSON.stringify(_payload));
+  if (_supabase) {
+    _supabase.from('nops_maint_state')
+      .upsert({ nursery: n, month: m, payload: _payload, updated_at: new Date().toISOString() }, { onConflict: 'nursery,month' })
+      .then(({ error }) => { if (error) console.warn('[maint] schedule save failed:', error.message); });
+  }
 }
 
 /* Load a saved state for a nursery+month.
@@ -259,7 +278,8 @@ function persistState(n, m) {
    TODO(supabase): fetch row by (nursery, month); return its JSON or null.
    (migrateManuringShape / migrateInterrowShape still run on whatever the DB returns.) */
 function loadPersistedState(n, m) {
-  return null;
+  const cached = dbStateCache[stateKey(n, m)];
+  return cached ? JSON.parse(JSON.stringify(cached)) : null;
 }
 let currentNursery = 'BNN';
 let canEditSchedule = true;   // no login — every session has full edit access
@@ -541,6 +561,7 @@ function autoSyncRecords() {
   const merged = newRecs.map(r => existingMap[existingKey(r)] || r);
   records = [...otherNurseryRecs, ...merged];
   renderRecords();
+  persistRecords();
 }
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -1389,7 +1410,10 @@ function toggleAllInterrow(ri, ci){
 /* Publish the flat task list for the worker app to consume.
    TODO(supabase): upsert `published_schedule` for (nursery, month) = tasks. */
 function publishSchedule(n, m, tasks) {
-  void n; void m; void tasks;   // in-memory/no-op until DB is wired
+  if (!_supabase) return;
+  _supabase.from('nops_maint_published')
+    .upsert({ nursery: n, month: m, tasks: tasks, updated_at: new Date().toISOString() }, { onConflict: 'nursery,month' })
+    .then(({ error }) => { if (error) console.warn('[maint] publish failed:', error.message); });
 }
 function saveSchedule() {
   const n = getNursery(), m = getMonth(), s = getState(n, m);
@@ -1583,7 +1607,17 @@ function renderRecords() {
   });
   tbody.innerHTML = html;
 }
-function togRec(id,f){ const r=records.find(x=>x.id===id); r[f]=r[f]?0:1; renderRecords(); }
+let _recSaveTimer = null;
+function persistRecords() {
+  if (!_supabase || !_dbReady) return;
+  clearTimeout(_recSaveTimer);
+  _recSaveTimer = setTimeout(() => {
+    _supabase.from('nops_maint_records')
+      .upsert({ id: 1, records: records, updated_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) console.warn('[maint] records save failed:', error.message); });
+  }, 400);
+}
+function togRec(id,f){ const r=records.find(x=>x.id===id); r[f]=r[f]?0:1; renderRecords(); persistRecords(); }
 function openRecModal(pre) {
   editRecId=pre?pre.id:null;
   document.getElementById('rec-modal-title').textContent=editRecId?'Edit Record':'Add Work Record';
@@ -1598,7 +1632,7 @@ function openRecModal(pre) {
 }
 function closeRecModal(){ document.getElementById('rec-modal').classList.remove('open'); }
 function editRec(id){ openRecModal(records.find(r=>r.id===id)); }
-function deleteRec(id){ if(!confirm('Delete this record?')) return; records=records.filter(r=>r.id!==id); renderRecords(); }
+function deleteRec(id){ if(!confirm('Delete this record?')) return; records=records.filter(r=>r.id!==id); renderRecords(); persistRecords(); }
 function saveRec(){
   const obj={
     tarikh:document.getElementById('rf-tarikh').value,
@@ -1612,7 +1646,7 @@ function saveRec(){
   if(!obj.plot){ alert('Please enter a plot number.'); return; }
   if(editRecId){ const i=records.findIndex(r=>r.id===editRecId); records[i]={...records[i],...obj}; }
   else records.push({id:Date.now(),...obj});
-  closeRecModal(); renderRecords();
+  closeRecModal(); renderRecords(); persistRecords();
 }
 
 /* ════════════════════════════
@@ -2304,3 +2338,33 @@ document.getElementById('pdf-modal').addEventListener('click', e=>{ if(e.target=
 document.getElementById('nursery-pill').textContent = getNursery();
 applyLang();        // applies saved language + renders all views
 autoSyncRecords();
+
+/* ── Initial load from Supabase ─────────────────────────────────
+   Pulls every saved schedule payload, the work-records list and the
+   plot-qty overrides, then re-renders. Writes are held back until this
+   completes (_dbReady) so the seed data can never clobber saved rows. */
+async function initDb() {
+  if (!_supabase) { _dbReady = true; return; }
+  try {
+    const [stRes, recRes, qtyRes] = await Promise.all([
+      _supabase.from('nops_maint_state').select('nursery, month, payload'),
+      _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
+      _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty')
+    ]);
+    (stRes.data || []).forEach(r => {
+      dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
+      if (appState[r.nursery]) delete appState[r.nursery][r.month]; // rebuild from DB
+    });
+    if (recRes.data && Array.isArray(recRes.data.records) && recRes.data.records.length) {
+      records = recRes.data.records;
+    }
+    (qtyRes.data || []).forEach(r => {
+      if (!plotQtyOverrides[r.nursery]) plotQtyOverrides[r.nursery] = {};
+      plotQtyOverrides[r.nursery][r.plot] = r.qty;
+    });
+  } catch (e) { console.warn('[maint] initial DB load failed:', e); }
+  _dbReady = true;
+  renderAll();
+  autoSyncRecords();
+}
+initDb();
