@@ -1491,11 +1491,11 @@ function showSaveToast(taskCount) {
   const t = document.createElement('div');
   t.id = 'save-toast';
   t.style.cssText = `position:fixed;top:70px;left:50%;transform:translateX(-50%);
-    background:var(--green-dark);color:#fff;padding:12px 24px;border-radius:12px;
+    background:#0a6038;color:#fff;padding:12px 24px;border-radius:12px;
     font-size:13px;font-weight:600;z-index:300;box-shadow:0 4px 16px rgba(0,40,20,0.25);
     text-align:center;line-height:1.6;`;
   t.innerHTML = `✓ Schedule saved<br>
-    <span style="font-size:11px;opacity:0.8;">${taskCount} tasks ready · database sync pending</span>`;
+    <span style="font-size:11px;opacity:0.85;">${taskCount} tasks · saved to database</span>`;
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.4s'; setTimeout(()=>t.remove(),400); }, 3500);
 }
