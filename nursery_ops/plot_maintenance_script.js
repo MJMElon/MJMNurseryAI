@@ -488,6 +488,8 @@ function onNurseryChange() {
 }
 function renderAll() {
   const m=getMonth(), n=getNursery(), lbl=NURSERY_LABELS[n];
+  // Remember the last-viewed month & nursery (restored on next visit).
+  try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   ['pd','manuring','weeding','interrow'].forEach(k => {
     const el = document.getElementById(`${k}-nursery-line`);
     if (el) el.textContent = `${lbl} — ${m}`;
@@ -2335,6 +2337,15 @@ document.getElementById('rec-modal').addEventListener('click', e=>{ if(e.target=
 document.getElementById('pdf-modal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closePdfModal(); });
 
 // Boot straight into the app (previously done on successful login)
+// Restore the last-used month & nursery before the first render.
+try {
+  const savedMonth   = localStorage.getItem('mjm_maint_month');
+  const savedNursery = localStorage.getItem('mjm_maint_nursery');
+  const mSel = document.getElementById('global-month');
+  const nSel = document.getElementById('global-nursery');
+  if (savedMonth && Array.from(mSel.options).some(o => o.value === savedMonth)) mSel.value = savedMonth;
+  if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
+} catch (_) {}
 document.getElementById('nursery-pill').textContent = getNursery();
 applyLang();        // applies saved language + renders all views
 autoSyncRecords();
