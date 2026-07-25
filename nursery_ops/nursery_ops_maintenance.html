@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MJM Nursery AI — Maintenance System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=10">
+</head>
+<body>
+
+<!-- ═══ APP VIEW ═══ -->
+<div id="view-app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="nursery_ops_dashboard.html" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-decoration:none;border:1.5px solid var(--border);border-radius:99px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">&#8592; Back</a>
+      <div class="logo-wrap">
+        <div class="logo-mark">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 3L7 8H4L2.5 12L4 16L7 21H17L20 16L21.5 12L20 8H17L12 3Z" stroke="#fff" stroke-width="1.7" fill="none"/>
+            <path d="M12 8V16M9 10.5L12 8L15 10.5M9 13.5L12 16L15 13.5" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-name">MJM NURSERY <span class="ai-chip">AI</span></div>
+          <div class="logo-sub">MAINTENANCE SYSTEM</div>
+        </div>
+      </div>
+      <div class="topbar-mid">
+        <div class="top-ctrl"><label data-i18n="top.month">Month</label>
+          <select class="top-sel" id="global-month" onchange="renderAll();autoSyncRecords()">
+            <option>Jan 2026</option><option>Feb 2026</option><option>Mar 2026</option>
+            <option selected>Apr 2026</option><option>May 2026</option><option>Jun 2026</option>
+            <option>Jul 2026</option><option>Aug 2026</option><option>Sep 2026</option>
+            <option>Oct 2026</option><option>Nov 2026</option><option>Dec 2026</option>
+          </select>
+        </div>
+        <div class="top-ctrl"><label data-i18n="top.nursery">Nursery</label>
+          <select class="top-sel" id="global-nursery" onchange="onNurseryChange()">
+            <option value="PN">PN — Pre Nursery</option>
+            <option value="BNN">BNN — Batu Niah</option>
+            <option value="UNN1">UNN 1 — Ulu Niah 1</option>
+            <option value="UNN2">UNN 2 — Ulu Niah 2</option>
+          </select>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="nursery-pill" id="nursery-pill">BNN</div>
+        <div class="lang-toggle" role="group" aria-label="Language">
+          <button type="button" class="lang-seg" data-l="en" onclick="setLang('en')">EN</button>
+          <button type="button" class="lang-seg" data-l="bm" onclick="setLang('bm')">BM</button>
+        </div>
+        <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+        <button class="btn-pdf" onclick="openPdfModal()" data-i18n="btn.pdf">⬇ PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="tabs-bar">
+      <button class="tab-btn active"  onclick="switchTab('pd',this)"       data-i18n="tab.pd">P &amp; D — Racun</button>
+      <button class="tab-btn"         onclick="switchTab('manuring',this)" data-i18n="tab.manuring">Manuring</button>
+      <button class="tab-btn"         onclick="switchTab('weeding',this)"  data-i18n="tab.weeding">Weeding</button>
+      <button class="tab-btn"         onclick="switchTab('interrow',this)" data-i18n="tab.interrow">Interrow Spray</button>
+      <button class="tab-btn"         onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
+      <button class="tab-btn"         onclick="switchTab('chart',this)"    data-i18n="tab.chart">Analytics</button>
+      <button class="tab-btn"         onclick="switchTab('calc',this)"     data-i18n="tab.calc">💊 Dosage Calc</button>
+    </div>
+
+    <!-- P&D -->
+    <div id="tab-pd" class="tab-panel active">
+      <div class="section-hdr">
+        <div><div class="co-name">MJM NURSERY</div><div class="nursery-line" id="pd-nursery-line"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="section-badge" data-i18n="badge.pd">JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA</div>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+        </div>
+      </div>
+      <div class="card"><div class="tbl-wrap"><table class="sched-table" id="pd-table"></table></div></div>
+    </div>
+
+    <!-- MANURING -->
+    <div id="tab-manuring" class="tab-panel">
+      <div class="section-hdr">
+        <div><div class="co-name">MJM NURSERY</div><div class="nursery-line" id="manuring-nursery-line"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="section-badge" data-i18n="badge.manuring">JADUAL MANURING</div>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+        </div>
+      </div>
+      <div class="card"><div class="tbl-wrap"><table class="sched-table" id="manuring-table"></table></div></div>
+    </div>
+
+    <!-- WEEDING -->
+    <div id="tab-weeding" class="tab-panel">
+      <div class="section-hdr">
+        <div><div class="co-name">MJM NURSERY</div><div class="nursery-line" id="weeding-nursery-line"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="section-badge" data-i18n="badge.weeding">JADUAL WEEDING</div>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+        </div>
+      </div>
+      <div class="card"><div class="tbl-wrap"><table class="sched-table" id="weeding-table"></table></div></div>
+    </div>
+
+    <!-- INTERROW SPRAY -->
+    <div id="tab-interrow" class="tab-panel">
+      <div class="section-hdr">
+        <div><div class="co-name">MJM NURSERY</div><div class="nursery-line" id="interrow-nursery-line"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="section-badge" data-i18n="badge.interrow">JADUAL INTERROW SPRAY</div>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+        </div>
+      </div>
+      <div class="card"><div class="tbl-wrap"><table class="sched-table" id="interrow-table"></table></div></div>
+    </div>
+
+    <!-- WORK RECORD -->
+    <div id="tab-record" class="tab-panel">
+      <div id="rec-metrics" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:nowrap;overflow-x:auto;"></div>
+      <div class="toolbar">
+        <select class="filter-sel" id="rf-filter-jenis" onchange="renderRecords()">
+          <option value="" data-i18n="rec.allJenis">All Jenis Kerja</option>
+          <option value="Penyemburan racun kulat dan serangga" data-i18n="jenis.pd">Penyemburan racun kulat dan serangga</option>
+          <option value="Meracun rumput secara selingan" data-i18n="jenis.interrow">Meracun rumput secara selingan</option>
+          <option value="Merumput" data-i18n="jenis.weeding">Merumput</option>
+          <option value="Membaja" data-i18n="jenis.manuring">Membaja</option>
+        </select>
+        <select class="filter-sel" id="rf-filter-plot" onchange="renderRecords()">
+          <option value="" data-i18n="rec.allPlot">All Plot</option>
+        </select>
+        <input class="filter-sel" type="text" id="rf-filter-date"
+               placeholder="Filter by date…" data-i18n-ph="rec.filterDate" oninput="renderRecords()"
+               style="width:160px;height:36px;padding:0 10px;font-size:12px;">
+        <button class="btn btn-primary" onclick="openRecModal()" data-i18n="btn.addRecord">+ Add Record</button>
+        <button class="btn" onclick="syncRecordsFromSchedule()" data-i18n="btn.sync">↺ Sync from Schedule</button>
+      </div>
+      <div class="card"><div class="tbl-wrap">
+        <table class="rec-table">
+          <thead><tr>
+            <th class="th-left" style="min-width:95px;"  data-i18n="rec.tarikh">Tarikh</th>
+            <th class="th-left" style="min-width:190px;" data-i18n="rec.jenis">Jenis Kerja</th>
+            <th class="th-left" style="min-width:210px;" data-i18n="rec.racun">Racun / Chemical</th>
+            <th style="text-align:center;"               data-i18n="rec.plot">Plot</th>
+            <th style="text-align:center;min-width:115px;" data-i18n="rec.batch">Batch</th>
+            <th style="text-align:center;min-width:60px;"  data-i18n="rec.gaia">Gaia</th>
+            <th class="th-left" style="min-width:110px;" data-i18n="rec.remark">Remark</th>
+            <th style="min-width:90px;"></th>
+          </tr></thead>
+          <tbody id="rec-body"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div id="tab-chart" class="tab-panel">
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:15px;font-weight:700;color:var(--text-head);">Analytics — <span id="chart-nursery-label"></span></div>
+      </div>
+
+      <!-- Metric cards — forced single row -->
+      <div id="chart-metrics" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:nowrap;overflow-x:auto;"></div>
+
+      <!-- All charts full width, stacked -->
+      <div class="chart-block" style="margin-bottom:16px;">
+        <div class="chart-head">
+          <div class="chart-title">Monthly Task Completion</div>
+          <div class="chart-legend">
+            <div class="leg-item"><div class="leg-sq" style="background:#0d7a47;"></div>Done</div>
+            <div class="leg-item"><div class="leg-sq" style="background:#d97706;"></div>Pending</div>
+          </div>
+        </div>
+        <div style="height:340px;"><canvas id="mainChart"></canvas></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="chart-block">
+          <div class="chart-head"><div class="chart-title">By Jenis Kerja</div></div>
+          <div style="height:320px;"><canvas id="jenisChart"></canvas></div>
+        </div>
+        <div class="chart-block">
+          <div class="chart-head"><div class="chart-title">Gaia Completion</div></div>
+          <div style="height:300px;"><canvas id="staffChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="chart-block">
+        <div class="chart-head">
+          <div class="chart-title">Completion by Plot</div>
+          <div class="chart-legend">
+            <div class="leg-item"><div class="leg-sq" style="background:#0d7a47;"></div>Carlos ✓</div>
+            <div class="leg-item"><div class="leg-sq" style="background:#1d4ed8;"></div>Gaia ✓</div>
+            <div class="leg-item"><div class="leg-sq" style="background:#e5e7eb;"></div>Pending</div>
+          </div>
+        </div>
+        <div style="height:360px;"><canvas id="plotChart"></canvas></div>
+      </div>
+
+    </div>
+
+    <!-- CHEMICAL CALCULATOR -->
+    <div id="tab-calc" class="tab-panel">
+      <div class="section-hdr">
+        <div><div class="co-name">MJM NURSERY</div><div class="nursery-line" id="calc-nursery-line"></div></div>
+        <div class="section-badge" data-i18n="badge.calc">💊 DOSAGE CALCULATOR</div>
+      </div>
+      <div class="card" style="padding:18px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.capacity">Nursery Plot Capacity (seedlings per plot — editable)</div>
+          <button class="btn" onclick="resetCalcCapacity()" style="font-size:11px" data-i18n="btn.reset">↺ Reset to Defaults</button>
+        </div>
+        <div id="calc-capacity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px"></div>
+      </div>
+
+      <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.chemHead">🧪 Chemical (Racun)</div>
+      <div class="card" style="padding:18px;margin-bottom:18px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
+          <div style="flex:1;min-width:220px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Chemical</label>
+            <select id="calc-chem" onchange="onCalcChemChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
+          </div>
+          <div style="width:120px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose</label>
+            <input id="calc-dose" type="number" min="0" step="0.5" oninput="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
+          </div>
+          <div style="width:90px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Unit</label>
+            <select id="calc-unit" onchange="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
+              <option value="gm">gm</option><option value="mL">mL</option>
+            </select>
+          </div>
+          <button class="btn" onclick="clearCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
+          <button class="btn" onclick="selectAllCalcPlots()" data-i18n="btn.selectAll">Select All</button>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
+        <div id="calc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:18px"></div>
+        <div id="calc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"></div>
+      </div>
+
+      <div style="font-size:13px;font-weight:700;color:#a16207;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.fertHead">🌱 Fertilizer (Baja)</div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
+          <div style="flex:1;min-width:220px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Fertilizer</label>
+            <select id="fcalc-fert" onchange="onFertCalcChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
+          </div>
+          <div style="width:120px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose (gm)</label>
+            <input id="fcalc-dose" type="number" min="0" step="0.5" oninput="renderFertCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
+          </div>
+          <div style="width:140px">
+            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Bag Size</label>
+            <input id="fcalc-bag" type="text" readonly style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit;background:#f5f5f5">
+          </div>
+          <button class="btn" onclick="clearFertCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
+          <button class="btn" onclick="selectAllFertCalcPlots()" data-i18n="btn.selectAll">Select All</button>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
+        <div id="fcalc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:18px"></div>
+        <div id="fcalc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer><div class="app-footer">
+    <div>MJM NURSERY (MJM Nursery Sdn Bhd 663951-U) — Maintenance Schedule System v2.1</div>
+    <div class="footer-brand">
+      <div class="logo-mark" style="width:22px;height:22px;">
+        <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;">
+          <path d="M12 3L7 8H4L2.5 12L4 16L7 21H17L20 16L21.5 12L20 8H17L12 3Z" stroke="#fff" stroke-width="1.8" fill="none"/>
+        </svg>
+      </div>MJM NURSERY AI
+    </div>
+  </div></footer>
+</div>
+
+<!-- ═══ ADD/EDIT RECORD MODAL ═══ -->
+<div class="modal-overlay" id="rec-modal">
+  <div class="modal">
+    <div class="modal-top">
+      <div class="modal-title" id="rec-modal-title">Add Work Record</div>
+      <button class="modal-close" onclick="closeRecModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="frow"><label>Tarikh</label><input type="text" id="rf-tarikh" placeholder="e.g. 09-04-2026"></div>
+      <div class="frow"><label>Jenis Kerja</label>
+        <select id="rf-jenis">
+          <option value="Penyemburan racun kulat dan serangga" data-i18n="jenis.pd">Penyemburan racun kulat dan serangga</option>
+          <option value="Meracun rumput secara selingan" data-i18n="jenis.interrow">Meracun rumput secara selingan</option>
+          <option value="Merumput" data-i18n="jenis.weeding">Merumput</option>
+          <option value="Membaja" data-i18n="jenis.manuring">Membaja</option>
+        </select>
+      </div>
+      <div class="frow"><label>Racun / Chemical</label><input type="text" id="rf-racun" placeholder="e.g. R1: Daconil 50gm + Bond 15mL"></div>
+      <div class="grid2">
+        <div class="frow"><label>Plot</label><input type="text" id="rf-plot" placeholder="e.g. B1"></div>
+        <div class="frow"><label>Batch No.</label><input type="text" id="rf-batch" placeholder="e.g. 234, 237, 241"></div>
+      </div>
+      <div class="frow"><label>Gaia Workdone ✓</label><select id="rf-gaia"><option value="0">— Pending</option><option value="1">✓ Done</option></select></div>
+      <div class="frow"><label>Remark</label><textarea id="rf-remark" placeholder="Optional remarks..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeRecModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRec()">Save Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PDF DOWNLOAD MODAL ═══ -->
+<div class="modal-overlay" id="pdf-modal">
+  <div class="modal" style="width:420px;">
+    <div class="modal-top">
+      <div class="modal-title" data-i18n="pdf.title">Download Schedule PDF</div>
+      <button class="modal-close" onclick="closePdfModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="frow"><label data-i18n="top.nursery">Nursery</label>
+        <select id="pdf-nursery">
+          <option value="PN">PN — Pre Nursery</option>
+          <option value="BNN">BNN — Batu Niah Nursery</option>
+          <option value="UNN1">UNN 1 — Ulu Niah Nursery 1</option>
+          <option value="UNN2">UNN 2 — Ulu Niah Nursery 2</option>
+        </select>
+      </div>
+      <div class="frow"><label data-i18n="top.month">Month</label>
+        <select id="pdf-month">
+          <option>Jan 2026</option><option>Feb 2026</option><option>Mar 2026</option>
+          <option selected>Apr 2026</option><option>May 2026</option><option>Jun 2026</option>
+          <option>Jul 2026</option><option>Aug 2026</option><option>Sep 2026</option>
+          <option>Oct 2026</option><option>Nov 2026</option><option>Dec 2026</option>
+        </select>
+      </div>
+      <div class="frow"><label data-i18n="pdf.include">Include schedules</label>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-top:6px;">
+          <label class="chk-label"><input type="checkbox" id="pdf-inc-pd"       checked> <span data-i18n="tab.pd">P&amp;D Racun</span></label>
+          <label class="chk-label"><input type="checkbox" id="pdf-inc-manuring" checked> <span data-i18n="tab.manuring">Manuring</span></label>
+          <label class="chk-label"><input type="checkbox" id="pdf-inc-weeding"  checked> <span data-i18n="tab.weeding">Weeding</span></label>
+          <label class="chk-label"><input type="checkbox" id="pdf-inc-interrow" checked> <span data-i18n="tab.interrow">Interrow Spray</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePdfModal()" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="downloadPDF()" data-i18n="btn.downloadPdf">⬇ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="plot_maintenance_script.js?v=10"></script>
+</body>
+</html>
