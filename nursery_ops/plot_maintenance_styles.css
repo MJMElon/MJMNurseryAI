@@ -65,6 +65,9 @@ select.top-sel option{background:#fff;}
 input.top-sel{height:34px;padding:0 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-head);outline:none;background:var(--bg-white);cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s;}
 input.top-sel:hover{border-color:var(--green);}
 input.top-sel:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(13,122,71,0.14);}
+button.top-sel{height:34px;padding:0 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-head);background:var(--bg-white);cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s;white-space:nowrap;}
+button.top-sel:hover{border-color:var(--green);}
+button.top-sel:focus{outline:none;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(13,122,71,0.14);}
 .topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .nursery-pill{font-size:11px;font-weight:700;color:var(--green-text);background:var(--green-light);border:1.5px solid var(--green-mid);padding:3px 12px;border-radius:99px;letter-spacing:0.5px;}
 .lang-toggle{display:inline-flex;border:1.5px solid var(--green-mid);border-radius:99px;overflow:hidden;background:var(--green-light);}
