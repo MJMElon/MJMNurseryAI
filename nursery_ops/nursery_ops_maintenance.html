@@ -28,7 +28,8 @@
       </div>
       <div class="topbar-mid">
         <div class="top-ctrl"><label data-i18n="top.month">Month</label>
-          <input type="month" class="top-sel" id="global-month" style="width:150px;" onchange="renderAll();autoSyncRecords()">
+          <input type="hidden" id="global-month">
+          <button type="button" class="top-sel" id="global-month-btn" style="min-width:110px;text-align:left;" onclick="openMonthWheel('global')">—</button>
         </div>
         <div class="top-ctrl"><label data-i18n="top.nursery">Nursery</label>
           <select class="top-sel" id="global-nursery" onchange="onNurseryChange()">
@@ -319,7 +320,8 @@
         </select>
       </div>
       <div class="frow"><label data-i18n="top.month">Month</label>
-        <input type="month" id="pdf-month">
+        <input type="hidden" id="pdf-month">
+        <button type="button" id="pdf-month-btn" onclick="openMonthWheel('pdf')" style="width:100%;height:38px;padding:0 12px;text-align:left;background:var(--bg-page);border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:13px;color:var(--text-head);cursor:pointer;">—</button>
       </div>
       <div class="frow"><label data-i18n="pdf.include">Include schedules</label>
         <div style="display:flex;flex-direction:column;gap:9px;margin-top:6px;">

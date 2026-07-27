@@ -494,6 +494,100 @@ function monthLabelToInput(lbl) {
 const getMonth   = () => monthInputToLabel(document.getElementById('global-month').value);
 const getNursery = () => document.getElementById('global-nursery').value;
 
+/* ── MONTH/YEAR WHEEL PICKER (Android-style spinner) ──
+   Two independently spinnable columns (month + year) with a Cancel/OK
+   footer. Writes "YYYY-MM" into the hidden #global-month / #pdf-month
+   inputs — everything downstream keeps the existing formats. */
+const WHEEL_ITEM_H = 40, WHEEL_YEAR_MIN = 2020, WHEEL_YEAR_MAX = 2035;
+let _wheelTarget = null, _wheelSnapTimers = {};
+function _ensureWheel() {
+  if (document.getElementById('wheel-overlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'wheel-overlay'; ov.className = 'wheel-overlay';
+  ov.innerHTML = `
+    <div class="wheel-panel">
+      <div class="wheel-cols">
+        <div class="wheel-col" id="wheel-months"></div>
+        <div class="wheel-col" id="wheel-years"></div>
+        <div class="wheel-band"></div>
+      </div>
+      <div class="wheel-actions">
+        <button type="button" onclick="closeMonthWheel()">Cancel</button>
+        <button type="button" onclick="okMonthWheel()">OK</button>
+      </div>
+    </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) closeMonthWheel(); });
+  document.body.appendChild(ov);
+  const mCol = ov.querySelector('#wheel-months');
+  MONTH_ABBR.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.className = 'wheel-item'; d.textContent = m;
+    d.onclick = () => _wheelScrollTo(mCol, i);
+    mCol.appendChild(d);
+  });
+  const yCol = ov.querySelector('#wheel-years');
+  for (let y = WHEEL_YEAR_MIN; y <= WHEEL_YEAR_MAX; y++) {
+    const d = document.createElement('div');
+    d.className = 'wheel-item'; d.textContent = y;
+    d.onclick = () => _wheelScrollTo(yCol, y - WHEEL_YEAR_MIN);
+    yCol.appendChild(d);
+  }
+  [mCol, yCol].forEach(col => col.addEventListener('scroll', () => _wheelOnScroll(col)));
+}
+function _wheelScrollTo(col, idx, instant) {
+  col.scrollTo({ top: idx * WHEEL_ITEM_H, behavior: instant ? 'auto' : 'smooth' });
+}
+function _wheelIdx(col) {
+  return Math.max(0, Math.min(col.children.length - 1, Math.round(col.scrollTop / WHEEL_ITEM_H)));
+}
+function _wheelOnScroll(col) {
+  _wheelHighlight(col);
+  clearTimeout(_wheelSnapTimers[col.id]);
+  _wheelSnapTimers[col.id] = setTimeout(() => {   // snap to nearest row when spinning stops
+    const idx = _wheelIdx(col);
+    if (Math.abs(col.scrollTop - idx * WHEEL_ITEM_H) > 1) _wheelScrollTo(col, idx);
+    _wheelHighlight(col, idx);
+  }, 90);
+}
+function _wheelHighlight(col, idx) {
+  if (idx === undefined) idx = _wheelIdx(col);
+  Array.from(col.children).forEach((el, i) => el.classList.toggle('sel', i === idx));
+}
+function openMonthWheel(target) {
+  _ensureWheel();
+  _wheelTarget = target;
+  const cur = document.getElementById(target === 'pdf' ? 'pdf-month' : 'global-month').value;
+  const m = /^(\d{4})-(\d{2})$/.exec(cur || '');
+  const now = new Date();
+  const yr = m ? parseInt(m[1], 10) : now.getFullYear();
+  const mo = m ? parseInt(m[2], 10) - 1 : now.getMonth();
+  document.getElementById('wheel-overlay').classList.add('open');
+  const mCol = document.getElementById('wheel-months');
+  const yCol = document.getElementById('wheel-years');
+  requestAnimationFrame(() => {
+    _wheelScrollTo(mCol, mo, true);
+    _wheelScrollTo(yCol, Math.max(0, Math.min(WHEEL_YEAR_MAX - WHEEL_YEAR_MIN, yr - WHEEL_YEAR_MIN)), true);
+    _wheelHighlight(mCol, mo);
+    _wheelHighlight(yCol, yr - WHEEL_YEAR_MIN);
+  });
+}
+function closeMonthWheel() { document.getElementById('wheel-overlay').classList.remove('open'); }
+function okMonthWheel() {
+  const mi = _wheelIdx(document.getElementById('wheel-months'));
+  const yi = _wheelIdx(document.getElementById('wheel-years'));
+  const val = `${WHEEL_YEAR_MIN + yi}-${String(mi + 1).padStart(2, '0')}`;
+  document.getElementById(_wheelTarget === 'pdf' ? 'pdf-month' : 'global-month').value = val;
+  _syncMonthButtons();
+  closeMonthWheel();
+  if (_wheelTarget !== 'pdf') { renderAll(); autoSyncRecords(); }
+}
+function _syncMonthButtons() {
+  const g = document.getElementById('global-month'), gb = document.getElementById('global-month-btn');
+  if (g && gb) gb.textContent = (monthInputToLabel(g.value) || 'Select month') + ' \u25BE';
+  const p = document.getElementById('pdf-month'), pb = document.getElementById('pdf-month-btn');
+  if (p && pb) pb.textContent = (monthInputToLabel(p.value) || 'Select month') + ' \u25BE';
+}
+
 function onNurseryChange() {
   document.getElementById('nursery-pill').textContent = getNursery();
   renderAll();
@@ -1669,7 +1763,7 @@ function saveRec(){
 ════════════════════════════ */
 function openPdfModal(){
   document.getElementById('pdf-nursery').value=getNursery();
-  document.getElementById('pdf-month').value=monthLabelToInput(getMonth());
+  document.getElementById('pdf-month').value=monthLabelToInput(getMonth()); _syncMonthButtons();
   document.getElementById('pdf-modal').classList.add('open');
 }
 function closePdfModal(){ document.getElementById('pdf-modal').classList.remove('open'); }
@@ -2361,6 +2455,7 @@ try {
             || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
 } catch (_) {}
+_syncMonthButtons();
 document.getElementById('nursery-pill').textContent = getNursery();
 applyLang();        // applies saved language + renders all views
 autoSyncRecords();

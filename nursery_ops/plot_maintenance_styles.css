@@ -268,3 +268,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .calc-result-card .val{font-size:24px;font-weight:700;color:var(--green-text);line-height:1.1;}
 .calc-result-card.highlight{background:var(--green-bg);border-color:var(--green);}
 .calc-result-card.highlight .val{color:#c2410c;}
+/* ─── MONTH/YEAR WHEEL PICKER ─── */
+.wheel-overlay{display:none;position:fixed;inset:0;z-index:600;background:rgba(5,20,10,0.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;}
+.wheel-overlay.open{display:flex;}
+.wheel-panel{background:#fff;border-radius:14px;box-shadow:var(--shadow-lg);width:300px;max-width:92vw;overflow:hidden;animation:modal-in 0.18s ease;}
+.wheel-cols{position:relative;display:flex;height:200px;padding:0 10px;}
+.wheel-col{flex:1;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding:80px 0;}
+.wheel-col::-webkit-scrollbar{display:none;}
+.wheel-item{height:40px;line-height:40px;text-align:center;font-size:15px;font-weight:600;color:#9ab0a3;user-select:none;cursor:pointer;transition:color .12s,font-size .12s;}
+.wheel-item.sel{color:var(--text-head);font-weight:700;font-size:17px;}
+.wheel-band{position:absolute;left:14px;right:14px;top:80px;height:40px;border-top:2px solid var(--green);border-bottom:2px solid var(--green);pointer-events:none;}
+.wheel-actions{display:grid;grid-template-columns:1fr 1fr;border-top:1.5px solid var(--border);}
+.wheel-actions button{height:46px;border:none;background:#fff;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text-muted);cursor:pointer;transition:background .12s;}
+.wheel-actions button:last-child{color:var(--green-text);border-left:1.5px solid var(--border);}
+.wheel-actions button:hover{background:var(--green-bg);}
