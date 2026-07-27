@@ -28,12 +28,7 @@
       </div>
       <div class="topbar-mid">
         <div class="top-ctrl"><label data-i18n="top.month">Month</label>
-          <select class="top-sel" id="global-month" onchange="renderAll();autoSyncRecords()">
-            <option>Jan 2026</option><option>Feb 2026</option><option>Mar 2026</option>
-            <option selected>Apr 2026</option><option>May 2026</option><option>Jun 2026</option>
-            <option>Jul 2026</option><option>Aug 2026</option><option>Sep 2026</option>
-            <option>Oct 2026</option><option>Nov 2026</option><option>Dec 2026</option>
-          </select>
+          <input type="month" class="top-sel" id="global-month" style="width:150px;" onchange="renderAll();autoSyncRecords()">
         </div>
         <div class="top-ctrl"><label data-i18n="top.nursery">Nursery</label>
           <select class="top-sel" id="global-nursery" onchange="onNurseryChange()">
@@ -324,12 +319,7 @@
         </select>
       </div>
       <div class="frow"><label data-i18n="top.month">Month</label>
-        <select id="pdf-month">
-          <option>Jan 2026</option><option>Feb 2026</option><option>Mar 2026</option>
-          <option selected>Apr 2026</option><option>May 2026</option><option>Jun 2026</option>
-          <option>Jul 2026</option><option>Aug 2026</option><option>Sep 2026</option>
-          <option>Oct 2026</option><option>Nov 2026</option><option>Dec 2026</option>
-        </select>
+        <input type="month" id="pdf-month">
       </div>
       <div class="frow"><label data-i18n="pdf.include">Include schedules</label>
         <div style="display:flex;flex-direction:column;gap:9px;margin-top:6px;">

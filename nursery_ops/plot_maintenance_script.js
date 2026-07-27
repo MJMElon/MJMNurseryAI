@@ -478,7 +478,20 @@ let records = [
 /* ════════════════════════════
    NAVIGATION
 ════════════════════════════ */
-const getMonth   = () => document.getElementById('global-month').value;
+/* The topbar now uses a native month+year picker (value "2026-04").
+   All internal keys/labels keep the original "Apr 2026" format. */
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function monthInputToLabel(v) {
+  const m = /^(\d{4})-(\d{2})$/.exec(v || '');
+  return m ? `${MONTH_ABBR[parseInt(m[2], 10) - 1]} ${m[1]}` : (v || '');
+}
+function monthLabelToInput(lbl) {
+  const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec((lbl || '').trim());
+  if (!m) return '';
+  const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === m[1].toLowerCase());
+  return idx >= 0 ? `${m[2]}-${String(idx + 1).padStart(2, '0')}` : '';
+}
+const getMonth   = () => monthInputToLabel(document.getElementById('global-month').value);
 const getNursery = () => document.getElementById('global-nursery').value;
 
 function onNurseryChange() {
@@ -1656,7 +1669,7 @@ function saveRec(){
 ════════════════════════════ */
 function openPdfModal(){
   document.getElementById('pdf-nursery').value=getNursery();
-  document.getElementById('pdf-month').value=getMonth();
+  document.getElementById('pdf-month').value=monthLabelToInput(getMonth());
   document.getElementById('pdf-modal').classList.add('open');
 }
 function closePdfModal(){ document.getElementById('pdf-modal').classList.remove('open'); }
@@ -1665,7 +1678,7 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const pN = document.getElementById('pdf-nursery').value;
-  const pM = document.getElementById('pdf-month').value;
+  const pM = monthInputToLabel(document.getElementById('pdf-month').value) || getMonth();
   const s  = getState(pN, pM);
   const plots = NURSERY_PLOTS[pN];
   const label = NURSERY_LABELS[pN];
@@ -2343,7 +2356,9 @@ try {
   const savedNursery = localStorage.getItem('mjm_maint_nursery');
   const mSel = document.getElementById('global-month');
   const nSel = document.getElementById('global-nursery');
-  if (savedMonth && Array.from(mSel.options).some(o => o.value === savedMonth)) mSel.value = savedMonth;
+  const now = new Date();
+  mSel.value = monthLabelToInput(savedMonth)
+            || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
 } catch (_) {}
 document.getElementById('nursery-pill').textContent = getNursery();
