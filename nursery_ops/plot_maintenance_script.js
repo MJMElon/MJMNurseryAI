@@ -498,7 +498,7 @@ const getNursery = () => document.getElementById('global-nursery').value;
    Two independently spinnable columns (month + year) with a Cancel/OK
    footer. Writes "YYYY-MM" into the hidden #global-month / #pdf-month
    inputs — everything downstream keeps the existing formats. */
-const WHEEL_ITEM_H = 40, WHEEL_YEAR_MIN = 2020, WHEEL_YEAR_MAX = 2035;
+const WHEEL_ITEM_H = 40, WHEEL_YEAR_MIN = 2020, WHEEL_YEAR_MAX = 2050;
 let _wheelTarget = null, _wheelSnapTimers = {};
 function _ensureWheel() {
   if (document.getElementById('wheel-overlay')) return;
