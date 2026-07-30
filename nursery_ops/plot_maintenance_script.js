@@ -245,6 +245,9 @@ const _supabase = (typeof supabase !== 'undefined' && typeof SHARED_SUPA_URL !==
   ? supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY)
   : null;
 let dbStateCache = {};   // `${nursery}_${month}` → saved schedule payload
+/* Admin of the "Nursery Operation Management" module in User Access.
+   Only admins may edit a record once it has been marked Checked. */
+let isNopsAdmin = false;
 let _dbReady     = false; // guards writes until the initial DB load lands
 
 /* ════════════════════════════
@@ -1756,11 +1759,19 @@ function renderRecords() {
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
         <td style="text-align:center;color:var(--text-muted);">${r.batch||'—'}</td>
-        <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}" onclick="togRec(${r.id},'gaia')">${r.gaia?'☑':'☐'}</span></td>
+        <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-sm" onclick="editRec(${r.id})">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteRec(${r.id})">Del</button>
+          ${r.checked
+            ? `<span class="rec-checked-badge" title="Checked — locked for normal users">✓ Checked</span>` +
+              (isNopsAdmin
+                ? `<button class="btn btn-sm" onclick="editRec(${r.id})">Edit</button>
+                   <button class="btn btn-sm btn-danger" onclick="deleteRec(${r.id})">Del</button>
+                   <button class="btn btn-sm" onclick="toggleChecked(${r.id})" title="Remove the checked lock">Uncheck</button>`
+                : '')
+            : `<button class="btn btn-sm btn-check" onclick="toggleChecked(${r.id})" title="Mark as checked — locks the row for normal users">✓ Check</button>
+               <button class="btn btn-sm" onclick="editRec(${r.id})">Edit</button>
+               <button class="btn btn-sm btn-danger" onclick="deleteRec(${r.id})">Del</button>`}
         </td>
       </tr>`;
     });
@@ -1777,7 +1788,19 @@ function persistRecords() {
       .then(({ error }) => { if (error) console.warn('[maint] records save failed:', error.message); });
   }, 400);
 }
-function togRec(id,f){ const r=records.find(x=>x.id===id); r[f]=r[f]?0:1; renderRecords(); persistRecords(); }
+/* A checked row is locked to everyone except an admin of the
+   Nursery Operation Management module (User Access). */
+function _recLocked(r){ return !!(r && r.checked) && !isNopsAdmin; }
+function _denyLocked(){ alert('This record is Checked. Only an admin can edit it.'); }
+
+function toggleChecked(id){
+  const r = records.find(x=>x.id===id);
+  if (!r) return;
+  if (r.checked && !isNopsAdmin) return _denyLocked();   // only admins may unlock
+  r.checked = r.checked ? 0 : 1;
+  renderRecords(); persistRecords();
+}
+function togRec(id,f){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); r[f]=r[f]?0:1; renderRecords(); persistRecords(); }
 function openRecModal(pre) {
   editRecId=pre?pre.id:null;
   document.getElementById('rec-modal-title').textContent=editRecId?'Edit Record':'Add Work Record';
@@ -1791,8 +1814,8 @@ function openRecModal(pre) {
   document.getElementById('rec-modal').classList.add('open');
 }
 function closeRecModal(){ document.getElementById('rec-modal').classList.remove('open'); }
-function editRec(id){ openRecModal(records.find(r=>r.id===id)); }
-function deleteRec(id){ if(!confirm('Delete this record?')) return; records=records.filter(r=>r.id!==id); renderRecords(); persistRecords(); }
+function editRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); openRecModal(r); }
+function deleteRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); if(!confirm('Delete this record?')) return; records=records.filter(x=>x.id!==id); renderRecords(); persistRecords(); }
 function saveRec(){
   const obj={
     tarikh:document.getElementById('rf-tarikh').value,
@@ -1804,7 +1827,11 @@ function saveRec(){
     remark:document.getElementById('rf-remark').value,
   };
   if(!obj.plot){ alert('Please enter a plot number.'); return; }
-  if(editRecId){ const i=records.findIndex(r=>r.id===editRecId); records[i]={...records[i],...obj}; }
+  if(editRecId){
+    const i=records.findIndex(r=>r.id===editRecId);
+    if(_recLocked(records[i])) { closeRecModal(); return _denyLocked(); }
+    records[i]={...records[i],...obj};
+  }
   else records.push({id:Date.now(),...obj});
   closeRecModal(); renderRecords(); persistRecords();
 }
@@ -2520,6 +2547,12 @@ autoSyncRecords();
 async function initDb() {
   if (!_supabase) { _dbReady = true; return; }
   try {
+    if (typeof MJMAccess !== 'undefined') {
+      try {
+        await MJMAccess.load(_supabase);
+        isNopsAdmin = MJMAccess.isAdminOf('nursery_ops');
+      } catch (e) { console.warn('[maint] access load failed:', e); }
+    }
     const [stRes, recRes, qtyRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),

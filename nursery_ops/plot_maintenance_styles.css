@@ -335,3 +335,10 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 #recview-list .toolbar .filter-sel{font-size:16px;height:46px;}
 #recview-list .toolbar .btn{font-size:15px;padding:11px 20px;}
 #recview-list .toolbar input.filter-sel{height:46px;font-size:16px;}
+
+/* ─── CHECKED (verified) ROWS ─── */
+.btn-check{color:#065f46 !important;border-color:#a7f3d0 !important;background:#ecfdf5 !important;}
+.btn-check:hover{background:var(--green) !important;color:#fff !important;border-color:var(--green) !important;}
+.rec-checked-badge{display:inline-block;font-size:13px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;
+  color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:999px;padding:6px 14px;margin-right:6px;vertical-align:middle;}
+.chk-btn.chk-locked{cursor:not-allowed;opacity:.55;}
