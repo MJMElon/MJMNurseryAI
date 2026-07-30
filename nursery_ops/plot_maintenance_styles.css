@@ -38,7 +38,7 @@
   --font: 'Outfit', sans-serif;
 }
 
-html { font-size: 14px; }
+html { font-size: 14px; overflow-y: scroll; scrollbar-gutter: stable; }
 body { font-family: var(--font); background: var(--bg-page); color: var(--text-body); line-height: 1.5; }
 
 /* ─── APP VIEW ─── */
@@ -209,7 +209,8 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .chk-off{color:#c8dbd2;}
 
 /* ─── CHARTS ─── */
-.chart-block{background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:20px 22px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+.chart-block{background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:18px 12px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+.chart-block .chart-head{padding:0 6px;}
 .chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .chart-title{font-size:12px;font-weight:700;color:var(--text-body);letter-spacing:0.5px;text-transform:uppercase;}
 .chart-legend{display:flex;gap:16px;}
