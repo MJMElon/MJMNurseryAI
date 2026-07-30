@@ -285,3 +285,29 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .wheel-actions button{height:46px;border:none;background:#fff;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text-muted);cursor:pointer;transition:background .12s;}
 .wheel-actions button:last-child{color:var(--green-text);border-left:1.5px solid var(--border);}
 .wheel-actions button:hover{background:var(--green-bg);}
+
+/* ─── RESTRUCTURED LAYOUT: sub-tabs, big metrics, nursery circles ─── */
+.subtabs-bar{display:flex;gap:4px;margin-bottom:18px;background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:5px;box-shadow:var(--shadow-sm);width:fit-content;max-width:100%;flex-wrap:wrap;}
+.subtab-btn{font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text-muted);background:transparent;border:none;cursor:pointer;padding:8px 16px;border-radius:var(--r-sm);transition:all .14s;white-space:nowrap;}
+.subtab-btn:hover{color:var(--text-body);background:var(--green-bg);}
+.subtab-btn.active{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(13,122,71,.3);}
+.recview{display:none;animation:fadein .18s ease;}
+.recview.active{display:block;}
+.sched-panel{display:none;animation:fadein .18s ease;}
+.sched-panel.active{display:block;}
+
+/* Big headline metric cards on the Work Record view */
+.metrics-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px;}
+.metrics-big .metric-card{padding:22px 24px;border-top-width:4px;}
+.metrics-big .mc-label{font-size:11px;letter-spacing:1.2px;margin-bottom:10px;}
+.metrics-big .mc-value{font-size:44px;line-height:1;}
+
+/* Page header — one bigger line: "Batu Niah Nursery — Apr 2026" */
+.page-hdr{margin-bottom:14px;}
+.page-hdr-title{font-size:26px;font-weight:700;color:var(--text-head);letter-spacing:.2px;line-height:1.2;}
+
+/* Nursery circle picker in the topbar */
+.nursery-circles{display:flex;align-items:center;gap:7px;}
+.nursery-circle{width:46px;height:46px;border-radius:50%;flex-shrink:0;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--green-text);background:var(--bg-white);border:2px solid var(--green-mid);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+.nursery-circle:hover{background:var(--green-light);border-color:var(--green);transform:translateY(-1px);}
+.nursery-circle.active{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 3px 10px rgba(13,122,71,.35);}

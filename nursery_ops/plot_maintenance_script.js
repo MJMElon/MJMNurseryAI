@@ -26,6 +26,12 @@ const NURSERY_LABELS = {
   UNN1: 'UNN 1 — Ulu Niah Nursery 1',
   UNN2: 'UNN 2 — Ulu Niah Nursery 2'
 };
+/* Plain nursery name (no code prefix) for the big page header:
+   "Batu Niah Nursery — Apr 2026". */
+const NURSERY_NAMES = {
+  PN: 'Pre Nursery', BNN: 'Batu Niah Nursery',
+  UNN1: 'Ulu Niah Nursery 1', UNN2: 'Ulu Niah Nursery 2'
+};
 
 /* Default seedling quantity per plot — used for max chemical usage calculation.
    User-edited values override these defaults (held in memory this session). */
@@ -299,7 +305,7 @@ const I18N = {
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
-    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics',
+    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule',
     'tab.calc':'💊 Dosage Calc',
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
@@ -338,7 +344,7 @@ const I18N = {
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
-    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik',
+    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual',
     'tab.calc':'💊 Kira Dos',
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
@@ -590,21 +596,27 @@ function _syncMonthButtons() {
 
 function onNurseryChange() {
   document.getElementById('nursery-pill').textContent = getNursery();
+syncNurseryCircles();
   renderAll();
   autoSyncRecords();
 }
 function renderAll() {
   const m=getMonth(), n=getNursery(), lbl=NURSERY_LABELS[n];
+  syncNurseryCircles();
+  // Big single-line header: "Batu Niah Nursery — Apr 2026"
+  const bigHdr = `${NURSERY_NAMES[n] || lbl} — ${m}`;
+  const recHdr = document.getElementById('record-nursery-line');
+  if (recHdr) recHdr.textContent = bigHdr;
   // Remember the last-viewed month & nursery (restored on next visit).
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   ['pd','manuring','weeding','interrow'].forEach(k => {
     const el = document.getElementById(`${k}-nursery-line`);
-    if (el) el.textContent = `${lbl} — ${m}`;
+    if (el) el.textContent = bigHdr;
   });
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
-  // Re-render analytics if that tab is active
-  const chartTab = document.getElementById('tab-chart');
-  if (chartTab && chartTab.classList.contains('active')) renderCharts();
+  // Re-render analytics when its sub-view inside Work Record is showing
+  const chartView = document.getElementById('recview-chart');
+  if (chartView && chartView.classList.contains('active')) renderCharts();
   // Re-render calculator if its tab is active (clear ticks since plots may differ between nurseries)
   const calcTab = document.getElementById('tab-calc');
   if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
@@ -674,12 +686,50 @@ function autoSyncRecords() {
 }
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-  if (name==='record') renderRecords();
-  if (name==='chart')  renderCharts();
+  const panel = document.getElementById('tab-'+name);
+  if (panel) panel.classList.add('active');
+  if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
   if (name==='calc')   renderCalc();
+}
+
+/* Work Record sub-views: the maintenance list and the analytics charts. */
+let _recordView = 'list';
+function switchRecordView(view, btn) {
+  _recordView = view;
+  document.querySelectorAll('.subtabs-bar .subtab-btn').forEach(b => {
+    if (b.id === 'subtab-list' || b.id === 'subtab-chart') b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.recview').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('recview-' + view);
+  if (el) el.classList.add('active');
+  if (view === 'chart') renderCharts(); else renderRecords();
+}
+
+/* Schedule sub-tabs: P&D / Manuring / Weeding / Interrow. */
+function switchSchedView(name, btn) {
+  const bar = btn ? btn.closest('.subtabs-bar') : null;
+  if (bar) bar.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.sched-panel').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('sched-' + name);
+  if (el) el.classList.add('active');
+}
+
+/* Nursery circle buttons drive the (hidden) select, so every existing
+   getNursery() caller keeps working untouched. */
+function pickNursery(n) {
+  const sel = document.getElementById('global-nursery');
+  if (sel) sel.value = n;
+  syncNurseryCircles();
+  onNurseryChange();
+}
+function syncNurseryCircles() {
+  const cur = getNursery();
+  document.querySelectorAll('.nursery-circle').forEach(b =>
+    b.classList.toggle('active', b.dataset.n === cur));
 }
 
 /* ════════════════════════════
@@ -1654,7 +1704,8 @@ function renderRecords() {
   const gPend  = total - gDone;
   const pct    = total ? Math.round(gDone/total*100) : 0;
 
-  document.getElementById('rec-metrics').innerHTML=`
+  const _recMx = document.getElementById('rec-metrics');
+  if (_recMx) _recMx.innerHTML=`
     <div class="metric-card mc-blue" ><div class="mc-label">${t('rec.totalTasks')}</div><div class="mc-value b">${total}</div></div>
     <div class="metric-card mc-green"><div class="mc-label">${t('rec.gaiaDone')}</div><div class="mc-value g">${gDone}</div></div>
     <div class="metric-card mc-amber"><div class="mc-label">${t('rec.gaiaPending')}</div><div class="mc-value a">${gPend}</div></div>
@@ -2300,7 +2351,8 @@ function renderCharts() {
   const pct      = total ? Math.round(gDone/total*100) : 0;
 
   // ── Metric cards — single horizontal row ──
-  document.getElementById('chart-metrics').innerHTML = `
+  const _chartMx = document.getElementById('chart-metrics');
+  if (_chartMx) _chartMx.innerHTML = `
     <div class="metric-card mc-blue" ><div class="mc-label">Total Tasks</div><div class="mc-value b">${total}</div></div>
     <div class="metric-card mc-green"><div class="mc-label">Gaia Done</div><div class="mc-value g">${gDone}</div></div>
     <div class="metric-card mc-amber"><div class="mc-label">Gaia Pending</div><div class="mc-value a">${gPend}</div></div>
@@ -2457,6 +2509,7 @@ try {
 } catch (_) {}
 _syncMonthButtons();
 document.getElementById('nursery-pill').textContent = getNursery();
+syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
 autoSyncRecords();
 
