@@ -79,3 +79,35 @@ BEGIN
     CREATE POLICY "Authenticated write maint" ON nops_maint_custom_plots FOR ALL TO authenticated USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- 6. Setting tab — piece rates (one rate card for all nurseries)
+--    and the per-nursery worker name list.
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nops_maint_piece_rates (
+  work_type  TEXT PRIMARY KEY,          -- pd | manuring | weeding | interrow
+  rate       NUMERIC(12,2) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS nops_maint_workers (
+  nursery    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (nursery, name)
+);
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['nops_maint_piece_rates','nops_maint_workers']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename=t AND policyname='Authenticated read maint') THEN
+      EXECUTE format('CREATE POLICY "Authenticated read maint" ON %I FOR SELECT TO authenticated USING (true)', t);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename=t AND policyname='Authenticated write maint') THEN
+      EXECUTE format('CREATE POLICY "Authenticated write maint" ON %I FOR ALL TO authenticated USING (true) WITH CHECK (true)', t);
+    END IF;
+  END LOOP;
+END $$;

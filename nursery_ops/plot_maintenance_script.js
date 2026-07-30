@@ -275,7 +275,7 @@ function addCustomPlot(n, name) {
   customPlots[n].push(name);
   if (NURSERY_PLOTS[n]) NURSERY_PLOTS[n].push(name);
   persistCustomPlot(n, name, false);
-  renderAll(); autoSyncRecords(); renderSettingPlots();
+  renderAll(); autoSyncRecords(); renderSettingPlots(); renderSettingWorkers();
 }
 
 function removeCustomPlot(n, name) {
@@ -286,7 +286,7 @@ function removeCustomPlot(n, name) {
     if (i >= 0) NURSERY_PLOTS[n].splice(i, 1);
   }
   persistCustomPlot(n, name, true);
-  renderAll(); autoSyncRecords(); renderSettingPlots();
+  renderAll(); autoSyncRecords(); renderSettingPlots(); renderSettingWorkers();
 }
 
 function persistCustomPlot(n, name, remove) {
@@ -295,6 +295,86 @@ function persistCustomPlot(n, name, remove) {
     ? _supabase.from('nops_maint_custom_plots').delete().eq('nursery', n).eq('plot', name)
     : _supabase.from('nops_maint_custom_plots').upsert({ nursery: n, plot: name }, { onConflict: 'nursery,plot' });
   q.then(({ error }) => { if (error) console.warn('[maint] custom plot save failed:', error.message); });
+}
+
+/* ── Piece rates (one rate card for all nurseries) ── */
+const PIECE_RATE_TYPES = [
+  { code: 'pd',       key: 'jenis.pd'       },
+  { code: 'manuring', key: 'jenis.manuring' },
+  { code: 'weeding',  key: 'jenis.weeding'  },
+  { code: 'interrow', key: 'jenis.interrow' }
+];
+let pieceRates = { pd: null, manuring: null, weeding: null, interrow: null };
+
+function renderSettingRates() {
+  const box = document.getElementById('setting-rate-list');
+  if (!box) return;
+  box.innerHTML = PIECE_RATE_TYPES.map(rt => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
+      <span style="font-size:12px;font-weight:700;color:var(--text-head);">${t(rt.key)}</span>
+      <span style="display:flex;align-items:center;gap:5px;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-muted);">RM</span>
+        <input type="number" min="0" step="0.01" value="${pieceRates[rt.code] ?? ''}" placeholder="0.00"
+          onchange="setPieceRate('${rt.code}', this.value)"
+          style="width:88px;height:32px;padding:0 8px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;">
+      </span>
+    </div>`).join('');
+}
+
+function setPieceRate(code, val) {
+  const raw = String(val ?? '').trim();
+  pieceRates[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
+  if (!_supabase) return;
+  const q = pieceRates[code] === null
+    ? _supabase.from('nops_maint_piece_rates').delete().eq('work_type', code)
+    : _supabase.from('nops_maint_piece_rates').upsert({ work_type: code, rate: pieceRates[code] }, { onConflict: 'work_type' });
+  q.then(({ error }) => { if (error) console.warn('[maint] piece rate save failed:', error.message); });
+}
+
+/* ── Workers (per nursery) ── */
+let workers = { PN: [], BNN: [], UNN1: [], UNN2: [] };
+
+function renderSettingWorkers() {
+  const box = document.getElementById('setting-worker-list');
+  if (!box) return;
+  const n = getNursery();
+  const list = workers[n] || [];
+  box.innerHTML = list.length
+    ? list.map(w => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
+          <span style="font-size:12px;font-weight:700;color:var(--text-head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${w}</span>
+          <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeWorker('${String(w).replace(/'/g, "\\'")}')">Remove</button>
+        </div>`).join('')
+    : '<div style="font-size:12px;color:var(--text-faint);">No workers added yet for this nursery.</div>';
+}
+
+function addWorkerFromSetting() {
+  const el = document.getElementById('setting-new-worker');
+  const name = (el?.value || '').trim();
+  if (!name) { alert('Key in a worker name first.'); return; }
+  const n = getNursery();
+  if (!workers[n]) workers[n] = [];
+  if (workers[n].some(w => w.toLowerCase() === name.toLowerCase())) { alert(`"${name}" is already on this nursery's list.`); return; }
+  workers[n].push(name);
+  persistWorker(n, name, false);
+  if (el) el.value = '';
+  renderSettingWorkers();
+}
+
+function removeWorker(name) {
+  const n = getNursery();
+  if (!confirm(`Remove worker "${name}" from ${NURSERY_NAMES[n]}?`)) return;
+  workers[n] = (workers[n] || []).filter(w => w !== name);
+  persistWorker(n, name, true);
+  renderSettingWorkers();
+}
+
+function persistWorker(n, name, remove) {
+  if (!_supabase) return;
+  const q = remove
+    ? _supabase.from('nops_maint_workers').delete().eq('nursery', n).eq('name', name)
+    : _supabase.from('nops_maint_workers').upsert({ nursery: n, name }, { onConflict: 'nursery,name' });
+  q.then(({ error }) => { if (error) console.warn('[maint] worker save failed:', error.message); });
 }
 
 /* Setting tab — list of user-added plots for the current nursery. */
@@ -768,7 +848,7 @@ function switchTab(name, btn) {
   if (panel) panel.classList.add('active');
   if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
   if (name==='calc')    renderCalc();
-  if (name==='setting') renderSettingPlots();
+  if (name==='setting') { renderSettingPlots(); renderSettingRates(); renderSettingWorkers(); }
 }
 
 /* Work Record sub-views: the maintenance list and the analytics charts. */
@@ -2630,11 +2710,13 @@ async function initDb() {
         isNopsAdmin = MJMAccess.isAdminOf('nursery_ops');
       } catch (e) { console.warn('[maint] access load failed:', e); }
     }
-    const [stRes, recRes, qtyRes, cpRes] = await Promise.all([
+    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
       _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
-      _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] }))
+      _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
+      _supabase.from('nops_maint_piece_rates').select('work_type, rate').then(r => r, () => ({ data: [] })),
+      _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] }))
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
@@ -2652,10 +2734,15 @@ async function initDb() {
       if (!customPlots[r.nursery].includes(r.plot)) customPlots[r.nursery].push(r.plot);
     });
     _mergeCustomPlots();
+    ((prRes && prRes.data) || []).forEach(r => { pieceRates[r.work_type] = r.rate; });
+    ((wkRes && wkRes.data) || []).forEach(r => {
+      if (!workers[r.nursery]) workers[r.nursery] = [];
+      if (!workers[r.nursery].includes(r.name)) workers[r.nursery].push(r.name);
+    });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
   renderAll();
   autoSyncRecords();
-  renderSettingPlots();
+  renderSettingPlots(); renderSettingRates(); renderSettingWorkers();
 }
 initDb();
