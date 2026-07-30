@@ -6618,22 +6618,39 @@ Thank you.`;
                     // Collection Details" lines — plot_N / qty_N / batch_N —
                     // parsed exactly as the Summary report does.
                     _supabase.from('shared_do_records')
-                        .select('status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+                        .select('do_number, total_qty, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
                         .then(r => r, () => ({ data: [] }))
                 ]);
                 ((c2Res && c2Res.data) || []).forEach(l => {
                     const k = String(l.plot_name || '').trim().toUpperCase();
                     if (k) dead2Map[k] = (dead2Map[k] || 0) + Math.abs(l.quantity_change || 0);
                 });
-                const _bt = String(batchId).trim();
+
+                // Read the DO collection details forgivingly, so a line keyed in
+                // slightly untidily still matches this batch's plot rows:
+                //   • batch  "239." / " 239" / "239 " → 239   (punctuation & spaces dropped)
+                //   • plot   "U15 (UPB PREMIER HYBRID)" → U15 (label/breed suffix dropped)
+                //   • qty    blank on the ONLY filled line → fall back to the DO's
+                //            total qty (what the DO modal itself displays)
+                // DO 03410 was invisible before for exactly these reasons.
+                const _normBatchKey = v => String(v == null ? '' : v).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+                const _normPlotKey  = v => String(v == null ? '' : v).trim().toUpperCase()
+                                              .replace(/^PLOT\s*:?\s*/, '')   // drop a "Plot " prefix
+                                              .split(/[\s(,\[]/)[0].replace(/[^0-9A-Z\-]/g, '');
+                const _bt = _normBatchKey(batchId);
                 ((doRes && doRes.data) || []).forEach(d => {
                     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
+                    // How many collection lines does this DO actually carry?
+                    let filled = 0;
+                    for (let i = 1; i <= 5; i++) if (_normPlotKey(d[`plot_${i}`])) filled++;
                     for (let i = 1; i <= 5; i++) {
-                        const qty = Number(d[`qty_${i}`] || 0);
-                        if (!qty) continue;
-                        if (String(d[`batch_${i}`] || '').trim() !== _bt) continue; // this batch only
-                        const k = String(d[`plot_${i}`] || '').trim().toUpperCase();
-                        if (k) salesMap[k] = (salesMap[k] || 0) + qty;
+                        const plotKey = _normPlotKey(d[`plot_${i}`]);
+                        if (!plotKey) continue;
+                        if (_normBatchKey(d[`batch_${i}`]) !== _bt) continue; // this batch only
+                        let qty = Number(d[`qty_${i}`] || 0);
+                        if (!qty && filled === 1) qty = Number(d.total_qty || 0); // single-line DO
+                        if (!qty) { console.warn('[t6] DO', d.do_number, 'line', i, 'has no qty — skipped'); continue; }
+                        salesMap[plotKey] = (salesMap[plotKey] || 0) + qty;
                     }
                 });
             }
