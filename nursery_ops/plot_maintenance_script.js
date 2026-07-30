@@ -306,10 +306,10 @@ function renderSettingPlots() {
   box.innerHTML = list.length
     ? list.map(p => `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
-          <span style="font-size:15px;font-weight:700;color:var(--green-text);">${p}</span>
-          <button class="btn btn-sm btn-danger" style="font-size:12px;" onclick="removeCustomPlot('${n}','${p}')">Remove</button>
+          <span style="font-size:13px;font-weight:700;color:var(--green-text);">${p}</span>
+          <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeCustomPlot('${n}','${p}')">Remove</button>
         </div>`).join('')
-    : '<div style="font-size:14px;color:var(--text-faint);">No added plots yet — use “➕ Add Row” on a schedule, or add one below.</div>';
+    : '<div style="font-size:12px;color:var(--text-faint);">No added plots yet — use “➕ Add Row” on a schedule, or add one below.</div>';
 }
 
 function addPlotFromSetting() {
