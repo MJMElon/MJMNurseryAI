@@ -6683,21 +6683,24 @@ Thank you.`;
 
             // Load ALL transplant types (main + premium + doubletone)
             if (batchId) {
+                // Premium Care transplants are deliberately EXCLUDED from the
+                // 3rd Culling report — those seedlings are handled separately,
+                // so their details must not appear here (and the batch-list
+                // completion rule skips premium-only plots to match).
                 const { data: logs } = await _supabase
                     .from('shared_inventory_logs')
                     .select('*')
                     .eq('batch_name', batchId)
-                    .in('transaction_type', ['Transplanted', 'Transplanted_Premium', 'Transplanted_DoubleTone'])
+                    .in('transaction_type', ['Transplanted', 'Transplanted_DoubleTone'])
                     .order('created_at', { ascending: true });
 
                 if (logs && logs.length > 0) {
                     // Merge same-plot transplants into ONE row (matching the
                     // 2nd Culling report): quantities sum across MAIN /
-                    // PREMIUM / D-TONE and across repeated transplants.
+                    // D-TONE and across repeated transplants.
                     const byPlot = new Map();
                     logs.forEach(log => {
-                        const destType = log.transaction_type === 'Transplanted_Premium'    ? 'premium'
-                                       : log.transaction_type === 'Transplanted_DoubleTone' ? 'doubletone' : 'main';
+                        const destType = log.transaction_type === 'Transplanted_DoubleTone' ? 'doubletone' : 'main';
                         const key = String(log.plot_name || '').trim().toUpperCase();
                         if (!key) return;
                         const cur = byPlot.get(key);
@@ -6713,7 +6716,7 @@ Thank you.`;
                         // DestType keys + legacy queue) — merged rows carry the
                         // summed culled qty and the first doc/map values found.
                         let culled = null, balance = null, docUrl = null, docName = null, mapQty = null;
-                        ['main', 'premium', 'doubletone'].forEach(d => {
+                        ['main', 'doubletone'].forEach(d => {   // premium excluded from this report
                             const e = savedCull3Map[`${v.plot}|${d}`];
                             if (!e) return;
                             culled = (culled || 0) + (e.culled || 0);
@@ -6748,11 +6751,12 @@ Thank you.`;
                 }
             }
 
-            // Fallback: scrape Tab 3 DOM (all dest types)
+            // Fallback: scrape Tab 3 DOM (premium excluded, as above)
             document.querySelectorAll('.action-row.transplant-row').forEach(row => {
                 const destType = row.querySelector('.t3-dest-type').value;
                 const destPlot = row.querySelector('.t3-dest-plot').value;
                 const qty      = parseInt(row.querySelector('.t3-qty').value) || 0;
+                if (destType === 'premium') return;
                 if (destPlot && qty > 0) {
                     t6_plotData.push({ plot: destPlot, qty, destType: destType || 'main', savedBalance: null, savedCulled: null, savedDocUrl: null, savedDocName: null });
                 }

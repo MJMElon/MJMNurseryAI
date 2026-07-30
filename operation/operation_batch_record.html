@@ -285,6 +285,11 @@
                 (transplantRes.data || []).forEach(r => {
                     const p = _normPlot(r.plot_name);
                     if (!p || !r.batch_name) return;
+                    // Premium Care transplants are excluded from the 3rd Culling
+                    // report, so a premium-ONLY plot can never receive a record
+                    // and must not block completion. A plot that also had a
+                    // main / d-tone transplant still counts (via that row).
+                    if (r.transaction_type === 'Transplanted_Premium') return;
                     (expectedPlots[r.batch_name] = expectedPlots[r.batch_name] || new Set())
                         .add(p); // per PLOT — Tab 6 merges same-plot rows and saves one record per plot
                 });
