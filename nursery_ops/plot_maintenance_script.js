@@ -248,6 +248,77 @@ let dbStateCache = {};   // `${nursery}_${month}` → saved schedule payload
 /* Admin of the "Nursery Operation Management" module in User Access.
    Only admins may edit a record once it has been marked Checked. */
 let isNopsAdmin = false;
+/* Plots added by the user via a schedule's "Add Row" (or Setting).
+   Persisted in nops_maint_custom_plots and merged into NURSERY_PLOTS on load,
+   so every existing renderer picks them up with no other changes. */
+let customPlots = { PN: [], BNN: [], UNN1: [], UNN2: [] };
+
+function _mergeCustomPlots() {
+  Object.keys(customPlots).forEach(n => {
+    if (!NURSERY_PLOTS[n]) return;
+    customPlots[n].forEach(p => { if (!NURSERY_PLOTS[n].includes(p)) NURSERY_PLOTS[n].push(p); });
+  });
+}
+
+/* Blank inline row: the user keys the plot name themselves. */
+function openAddPlotRow() {
+  const n = getNursery();
+  const name = (prompt(`Add a row to ${NURSERY_NAMES[n]} — key in the plot name:`, '') || '').trim().toUpperCase();
+  if (!name) return;
+  addCustomPlot(n, name);
+}
+
+function addCustomPlot(n, name) {
+  if (!name) return;
+  if (NURSERY_PLOTS[n] && NURSERY_PLOTS[n].includes(name)) { alert(`Plot "${name}" already exists in this nursery.`); return; }
+  if (!customPlots[n]) customPlots[n] = [];
+  customPlots[n].push(name);
+  if (NURSERY_PLOTS[n]) NURSERY_PLOTS[n].push(name);
+  persistCustomPlot(n, name, false);
+  renderAll(); autoSyncRecords(); renderSettingPlots();
+}
+
+function removeCustomPlot(n, name) {
+  if (!confirm(`Remove plot "${name}" from ${NURSERY_NAMES[n]}?\n\nIts row disappears from all four schedules. Saved work records for it are kept.`)) return;
+  customPlots[n] = (customPlots[n] || []).filter(p => p !== name);
+  if (NURSERY_PLOTS[n]) {
+    const i = NURSERY_PLOTS[n].indexOf(name);
+    if (i >= 0) NURSERY_PLOTS[n].splice(i, 1);
+  }
+  persistCustomPlot(n, name, true);
+  renderAll(); autoSyncRecords(); renderSettingPlots();
+}
+
+function persistCustomPlot(n, name, remove) {
+  if (!_supabase) return;
+  const q = remove
+    ? _supabase.from('nops_maint_custom_plots').delete().eq('nursery', n).eq('plot', name)
+    : _supabase.from('nops_maint_custom_plots').upsert({ nursery: n, plot: name }, { onConflict: 'nursery,plot' });
+  q.then(({ error }) => { if (error) console.warn('[maint] custom plot save failed:', error.message); });
+}
+
+/* Setting tab — list of user-added plots for the current nursery. */
+function renderSettingPlots() {
+  const box = document.getElementById('setting-plot-list');
+  if (!box) return;
+  const n = getNursery();
+  const list = customPlots[n] || [];
+  box.innerHTML = list.length
+    ? list.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
+          <span style="font-size:15px;font-weight:700;color:var(--green-text);">${p}</span>
+          <button class="btn btn-sm btn-danger" style="font-size:12px;" onclick="removeCustomPlot('${n}','${p}')">Remove</button>
+        </div>`).join('')
+    : '<div style="font-size:14px;color:var(--text-faint);">No added plots yet — use “➕ Add Row” on a schedule, or add one below.</div>';
+}
+
+function addPlotFromSetting() {
+  const el = document.getElementById('setting-new-plot');
+  const name = (el?.value || '').trim().toUpperCase();
+  if (!name) { alert('Key in a plot name first.'); return; }
+  addCustomPlot(getNursery(), name);
+  if (el) el.value = '';
+}
 let _dbReady     = false; // guards writes until the initial DB load lands
 
 /* ════════════════════════════
@@ -308,7 +379,7 @@ const I18N = {
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
-    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule',
+    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'💵 Monthly Payroll', 'tab.setting':'⚙️ Setting',
     'tab.calc':'💊 Dosage Calc',
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
@@ -347,7 +418,7 @@ const I18N = {
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
-    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual',
+    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'💵 Penggajian Bulanan', 'tab.setting':'⚙️ Tetapan',
     'tab.calc':'💊 Kira Dos',
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
@@ -608,8 +679,10 @@ function renderAll() {
   syncNurseryCircles();
   // Big single-line header: "Batu Niah Nursery — Apr 2026"
   const bigHdr = `${NURSERY_NAMES[n] || lbl} — ${m}`;
-  const recHdr = document.getElementById('record-nursery-line');
-  if (recHdr) recHdr.textContent = bigHdr;
+  ['record','payroll','setting'].forEach(k => {
+    const el = document.getElementById(`${k}-nursery-line`);
+    if (el) el.textContent = bigHdr;
+  });
   // Remember the last-viewed month & nursery (restored on next visit).
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   ['pd','manuring','weeding','interrow'].forEach(k => {
@@ -694,7 +767,8 @@ function switchTab(name, btn) {
   const panel = document.getElementById('tab-'+name);
   if (panel) panel.classList.add('active');
   if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
-  if (name==='calc')   renderCalc();
+  if (name==='calc')    renderCalc();
+  if (name==='setting') renderSettingPlots();
 }
 
 /* Work Record sub-views: the maintenance list and the analytics charts. */
@@ -2556,10 +2630,11 @@ async function initDb() {
         isNopsAdmin = MJMAccess.isAdminOf('nursery_ops');
       } catch (e) { console.warn('[maint] access load failed:', e); }
     }
-    const [stRes, recRes, qtyRes] = await Promise.all([
+    const [stRes, recRes, qtyRes, cpRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
-      _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty')
+      _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
+      _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] }))
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
@@ -2572,9 +2647,15 @@ async function initDb() {
       if (!plotQtyOverrides[r.nursery]) plotQtyOverrides[r.nursery] = {};
       plotQtyOverrides[r.nursery][r.plot] = r.qty;
     });
+    ((cpRes && cpRes.data) || []).forEach(r => {
+      if (!customPlots[r.nursery]) customPlots[r.nursery] = [];
+      if (!customPlots[r.nursery].includes(r.plot)) customPlots[r.nursery].push(r.plot);
+    });
+    _mergeCustomPlots();
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
   renderAll();
   autoSyncRecords();
+  renderSettingPlots();
 }
 initDb();

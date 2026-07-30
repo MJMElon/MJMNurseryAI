@@ -56,3 +56,26 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- 5. User-added plots per nursery (schedule "Add Row" / Setting tab)
+--    Merged into the built-in plot list so the added row appears in
+--    every schedule (P&D, Manuring, Weeding, Interrow).
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nops_maint_custom_plots (
+  nursery    TEXT NOT NULL,
+  plot       TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (nursery, plot)
+);
+
+ALTER TABLE nops_maint_custom_plots ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_custom_plots' AND policyname='Authenticated read maint') THEN
+    CREATE POLICY "Authenticated read maint" ON nops_maint_custom_plots FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_custom_plots' AND policyname='Authenticated write maint') THEN
+    CREATE POLICY "Authenticated write maint" ON nops_maint_custom_plots FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;
