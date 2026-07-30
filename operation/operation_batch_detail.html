@@ -1427,7 +1427,7 @@
                                 </div>
 
                                 <!-- Column headers: Plot → Transplanted → 2nd Culled → Sales → Balance → 3rd Culled Qty → 3rd Culled % → Transfer → Drone Map -->
-                                <div class="hidden lg:grid gap-3 px-6 pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 1.1fr 0.65fr 0.65fr 0.65fr 0.85fr 0.75fr 0.55fr 1.15fr 1.35fr;">
+                                <div class="hidden lg:grid gap-2 px-6 pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 0.95fr 0.55fr 0.5fr 0.55fr 0.8fr 0.65fr 0.5fr 1.5fr 1.7fr;">
                                     <span>Main Plot</span>
                                     <span>Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
@@ -6831,7 +6831,7 @@ Thank you.`;
 
                 container.insertAdjacentHTML('beforeend', `
                     <div id="${rowId}" class="t6-plot-row border ${rowBg} rounded-xl overflow-hidden">
-                        <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_0.65fr_0.65fr_0.65fr_0.85fr_0.75fr_0.55fr_1.15fr_1.35fr] gap-3 p-4 items-start t-tidy">
+                        <div class="grid grid-cols-1 lg:grid-cols-[0.95fr_0.55fr_0.5fr_0.55fr_0.8fr_0.65fr_0.5fr_1.5fr_1.7fr] gap-2 p-4 items-center t-tidy">
 
                             <!-- Plot -->
                             <div class="flex flex-col gap-0.5 pt-1">
@@ -6871,15 +6871,14 @@ Thank you.`;
                                 <div class="text-[8px] font-bold text-[#8a7a68] mt-0.5 uppercase tracking-wide">− ${dead2.toLocaleString()} dead − ${sales.toLocaleString()} sold</div>
                             </div>
 
-                            <!-- Culled qty — AUTO (2nd culled + balance), read-only. -->
+                            <!-- Culled qty — AUTO (2nd culled + balance). The value lives on a
+                                 hidden input (every calc/save reads .t6-culled-input); the visible
+                                 cell shows it thousands-formatted, which a number input can't do. -->
                             <div>
                                 <label class="label-style lg:hidden !text-[#a83020]">Culled Qty (auto)</label>
-                                <input type="number" inputmode="numeric" class="input-style !text-[#a83020] font-black t6-culled-input !bg-[#fff5f5] cursor-not-allowed"
-                                    min="0" placeholder="—" readonly tabindex="-1"
-                                    title="Auto-calculated: 2nd Culled + Balance"
-                                    data-transplanted="${p.qty}"
-                                    value="${cullVal}"
-                                    oninput="calcT6Row('${rowId}'); calcT6()">
+                                <input type="hidden" class="t6-culled-input" data-transplanted="${p.qty}" value="${cullVal}">
+                                <div class="input-style !bg-[#fff5f5] font-black text-[#a83020] flex items-center justify-center text-sm t6-culled-display"
+                                     title="Auto-calculated: 2nd Culled + Balance">${cullVal === '' ? '—' : Number(cullVal).toLocaleString()}</div>
                             </div>
 
                             <!-- Cull rate % — auto -->
@@ -6893,22 +6892,26 @@ Thank you.`;
                                  culled qty can be keyed in later. -->
                             <div>
                                 <div class="text-[9px] font-black text-[#0891b2] uppercase lg:hidden mb-0.5">Transfer</div>
-                                <div class="select-wrapper"><select class="input-style !text-[#0891b2] t6-transfer-plot !text-xs !py-2">${getPlotOptionsHTML()}</select></div>
-                                <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-transfer-qty !text-xs !py-2 mt-1.5" placeholder="Transfer qty" value="${p.savedTransferQty ?? ''}">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="select-wrapper flex-1 min-w-0"><select class="input-style !text-[#0891b2] t6-transfer-plot !text-xs !py-2">${getPlotOptionsHTML()}</select></div>
+                                    <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-transfer-qty !text-xs !py-2 w-[72px] shrink-0" placeholder="Qty" value="${p.savedTransferQty ?? ''}">
+                                </div>
                             </div>
 
                             <!-- Drone Map — qty keyed from the drone map + attachment -->
                             <div class="flex flex-col gap-1.5">
                                 <div class="text-[9px] font-black text-[#8a7a68] uppercase lg:hidden mb-0.5">Drone Map</div>
-                                <input type="number" min="0" class="input-style t6-map-qty !text-xs !py-2" placeholder="Drone map qty"
+                                <div class="flex items-center gap-1.5">
+                                <input type="number" min="0" class="input-style t6-map-qty !text-xs !py-2 w-[78px] shrink-0" placeholder="Map qty"
                                     value="${p.savedMapQty ?? ''}" oninput="calcT6()">
-                                <div id="${rowId}-doc-zone"
+                                <div class="flex-1 min-w-0" id="${rowId}-doc-zone"
                                     class="border-2 border-dashed border-[#e8dcc8] bg-white rounded-xl h-[45px] flex items-center justify-center cursor-pointer hover:bg-[#f3efe6] hover:border-[#c07820] transition-all"
                                     onclick="document.getElementById('${rowId}-doc-input').click()"
                                     ondragover="event.preventDefault(); this.classList.add('!border-[#c07820]','!bg-[#fdfaf4]');"
                                     ondragleave="event.preventDefault(); this.classList.remove('!border-[#c07820]','!bg-[#fdfaf4]');"
                                     ondrop="event.preventDefault(); this.classList.remove('!border-[#c07820]','!bg-[#fdfaf4]'); handleT6DocDrop(event,'${rowId}')">
                                     <span class="text-[11px] font-bold text-[#8a7a68] uppercase tracking-wider pointer-events-none">🗺️ Drag or Attach</span>
+                                </div>
                                 </div>
                                 <input type="file" id="${rowId}-doc-input" class="hidden" accept="image/*,.pdf"
                                     onchange="handleT6DocUpload(this,'${rowId}')">
@@ -6993,6 +6996,9 @@ Thank you.`;
             const cullVal      = row.querySelector('.t6-culled-input').value;
             const culled       = parseInt(cullVal) || 0;
             const cullCell     = document.getElementById(`${rowId}-cullrate`);
+            // Mirror the raw hidden value into the formatted display cell.
+            const cullDisp     = row.querySelector('.t6-culled-display');
+            if (cullDisp) cullDisp.innerText = (cullVal === '' || isNaN(culled)) ? '—' : culled.toLocaleString();
 
             if (cullVal !== '' && transplanted > 0) {
                 const cullPct = ((culled / transplanted) * 100).toFixed(2);
