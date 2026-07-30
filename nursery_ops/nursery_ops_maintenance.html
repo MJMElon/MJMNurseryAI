@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=27">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=28">
 </head>
 <body>
 
@@ -284,11 +284,8 @@
 
     <!-- MONTHLY PAYROLL -->
     <div id="tab-payroll" class="tab-panel">
-      <div class="section-hdr">
-        <div><div class="page-hdr-title" id="payroll-nursery-line"></div></div>
-        <div class="section-badge">💵 MONTHLY PAYROLL</div>
-      </div>
-      <div class="card" style="padding:22px;">
+      <div class="page-hdr"><div class="page-hdr-title" id="payroll-nursery-line"></div></div>
+      <div class="card" style="padding:18px;">
         <div style="font-size:13px;font-weight:600;color:var(--text-muted);">
           Payroll for this nursery and month will live here.
           <div style="font-size:12px;margin-top:8px;">Tell me the columns you need (for example: worker name, days worked, rate per day, overtime, allowance, deductions, net pay) and I'll build the table with save-to-database and a PDF export.</div>
@@ -298,11 +295,8 @@
 
     <!-- SETTING -->
     <div id="tab-setting" class="tab-panel">
-      <div class="section-hdr">
-        <div><div class="page-hdr-title" id="setting-nursery-line"></div></div>
-        <div class="section-badge">⚙️ SETTING</div>
-      </div>
-      <div class="card" style="padding:22px;margin-bottom:16px;">
+      <div class="page-hdr"><div class="page-hdr-title" id="setting-nursery-line"></div></div>
+      <div class="card" style="padding:18px;margin-bottom:16px;">
         <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Plots in this nursery</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rows added from a schedule's “Add Row” button appear here. Removing one takes its row out of all four schedules.</div>
         <div id="setting-plot-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>
