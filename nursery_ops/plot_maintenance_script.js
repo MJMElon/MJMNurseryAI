@@ -297,6 +297,178 @@ function persistCustomPlot(n, name, remove) {
   q.then(({ error }) => { if (error) console.warn('[maint] custom plot save failed:', error.message); });
 }
 
+
+/* ════════════════════════════
+   MONTHLY PAYROLL — Borang Tuntutan Gaji
+   One sub-tab per work type. Rows come from the work records for the
+   current nursery+month; worker columns come from Setting → Workers and
+   the rate from Setting → Piece Rate. Cell values are the capacity each
+   worker covered, stored per (nursery, month, work type).
+════════════════════════════ */
+const PAYROLL_TYPES = {
+  pd:       { jenis: 'Penyemburan racun kulat dan serangga', label: 'jenis.pd',       unit: 'Beg' },
+  manuring: { jenis: 'Membaja',                              label: 'jenis.manuring', unit: 'Beg' },
+  weeding:  { jenis: 'Merumput',                             label: 'jenis.weeding',  unit: 'Beg' },
+  interrow: { jenis: 'Meracun rumput secara selingan',       label: 'jenis.interrow', unit: 'Beg' }
+};
+let _payrollView = 'pd';
+let payrollData  = {};   // `${nursery}_${month}_${type}` → { recId: { worker: qty } }
+let _payrollSaveTimer = null;
+
+function payrollKey(n, m, type) { return `${n}_${m}_${type}`; }
+
+function switchPayrollView(type, btn) {
+  _payrollView = type;
+  const bar = btn ? btn.closest('.subtabs-bar') : null;
+  if (bar) bar.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderPayroll();
+}
+
+function payrollRows() {
+  const n = getNursery();
+  const plots = NURSERY_PLOTS[n] || [];
+  const jenis = PAYROLL_TYPES[_payrollView].jenis;
+  return records
+    .filter(r => r.jenis === jenis && plots.includes(r.plot))
+    .sort((a, b) => plots.indexOf(a.plot) - plots.indexOf(b.plot));
+}
+
+function renderPayroll() {
+  const tbl = document.getElementById('payroll-table');
+  if (!tbl) return;
+  const n = getNursery(), m = getMonth();
+  const cfg = PAYROLL_TYPES[_payrollView];
+  const line = document.getElementById('payroll-form-line');
+  if (line) line.textContent = `Borang Tuntutan Gaji (${NURSERY_NAMES[n]}) — Bulan ${m}`;
+
+  const wk = workers[n] || [];
+  const rows = payrollRows();
+  const rate = pieceRates[_payrollView];
+  const store = payrollData[payrollKey(n, m, _payrollView)] || {};
+
+  if (!wk.length) {
+    tbl.innerHTML = `<tbody><tr><td style="padding:2rem;text-align:center;color:var(--text-faint);font-size:13px;">
+      Add worker names under <strong>Setting → Workers</strong> to build this form.</td></tr></tbody>`;
+    return;
+  }
+
+  const rateTxt = (rate === null || rate === undefined) ? '—' : Number(rate).toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+  let h = `<thead>
+    <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)} — RM ${rateTxt}/${cfg.unit}</th></tr>
+    <tr>
+      <th class="th-left" style="min-width:92px;">Tarikh</th>
+      <th style="min-width:64px;">Plot</th>
+      <th style="min-width:96px;">Kapasiti plot<br>(bibit)</th>
+      ${wk.map(w => `<th style="min-width:104px;">${w}</th>`).join('')}
+      <th style="min-width:104px;">Kapasiti Kerja<br>Setiap Orang (bibit)</th>
+    </tr></thead><tbody>`;
+
+  const totals = {}; wk.forEach(w => totals[w] = 0);
+  let capTotal = 0;
+
+  if (!rows.length) {
+    h += `<tr><td colspan="${3 + wk.length + 1}" style="padding:1.6rem;text-align:center;color:var(--text-faint);">
+      No ${t(cfg.label)} records for this nursery and month yet — tick the schedule, then Sync from Schedule.</td></tr>`;
+  } else {
+    rows.forEach(r => {
+      const cells = store[r.id] || {};
+      let rowSum = 0;
+      wk.forEach(w => { const v = Number(cells[w] || 0); rowSum += v; totals[w] += v; });
+      const cap = (r.qty === 0 || r.qty) ? Number(r.qty) : 0;
+      capTotal += cap;
+      h += `<tr>
+        <td class="th-left" style="font-weight:600;">${r.tarikh || '-'}</td>
+        <td class="plot-td">${r.plot}</td>
+        <td>${cap ? cap.toLocaleString() : '—'}</td>
+        ${wk.map(w => `<td style="padding:4px 6px;"><input type="number" min="0" value="${cells[w] ?? ''}"
+            onchange="setPayrollCell(${r.id},'${String(w).replace(/'/g, "\\'")}',this.value)"
+            style="width:100%;min-width:0;height:32px;padding:0 6px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;"></td>`).join('')}
+        <td style="font-weight:700;">${rowSum ? rowSum.toLocaleString() : '—'}</td>
+      </tr>`;
+    });
+  }
+
+  const grand = wk.reduce((sk, w) => sk + totals[w], 0);
+  h += `</tbody><tfoot>
+    <tr class="jumlah-tr"><td colspan="2">Jumlah (Capacity)</td><td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
+      ${wk.map(w => `<td>${totals[w] ? totals[w].toLocaleString() : '0'}</td>`).join('')}
+      <td>${grand ? grand.toLocaleString() : '0'}</td></tr>
+    <tr class="jumlah-tr"><td colspan="3">Piece Rate (RM)</td>
+      ${wk.map(() => `<td>${rateTxt}</td>`).join('')}<td></td></tr>
+    <tr class="jumlah-tr"><td colspan="3">Total (RM)</td>
+      ${wk.map(w => `<td>${rate ? (totals[w] * rate).toFixed(2) : '0.00'}</td>`).join('')}
+      <td>${rate ? (grand * rate).toFixed(2) : '0.00'}</td></tr>
+  </tfoot>`;
+  tbl.innerHTML = h;
+}
+
+function setPayrollCell(recId, worker, val) {
+  const n = getNursery(), m = getMonth();
+  const k = payrollKey(n, m, _payrollView);
+  if (!payrollData[k]) payrollData[k] = {};
+  if (!payrollData[k][recId]) payrollData[k][recId] = {};
+  const raw = String(val ?? '').trim();
+  if (raw === '') delete payrollData[k][recId][worker];
+  else payrollData[k][recId][worker] = Math.max(0, parseInt(raw) || 0);
+  renderPayroll();
+  persistPayroll(n, m, _payrollView);
+}
+
+function persistPayroll(n, m, type) {
+  if (!_supabase || !_dbReady) return;
+  clearTimeout(_payrollSaveTimer);
+  _payrollSaveTimer = setTimeout(() => {
+    _supabase.from('nops_maint_payroll')
+      .upsert({ nursery: n, month: m, work_type: type,
+                data: payrollData[payrollKey(n, m, type)] || {},
+                updated_at: new Date().toISOString() }, { onConflict: 'nursery,month,work_type' })
+      .then(({ error }) => { if (error) console.warn('[maint] payroll save failed:', error.message); });
+  }, 400);
+}
+
+function downloadPayrollPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const n = getNursery(), m = getMonth(), cfg = PAYROLL_TYPES[_payrollView];
+  const wk = workers[n] || [], rows = payrollRows();
+  const rate = pieceRates[_payrollView] || 0;
+  const store = payrollData[payrollKey(n, m, _payrollView)] || {};
+
+  doc.setFont('times', 'bold'); doc.setFontSize(13);
+  doc.text('Mega Jutamas Sdn Bhd', 148, 12, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text(`Borang Tuntutan Gaji (${NURSERY_NAMES[n]})`, 148, 18, { align: 'center' });
+  doc.setFont('times', 'normal');
+  doc.text(`Bulan ${m}`, 148, 24, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(`${t(cfg.label)} — RM ${rate}/${cfg.unit}`, 148, 31, { align: 'center' });
+
+  const head = ['Tarikh', 'Plot', 'Kapasiti plot', ...wk, 'Kapasiti/Orang'];
+  const colW = [22, 16, 22, ...wk.map(() => Math.max(16, (200 - 60) / Math.max(1, wk.length))), 24];
+  let y = 38;
+  const drawRow = (cells, bold) => {
+    doc.setFont('times', bold ? 'bold' : 'normal'); doc.setFontSize(8);
+    let x = 10;
+    cells.forEach((c, i) => { doc.rect(x, y, colW[i], 6); doc.text(String(c ?? ''), x + colW[i] - 1.5, y + 4, { align: 'right' }); x += colW[i]; });
+    y += 6;
+  };
+  drawRow(head, true);
+  const totals = {}; wk.forEach(w => totals[w] = 0); let capTotal = 0;
+  rows.forEach(r => {
+    if (y > 190) { doc.addPage(); y = 15; drawRow(head, true); }
+    const cells = store[r.id] || {};
+    let rowSum = 0; wk.forEach(w => { const v = Number(cells[w] || 0); rowSum += v; totals[w] += v; });
+    const cap = (r.qty === 0 || r.qty) ? Number(r.qty) : 0; capTotal += cap;
+    drawRow([r.tarikh || '-', r.plot, cap || '-', ...wk.map(w => cells[w] ?? ''), rowSum || '-']);
+  });
+  const grand = wk.reduce((sk, w) => sk + totals[w], 0);
+  drawRow(['Jumlah', '', capTotal || '-', ...wk.map(w => totals[w]), grand], true);
+  drawRow(['Piece Rate', '', '', ...wk.map(() => rate), ''], true);
+  drawRow(['Total (RM)', '', '', ...wk.map(w => (totals[w] * rate).toFixed(2)), (grand * rate).toFixed(2)], true);
+  doc.save(`Borang_Tuntutan_Gaji_${n}_${m.replace(' ', '_')}_${_payrollView}.pdf`);
+}
+
 /* ── Piece rates (one rate card for all nurseries) ── */
 const PIECE_RATE_TYPES = [
   { code: 'pd',       key: 'jenis.pd'       },
@@ -329,6 +501,7 @@ function setPieceRate(code, val) {
     ? _supabase.from('nops_maint_piece_rates').delete().eq('work_type', code)
     : _supabase.from('nops_maint_piece_rates').upsert({ work_type: code, rate: pieceRates[code] }, { onConflict: 'work_type' });
   q.then(({ error }) => { if (error) console.warn('[maint] piece rate save failed:', error.message); });
+  renderSettingRates(); renderPayroll();
 }
 
 /* ── Workers (per nursery) ── */
@@ -358,7 +531,7 @@ function addWorkerFromSetting() {
   workers[n].push(name);
   persistWorker(n, name, false);
   if (el) el.value = '';
-  renderSettingWorkers();
+  renderSettingWorkers(); renderPayroll();
 }
 
 function removeWorker(name) {
@@ -366,7 +539,7 @@ function removeWorker(name) {
   if (!confirm(`Remove worker "${name}" from ${NURSERY_NAMES[n]}?`)) return;
   workers[n] = (workers[n] || []).filter(w => w !== name);
   persistWorker(n, name, true);
-  renderSettingWorkers();
+  renderSettingWorkers(); renderPayroll();
 }
 
 function persistWorker(n, name, remove) {
@@ -773,6 +946,8 @@ function renderAll() {
   // Re-render analytics when its sub-view inside Work Record is showing
   const chartView = document.getElementById('recview-chart');
   if (chartView && chartView.classList.contains('active')) renderCharts();
+  const payTab = document.getElementById('tab-payroll');
+  if (payTab && payTab.classList.contains('active')) renderPayroll();
   // Re-render calculator if its tab is active (clear ticks since plots may differ between nurseries)
   const calcTab = document.getElementById('tab-calc');
   if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
@@ -849,6 +1024,7 @@ function switchTab(name, btn) {
   if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
   if (name==='calc')    renderCalc();
   if (name==='setting') { renderSettingPlots(); renderSettingRates(); renderSettingWorkers(); }
+  if (name==='payroll') renderPayroll();
 }
 
 /* Work Record sub-views: the maintenance list and the analytics charts. */
@@ -2710,13 +2886,14 @@ async function initDb() {
         isNopsAdmin = MJMAccess.isAdminOf('nursery_ops');
       } catch (e) { console.warn('[maint] access load failed:', e); }
     }
-    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes] = await Promise.all([
+    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, payRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
       _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
       _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_piece_rates').select('work_type, rate').then(r => r, () => ({ data: [] })),
-      _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] }))
+      _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
+      _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] }))
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
@@ -2738,6 +2915,9 @@ async function initDb() {
     ((wkRes && wkRes.data) || []).forEach(r => {
       if (!workers[r.nursery]) workers[r.nursery] = [];
       if (!workers[r.nursery].includes(r.name)) workers[r.nursery].push(r.name);
+    });
+    ((payRes && payRes.data) || []).forEach(r => {
+      payrollData[payrollKey(r.nursery, r.month, r.work_type)] = r.data || {};
     });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;

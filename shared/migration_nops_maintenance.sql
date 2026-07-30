@@ -111,3 +111,27 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- 7. Monthly Payroll (Borang Tuntutan Gaji) — one row per
+--    (nursery, month, work type); data = { recordId: { worker: qty } }
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nops_maint_payroll (
+  nursery    TEXT NOT NULL,
+  month      TEXT NOT NULL,
+  work_type  TEXT NOT NULL,             -- pd | manuring | weeding | interrow
+  data       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (nursery, month, work_type)
+);
+
+ALTER TABLE nops_maint_payroll ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_payroll' AND policyname='Authenticated read maint') THEN
+    CREATE POLICY "Authenticated read maint" ON nops_maint_payroll FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_payroll' AND policyname='Authenticated write maint') THEN
+    CREATE POLICY "Authenticated write maint" ON nops_maint_payroll FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;

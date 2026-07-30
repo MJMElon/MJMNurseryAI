@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=29">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=30">
 </head>
 <body>
 
@@ -282,14 +282,25 @@
   </div>
 
 
-    <!-- MONTHLY PAYROLL -->
+    <!-- MONTHLY PAYROLL — Borang Tuntutan Gaji, one sub-tab per work type -->
     <div id="tab-payroll" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="payroll-nursery-line"></div></div>
-      <div class="card" style="padding:18px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text-muted);">
-          Payroll for this nursery and month will live here.
-          <div style="font-size:12px;margin-top:8px;">Tell me the columns you need (for example: worker name, days worked, rate per day, overtime, allowance, deductions, net pay) and I'll build the table with save-to-database and a PDF export.</div>
+      <div class="subtabs-bar">
+        <button class="subtab-btn active" onclick="switchPayrollView('pd',this)"       data-i18n="tab.pd">P &amp; D — Racun</button>
+        <button class="subtab-btn"        onclick="switchPayrollView('manuring',this)" data-i18n="tab.manuring">Manuring</button>
+        <button class="subtab-btn"        onclick="switchPayrollView('weeding',this)"  data-i18n="tab.weeding">Weeding</button>
+        <button class="subtab-btn"        onclick="switchPayrollView('interrow',this)" data-i18n="tab.interrow">Interrow Spray</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text-head);">Mega Jutamas Sdn Bhd</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);" id="payroll-form-line"></div>
         </div>
+        <button class="btn" style="font-size:12px;" onclick="downloadPayrollPDF()">⬇ PDF</button>
+      </div>
+      <div class="card"><div class="tbl-wrap"><table class="sched-table" id="payroll-table"></table></div></div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:8px;">
+        Rows come from the Work Record for this nursery and month. Worker columns and piece rates are set under <strong>Setting</strong>. Entries save automatically.
       </div>
     </div>
 
@@ -411,6 +422,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=29"></script>
+<script src="plot_maintenance_script.js?v=30"></script>
 </body>
 </html>
