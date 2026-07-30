@@ -1739,11 +1739,11 @@ function renderRecords() {
   sortedPlots.forEach(plot => {
     const recs = plotGroups[plot];
     html += `<tr class="plot-group-row">
-      <td colspan="8" style="padding:11px 14px 8px;font-size:14px;font-weight:700;letter-spacing:1px;
+      <td colspan="8" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
         text-transform:uppercase;color:var(--green-text);background:var(--green-light);
         border-top:2px solid var(--green-mid);border-bottom:1px solid var(--green-mid);">
         📍 Plot ${plot}
-        <span style="font-weight:400;font-size:12px;color:var(--text-muted);margin-left:8px;">
+        <span class="rec-group-sub" style="font-weight:400;color:var(--text-muted);margin-left:8px;">
           ${recs.length} task${recs.length>1?'s':''} &nbsp;·&nbsp;
           ${recs.filter(r=>r.gaia).length} Gaia ✓
         </span>
@@ -1751,13 +1751,13 @@ function renderRecords() {
     </tr>`;
     recs.forEach(r => {
       html += `<tr>
-        <td style="font-weight:600;color:var(--green-text);font-size:15px;">${r.tarikh}</td>
-        <td style="font-size:15px;">${jenisLabel(r.jenis)}</td>
+        <td style="font-weight:600;color:var(--green-text);">${r.tarikh}</td>
+        <td>${jenisLabel(r.jenis)}</td>
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
-        <td style="text-align:center;font-weight:700;font-size:15px;color:var(--green-text);">${r.plot}</td>
-        <td style="text-align:center;font-size:14px;color:var(--text-muted);">${r.batch||'—'}</td>
+        <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
+        <td style="text-align:center;color:var(--text-muted);">${r.batch||'—'}</td>
         <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}" onclick="togRec(${r.id},'gaia')">${r.gaia?'☑':'☐'}</span></td>
-        <td style="font-size:14px;color:var(--text-muted);">${r.remark||'—'}</td>
+        <td style="color:var(--text-muted);">${r.remark||'—'}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="editRec(${r.id})">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteRec(${r.id})">Del</button>

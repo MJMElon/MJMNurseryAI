@@ -323,11 +323,15 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .nursery-circle:hover{background:var(--green-light);border-color:var(--green);transform:translateY(-1px);}
 .nursery-circle.active{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 3px 10px rgba(13,122,71,.35);}
 
-/* ─── WORK MAINTENANCE LIST — larger, more readable type ─── */
-#recview-list .rec-table thead th{font-size:12px;padding:13px 14px;}
-#recview-list .rec-table tbody td{font-size:15px;padding:13px 14px;}
-#recview-list .rec-table .pill{font-size:13px;padding:5px 12px;max-width:none;}
-#recview-list .rec-table .chk-btn{font-size:22px;}
-#recview-list .rec-table .btn-sm{font-size:12px;padding:6px 12px;}
-#recview-list .toolbar .filter-sel{font-size:14px;height:40px;}
-#recview-list .toolbar .btn{font-size:13px;padding:9px 16px;}
+/* ─── WORK MAINTENANCE LIST — large, readable type ───
+   Single source of truth: the row template carries no inline font-size. */
+#recview-list .rec-table thead th{font-size:15px;padding:16px 16px;letter-spacing:.6px;}
+#recview-list .rec-table tbody td{font-size:19px;padding:16px 16px;}
+#recview-list .rec-table .rec-group-cell{font-size:20px;}
+#recview-list .rec-table .rec-group-sub{font-size:15px;}
+#recview-list .rec-table .pill{font-size:17px;padding:7px 16px;max-width:none;}
+#recview-list .rec-table .chk-btn{font-size:30px;}
+#recview-list .rec-table .btn-sm{font-size:14px;padding:8px 16px;}
+#recview-list .toolbar .filter-sel{font-size:16px;height:46px;}
+#recview-list .toolbar .btn{font-size:15px;padding:11px 20px;}
+#recview-list .toolbar input.filter-sel{height:46px;font-size:16px;}
