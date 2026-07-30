@@ -334,7 +334,7 @@ const I18N = {
     'pdf.short.weeding':'WEEDING', 'pdf.short.interrow':'INTERROW SPRAY', 'pdf.merumput':'Weeding in polybag',
     'pdf.include':'Include schedules', 'btn.cancel':'Cancel', 'btn.downloadPdf':'⬇ Download PDF',
     'rec.tarikh':'Date', 'rec.jenis':'Work Type', 'rec.racun':'Chemical',
-    'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.gaia':'Gaia', 'rec.remark':'Remark',
+    'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Quantity', 'rec.gaia':'Gaia', 'rec.remark':'Remark',
     'rec.allJenis':'All Work Types', 'rec.allPlot':'All Plots', 'rec.filterDate':'Filter by date…',
     'rec.totalTasks':'Total Tasks', 'rec.gaiaDone':'Gaia Done', 'rec.gaiaPending':'Gaia Pending',
     'rec.donePct':'Done %', 'rec.none':'No records found.',
@@ -373,7 +373,7 @@ const I18N = {
     'pdf.short.weeding':'MERUMPUT', 'pdf.short.interrow':'RACUN SELINGAN', 'pdf.merumput':'Merumput dalam polibeg',
     'pdf.include':'Sertakan jadual', 'btn.cancel':'Batal', 'btn.downloadPdf':'⬇ Muat Turun PDF',
     'rec.tarikh':'Tarikh', 'rec.jenis':'Jenis Kerja', 'rec.racun':'Racun / Bahan',
-    'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.gaia':'Gaia', 'rec.remark':'Catatan',
+    'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Kuantiti', 'rec.gaia':'Gaia', 'rec.remark':'Catatan',
     'rec.allJenis':'Semua Jenis Kerja', 'rec.allPlot':'Semua Plot', 'rec.filterDate':'Tapis ikut tarikh…',
     'rec.totalTasks':'Jumlah Tugasan', 'rec.gaiaDone':'Gaia Selesai', 'rec.gaiaPending':'Gaia Belum',
     'rec.donePct':'% Selesai', 'rec.none':'Tiada rekod dijumpai.',
@@ -638,13 +638,13 @@ function autoSyncRecords() {
         const pStick = c.P_sticker && c.P_sticker !== '—' ? ` + ${c.P_sticker} ${c.P_sticker_dose}${c.P_sticker_unit}` : '';
         newRecs.push({id:id++, tarikh:'-', jenis:'Penyemburan racun kulat dan serangga',
           racun:`Round ${w[1]}: ${c.P} ${c.P_dose}${c.P_unit}${pStick}`,
-          plot, batch:'', carlos:0, gaia:0, remark:''});
+          plot, batch:'', qty:null, carlos:0, gaia:0, remark:''});
       }
       if (s.pd[w]?.[plot]?.D && c.D!=='—') {
         const dStick = c.D_sticker && c.D_sticker !== '—' ? ` + ${c.D_sticker} ${c.D_sticker_dose}${c.D_sticker_unit}` : '';
         newRecs.push({id:id++, tarikh:'-', jenis:'Penyemburan racun kulat dan serangga',
           racun:`Round ${w[1]}: ${c.D} ${c.D_dose}${c.D_unit}${dStick}`,
-          plot, batch:'', carlos:0, gaia:0, remark:''});
+          plot, batch:'', qty:null, carlos:0, gaia:0, remark:''});
       }
     });
   });
@@ -653,7 +653,7 @@ function autoSyncRecords() {
       plots.filter(p=>s.manuring[p]?.[ri]?.[ci]).forEach(plot => {
         newRecs.push({id:id++, tarikh:'-', jenis:'Membaja',
           racun:`Round ${ri+1}: ${c.name} ${c.dose}${c.unit}`,
-          plot, batch:'', carlos:0, gaia:0, remark:''});
+          plot, batch:'', qty:null, carlos:0, gaia:0, remark:''});
       });
     });
   });
@@ -661,7 +661,7 @@ function autoSyncRecords() {
     plots.filter(p=>s.weeding[p]?.[r]).forEach(plot=>{
       newRecs.push({id:id++, tarikh:'-', jenis:'Merumput',
         racun:`Round ${r[1]}: Merumput dalam polibeg`,
-        plot, batch:'', carlos:0, gaia:0, remark:''});
+        plot, batch:'', qty:null, carlos:0, gaia:0, remark:''});
     });
   });
   s.interrowConfig.forEach((round, ri) => {
@@ -669,7 +669,7 @@ function autoSyncRecords() {
       plots.filter(p=>s.interrow[p]?.[ri]?.[ci]).forEach(plot=>{
         newRecs.push({id:id++, tarikh:'-', jenis:'Meracun rumput secara selingan',
           racun:`Round ${ri+1}: ${c.chem} ${c.chem_dose}${c.chem_unit} + Activator ${c.activator_dose}${c.activator_unit}`,
-          plot, batch:'', carlos:0, gaia:0, remark:''});
+          plot, batch:'', qty:null, carlos:0, gaia:0, remark:''});
       });
     });
   });
@@ -1742,7 +1742,7 @@ function renderRecords() {
   sortedPlots.forEach(plot => {
     const recs = plotGroups[plot];
     html += `<tr class="plot-group-row">
-      <td colspan="8" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
+      <td colspan="9" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
         text-transform:uppercase;color:var(--green-text);background:var(--green-light);
         border-top:2px solid var(--green-mid);border-bottom:1px solid var(--green-mid);">
         📍 Plot ${plot}
@@ -1759,6 +1759,7 @@ function renderRecords() {
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
         <td style="text-align:center;color:var(--text-muted);">${r.batch||'—'}</td>
+        <td style="text-align:center;font-weight:700;color:var(--text-head);">${(r.qty===0||r.qty)?Number(r.qty).toLocaleString():'—'}</td>
         <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
         <td style="white-space:nowrap;">
@@ -1809,6 +1810,7 @@ function openRecModal(pre) {
   document.getElementById('rf-racun').value=pre?.racun||'';
   document.getElementById('rf-plot').value=pre?.plot||'';
   document.getElementById('rf-batch').value=pre?.batch||'';
+  document.getElementById('rf-qty').value=(pre && (pre.qty===0||pre.qty)) ? pre.qty : '';
   document.getElementById('rf-gaia').value=pre?.gaia||0;
   document.getElementById('rf-remark').value=pre?.remark||'';
   document.getElementById('rec-modal').classList.add('open');
@@ -1823,6 +1825,7 @@ function saveRec(){
     racun:document.getElementById('rf-racun').value,
     plot:document.getElementById('rf-plot').value.trim(),
     batch:document.getElementById('rf-batch').value,
+    qty:(document.getElementById('rf-qty').value ?? '').trim()==='' ? null : Math.max(0, parseInt(document.getElementById('rf-qty').value)||0),
     gaia:+document.getElementById('rf-gaia').value,
     remark:document.getElementById('rf-remark').value,
   };
