@@ -93,6 +93,7 @@
                 </div>
             </div>
 
+            <div id="al-pagination-header" class="mb-4 pb-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-3 text-xs font-bold text-slate-500 relative z-30"></div>
             <div class="overflow-x-auto relative z-30">
                 <table class="w-full text-left border-collapse min-w-[1200px]">
                     <thead>
@@ -384,7 +385,7 @@
         // ─────────────────────────────────────────────
         let _alSort = { key: 'order_date', dir: 'desc' };
         let _alPage = 1;
-        const _AL_PAGE_SIZE = 25;
+        const _AL_PAGE_SIZE = 100;
 
         function onFiltersChanged() { _alPage = 1; renderTable(); }
         function clearALFilters() {
@@ -507,8 +508,11 @@
         }
 
         function renderALPaginationFooter(total, totalPages, startIdx, pageCount) {
-            const el = document.getElementById('al-pagination-footer');
-            if (!el) return;
+            // Same controls shown above AND below the table.
+            const bars = [document.getElementById('al-pagination-header'),
+                          document.getElementById('al-pagination-footer')].filter(Boolean);
+            if (!bars.length) return;
+            const el = { set innerHTML(v) { bars.forEach(b => b.innerHTML = v); } };
             if (total === 0) {
                 el.innerHTML = '<div class="text-slate-400">No entries to display.</div>';
                 return;

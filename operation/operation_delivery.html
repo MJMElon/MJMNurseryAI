@@ -80,7 +80,17 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto relative z-30">
+                        <div class="do-pager hidden flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest do-pager-info">—</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="doPagePrev()"
+                        class="do-pager-prev px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
+                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page">Page 1 of 1</span>
+                    <button type="button" onclick="doPageNext()"
+                        class="do-pager-next px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
+                </div>
+            </div>
+<div class="overflow-x-auto relative z-30">
                 <table class="w-full text-left border-collapse min-w-[1100px]">
                     <thead>
                         <tr class="text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b-2 border-slate-100 pb-2">
@@ -100,14 +110,14 @@
             <!-- DO list pagination — 100 rows per page. Paging only slices the
                  already-built list, so the running-number sequence (and the
                  MISSING RUNNING NUMBER placeholder rows) stay exactly as-is. -->
-            <div id="do-pager" class="hidden flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-100">
-                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest" id="do-pager-info">—</div>
+            <div class="do-pager hidden flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-100">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest do-pager-info">—</div>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="doPagePrev()" id="do-pager-prev"
-                        class="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
-                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest" id="do-pager-page">Page 1 of 1</span>
-                    <button type="button" onclick="doPageNext()" id="do-pager-next"
-                        class="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
+                    <button type="button" onclick="doPagePrev()"
+                        class="do-pager-prev px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
+                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page">Page 1 of 1</span>
+                    <button type="button" onclick="doPageNext()"
+                        class="do-pager-next px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
                 </div>
             </div>
         </div>
@@ -363,18 +373,17 @@
         // ── DO list pagination state & controls ──────────────────────
         let doCurrentPage = 1;
         function renderDOPager(totalRows, totalPages, start, shown) {
-            const bar = document.getElementById('do-pager');
-            if (!bar) return;
-            bar.classList.toggle('hidden', totalRows === 0);
-            bar.classList.toggle('flex', totalRows > 0);
-            const info = document.getElementById('do-pager-info');
-            const lbl  = document.getElementById('do-pager-page');
-            const prev = document.getElementById('do-pager-prev');
-            const next = document.getElementById('do-pager-next');
-            if (info) info.innerText = totalRows ? `Showing ${start + 1}–${start + shown} of ${totalRows}` : '—';
-            if (lbl)  lbl.innerText  = `Page ${doCurrentPage} of ${totalPages}`;
-            if (prev) prev.disabled  = doCurrentPage <= 1;
-            if (next) next.disabled  = doCurrentPage >= totalPages;
+            // Two identical bars (above and below the table) stay in sync.
+            document.querySelectorAll('.do-pager').forEach(bar => {
+                bar.classList.toggle('hidden', totalRows === 0);
+                bar.classList.toggle('flex', totalRows > 0);
+            });
+            document.querySelectorAll('.do-pager-info').forEach(el =>
+                el.innerText = totalRows ? `Showing ${start + 1}–${start + shown} of ${totalRows}` : '—');
+            document.querySelectorAll('.do-pager-page').forEach(el =>
+                el.innerText = `Page ${doCurrentPage} of ${totalPages}`);
+            document.querySelectorAll('.do-pager-prev').forEach(el => el.disabled = doCurrentPage <= 1);
+            document.querySelectorAll('.do-pager-next').forEach(el => el.disabled = doCurrentPage >= totalPages);
         }
         function doPagePrev() { if (doCurrentPage > 1) { doCurrentPage--; renderDOTable(); document.getElementById('do-records-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
         function doPageNext() { doCurrentPage++; renderDOTable(); document.getElementById('do-records-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
