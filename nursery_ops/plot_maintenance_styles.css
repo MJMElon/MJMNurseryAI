@@ -291,13 +291,18 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .subtab-btn{font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text-muted);background:transparent;border:none;cursor:pointer;padding:8px 16px;border-radius:var(--r-sm);transition:all .14s;white-space:nowrap;}
 .subtab-btn:hover{color:var(--text-body);background:var(--green-bg);}
 .subtab-btn.active{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(13,122,71,.3);}
-.recview{display:none;animation:fadein .18s ease;}
+.recview{display:none;animation:fadein .18s ease;min-width:0;}
 .recview.active{display:block;}
 .sched-panel{display:none;animation:fadein .18s ease;}
 .sched-panel.active{display:block;}
 
 /* Big headline metric cards on the Work Record view */
-.metrics-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px;}
+/* Fixed 4-up grid (not auto-fit) so the headline cards keep the SAME size and
+   layout whichever sub-view is open - the analytics charts change the available
+   width, which previously made the cards reflow 4-up -> 3-up and resize. */
+.metrics-big{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px;}
+@media (max-width:900px){ .metrics-big{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media (max-width:480px){ .metrics-big{grid-template-columns:1fr;} }
 .metrics-big .metric-card{padding:22px 24px;border-top-width:4px;}
 .metrics-big .mc-label{font-size:11px;letter-spacing:1.2px;margin-bottom:10px;}
 .metrics-big .mc-value{font-size:44px;line-height:1;}
