@@ -325,16 +325,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 
 /* ─── WORK MAINTENANCE LIST — large, readable type ───
    Single source of truth: the row template carries no inline font-size. */
-#recview-list .rec-table thead th{font-size:15px;padding:16px 16px;letter-spacing:.6px;}
-#recview-list .rec-table tbody td{font-size:19px;padding:16px 16px;}
-#recview-list .rec-table .rec-group-cell{font-size:20px;}
-#recview-list .rec-table .rec-group-sub{font-size:15px;}
-#recview-list .rec-table .pill{font-size:17px;padding:7px 16px;max-width:none;}
-#recview-list .rec-table .chk-btn{font-size:30px;}
-#recview-list .rec-table .btn-sm{font-size:14px;padding:8px 16px;}
-#recview-list .toolbar .filter-sel{font-size:16px;height:46px;}
-#recview-list .toolbar .btn{font-size:15px;padding:11px 20px;}
-#recview-list .toolbar input.filter-sel{height:46px;font-size:16px;}
+#recview-list .rec-table thead th{font-size:13px;padding:14px 16px;letter-spacing:.6px;}
+#recview-list .rec-table tbody td{font-size:16px;padding:14px 16px;}
+#recview-list .rec-table .rec-group-cell{font-size:17px;}
+#recview-list .rec-table .rec-group-sub{font-size:13px;}
+#recview-list .rec-table .pill{font-size:14px;padding:6px 14px;max-width:none;}
+#recview-list .rec-table .chk-btn{font-size:25px;}
+#recview-list .rec-table .btn-sm{font-size:13px;padding:7px 14px;}
+#recview-list .rec-table .rec-checked-badge{font-size:12px;padding:5px 12px;}
+#recview-list .toolbar .filter-sel{font-size:15px;height:42px;}
+#recview-list .toolbar .btn{font-size:14px;padding:10px 18px;}
+#recview-list .toolbar input.filter-sel{height:42px;font-size:15px;}
 
 /* ─── CHECKED (verified) ROWS ─── */
 .btn-check{color:#065f46 !important;border-color:#a7f3d0 !important;background:#ecfdf5 !important;}
