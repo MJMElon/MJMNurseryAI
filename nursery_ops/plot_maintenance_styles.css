@@ -342,3 +342,19 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .rec-checked-badge{display:inline-block;font-size:13px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;
   color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:999px;padding:6px 14px;margin-right:6px;vertical-align:middle;}
 .chk-btn.chk-locked{cursor:not-allowed;opacity:.55;}
+
+/* ─── DOSAGE CALC — larger type throughout ───
+   !important is needed because much of this panel carries inline font-size. */
+#tab-calc, #tab-calc div, #tab-calc label, #tab-calc span{ }
+#tab-calc [style*="font-size:11px"]{font-size:14px !important;}
+#tab-calc [style*="font-size:12px"]{font-size:15px !important;}
+#tab-calc [style*="font-size:13px"]{font-size:16px !important;}
+#tab-calc .page-hdr-title{font-size:26px;}
+#tab-calc .section-badge{font-size:13px;padding:6px 16px;}
+#tab-calc select, #tab-calc input{font-size:16px !important;height:44px !important;}
+#tab-calc .btn{font-size:15px;padding:10px 18px;}
+#tab-calc .calc-plot-btn{font-size:15px;padding:11px 8px;}
+#tab-calc .calc-result-card{padding:18px 20px;}
+#tab-calc .calc-result-card .lbl{font-size:14px !important;}
+#tab-calc .calc-result-card .val{font-size:30px !important;}
+#tab-calc .calc-result-card .val[style*="font-size:16px"]{font-size:22px !important;}

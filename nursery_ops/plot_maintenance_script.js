@@ -832,7 +832,7 @@ function renderCalcCapacity() {
   if (!grid) return;
   const n = getNursery();
   const plots = NURSERY_PLOTS[n];
-  if (!plots.length) { grid.innerHTML = `<div style="font-size:12px;color:#888">${t('calc.noPlots')}</div>`; return; }
+  if (!plots.length) { grid.innerHTML = `<div style="font-size:15px;color:#888">${t('calc.noPlots')}</div>`; return; }
   grid.innerHTML = plots.map(p => `
     <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #d4d8d4;border-radius:6px;padding:5px 8px">
       <span style="font-size:12px;font-weight:700;color:#236023;min-width:38px">${p}</span>

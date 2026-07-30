@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=23">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=24">
 </head>
 <body>
 
@@ -222,7 +222,7 @@
           <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.capacity">Nursery Plot Capacity (seedlings per plot — editable)</div>
           <button class="btn" onclick="resetCalcCapacity()" style="font-size:11px" data-i18n="btn.reset">↺ Reset to Defaults</button>
         </div>
-        <div id="calc-capacity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px"></div>
+        <div id="calc-capacity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px"></div>
       </div>
 
       <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.chemHead">🧪 Chemical (Racun)</div>
@@ -246,8 +246,8 @@
           <button class="btn" onclick="selectAllCalcPlots()" data-i18n="btn.selectAll">Select All</button>
         </div>
         <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="calc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:18px"></div>
-        <div id="calc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"></div>
+        <div id="calc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
+        <div id="calc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
       </div>
 
       <div style="font-size:13px;font-weight:700;color:#a16207;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.fertHead">🌱 Fertilizer (Baja)</div>
@@ -269,8 +269,8 @@
           <button class="btn" onclick="selectAllFertCalcPlots()" data-i18n="btn.selectAll">Select All</button>
         </div>
         <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="fcalc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:18px"></div>
-        <div id="fcalc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"></div>
+        <div id="fcalc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
+        <div id="fcalc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
       </div>
     </div>
   </div>
@@ -361,6 +361,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=23"></script>
+<script src="plot_maintenance_script.js?v=24"></script>
 </body>
 </html>
