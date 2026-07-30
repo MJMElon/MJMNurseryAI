@@ -1427,7 +1427,7 @@
                                 </div>
 
                                 <!-- Column headers: Plot → Transplanted → 2nd Culled → Sales → Balance → 3rd Culled Qty → 3rd Culled % → Transfer → Drone Map -->
-                                <div class="hidden lg:grid gap-2 px-6 pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 0.95fr 0.55fr 0.5fr 0.55fr 0.8fr 0.65fr 0.5fr 1.5fr 1.7fr;">
+                                <div class="hidden lg:grid gap-2 px-6 pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 0.8fr 0.5fr 0.45fr 0.45fr 0.7fr 0.6fr 0.75fr 1.4fr 1.5fr;">
                                     <span>Main Plot</span>
                                     <span>Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
@@ -6831,7 +6831,7 @@ Thank you.`;
 
                 container.insertAdjacentHTML('beforeend', `
                     <div id="${rowId}" class="t6-plot-row border ${rowBg} rounded-xl overflow-hidden">
-                        <div class="grid grid-cols-1 lg:grid-cols-[0.95fr_0.55fr_0.5fr_0.55fr_0.8fr_0.65fr_0.5fr_1.5fr_1.7fr] gap-2 p-4 items-center t-tidy">
+                        <div class="grid grid-cols-1 lg:grid-cols-[0.8fr_0.5fr_0.45fr_0.45fr_0.7fr_0.6fr_0.75fr_1.4fr_1.5fr] gap-2 p-4 items-center t-tidy">
 
                             <!-- Plot -->
                             <div class="flex flex-col gap-0.5 pt-1">
@@ -6868,7 +6868,6 @@ Thank you.`;
                                 <div class="input-style bg-[#f0f8ec] font-black text-[#4a7a2e] flex items-center text-sm"
                                     title="Auto: Transplanted − 2nd Culled − Sales">${autoBal.toLocaleString()}</div>
                                 <input type="hidden" class="t6-balance" data-transplanted="${p.qty}" value="${autoBal}">
-                                <div class="text-[8px] font-bold text-[#8a7a68] mt-0.5 uppercase tracking-wide">− ${dead2.toLocaleString()} dead − ${sales.toLocaleString()} sold</div>
                             </div>
 
                             <!-- Culled qty — AUTO (2nd culled + balance). The value lives on a
@@ -6884,7 +6883,7 @@ Thank you.`;
                             <!-- Cull rate % — auto -->
                             <div class="pt-1">
                                 <div class="text-[9px] font-black text-[#c07820] uppercase lg:hidden mb-0.5">Cull Rate %</div>
-                                <div class="text-base font-black text-[#8a7a68] t6-cull-rate-cell" id="${rowId}-cullrate">—</div>
+                                <div class="text-sm font-black text-[#8a7a68] whitespace-nowrap t6-cull-rate-cell" id="${rowId}-cullrate">—</div>
                             </div>
 
                             <!-- Transfer — move seedlings from this plot to another plot.
@@ -7004,10 +7003,10 @@ Thank you.`;
                 const cullPct = ((culled / transplanted) * 100).toFixed(2);
                 cullCell.innerText = cullPct + '%';
                 // Always red to match 2nd culling style
-                cullCell.className = 'text-base font-black text-[#a83020] t6-cull-rate-cell';
+                cullCell.className = 'text-sm font-black text-[#a83020] whitespace-nowrap t6-cull-rate-cell';
             } else {
                 cullCell.innerText   = '—';
-                cullCell.className   = 'text-base font-black text-[#8a7a68] t6-cull-rate-cell';
+                cullCell.className   = 'text-sm font-black text-[#8a7a68] whitespace-nowrap t6-cull-rate-cell';
             }
 
             // Auto-fill the D-TONE row for the same plot with 0 the moment its
