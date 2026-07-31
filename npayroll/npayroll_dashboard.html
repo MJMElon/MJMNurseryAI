@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nursery Payroll System</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%236366f1%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2714%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENP%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f5f5ff; margin:0; }
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #c7d2fe; color:#4338ca; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s;
+              box-shadow:0 3px 10px rgba(99,102,241,.10); }
+  .tool-btn:hover { background:#eef2ff; transform:translateY(-1px); }
+  .stat { background:#fff; border:1.5px solid #e0e7ff; border-radius:16px; padding:18px 20px;
+          box-shadow:0 3px 12px rgba(99,102,241,.07); }
+  .stat-lbl { font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:#818cf8; }
+  .stat-val { font-size:30px; font-weight:900; color:#312e81; line-height:1.15; margin-top:4px; }
+  .stat-sub { font-size:11px; font-weight:600; color:#94a3b8; margin-top:2px; }
+  .setup-note { background:#fffbeb; border:1.5px solid #fcd34d; border-radius:16px; padding:18px 20px; color:#78350f; }
+  .setup-note code { background:#fef3c7; padding:1px 6px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="bg-white border-b border-indigo-100 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
+  <a href="../index.html" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-indigo-600 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; Module Selection</a>
+  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Payroll System</span>
+  <div class="justify-self-end flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NP</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-8 hidden">
+
+  <div class="flex flex-wrap items-center justify-center gap-3 mb-7">
+    <a class="tool-btn" href="npayroll_workers.html">👷 Worker Register</a>
+  </div>
+
+  <!-- Shown only when the tables are not in the database yet. -->
+  <div id="setup" class="setup-note mb-7 hidden">
+    <div class="font-black text-sm mb-1">⚠️ Database not set up yet</div>
+    <div class="text-[13px] leading-relaxed">
+      The payroll tables have not been created. Run
+      <code>shared/migration_mjmnpayroll.sql</code> in the Supabase SQL Editor, then reload this page.
+      <div class="mt-2 text-[12px] opacity-80" id="setup-err"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
+    <div class="stat">
+      <div class="stat-lbl">Active Workers</div>
+      <div class="stat-val" id="s-workers">—</div>
+      <div class="stat-sub" id="s-workers-sub">on the payroll</div>
+    </div>
+    <div class="stat">
+      <div class="stat-lbl">Open Pay Periods</div>
+      <div class="stat-val" id="s-periods">—</div>
+      <div class="stat-sub" id="s-periods-sub">not yet locked</div>
+    </div>
+    <div class="stat">
+      <div class="stat-lbl">Latest Period</div>
+      <div class="stat-val" id="s-latest">—</div>
+      <div class="stat-sub" id="s-latest-sub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm">
+    <div class="text-[11px] font-black uppercase tracking-widest text-indigo-400 mb-2">About this module</div>
+    <p class="text-[13px] text-slate-600 leading-relaxed">
+      The Nursery Payroll System keeps the worker register, the monthly pay periods and every
+      earning and deduction that makes up a worker's pay. Its tables use the
+      <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[12px]">mjmnpayroll_</code> prefix.
+    </p>
+    <p class="text-[13px] text-slate-600 leading-relaxed mt-2">
+      Piece-rate work done in the nursery is recorded in
+      <a href="../nursery_ops/nursery_ops_maintenance.html" class="text-indigo-700 font-bold underline underline-offset-2">Work Maintenance</a>;
+      this module is where that becomes pay.
+    </p>
+  </div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-8">
+    Module access is granted per user on the main portal's
+    <a href="../user_access.html" class="text-indigo-700 font-bold underline underline-offset-2">User Access</a>.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monthLabel = m => { const [y, mo] = String(m).split('-'); return `${MONTHS[+mo - 1] || mo} ${y}`; };
+
+/* The module is usable before the migration has been run — say so plainly
+   rather than showing zeros that look like real numbers. */
+async function loadSummary() {
+  const [wRes, pRes] = await Promise.all([
+    _supabase.from('mjmnpayroll_workers').select('id, active'),
+    _supabase.from('mjmnpayroll_periods').select('month, status').order('month', { ascending: false })
+  ]);
+
+  if (wRes.error || pRes.error) {
+    const msg = (wRes.error || pRes.error).message || '';
+    $('setup').classList.remove('hidden');
+    $('setup-err').textContent = msg;
+    ['s-workers', 's-periods', 's-latest'].forEach(id => $(id).textContent = '—');
+    return;
+  }
+
+  const workers = wRes.data || [];
+  const active  = workers.filter(w => w.active !== false).length;
+  $('s-workers').textContent = active.toLocaleString();
+  $('s-workers-sub').textContent = workers.length === active
+    ? 'on the payroll'
+    : `${workers.length - active} inactive not counted`;
+
+  const periods = pRes.data || [];
+  $('s-periods').textContent = periods.filter(p => p.status === 'open').length.toLocaleString();
+
+  const latest = periods[0];
+  $('s-latest').textContent = latest ? monthLabel(latest.month) : '—';
+  $('s-latest-sub').textContent = latest ? latest.status : 'no pay period yet';
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('npayroll')) {
+      alert('You do not have access to the Nursery Payroll System.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    $('who').textContent = u.full_name || u.email || '';
+    await loadSummary();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>
