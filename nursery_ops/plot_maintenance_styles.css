@@ -360,9 +360,15 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 #tab-calc .calc-result-card .val{font-size:30px !important;}
 #tab-calc .calc-result-card .val[style*="font-size:16px"]{font-size:22px !important;}
 
-/* ─── MONTHLY PAYROLL — breathing room + column alignment ─── */
-#tab-payroll .card{margin:0 6px;}
-#tab-payroll .tbl-wrap{padding:0 10px 10px;}
+/* ─── MONTHLY PAYROLL — breathing room + column alignment ───
+   The form is wide, so pin the card to the page width and let the TABLE
+   scroll inside it. Without this the table stretches its container past
+   the page's side margins and the panel loses the inset every other tab
+   has. */
+#tab-payroll, #tab-setting{max-width:100%;min-width:0;overflow-x:hidden;}
+#tab-payroll .card{margin:0;max-width:100%;}
+#tab-payroll .tbl-wrap{max-width:100%;overflow-x:auto;padding:0 10px 10px;}
+#tab-payroll .tbl-wrap .sched-table{width:max-content;min-width:100%;}
 #tab-payroll .sched-table{margin-top:0;}
 /* Footer totals sit in real columns (no colspan), so centre them like the body
    and keep the row labels left-aligned. */
