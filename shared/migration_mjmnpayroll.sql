@@ -1,27 +1,28 @@
 -- ════════════════════════════════════════════════════════════════
 -- Nursery Payroll System — persistence (mjmnpayroll_*)
--- Backs npayroll/npayroll_dashboard.html and npayroll_workers.html.
+-- Backs npayroll/npayroll_dashboard.html.
 -- Run once in the Supabase SQL Editor (same database as mjm-ai-system).
--- Safe to re-run — every statement checks before it changes anything.
+-- Safe to re-run, and safe to run over an earlier version of this file —
+-- every statement checks before it changes anything.
 -- ════════════════════════════════════════════════════════════════
 
 -- ── 1. Worker register ──────────────────────────────────────────
---    One row per person on the payroll. `nursery` is free text so a
---    worker can sit outside the four nurseries (office, transport…).
+--    One row per person on the payroll, filed under a section:
+--    PN | BNN | UNN1 | UNN2 | UNE | Driver.
 CREATE TABLE IF NOT EXISTS mjmnpayroll_workers (
   id          BIGSERIAL PRIMARY KEY,
-  worker_no   TEXT,                       -- staff/payroll number, optional
+  worker_no   TEXT,
   full_name   TEXT NOT NULL,
-  id_no       TEXT,                       -- IC / passport
-  nursery     TEXT,                       -- PN | BNN | UNN1 | UNN2 | other
+  id_no       TEXT,
+  nursery     TEXT,
   job_title   TEXT,
   pay_type    TEXT NOT NULL DEFAULT 'piece'
               CHECK (pay_type IN ('piece','daily','monthly')),
-  base_rate   NUMERIC(12,2) NOT NULL DEFAULT 0,   -- daily or monthly wage
+  base_rate   NUMERIC(12,2) NOT NULL DEFAULT 0,
   bank_name   TEXT,
   bank_acct   TEXT,
   joined_on   DATE,
-  left_on     DATE,                       -- set when they leave; keeps history
+  left_on     DATE,
   active      BOOLEAN NOT NULL DEFAULT true,
   remark      TEXT,
   created_at  TIMESTAMPTZ DEFAULT now(),
@@ -30,17 +31,69 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_workers (
   updated_by  TEXT
 );
 
-CREATE INDEX IF NOT EXISTS mjmnpayroll_workers_nursery_idx ON mjmnpayroll_workers (nursery);
+-- Section + role, added separately so an earlier run of this file upgrades
+-- cleanly instead of needing the table dropped.
+ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS section TEXT;
+ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS role    TEXT;
+
+-- Carry anything already filed under the old columns across.
+UPDATE mjmnpayroll_workers SET section = nursery   WHERE section IS NULL AND nursery   IS NOT NULL;
+UPDATE mjmnpayroll_workers SET role    = job_title WHERE role    IS NULL AND job_title IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS mjmnpayroll_workers_section_idx ON mjmnpayroll_workers (section);
 CREATE INDEX IF NOT EXISTS mjmnpayroll_workers_active_idx  ON mjmnpayroll_workers (active);
 
--- ── 2. Pay periods ──────────────────────────────────────────────
---    One row per month per nursery. `status` walks open → locked →
---    paid; locking freezes the lines so a payslip cannot move after
---    it has been issued.
+-- ── 2. Piece rates ──────────────────────────────────────────────
+--    The job list: what the work is, the unit it is counted in, and what
+--    one unit pays. Used by the Transplanting and Seedlings Collection
+--    sheets, and shown on the payroll.
+CREATE TABLE IF NOT EXISTS mjmnpayroll_piece_rates (
+  id          BIGSERIAL PRIMARY KEY,
+  job_desc    TEXT NOT NULL,
+  unit        TEXT,                              -- beg | tray | pokok | hari …
+  rate        NUMERIC(12,4) NOT NULL DEFAULT 0,  -- RM per unit
+  category    TEXT,                              -- transplanting | seedlings | maintenance | other
+  active      BOOLEAN NOT NULL DEFAULT true,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  created_by  TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT now(),
+  updated_by  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS mjmnpayroll_piece_rates_cat_idx ON mjmnpayroll_piece_rates (category);
+
+-- ── 3. Work entries ─────────────────────────────────────────────
+--    What each worker did, for the sheets that are keyed here rather than
+--    pulled from another module (Transplanting, Seedlings Collection).
+--    The rate is copied onto the row: changing a piece rate later must
+--    never silently restate a month that has already been paid.
+CREATE TABLE IF NOT EXISTS mjmnpayroll_work_entries (
+  id         BIGSERIAL PRIMARY KEY,
+  month      TEXT NOT NULL,                      -- 'YYYY-MM'
+  category   TEXT NOT NULL,                      -- transplanting | seedlings
+  section    TEXT,                               -- PN | BNN | UNN1 | UNN2 | UNE | Driver
+  worker_id  BIGINT REFERENCES mjmnpayroll_workers(id) ON DELETE CASCADE,
+  rate_id    BIGINT REFERENCES mjmnpayroll_piece_rates(id) ON DELETE SET NULL,
+  job_desc   TEXT,                               -- snapshot of the job name
+  unit       TEXT,
+  work_date  DATE,
+  qty        NUMERIC(14,2) NOT NULL DEFAULT 0,
+  rate       NUMERIC(12,4) NOT NULL DEFAULT 0,   -- snapshot
+  amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
+  remark     TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by TEXT
+);
+
+CREATE INDEX IF NOT EXISTS mjmnpayroll_work_month_idx  ON mjmnpayroll_work_entries (month, category);
+CREATE INDEX IF NOT EXISTS mjmnpayroll_work_worker_idx ON mjmnpayroll_work_entries (worker_id);
+
+-- ── 4. Pay periods ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mjmnpayroll_periods (
   id         BIGSERIAL PRIMARY KEY,
   nursery    TEXT NOT NULL,
-  month      TEXT NOT NULL,               -- 'YYYY-MM'
+  month      TEXT NOT NULL,
   status     TEXT NOT NULL DEFAULT 'open'
              CHECK (status IN ('open','locked','paid')),
   locked_at  TIMESTAMPTZ,
@@ -53,23 +106,18 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_periods (
   UNIQUE (nursery, month)
 );
 
--- ── 3. Payroll lines ────────────────────────────────────────────
---    Every earning and deduction that makes up one worker's pay for
---    one period. Kept as lines rather than columns so a new allowance
---    or deduction never needs a schema change.
---      kind 'earning'   — piece work, daily wage, overtime, allowance, bonus
---      kind 'deduction' — advance, EPF, SOCSO, EIS, unpaid leave, other
+-- ── 5. Payroll lines (earnings / deductions on a period) ────────
 CREATE TABLE IF NOT EXISTS mjmnpayroll_lines (
   id         BIGSERIAL PRIMARY KEY,
   period_id  BIGINT NOT NULL REFERENCES mjmnpayroll_periods(id) ON DELETE CASCADE,
   worker_id  BIGINT NOT NULL REFERENCES mjmnpayroll_workers(id) ON DELETE CASCADE,
   kind       TEXT NOT NULL CHECK (kind IN ('earning','deduction')),
-  category   TEXT NOT NULL,               -- piece_work | daily | overtime | allowance | bonus | advance | epf | socso | eis | other
+  category   TEXT NOT NULL,
   descr      TEXT,
-  qty        NUMERIC(14,2),               -- units (seedlings, days, hours)
-  rate       NUMERIC(12,4),               -- per unit
+  qty        NUMERIC(14,2),
+  rate       NUMERIC(12,4),
   amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
-  source     TEXT,                        -- 'manual' | 'maintenance' (pulled from the work records)
+  source     TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   created_by TEXT
 );
@@ -77,9 +125,7 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_lines (
 CREATE INDEX IF NOT EXISTS mjmnpayroll_lines_period_idx ON mjmnpayroll_lines (period_id);
 CREATE INDEX IF NOT EXISTS mjmnpayroll_lines_worker_idx ON mjmnpayroll_lines (worker_id);
 
--- ── 4. Module settings ──────────────────────────────────────────
---    Single JSONB row, same shape the other modules use, so a new
---    setting never needs a migration.
+-- ── 6. Module settings ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mjmnpayroll_settings (
   id         SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   payload    JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -92,7 +138,8 @@ DO $$
 DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'mjmnpayroll_workers','mjmnpayroll_periods','mjmnpayroll_lines','mjmnpayroll_settings'
+    'mjmnpayroll_workers','mjmnpayroll_piece_rates','mjmnpayroll_work_entries',
+    'mjmnpayroll_periods','mjmnpayroll_lines','mjmnpayroll_settings'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
