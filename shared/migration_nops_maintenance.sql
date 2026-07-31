@@ -149,12 +149,28 @@ END $$;
 -- ════════════════════════════════════════════════════════════════
 DO $$
 BEGIN
+  -- (a) Table has never been created — make it in the final shape.
   IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'nops_maint_piece_rates'
+  ) THEN
+    CREATE TABLE nops_maint_piece_rates (
+      nursery    TEXT NOT NULL,
+      work_type  TEXT NOT NULL,
+      rate       NUMERIC(12,2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (nursery, work_type)
+    );
+    RAISE NOTICE 'nops_maint_piece_rates created (per-nursery).';
+
+  -- (b) Old shape — one shared rate card. Convert it, keeping the rates.
+  ELSIF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name   = 'nops_maint_piece_rates'
       AND column_name  = 'nursery'
   ) THEN
+    DROP TABLE IF EXISTS _pr_old;
     CREATE TEMP TABLE _pr_old AS SELECT work_type, rate FROM nops_maint_piece_rates;
 
     ALTER TABLE nops_maint_piece_rates DROP CONSTRAINT IF EXISTS nops_maint_piece_rates_pkey;
@@ -170,9 +186,11 @@ BEGIN
     ALTER TABLE nops_maint_piece_rates ADD PRIMARY KEY (nursery, work_type);
 
     DROP TABLE _pr_old;
-    RAISE NOTICE 'nops_maint_piece_rates is now per-nursery.';
+    RAISE NOTICE 'nops_maint_piece_rates converted to per-nursery; existing rates copied to all four nurseries.';
+
+  -- (c) Already done.
   ELSE
-    RAISE NOTICE 'nops_maint_piece_rates already per-nursery — nothing to do.';
+    RAISE NOTICE 'nops_maint_piece_rates already per-nursery - nothing to do.';
   END IF;
 END $$;
 
