@@ -369,7 +369,6 @@ function renderPayroll() {
 
   const wk = workers[n] || [];
   const rows = payrollRows();
-  const rate = nurseryRates(n)[_payrollView];
   const store = payrollData[payrollKey(n, m, _payrollView)] || {};
 
   if (!wk.length) {
@@ -377,7 +376,6 @@ function renderPayroll() {
     return;
   }
 
-  const rateTxt = (rate === null || rate === undefined) ? '—' : String(rate);
   // Column headers are capped at their own width so a long label (a worker's
   // full name, "Capacity per worker") wraps onto a second line instead of
   // stretching the column — the table is width:max-content, so without the
@@ -385,7 +383,7 @@ function renderPayroll() {
   const payTh = (txt, w, cls) =>
     `<th class="${cls || ''}" style="min-width:${w}px;"><div class="th-wrap" style="max-width:${w}px;">${txt}</div></th>`;
   let h = `<thead>
-    <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)} — RM ${rateTxt}/${cfg.unit}</th></tr>
+    <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)}</th></tr>
     <tr>
       ${payTh(t('pay.date'), 92, 'th-left')}
       ${payTh(t('pay.plot'), 64)}
@@ -421,19 +419,15 @@ function renderPayroll() {
 
   // Total capacity = the sum of every worker's earned capacity.
   const grand = wk.reduce((sum, w) => sum + totals[w], 0);
+  // Capacity only. Money lives in the Nursery Payroll System, which reads
+  // this record and prices it — keeping one sheet for what was done and
+  // another for what it pays.
   h += `</tbody><tfoot>
     <tr class="jumlah-tr">
       <td class="th-left">${t('pay.totalCap')}</td><td></td>
       <td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
       ${wk.map(w => `<td>${Math.round(totals[w]).toLocaleString()}</td>`).join('')}
       <td>${Math.round(grand).toLocaleString()}</td></tr>
-    <tr class="jumlah-tr">
-      <td class="th-left">${t('pay.rate')}</td><td></td><td></td>
-      ${wk.map(() => `<td>${rateTxt}</td>`).join('')}<td></td></tr>
-    <tr class="jumlah-tr">
-      <td class="th-left">${t('pay.totalRM')}</td><td></td><td></td>
-      ${wk.map(w => `<td>${rate ? (totals[w] * rate).toFixed(2) : '0.00'}</td>`).join('')}
-      <td>${rate ? (grand * rate).toFixed(2) : '0.00'}</td></tr>
   </tfoot>`;
   tbl.innerHTML = h;
 }
@@ -473,11 +467,13 @@ function _fmtRate(r) {
   return n.toFixed(4);
 }
 
-/* ── Borang Tuntutan Gaji (salary claim form) ─────────────────────────────
-   Portrait A4, 25 mm margins, everything centred. One row per worker
-   showing the capacity earned on each of the four work types and the money
-   that comes to, rather than the old landscape tick-grid per work type —
-   which needed four separate files and ran off the page. */
+/* ── Worker Record ────────────────────────────────────────────────────────
+   Portrait A4, 25 mm margins, everything centred. One row per worker showing
+   the capacity they completed on each of the four work types.
+
+   Capacity only — no money. Pay is worked out in the Nursery Payroll System,
+   which reads this same record and prices it, so there is one sheet for what
+   was done and another for what it pays. */
 function downloadPayrollPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -499,29 +495,17 @@ function downloadPayrollPDF() {
   // figure would print "433" next to "8.67" and the form would not add up for
   // whoever signs it. Column totals are likewise the sum of the printed
   // values, so the page is consistent read either way.
-  // The money is kept in whole cents, worked out with the rate scaled to an
-  // integer. Doing it in floating point put 1,833 × 0.015 at 27.49499… so the
-  // form printed 27.49 where a calculator says 27.50.
   const byType = {};
   TYPES.forEach(ty => { byType[ty] = payrollTotalsFor(ty); });
-  const rateScaled  = ty => Math.round((rates[ty] || 0) * 100000);   // 0.015 → 1500
-  const capOf       = (ty, w) => Math.round(byType[ty].perWorker[w] || 0);
-  const centsOf     = (ty, w) => Math.round(capOf(ty, w) * rateScaled(ty) / 1000);
-  const rmOf        = (ty, w) => centsOf(ty, w) / 100;
-  const earnedCents = w => TYPES.reduce((s, ty) => s + centsOf(ty, w), 0);
-  const earned      = w => earnedCents(w) / 100;
+  const capOf   = (ty, w) => Math.round(byType[ty].perWorker[w] || 0);
+  const capAll  = w => TYPES.reduce((s, ty) => s + capOf(ty, w), 0);
 
-  // Each work type shows the capacity done AND what it earned, so it takes a
-  // pair of columns:
-  //   No | Worker | (Cap|RM) ×4 | Total  →  8 + 32 + 4×(14+11) + 20 = 160 mm
-  const C_NO = 7, C_NAME = 30, C_CAP = 11, C_RM = 15, C_TOTAL = 19;
-  const COL = [C_NO, C_NAME,
-               C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM,
-               C_TOTAL];
+  //   No | Worker | one capacity column per work type | Total capacity
+  //   7 + 45 + 4×22 + 20 = 160 mm
+  const COL = [7, 45, 22, 22, 22, 22, 20];
   const X0 = MARGIN;
   const colX = [];                       // left edge of each column
   COL.reduce((x, w, i) => { colX[i] = x; return x + w; }, X0);
-  const PAIR = i => 2 + i * 2;           // first column index of work type i
   const I_TOTAL = COL.length - 1;
 
   /* One bordered cell, text centred both ways and shrunk to fit.
@@ -577,30 +561,18 @@ function downloadPayrollPDF() {
     doc.setLineWidth(0.2);
     y += 34;
 
-    // Two-row header: work type on top, its Capacity / RM pair underneath.
-    const H1 = 9, H2 = 7;
+    // Two-row header: a "capacity completed" banner over the four work types.
+    // No piece-rate row — this sheet carries no money.
+    const H1 = 8, H2 = 9;
     cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, size: 8, nowrap: true, fill: HEAD_FILL });
-    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, size: 8.5, fill: HEAD_FILL });
+    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, size: 9, fill: HEAD_FILL });
+    const capW = COL[2] + COL[3] + COL[4] + COL[5];
+    cell(colX[2], y, capW, H1, t('pay.capBy'), { bold: true, size: 8, fill: HEAD_FILL });
     TYPES.forEach((ty, i) => {
-      const c = PAIR(i);
-      cell(colX[c], y, COL[c] + COL[c + 1], H1, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
-      cell(colX[c],     y + H1, COL[c],     H2, t('pay.capShort'), { bold: true, size: 6.5, nowrap: true, fill: HEAD_FILL });
-      cell(colX[c + 1], y + H1, COL[c + 1], H2, t('pay.rmShort'),  { bold: true, size: 6.5, nowrap: true, fill: HEAD_FILL });
+      cell(colX[2 + i], y + H1, COL[2 + i], H2, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
     });
-    cell(colX[I_TOTAL], y, COL[I_TOTAL], H1 + H2, t('pay.totalEarn'), { bold: true, size: 7.5, fill: HEAD_FILL });
+    cell(colX[I_TOTAL], y, COL[I_TOTAL], H1 + H2, t('pay.totalCapCol'), { bold: true, size: 8, fill: HEAD_FILL });
     y += H1 + H2;
-
-    // Piece rate reference, so the money can be checked against the capacity.
-    const RH = 7;
-    cell(colX[0], y, COL[0] + COL[1], RH, t('pay.rate'), { bold: true, size: 7.5, fill: [246, 248, 247] });
-    TYPES.forEach((ty, i) => {
-      const c = PAIR(i), r = rates[ty];
-      cell(colX[c], y, COL[c] + COL[c + 1], RH,
-           (r === null || r === undefined) ? '—' : `${_fmtRate(r)} / ${PAYROLL_TYPES[ty].unit}`,
-           { size: 7, nowrap: true, fill: [246, 248, 247] });
-    });
-    cell(colX[I_TOTAL], y, COL[I_TOTAL], RH, '', { fill: [246, 248, 247] });
-    y += RH;
 
     if (pageNo > 1) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
@@ -621,36 +593,27 @@ function downloadPayrollPDF() {
   }
 
   const fmtCap = v => v ? Math.round(v).toLocaleString() : '—';
-  // Currency in front of every money figure so a column of bare numbers is
-  // never mistaken for a capacity.
-  const fmtRM  = v => v ? `RM ${v.toFixed(2)}` : '—';
 
   wk.forEach((w, i) => {
     if (y + ROW_H > PH - MARGIN - FOOTER_RESERVE) { doc.addPage(); page++; y = drawHeader(page); }
     const zebra = i % 2 ? [250, 252, 251] : null;
-    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8, fill: zebra });
+    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8, nowrap: true, fill: zebra });
     cell(colX[1], y, COL[1], ROW_H, w,             { size: 8.5, fill: zebra });
     TYPES.forEach((ty, k) => {
-      const c = PAIR(k);
-      cell(colX[c],     y, COL[c],     ROW_H, fmtCap(capOf(ty, w)), { size: 8, nowrap: true, fill: zebra });
-      cell(colX[c + 1], y, COL[c + 1], ROW_H, fmtRM(rmOf(ty, w)),   { size: 7.5, nowrap: true, fill: zebra });
+      cell(colX[2 + k], y, COL[2 + k], ROW_H, fmtCap(capOf(ty, w)), { size: 8.5, nowrap: true, fill: zebra });
     });
-    cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H, fmtRM(earned(w)), { bold: true, size: 8.5, nowrap: true, fill: zebra });
+    cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H, fmtCap(capAll(w)), { bold: true, size: 8.5, nowrap: true, fill: zebra });
     y += ROW_H;
   });
 
-  // Grand totals — capacity and money for each work type, then the payout.
-  // Totals summed in cents too, so a column of exact 2-dp figures cannot drift.
-  const capSum  = ty => wk.reduce((s, w) => s + capOf(ty, w), 0);
-  const rmSumOf = ty => wk.reduce((s, w) => s + centsOf(ty, w), 0) / 100;
-  const rmSum   = wk.reduce((s, w) => s + earnedCents(w), 0) / 100;
+  // Grand totals — capacity per work type, then the whole month.
+  const capSum = ty => wk.reduce((s, w) => s + capOf(ty, w), 0);
   cell(colX[0], y, COL[0] + COL[1], ROW_H + 1, t('pay.grandTotal'), { bold: true, size: 8.5, fill: TOTAL_FILL });
   TYPES.forEach((ty, k) => {
-    const c = PAIR(k);
-    cell(colX[c],     y, COL[c],     ROW_H + 1, fmtCap(capSum(ty)),  { bold: true, size: 8, nowrap: true, fill: TOTAL_FILL });
-    cell(colX[c + 1], y, COL[c + 1], ROW_H + 1, fmtRM(rmSumOf(ty)), { bold: true, size: 7.5, nowrap: true, fill: TOTAL_FILL });
+    cell(colX[2 + k], y, COL[2 + k], ROW_H + 1, fmtCap(capSum(ty)), { bold: true, size: 8.5, nowrap: true, fill: TOTAL_FILL });
   });
-  cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H + 1, fmtRM(rmSum), { bold: true, size: 9, nowrap: true, fill: TOTAL_FILL });
+  cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H + 1,
+       fmtCap(wk.reduce((s, w) => s + capAll(w), 0)), { bold: true, size: 9, nowrap: true, fill: TOTAL_FILL });
   y += ROW_H + 1;
 
   // Footer note in place of the signature block — the figures come straight
@@ -659,7 +622,7 @@ function downloadPayrollPDF() {
   doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(110, 110, 110);
   doc.text(t('pay.autoNote'), MID, y, { align: 'center' });
 
-  doc.save(`Borang_Tuntutan_Gaji_${n}_${m.replace(/\s+/g, '_')}.pdf`);
+  doc.save(`Worker_Record_${n}_${m.replace(/\s+/g, '_')}.pdf`);
 }
 
 /* ── Piece rates (one rate card for all nurseries) ── */
@@ -976,20 +939,20 @@ const I18N = {
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
-    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'💵 Monthly Payroll', 'tab.setting':'⚙️ Setting',
-    'pay.form':'Salary Claim Form', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
+    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
+    'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
     'pay.noWorkers':'Add worker names under Setting → Workers to build this form.',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
-    'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row.',
+    'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
     /* Salary claim form (PDF) */
     'pay.no':'No.', 'pay.worker':'Worker Name',
     'pay.capBy':'CAPACITY COMPLETED (SEEDLINGS)', 'pay.totalEarn':'Total Earned (RM)',
-    'pay.capShort':'Capacity', 'pay.rmShort':'Earned',
+    'pay.capShort':'Capacity', 'pay.rmShort':'Earned', 'pay.totalCapCol':'Total Capacity',
     'pay.grandTotal':'GRAND TOTAL',
-    'pay.autoNote':'This salary claim form is automatically generated by the MJM Nursery AI system.',
-    'btn.claimPdf':'⬇ Salary Claim Form (PDF)',
+    'pay.autoNote':'This worker record is automatically generated by the MJM Nursery AI system.',
+    'btn.claimPdf':'⬇ Worker Record (PDF)',
     'tab.calc':'💊 Dosage Calc',
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
@@ -1055,20 +1018,20 @@ const I18N = {
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
-    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'💵 Penggajian Bulanan', 'tab.setting':'⚙️ Tetapan',
-    'pay.form':'Borang Tuntutan Gaji', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
+    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
+    'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
     'pay.noWorkers':'Tambah nama pekerja di Tetapan → Pekerja untuk membina borang ini.',
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
-    'pay.capShort':'Kapasiti', 'pay.rmShort':'Diperoleh',
+    'pay.capShort':'Kapasiti', 'pay.rmShort':'Diperoleh', 'pay.totalCapCol':'Jumlah Kapasiti',
     'pay.grandTotal':'JUMLAH BESAR',
-    'pay.autoNote':'Borang tuntutan gaji ini dijana secara automatik oleh sistem MJM Nursery AI.',
-    'btn.claimPdf':'⬇ Borang Tuntutan Gaji (PDF)',
+    'pay.autoNote':'Rekod pekerja ini dijana secara automatik oleh sistem MJM Nursery AI.',
+    'btn.claimPdf':'⬇ Rekod Pekerja (PDF)',
     'pay.noRows':'Tiada rekod untuk nurseri dan bulan ini — tandakan jadual, kemudian Sync from Schedule.',
-    'pay.tickHint':'Tandakan setiap pekerja yang membuat kerja. Kapasiti setiap pekerja = kapasiti plot ÷ bilangan tanda pada baris itu.',
+    'pay.tickHint':'Tandakan setiap pekerja yang membuat kerja. Kapasiti setiap pekerja = kapasiti plot ÷ bilangan tanda pada baris itu. Gaji dikira daripada rekod ini di Sistem Penggajian Nurseri.',
     'tab.calc':'💊 Kira Dos',
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',

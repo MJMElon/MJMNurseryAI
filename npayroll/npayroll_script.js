@@ -8,11 +8,11 @@
      Worker System PN · BNN · UNN1 · UNN2 · UNE · Driver
      Piece Rate    job description · unit · rate
 
-   Work Maintenance is READ from the Nursery Operation module — the ticks
-   and plot capacities already live there (nops_maint_*), so this sheet
-   mirrors them rather than asking for the same work to be keyed twice.
-   Transplanting and Seedlings Collection are keyed here, priced from the
-   Piece Rate list.
+   Work Maintenance is READ from the Worker Record in the Nursery Operation
+   module. That sheet records the capacity each worker completed and carries
+   no money; this one prices it. One place records the work, one place pays
+   for it. Transplanting and Seedlings Collection are keyed here, priced from
+   the Piece Rate list.
 ════════════════════════════════════════════════════════════════ */
 
 const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
@@ -525,7 +525,7 @@ function renderMaint() {
   const missing = MAINT_TYPES.filter(t => rateOf(t.code) == null).map(t => t.label);
   $('maint-note').textContent = missing.length
     ? `No piece rate set for ${missing.join(', ')} — set it under Nursery Operation → Work Maintenance → Setting → Piece Rate.`
-    : 'Capacity is a plot’s quantity divided among the workers ticked on that row, exactly as Work Maintenance records it.';
+    : 'Capacity comes from the Worker Record in Work Maintenance — a plot’s quantity divided among the workers ticked on that row. The money is worked out here.';
 }
 
 /* ════════════ MONTHLY PAYROLL ════════════ */
