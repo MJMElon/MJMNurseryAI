@@ -468,85 +468,95 @@ function _fmtRate(r) {
 }
 
 /* ── Worker Record ────────────────────────────────────────────────────────
-   Portrait A4, 25 mm margins, everything centred. One row per worker showing
-   the capacity they completed on each of the four work types.
+   The four sheets exactly as they appear on screen — P & D Spraying,
+   Manuring, Weeding and Interrow Spraying — one table per work type, each
+   starting on its own page.
+
+   Landscape A4 with 25 mm margins on all four sides. Landscape because the
+   table is a tick grid: three fixed columns, one column per worker, then the
+   capacity each worker earned. In portrait a worker column falls below 10 mm
+   once there are more than a handful of names, and the header stops being
+   readable. If the names still do not fit, the workers are split across
+   further pages with the Date / Plot / Capacity columns repeated, rather than
+   squeezed until they are illegible.
 
    Capacity only — no money. Pay is worked out in the Nursery Payroll System,
-   which reads this same record and prices it, so there is one sheet for what
-   was done and another for what it pays. */
+   which reads this same record. */
 function downloadPayrollPDF() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const PW = 210, PH = 297, MARGIN = 25;
-  const CONTENT_W = PW - MARGIN * 2;       // 160 mm
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const PW = 297, PH = 210, MARGIN = 25;
+  const CONTENT_W = PW - MARGIN * 2;      // 247 mm
   const MID = PW / 2;
 
   const n = getNursery(), m = getMonth();
   const wk = workers[n] || [];
-  const rates = nurseryRates(n);
   const TYPES = ['pd', 'manuring', 'weeding', 'interrow'];
 
-  // Capacity + money per worker, per work type.
-  //
-  // Capacity is fractional — a plot's quantity is split among the workers who
-  // ticked it (1,300 ÷ 3 = 433.33) — but the form prints whole seedlings. The
-  // money is therefore worked out from the ROUNDED capacity, so every printed
-  // row multiplies out: 433 × 0.02 really is 8.66. Paying from the unrounded
-  // figure would print "433" next to "8.67" and the form would not add up for
-  // whoever signs it. Column totals are likewise the sum of the printed
-  // values, so the page is consistent read either way.
-  const byType = {};
-  TYPES.forEach(ty => { byType[ty] = payrollTotalsFor(ty); });
-  const capOf   = (ty, w) => Math.round(byType[ty].perWorker[w] || 0);
-  const capAll  = w => TYPES.reduce((s, ty) => s + capOf(ty, w), 0);
+  if (!wk.length) {
+    alert(t('pay.noWorkers'));
+    return;
+  }
 
-  //   No | Worker | one capacity column per work type | Total capacity
-  //   7 + 45 + 4×22 + 20 = 160 mm
-  const COL = [7, 45, 22, 22, 22, 22, 20];
-  const X0 = MARGIN;
-  const colX = [];                       // left edge of each column
-  COL.reduce((x, w, i) => { colX[i] = x; return x + w; }, X0);
-  const I_TOTAL = COL.length - 1;
+  const HEAD_FILL = [232, 240, 235], TOTAL_FILL = [219, 236, 226], ZEBRA = [250, 252, 251];
 
-  /* One bordered cell, text centred both ways and shrunk to fit.
-     nowrap: shrink until the text sits on ONE line. Numbers must never wrap —
-     "117.00" split as "117.0" / "0" reads as a different figure entirely. */
+  /* One bordered cell, centred both ways, shrunk to fit.
+     nowrap keeps a number on one line — "1,200" broken as "1,20" / "0" reads
+     as a different figure. */
   function cell(x, y, w, h, text, opt) {
-    const o = Object.assign({ bold: false, size: 9, fill: null, color: [0, 0, 0], nowrap: false }, opt || {});
-    if (o.fill) { doc.setFillColor(...o.fill); doc.rect(x, y, w, h, 'F'); }
-    doc.setDrawColor(80, 80, 80); doc.setLineWidth(0.2);
+    const o = Object.assign({ bold: false, size: 9, fill: null, nowrap: false, wordSafe: false, align: 'center' }, opt || {});
+    if (o.fill) { doc.setFillColor(o.fill[0], o.fill[1], o.fill[2]); doc.rect(x, y, w, h, 'F'); }
+    doc.setDrawColor(90, 90, 90); doc.setLineWidth(0.2);
     doc.rect(x, y, w, h);
     const str = String(text ?? '');
     if (!str) return;
     doc.setFont('helvetica', o.bold ? 'bold' : 'normal');
-    doc.setTextColor(...o.color);
+    doc.setTextColor(0, 0, 0);
     let size = o.size, lines;
     if (o.nowrap) {
-      const avail = w - 1.6;
-      for (;;) {
-        doc.setFontSize(size);
-        if (doc.getTextWidth(str) <= avail || size <= 4) break;
-        size -= 0.25;
-      }
+      for (;;) { doc.setFontSize(size); if (doc.getTextWidth(str) <= w - 1.8 || size <= 4) break; size -= 0.25; }
       lines = [str];
     } else {
+      // Shrink first so no single word is wider than the cell — otherwise a
+      // name like "Muhammad" gets split as "Muhamma" / "d", which reads as a
+      // different name. Only then wrap at spaces and fit the height.
+      if (o.wordSafe) {
+        const words = str.split(/\s+/).filter(Boolean);
+        for (;;) {
+          doc.setFontSize(size);
+          const widest = words.reduce((mx, wd) => Math.max(mx, doc.getTextWidth(wd)), 0);
+          if (widest <= w - 2.6 || size <= 4) break;
+          size -= 0.25;
+        }
+      }
       for (;;) {
         doc.setFontSize(size);
-        lines = doc.splitTextToSize(str, w - 3);
-        if (lines.length * size * 0.3528 * 1.15 <= h - 1.5 || size <= 5) break;
-        size -= 0.4;
+        lines = doc.splitTextToSize(str, w - 2.6);
+        if (lines.length * size * 0.3528 * 1.15 <= h - 1.4 || size <= 4.5) break;
+        size -= 0.3;
       }
     }
     doc.setFontSize(size);
     const lh = size * 0.3528 * 1.15;
     let ty = y + (h - lines.length * lh) / 2 + lh * 0.78;
-    lines.forEach(ln => { doc.text(ln, x + w / 2, ty, { align: 'center' }); ty += lh; });
+    lines.forEach(ln => {
+      const tx = o.align === 'left' ? x + 2 : x + w / 2;
+      doc.text(ln, tx, ty, { align: o.align === 'left' ? 'left' : 'center' });
+      ty += lh;
+    });
   }
 
-  const HEAD_FILL = [232, 240, 235], TOTAL_FILL = [219, 236, 226];
+  /* A tick, drawn rather than typed so it renders in every viewer. */
+  function drawTick(x, y, w, h) {
+    const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h) * 0.42;
+    doc.setDrawColor(13, 122, 71); doc.setLineWidth(0.7);
+    doc.line(cx - s * 0.55, cy + s * 0.05, cx - s * 0.1, cy + s * 0.42);
+    doc.line(cx - s * 0.1,  cy + s * 0.42, cx + s * 0.6, cy - s * 0.38);
+    doc.setLineWidth(0.2);
+  }
 
-  /* Title block + column headers. Returns the y to start rows at. */
-  function drawHeader(pageNo) {
+  /* Title block at the top of a page. Returns the y to carry on from. */
+  function titleBlock(typeLabel, part) {
     let y = MARGIN;
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
@@ -554,73 +564,118 @@ function downloadPayrollPDF() {
     doc.setFontSize(12);
     doc.text(t('pay.form').toUpperCase(), MID, y + 12, { align: 'center' });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-    doc.text(`${NURSERY_NAMES[n]} (${n})`, MID, y + 19, { align: 'center' });
-    doc.text(`${t('pay.month')} ${m}`, MID, y + 25.5, { align: 'center' });
+    doc.text(`${NURSERY_NAMES[n] || n} (${n})  ·  ${t('pay.month')} ${m}`, MID, y + 19, { align: 'center' });
     doc.setDrawColor(13, 122, 71); doc.setLineWidth(0.6);
-    doc.line(MARGIN, y + 29, PW - MARGIN, y + 29);
+    doc.line(MARGIN, y + 23, PW - MARGIN, y + 23);
     doc.setLineWidth(0.2);
-    y += 34;
+    y += 27;
 
-    // Two-row header: a "capacity completed" banner over the four work types.
-    // No piece-rate row — this sheet carries no money.
-    const H1 = 8, H2 = 9;
-    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, size: 8, nowrap: true, fill: HEAD_FILL });
-    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, size: 9, fill: HEAD_FILL });
-    const capW = COL[2] + COL[3] + COL[4] + COL[5];
-    cell(colX[2], y, capW, H1, t('pay.capBy'), { bold: true, size: 8, fill: HEAD_FILL });
-    TYPES.forEach((ty, i) => {
-      cell(colX[2 + i], y + H1, COL[2 + i], H2, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
-    });
-    cell(colX[I_TOTAL], y, COL[I_TOTAL], H1 + H2, t('pay.totalCapCol'), { bold: true, size: 8, fill: HEAD_FILL });
-    y += H1 + H2;
+    // Work-type banner across the full table width.
+    doc.setFillColor(8, 92, 51);
+    doc.rect(MARGIN, y, CONTENT_W, 9, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255);
+    doc.text(typeLabel + (part ? `  (${part})` : ''), MID, y + 6, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    return y + 9;
+  }
 
-    if (pageNo > 1) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-      doc.text(`Page ${pageNo}`, PW - MARGIN, MARGIN - 4, { align: 'right' });
+  /* Column widths for one chunk of workers. The three fixed columns and the
+     per-worker total keep their size; the workers share what is left. */
+  const W_DATE = 26, W_PLOT = 18, W_CAP = 26, W_PER = 26;
+  const FIXED = W_DATE + W_PLOT + W_CAP + W_PER;
+  const MIN_WK = 12;
+  const maxPerPage = Math.max(1, Math.floor((CONTENT_W - FIXED) / MIN_WK));
+
+  // Split the worker list only when it genuinely will not fit.
+  const chunks = [];
+  for (let i = 0; i < wk.length; i += maxPerPage) chunks.push(wk.slice(i, i + maxPerPage));
+
+  const ROW_H = 8, HEAD_H = 13;
+  let firstPage = true;
+
+  TYPES.forEach(type => {
+    const cfg = PAYROLL_TYPES[type];
+    const rows = payrollRowsFor(type);
+    const store = payrollData[payrollKey(n, m, type)] || {};
+
+    chunks.forEach((chunk, ci) => {
+      if (!firstPage) doc.addPage();
+      firstPage = false;
+
+      const part = chunks.length > 1
+        ? `${t('pay.workersRange')} ${ci * maxPerPage + 1}–${ci * maxPerPage + chunk.length} ${t('pay.ofTotal')} ${wk.length}`
+        : '';
+      let y = titleBlock(t(cfg.label), part);
+
+      const wkW  = (CONTENT_W - FIXED) / chunk.length;
+      const xs = [];
+      let x = MARGIN;
+      [W_DATE, W_PLOT, W_CAP, ...chunk.map(() => wkW), W_PER].forEach(w => { xs.push(x); x += w; });
+      const widths = [W_DATE, W_PLOT, W_CAP, ...chunk.map(() => wkW), W_PER];
+      const iPer = widths.length - 1;
+
+      const drawHead = () => {
+        cell(xs[0], y, widths[0], HEAD_H, t('pay.date'),    { bold: true, size: 8.5, fill: HEAD_FILL });
+        cell(xs[1], y, widths[1], HEAD_H, t('pay.plot'),    { bold: true, size: 8.5, fill: HEAD_FILL });
+        cell(xs[2], y, widths[2], HEAD_H, t('pay.plotCap'), { bold: true, size: 7.5, fill: HEAD_FILL });
+        chunk.forEach((w, i) => cell(xs[3 + i], y, widths[3 + i], HEAD_H, w, { bold: true, size: 7.5, wordSafe: true, fill: HEAD_FILL }));
+        cell(xs[iPer], y, widths[iPer], HEAD_H, t('pay.perWorker'), { bold: true, size: 7.5, fill: HEAD_FILL });
+        y += HEAD_H;
+      };
+      drawHead();
+
+      const totals = {}; chunk.forEach(w => totals[w] = 0);
+      let capTotal = 0;
+
+      if (!rows.length) {
+        cell(MARGIN, y, CONTENT_W, 14, t('pay.noRows'), { size: 9 });
+        y += 14;
+      } else {
+        rows.forEach((r, ri) => {
+          // Reserve room for the total row and the footer note.
+          if (y + ROW_H > PH - MARGIN - 26) {
+            doc.addPage();
+            y = titleBlock(t(cfg.label), part);
+            drawHead();
+          }
+          const cells  = store[r.id] || {};
+          const cap    = recQty(r).value || 0;
+          // The share is divided among EVERY ticked worker, not just those on
+          // this page — splitting the sheet must not change the arithmetic.
+          const ticked = wk.filter(w => cells[w]);
+          const share  = ticked.length ? cap / ticked.length : 0;
+          chunk.forEach(w => { if (cells[w]) totals[w] += share; });
+          capTotal += cap;
+
+          const z = ri % 2 ? ZEBRA : null;
+          cell(xs[0], y, widths[0], ROW_H, _tarikhDisplay(r.tarikh), { size: 8, nowrap: true, fill: z });
+          cell(xs[1], y, widths[1], ROW_H, r.plot,                   { size: 8.5, bold: true, nowrap: true, fill: z });
+          cell(xs[2], y, widths[2], ROW_H, cap ? cap.toLocaleString() : '—', { size: 8.5, nowrap: true, fill: z });
+          chunk.forEach((w, i) => {
+            cell(xs[3 + i], y, widths[3 + i], ROW_H, '', { fill: z });
+            if (cells[w]) drawTick(xs[3 + i], y, widths[3 + i], ROW_H);
+          });
+          cell(xs[iPer], y, widths[iPer], ROW_H, share ? Math.round(share).toLocaleString() : '—',
+               { size: 8.5, bold: true, nowrap: true, fill: z });
+          y += ROW_H;
+        });
+      }
+
+      // Total (Capacity) — capacity only, as on screen.
+      const grand = chunk.reduce((s, w) => s + totals[w], 0);
+      cell(xs[0], y, widths[0] + widths[1], ROW_H + 1, t('pay.totalCap'), { bold: true, size: 8.5, fill: TOTAL_FILL });
+      cell(xs[2], y, widths[2], ROW_H + 1, capTotal ? capTotal.toLocaleString() : '—', { bold: true, size: 8.5, nowrap: true, fill: TOTAL_FILL });
+      chunk.forEach((w, i) => cell(xs[3 + i], y, widths[3 + i], ROW_H + 1,
+        totals[w] ? Math.round(totals[w]).toLocaleString() : '—', { bold: true, size: 8, nowrap: true, fill: TOTAL_FILL }));
+      cell(xs[iPer], y, widths[iPer], ROW_H + 1, grand ? Math.round(grand).toLocaleString() : '—',
+           { bold: true, size: 8.5, nowrap: true, fill: TOTAL_FILL });
+      y += ROW_H + 1;
+
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(110, 110, 110);
+      doc.text(t('pay.autoNote'), MID, PH - MARGIN + 6, { align: 'center' });
       doc.setTextColor(0, 0, 0);
-    }
-    return y;
-  }
-
-  const ROW_H = 9;
-  const FOOTER_RESERVE = 46;          // totals row + signature block
-  let page = 1;
-  let y = drawHeader(page);
-
-  if (!wk.length) {
-    cell(X0, y, CONTENT_W, 14, t('pay.noWorkers'), { size: 10 });
-    y += 14;
-  }
-
-  const fmtCap = v => v ? Math.round(v).toLocaleString() : '—';
-
-  wk.forEach((w, i) => {
-    if (y + ROW_H > PH - MARGIN - FOOTER_RESERVE) { doc.addPage(); page++; y = drawHeader(page); }
-    const zebra = i % 2 ? [250, 252, 251] : null;
-    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8, nowrap: true, fill: zebra });
-    cell(colX[1], y, COL[1], ROW_H, w,             { size: 8.5, fill: zebra });
-    TYPES.forEach((ty, k) => {
-      cell(colX[2 + k], y, COL[2 + k], ROW_H, fmtCap(capOf(ty, w)), { size: 8.5, nowrap: true, fill: zebra });
     });
-    cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H, fmtCap(capAll(w)), { bold: true, size: 8.5, nowrap: true, fill: zebra });
-    y += ROW_H;
   });
-
-  // Grand totals — capacity per work type, then the whole month.
-  const capSum = ty => wk.reduce((s, w) => s + capOf(ty, w), 0);
-  cell(colX[0], y, COL[0] + COL[1], ROW_H + 1, t('pay.grandTotal'), { bold: true, size: 8.5, fill: TOTAL_FILL });
-  TYPES.forEach((ty, k) => {
-    cell(colX[2 + k], y, COL[2 + k], ROW_H + 1, fmtCap(capSum(ty)), { bold: true, size: 8.5, nowrap: true, fill: TOTAL_FILL });
-  });
-  cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H + 1,
-       fmtCap(wk.reduce((s, w) => s + capAll(w), 0)), { bold: true, size: 9, nowrap: true, fill: TOTAL_FILL });
-  y += ROW_H + 1;
-
-  // Footer note in place of the signature block — the figures come straight
-  // from the work records, so there is nothing here for anyone to sign off.
-  y += 12;
-  doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(110, 110, 110);
-  doc.text(t('pay.autoNote'), MID, y, { align: 'center' });
 
   doc.save(`Worker_Record_${n}_${m.replace(/\s+/g, '_')}.pdf`);
 }
@@ -947,7 +1002,7 @@ const I18N = {
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
     /* Salary claim form (PDF) */
-    'pay.no':'No.', 'pay.worker':'Worker Name',
+    'pay.no':'No.', 'pay.worker':'Worker Name', 'pay.workersRange':'Workers', 'pay.ofTotal':'of',
     'pay.capBy':'CAPACITY COMPLETED (SEEDLINGS)', 'pay.totalEarn':'Total Earned (RM)',
     'pay.capShort':'Capacity', 'pay.rmShort':'Earned', 'pay.totalCapCol':'Total Capacity',
     'pay.grandTotal':'GRAND TOTAL',
@@ -1024,7 +1079,7 @@ const I18N = {
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
     'pay.noWorkers':'Tambah nama pekerja di Tetapan → Pekerja untuk membina borang ini.',
     /* Borang tuntutan gaji (PDF) */
-    'pay.no':'Bil.', 'pay.worker':'Nama Pekerja',
+    'pay.no':'Bil.', 'pay.worker':'Nama Pekerja', 'pay.workersRange':'Pekerja', 'pay.ofTotal':'daripada',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
     'pay.capShort':'Kapasiti', 'pay.rmShort':'Diperoleh', 'pay.totalCapCol':'Jumlah Kapasiti',
     'pay.grandTotal':'JUMLAH BESAR',
