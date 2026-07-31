@@ -387,7 +387,7 @@ function renderPayroll() {
       ticked.forEach(w => { totals[w] += share; });
       capTotal += cap;
       h += `<tr>
-        <td class="th-left" style="font-weight:600;">${r.tarikh || '-'}</td>
+        <td class="th-left" style="font-weight:600;">${_tarikhDisplay(r.tarikh)}</td>
         <td class="plot-td">${r.plot}</td>
         <td>${cap ? cap.toLocaleString() : '—'}</td>
         ${wk.map(w => `<td class="check-td${cells[w] ? ' ticked' : ''}" onclick="togglePayrollTick(${r.id},'${String(w).replace(/'/g, "\\'")}')" title="${w}"></td>`).join('')}
@@ -474,7 +474,7 @@ function downloadPayrollPDF() {
     const ticked = wk.filter(w => cells[w]);
     const share = ticked.length ? cap / ticked.length : 0;
     ticked.forEach(w => { totals[w] += share; });
-    drawRow([r.tarikh || '-', r.plot, cap || '-', ...wk.map(w => cells[w] ? '✓' : ''), share ? Math.round(share) : '-']);
+    drawRow([_tarikhDisplay(r.tarikh), r.plot, cap || '-', ...wk.map(w => cells[w] ? '✓' : ''), share ? Math.round(share) : '-']);
   });
   const grand = wk.reduce((sk, w) => sk + totals[w], 0);
   drawRow([t('pay.totalCap'), '', capTotal || '-', ...wk.map(w => Math.round(totals[w])), Math.round(grand)], true);
@@ -698,6 +698,28 @@ const I18N = {
     'rec.donePct':'Done %', 'rec.none':'No records found.',
     'jenis.pd':'P & D Spraying', 'jenis.interrow':'Interrow Spraying',
     'jenis.weeding':'Weeding', 'jenis.manuring':'Manuring',
+    /* Add / Edit Record modal */
+    'mod.addRec':'Add Work Record', 'mod.editRec':'Edit Record',
+    'mod.tarikh':'Date', 'mod.jenis':'Work Type', 'mod.racun':'Chemical',
+    'mod.plot':'Plot', 'mod.batch':'Batch No.', 'mod.qty':'Quantity',
+    'mod.gaia':'Gaia Workdone', 'mod.remark':'Remark',
+    'mod.ph.racun':'e.g. R1: Daconil 50gm + Bond 15mL',
+    'mod.ph.plot':'e.g. B1',
+    'mod.ph.batch':'Blank = all batches in the plot',
+    'mod.ph.qty':'Leave blank to link from the batch report',
+    'mod.ph.remark':'Optional remarks…',
+    'mod.gaiaPending':'— Pending', 'mod.gaiaDone':'Done',
+    'btn.saveRec':'Save Record',
+    /* Quantity linked to the movement report */
+    'link.loading':'Linking to the batch report…',
+    'link.unreachable':'Could not reach the batch report — key the quantity manually.',
+    'link.none':'No batch movement found for plot {x} — key the quantity manually.',
+    'link.allBatches':'all batches ({x})', 'link.someBatches':'batch {x}',
+    'link.asAt':'as at {x}', 'link.today':'standing today — no date picked yet',
+    'link.willUse':'{x} will be used',
+    'link.overridden':'Linked value is {x} — your {y} overrides it',
+    'link.basis':'movement report closing balance',
+    'link.negative':'Batch report nets to {x} here — check that plot\'s records.',
   },
   bm: {
     'top.month':'Bulan', 'top.nursery':'Tapak Semaian',
@@ -743,6 +765,28 @@ const I18N = {
     'rec.donePct':'% Selesai', 'rec.none':'Tiada rekod dijumpai.',
     'jenis.pd':'Penyemburan racun kulat dan serangga', 'jenis.interrow':'Meracun rumput secara selingan',
     'jenis.weeding':'Merumput', 'jenis.manuring':'Membaja',
+    /* Borang Tambah / Sunting Rekod */
+    'mod.addRec':'Tambah Rekod Kerja', 'mod.editRec':'Sunting Rekod',
+    'mod.tarikh':'Tarikh', 'mod.jenis':'Jenis Kerja', 'mod.racun':'Racun / Bahan Kimia',
+    'mod.plot':'Plot', 'mod.batch':'No. Batch', 'mod.qty':'Kuantiti',
+    'mod.gaia':'Kerja Siap Gaia', 'mod.remark':'Catatan',
+    'mod.ph.racun':'cth. R1: Daconil 50gm + Bond 15mL',
+    'mod.ph.plot':'cth. B1',
+    'mod.ph.batch':'Kosong = semua batch dalam plot',
+    'mod.ph.qty':'Biar kosong untuk ambil dari laporan batch',
+    'mod.ph.remark':'Catatan tambahan…',
+    'mod.gaiaPending':'— Belum Siap', 'mod.gaiaDone':'Siap',
+    'btn.saveRec':'Simpan Rekod',
+    /* Kuantiti diambil dari laporan pergerakan */
+    'link.loading':'Menyambung ke laporan batch…',
+    'link.unreachable':'Laporan batch tidak dapat dicapai — sila isi kuantiti sendiri.',
+    'link.none':'Tiada pergerakan batch dijumpai untuk plot {x} — sila isi kuantiti sendiri.',
+    'link.allBatches':'semua batch ({x})', 'link.someBatches':'batch {x}',
+    'link.asAt':'pada {x}', 'link.today':'baki semasa — tarikh belum dipilih',
+    'link.willUse':'{x} akan digunakan',
+    'link.overridden':'Nilai dari laporan ialah {x} — {y} yang anda isi mengatasinya',
+    'link.basis':'baki akhir laporan pergerakan',
+    'link.negative':'Laporan batch menunjukkan {x} di sini — sila semak rekod plot itu.',
   },
 };
 let currentLang = localStorage.getItem('mjm_lang') || 'en';
@@ -777,6 +821,10 @@ function applyLang(){
   document.querySelectorAll('.lang-seg').forEach(b => {
     b.classList.toggle('active', b.getAttribute('data-l')===currentLang);
   });
+  // The record modal's title is set in code, so it needs re-titling too when
+  // the language changes while it is open.
+  const recTitle = document.getElementById('rec-modal-title');
+  if (recTitle) recTitle.textContent = t(editRecId ? 'mod.editRec' : 'mod.addRec');
   // Dynamic tables/records carry their own strings through t()
   if (typeof renderAll === 'function') renderAll();
 }
@@ -2091,17 +2139,38 @@ function _mvLogDate(l) {
   return l.created_at ? String(l.created_at).slice(0, 10) : null;
 }
 
-/* Records store Tarikh as free text — "09-03-2026" (DD-MM-YYYY), sometimes
-   "2026-03-09", and "-" while the work is still pending. */
+/* Tarikh is now stored as YYYY-MM-DD (the date picker's own format), but older
+   records hold "09-03-2026", "20 apr 2026" or "-" for work not yet done, so all
+   of those still have to read. */
 function _mvParseDate(s) {
   const str = String(s == null ? '' : s).trim();
   if (!str || str === '-') return null;
-  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
   m = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
   if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
   const d = new Date(str);
-  return isNaN(d) ? null : d.getTime();
+  if (isNaN(d)) return null;
+  // Text like "20 apr 2026" parses in LOCAL time; pin it to UTC midnight so a
+  // round-trip through the picker can never slip to the day before.
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+const _MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+/* YYYY-MM-DD for the <input type="date">; '' when there is no date yet. */
+function _tarikhToISO(s) {
+  const ms = _mvParseDate(s);
+  if (ms == null) return '';
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+/* "20 Apr 2026" for reading — one format everywhere regardless of how the
+   record was originally keyed. */
+function _tarikhDisplay(s) {
+  const ms = _mvParseDate(s);
+  if (ms == null) return '-';
+  const d = new Date(ms);
+  return `${String(d.getUTCDate()).padStart(2, '0')} ${_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 const _mvPlotKey  = v => String(v == null ? '' : v).trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
@@ -2268,7 +2337,8 @@ function renderRecords() {
     if (!nurseryPlots.includes(r.plot)) return false;
     if (jF && r.jenis !== jF) return false;
     if (pF && r.plot !== pF) return false;
-    if (dF && !r.tarikh.toLowerCase().includes(dF)) return false;
+    // Match either the stored value or the "20 Apr 2026" form on screen.
+    if (dF && !`${r.tarikh||''} ${_tarikhDisplay(r.tarikh)}`.toLowerCase().includes(dF)) return false;
     return true;
   });
 
@@ -2326,7 +2396,7 @@ function renderRecords() {
     </tr>`;
     recs.forEach(r => {
       html += `<tr>
-        <td style="font-weight:600;color:var(--green-text);">${r.tarikh}</td>
+        <td style="font-weight:600;color:var(--green-text);">${_tarikhDisplay(r.tarikh)}</td>
         <td>${jenisLabel(r.jenis)}</td>
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
@@ -2378,8 +2448,8 @@ function toggleChecked(id){
 function togRec(id,f){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); r[f]=r[f]?0:1; renderRecords(); persistRecords(); }
 function openRecModal(pre) {
   editRecId=pre?pre.id:null;
-  document.getElementById('rec-modal-title').textContent=editRecId?'Edit Record':'Add Work Record';
-  document.getElementById('rf-tarikh').value=pre?.tarikh||'';
+  document.getElementById('rec-modal-title').textContent=t(editRecId?'mod.editRec':'mod.addRec');
+  document.getElementById('rf-tarikh').value=_tarikhToISO(pre?.tarikh);
   document.getElementById('rf-jenis').value=pre?.jenis||'Penyemburan racun kulat dan serangga';
   document.getElementById('rf-racun').value=pre?.racun||'';
   document.getElementById('rf-plot').value=pre?.plot||'';
@@ -2404,30 +2474,35 @@ function refreshLinkedQty() {
   if (!plot) { box.innerHTML = ''; return; }
   if (!_mvReady) {
     box.innerHTML = _mvLoadErr
-      ? `<span style="color:#a83020;">Could not reach the batch report — key the quantity manually.</span>`
-      : `Linking to the batch report…`;
+      ? `<span style="color:#a83020;">${t('link.unreachable')}</span>`
+      : t('link.loading');
     return;
   }
   const link = linkedPlotQty(plot, batch, tarikh);
   if (!link) {
-    box.innerHTML = `<span style="color:#a16207;">No batch movement found for plot ${plot}${batch ? ` / batch ${batch}` : ''} — key the quantity manually.</span>`;
+    const where = `${plot}${batch ? ` / ${batch}` : ''}`;
+    box.innerHTML = `<span style="color:#a16207;">${t('link.none').replace('{x}', where)}</span>`;
     return;
   }
-  const scope = link.allBatches ? `all batches (${link.batches.join(', ')})` : `batch ${link.batches.join(', ')}`;
-  const when  = link.asOf ? `as at ${link.asOf}` : 'standing today — no Tarikh keyed yet';
+  const list  = link.batches.join(', ');
+  const scope = link.allBatches ? t('link.allBatches').replace('{x}', list)
+                                : t('link.someBatches').replace('{x}', list);
+  const when  = link.asOf ? t('link.asAt').replace('{x}', _tarikhDisplay(link.asOf)) : t('link.today');
   const head  = typed === ''
-    ? `🔗 <b style="color:var(--green-text);">${link.qty.toLocaleString()}</b> will be used`
-    : `🔗 Linked value is <b>${link.qty.toLocaleString()}</b> — your keyed ${Number(typed).toLocaleString()} overrides it`;
+    ? t('link.willUse').replace('{x}', `<b style="color:var(--green-text);">${link.qty.toLocaleString()}</b>`)
+    : t('link.overridden').replace('{x}', `<b>${link.qty.toLocaleString()}</b>`)
+                          .replace('{y}', Number(typed).toLocaleString());
   const warn = link.raw < 0
-    ? `<br><span style="color:#a83020;">Batch report nets to ${link.raw.toLocaleString()} here — check that plot's records.</span>` : '';
-  box.innerHTML = `${head}<br>${scope}, ${when} · movement report closing balance${warn}`;
+    ? `<br><span style="color:#a83020;">${t('link.negative').replace('{x}', link.raw.toLocaleString())}</span>` : '';
+  box.innerHTML = `🔗 ${head}<br>${scope}, ${when} · ${t('link.basis')}${warn}`;
 }
 function closeRecModal(){ document.getElementById('rec-modal').classList.remove('open'); }
 function editRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); openRecModal(r); }
 function deleteRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); if(!confirm('Delete this record?')) return; records=records.filter(x=>x.id!==id); renderRecords(); persistRecords(); }
 function saveRec(){
   const obj={
-    tarikh:document.getElementById('rf-tarikh').value,
+    // The picker yields YYYY-MM-DD; blank means the work is not dated yet.
+    tarikh:(document.getElementById('rf-tarikh').value||'').trim()||'-',
     jenis:document.getElementById('rf-jenis').value,
     racun:document.getElementById('rf-racun').value,
     plot:document.getElementById('rf-plot').value.trim(),
@@ -3010,15 +3085,13 @@ function renderCharts() {
   const monthlyPending = Array(12).fill(0);
   const curMi = MONTHS_SHORT.indexOf(getMonth().split(' ')[0]);
   recs.forEach(r => {
-    if (r.tarikh && r.tarikh !== '-') {
-      const parts = r.tarikh.split('-');
-      if (parts.length === 3) {
-        const mi = parseInt(parts[1]) - 1;
-        if (mi >= 0 && mi < 12) {
-          if (r.gaia) monthlyDone[mi]++;
-          else monthlyPending[mi]++;
-        }
-      }
+    // Split on '-' only ever worked for two of the three stored formats;
+    // the shared parser handles every one of them.
+    const ms = _mvParseDate(r.tarikh);
+    if (ms != null) {
+      const mi = new Date(ms).getUTCMonth();
+      if (r.gaia) monthlyDone[mi]++;
+      else monthlyPending[mi]++;
     } else {
       if (curMi >= 0) monthlyPending[curMi]++;
     }

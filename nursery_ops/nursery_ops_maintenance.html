@@ -358,8 +358,9 @@
       <button class="modal-close" onclick="closeRecModal()">×</button>
     </div>
     <div class="modal-body">
-      <div class="frow"><label>Tarikh</label><input type="text" id="rf-tarikh" placeholder="e.g. 09-04-2026" oninput="refreshLinkedQty()"></div>
-      <div class="frow"><label>Jenis Kerja</label>
+      <!-- Native date input: tapping it opens the platform calendar. -->
+      <div class="frow"><label data-i18n="mod.tarikh">Date</label><input type="date" id="rf-tarikh" onchange="refreshLinkedQty()"></div>
+      <div class="frow"><label data-i18n="mod.jenis">Work Type</label>
         <select id="rf-jenis">
           <option value="Penyemburan racun kulat dan serangga" data-i18n="jenis.pd">Penyemburan racun kulat dan serangga</option>
           <option value="Meracun rumput secara selingan" data-i18n="jenis.interrow">Meracun rumput secara selingan</option>
@@ -367,22 +368,25 @@
           <option value="Membaja" data-i18n="jenis.manuring">Membaja</option>
         </select>
       </div>
-      <div class="frow"><label>Racun / Chemical</label><input type="text" id="rf-racun" placeholder="e.g. R1: Daconil 50gm + Bond 15mL"></div>
+      <div class="frow"><label data-i18n="mod.racun">Chemical</label><input type="text" id="rf-racun" data-i18n-ph="mod.ph.racun" placeholder="e.g. R1: Daconil 50gm + Bond 15mL"></div>
       <div class="grid2">
-        <div class="frow"><label>Plot</label><input type="text" id="rf-plot" placeholder="e.g. B1" oninput="refreshLinkedQty()"></div>
-        <div class="frow"><label>Batch No.</label><input type="text" id="rf-batch" placeholder="Blank = all batches in the plot" oninput="refreshLinkedQty()"></div>
+        <div class="frow"><label data-i18n="mod.plot">Plot</label><input type="text" id="rf-plot" data-i18n-ph="mod.ph.plot" placeholder="e.g. B1" oninput="refreshLinkedQty()"></div>
+        <div class="frow"><label data-i18n="mod.batch">Batch No.</label><input type="text" id="rf-batch" data-i18n-ph="mod.ph.batch" placeholder="Blank = all batches in the plot" oninput="refreshLinkedQty()"></div>
       </div>
       <div class="frow">
-        <label>Quantity</label>
-        <input type="number" min="0" id="rf-qty" placeholder="Leave blank to link from the batch report" oninput="refreshLinkedQty()">
+        <label data-i18n="mod.qty">Quantity</label>
+        <input type="number" min="0" id="rf-qty" data-i18n-ph="mod.ph.qty" placeholder="Leave blank to link from the batch report" oninput="refreshLinkedQty()">
         <div id="rf-qty-link" style="font-size:11px;font-weight:600;color:var(--text-muted);margin-top:5px;line-height:1.45;"></div>
       </div>
-      <div class="frow"><label>Gaia Workdone ✓</label><select id="rf-gaia"><option value="0">— Pending</option><option value="1">✓ Done</option></select></div>
-      <div class="frow"><label>Remark</label><textarea id="rf-remark" placeholder="Optional remarks..."></textarea></div>
+      <div class="frow"><label data-i18n="mod.gaia">Gaia Workdone</label><select id="rf-gaia">
+        <option value="0" data-i18n="mod.gaiaPending">— Pending</option>
+        <option value="1" data-i18n="mod.gaiaDone">Done</option>
+      </select></div>
+      <div class="frow"><label data-i18n="mod.remark">Remark</label><textarea id="rf-remark" data-i18n-ph="mod.ph.remark" placeholder="Optional remarks…"></textarea></div>
     </div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeRecModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveRec()">Save Record</button>
+      <button class="btn" onclick="closeRecModal()" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRec()" data-i18n="btn.saveRec">Save Record</button>
     </div>
   </div>
 </div>
@@ -428,6 +432,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=37"></script>
+<script src="plot_maintenance_script.js?v=38"></script>
 </body>
 </html>
