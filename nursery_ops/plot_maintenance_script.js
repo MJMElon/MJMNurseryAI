@@ -380,7 +380,8 @@ function renderPayroll() {
     rows.forEach(r => {
       const cells = store[r.id] || {};
       // Date and plot capacity come straight from the work record.
-      const cap    = (r.qty === 0 || r.qty) ? Number(r.qty) : 0;
+      // Plot capacity follows the record's Quantity, linked or keyed.
+      const cap    = recQty(r).value || 0;
       const ticked = wk.filter(w => cells[w]);
       const share  = ticked.length ? cap / ticked.length : 0;   // capacity ÷ ticks
       ticked.forEach(w => { totals[w] += share; });
@@ -469,7 +470,7 @@ function downloadPayrollPDF() {
   rows.forEach(r => {
     if (y > 190) { doc.addPage(); y = 15; drawRow(head, true); }
     const cells = store[r.id] || {};
-    const cap = (r.qty === 0 || r.qty) ? Number(r.qty) : 0; capTotal += cap;
+    const cap = recQty(r).value || 0; capTotal += cap;
     const ticked = wk.filter(w => cells[w]);
     const share = ticked.length ? cap / ticked.length : 0;
     ticked.forEach(w => { totals[w] += share; });
@@ -2059,6 +2060,202 @@ function pillCls(jenis) {
   return 'pill-green';
 }
 
+/* ════════════════════════════════════════════════════════════════
+   PLOT QUANTITY — linked to the Nursery Movement Report
+   ────────────────────────────────────────────────────────────────
+   A work record's Quantity is the live seedling count standing in its
+   plot on the date the work was done. It is derived from the batch
+   report the same way operation_reports.html builds the movement
+   report, so the two always agree:
+
+     per (plot, batch)  →  closing balance as at the record's date
+                           − any 2nd culling not yet counted by then
+
+   Why the second term: closing already deducts a 2nd culling once that
+   culling has been recorded. Subtracting the full 2nd-cull figure on top
+   would remove it twice for work done after the cull. Taking only the
+   part dated AFTER the record removes the dead seedlings exactly once,
+   whether the work happened before or after the culling was keyed —
+   which is the rule "closing balance − 2nd culled quantity" in both
+   directions.
+
+   A blank Batch on the record means every batch standing in that plot,
+   summed. Listing batches ("234, 237, 241") restricts it to those.
+════════════════════════════════════════════════════════════════ */
+
+/* Same date resolution the batch report needs: it saves most movement rows
+   without transaction_date and puts the keyed date in the remark instead. */
+const _RE_MV_DATE = /(?:Cull)?Date:\s*(\d{4}-\d{2}-\d{2})/i;
+function _mvLogDate(l) {
+  if (l.transaction_date) return String(l.transaction_date).slice(0, 10);
+  const m = l.remark ? String(l.remark).match(_RE_MV_DATE) : null;
+  if (m) return m[1];
+  return l.created_at ? String(l.created_at).slice(0, 10) : null;
+}
+
+/* Records store Tarikh as free text — "09-03-2026" (DD-MM-YYYY), sometimes
+   "2026-03-09", and "-" while the work is still pending. */
+function _mvParseDate(s) {
+  const str = String(s == null ? '' : s).trim();
+  if (!str || str === '-') return null;
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  m = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
+  const d = new Date(str);
+  return isNaN(d) ? null : d.getTime();
+}
+
+const _mvPlotKey  = v => String(v == null ? '' : v).trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+const _mvBatchKey = v => String(v == null ? '' : v).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+function _mvBatchList(s) {
+  return String(s == null ? '' : s).split(/[,;/|]+/).map(_mvBatchKey).filter(Boolean);
+}
+
+/* Sign a movement the way the report's closing balance does. */
+function _mvSigned(type, qty) {
+  const q = Number(qty || 0);
+  switch (type) {
+    case 'Seeds_Received': case 'Planted': case 'Transplanted':
+    case 'Transplanted_Premium': case 'Transplanted_DoubleTone':
+      return q;
+    case 'Damaged_Seeds': case '1st_Culling': case '2nd_Culling':
+    case '3rd_Culling':   case 'Sold':
+      return -Math.abs(q);
+    default: return 0;
+  }
+}
+
+let _mvEvents = null;      // [{plotKey, batchKey, batch, type, qty, ms}]
+let _mvReady  = false;
+let _mvLoadErr = null;
+
+async function _mvFetchAll(build, pageSize = 1000) {
+  const all = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build().range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    all.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
+/* Pulled once per page load; the ledger is far too big to re-read per row. */
+async function loadMovementData() {
+  if (!_supabase) return;
+  try {
+    const [logsRes, dosRes] = await Promise.all([
+      _mvFetchAll(() => _supabase.from('shared_inventory_logs')
+        .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
+        .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
+            'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
+            '1st_Culling', '2nd_Culling', '3rd_Culling'])
+        .order('id', { ascending: true })),
+      // Sold comes from the customer DO system, exactly as the report does it.
+      _mvFetchAll(() => _supabase.from('shared_do_records')
+        .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+        .order('id', { ascending: true }))
+    ]);
+    if (logsRes.error) throw logsRes.error;
+
+    const evs = [];
+    (logsRes.data || []).forEach(l => {
+      const ms = _mvParseDate(_mvLogDate(l));
+      if (ms == null) return;
+      evs.push({
+        plotKey:  _mvPlotKey(l.plot_name),
+        batchKey: _mvBatchKey(l.batch_name),
+        batch:    l.batch_name || '—',
+        type:     l.transaction_type,
+        qty:      Number(l.quantity_change || 0),
+        ms
+      });
+    });
+    (dosRes.data || []).forEach(d => {
+      if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
+      const ms = _mvParseDate(d.delivery_date);
+      if (ms == null) return;
+      for (let i = 1; i <= 5; i++) {
+        const qty = Number(d[`qty_${i}`] || 0);
+        if (!qty) continue;
+        evs.push({
+          plotKey:  _mvPlotKey(d[`plot_${i}`]),
+          batchKey: _mvBatchKey(d[`batch_${i}`]),
+          batch:    d[`batch_${i}`] || '—',
+          type:     'Sold',
+          qty, ms
+        });
+      }
+    });
+    _mvEvents = evs;
+    _mvReady  = true;
+    _mvLoadErr = null;
+  } catch (e) {
+    _mvLoadErr = e.message || String(e);
+    console.warn('[maint] movement data load failed:', _mvLoadErr);
+  }
+}
+
+/* The linked quantity for one work record.
+   Returns null when it cannot be resolved (data not loaded, no plot, or the
+   plot/batch has no movement at all) so the caller can fall back gracefully. */
+function linkedPlotQty(plot, batchStr, tarikh) {
+  if (!_mvReady || !_mvEvents || !plot) return null;
+  const pk = _mvPlotKey(plot);
+  if (!pk) return null;
+  const wanted = _mvBatchList(batchStr);
+  // No date keyed yet ("-") → stand at today, the plot's current standing count.
+  const asOf = _mvParseDate(tarikh);
+  const cutoff = asOf == null ? Infinity : asOf;
+
+  const per = {};
+  for (const ev of _mvEvents) {
+    if (ev.plotKey !== pk) continue;
+    if (wanted.length && !wanted.includes(ev.batchKey)) continue;
+    const b = (per[ev.batchKey] ||= { closing: 0, cull2After: 0, label: ev.batch });
+    if (ev.ms <= cutoff) b.closing += _mvSigned(ev.type, ev.qty);
+    else if (ev.type === '2nd_Culling') b.cull2After += Math.abs(ev.qty);
+  }
+
+  const keys = Object.keys(per);
+  if (!keys.length) return null;
+  let raw = 0;
+  keys.forEach(k => { raw += per[k].closing - per[k].cull2After; });
+  return {
+    qty: Math.max(0, Math.round(raw)),
+    raw: Math.round(raw),
+    batches: keys.map(k => per[k].label),
+    allBatches: wanted.length === 0,
+    asOf: asOf == null ? null : tarikh
+  };
+}
+
+/* Quantity shown for a record: a keyed value always wins; otherwise the
+   linked one. */
+function recQty(r) {
+  if (r && (r.qty === 0 || r.qty)) return { value: Number(r.qty), linked: false };
+  const link = linkedPlotQty(r?.plot, r?.batch, r?.tarikh);
+  if (!link) return { value: null, linked: false };
+  return { value: link.qty, linked: true, info: link };
+}
+
+/* Quantity cell. A linked value is marked with 🔗 and explains itself on
+   hover, so nobody mistakes a derived number for one somebody keyed. */
+function _qtyCell(r) {
+  const q = recQty(r);
+  if (q.value === null) return '—';
+  const txt = q.value.toLocaleString();
+  if (!q.linked) return txt;
+  const i = q.info;
+  const scope = i.allBatches
+    ? `all batches in plot ${r.plot}`
+    : `batch ${i.batches.join(', ')}`;
+  const when = i.asOf ? `as at ${i.asOf}` : 'standing today (no date keyed)';
+  const tip = `Linked from the batch report — ${scope}, ${when}. Closing balance less 2nd culled. Key a number here to override.`;
+  return `<span class="qty-linked" title="${tip.replace(/"/g, '&quot;')}">🔗 ${txt}</span>`;
+}
+
 function renderRecords() {
   const jF   = document.getElementById('rf-filter-jenis').value;
   const pF   = document.getElementById('rf-filter-plot').value;
@@ -2135,7 +2332,7 @@ function renderRecords() {
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
         <td style="text-align:center;color:var(--text-muted);">${r.batch||'—'}</td>
-        <td style="text-align:center;font-weight:700;color:var(--text-head);">${(r.qty===0||r.qty)?Number(r.qty).toLocaleString():'—'}</td>
+        <td style="text-align:center;font-weight:700;color:var(--text-head);">${_qtyCell(r)}</td>
         <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
         <td style="white-space:nowrap;">
@@ -2191,7 +2388,40 @@ function openRecModal(pre) {
   document.getElementById('rf-qty').value=(pre && (pre.qty===0||pre.qty)) ? pre.qty : '';
   document.getElementById('rf-gaia').value=pre?.gaia||0;
   document.getElementById('rf-remark').value=pre?.remark||'';
+  refreshLinkedQty();
   document.getElementById('rec-modal').classList.add('open');
+}
+
+/* Live preview of the linked quantity while the record is being keyed, so the
+   number is visible before saving rather than only after. */
+function refreshLinkedQty() {
+  const box = document.getElementById('rf-qty-link');
+  if (!box) return;
+  const plot   = (document.getElementById('rf-plot').value || '').trim();
+  const batch  = document.getElementById('rf-batch').value || '';
+  const tarikh = document.getElementById('rf-tarikh').value || '';
+  const typed  = (document.getElementById('rf-qty').value ?? '').trim();
+
+  if (!plot) { box.innerHTML = ''; return; }
+  if (!_mvReady) {
+    box.innerHTML = _mvLoadErr
+      ? `<span style="color:#a83020;">Could not reach the batch report — key the quantity manually.</span>`
+      : `Linking to the batch report…`;
+    return;
+  }
+  const link = linkedPlotQty(plot, batch, tarikh);
+  if (!link) {
+    box.innerHTML = `<span style="color:#a16207;">No batch movement found for plot ${plot}${batch ? ` / batch ${batch}` : ''} — key the quantity manually.</span>`;
+    return;
+  }
+  const scope = link.allBatches ? `all batches (${link.batches.join(', ')})` : `batch ${link.batches.join(', ')}`;
+  const when  = link.asOf ? `as at ${link.asOf}` : 'standing today — no Tarikh keyed yet';
+  const head  = typed === ''
+    ? `🔗 <b style="color:var(--green-text);">${link.qty.toLocaleString()}</b> will be used`
+    : `🔗 Linked value is <b>${link.qty.toLocaleString()}</b> — your keyed ${Number(typed).toLocaleString()} overrides it`;
+  const warn = link.raw < 0
+    ? `<br><span style="color:#a83020;">Batch report nets to ${link.raw.toLocaleString()} here — check that plot's records.</span>` : '';
+  box.innerHTML = `${head}<br>${scope}, ${when} · closing balance less 2nd culled${warn}`;
 }
 function closeRecModal(){ document.getElementById('rec-modal').classList.remove('open'); }
 function editRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); openRecModal(r); }
@@ -2986,5 +3216,14 @@ async function initDb() {
   renderAll();
   autoSyncRecords();
   renderSettingPlots(); renderSettingRates(); renderSettingWorkers();
+
+  // The batch-report ledger is a separate, larger read — don't hold the page
+  // on it. Repaint the pieces that show a linked quantity once it lands.
+  loadMovementData().then(() => {
+    if (!_mvReady) return;
+    try { renderRecords(); } catch (_) {}
+    try { renderPayroll(); } catch (_) {}
+    try { refreshLinkedQty(); } catch (_) {}
+  });
 }
 initDb();

@@ -377,3 +377,7 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 #tab-payroll .sched-table thead th.th-left .th-wrap{margin-left:0;margin-right:auto;}
 #tab-payroll .sched-table tbody td{padding:8px 8px;}
 #tab-payroll .check-td{padding:8px 6px;}
+
+/* Quantity derived from the batch report's movement data rather than keyed by
+   hand — marked so a linked number is never mistaken for an entered one. */
+.qty-linked{color:var(--green-text);border-bottom:1px dotted var(--green-mid);cursor:help;}
