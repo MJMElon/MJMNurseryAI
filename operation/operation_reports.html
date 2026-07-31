@@ -220,18 +220,20 @@ async function runBatchProduction() {
   // Fetch all batches in range — anchor date is Seeds_Received transaction_date.
   // plot_name joins us to nursery (main-nursery drilldowns need it).
   const [logsRes, batchesRes, plotsRes] = await Promise.all([
-    _supabase.from('shared_inventory_logs')
+    // Paged — a single request stops at 1000 rows, which quietly dropped the
+    // older batches out of the funnel entirely.
+    fetchAllRows(() => _supabase.from('shared_inventory_logs')
       // breed_name comes off the log too — bulk-imported batches don't
       // have an operation_batches mirror row, so we can't rely on that
       // table alone to name the source.
-      .select('batch_name, transaction_type, quantity_change, transaction_date, created_at, plot_name, breed_name')
+      .select('batch_name, transaction_type, quantity_change, transaction_date, created_at, remark, plot_name, breed_name')
       // Only the funnel's types — the aggregation loop ignores everything
       // else anyway, and pulling the full table (photo rows, calibration,
       // audit notes…) was hammering the database on every report open.
       .in('transaction_type', ['Seeds_Received', 'Damaged_Seeds', 'Planted',
           'Transplanted', 'Transplanted_Premium', 'Transplanted_DoubleTone',
           '1st_Culling', '2nd_Culling', '3rd_Culling'])
-      .order('transaction_date', { ascending: true }),
+      .order('id', { ascending: true })),
     _supabase.from('operation_batches').select('name, breed_name, created_at'),
     _supabase.from('shared_plots').select('plot_name, nursery_name')
   ]);
@@ -750,6 +752,43 @@ const SUMMARY_SKIP_TYPES = new Set([
   'Planting_Photo', 'Stock_Calibration'
 ]);
 
+/* ── Reading a movement date out of a batch-report log ──────────────────────
+   The batch report writes most movement rows WITHOUT transaction_date — the
+   date the user keyed sits inside the remark instead:
+
+     Transplanted / Premium / D-Tone  →  "... Date: 2026-03-04"
+     1st Culling                      →  "... Date: 2026-03-04"
+     2nd Culling                      →  "... CullDate: 2026-03-04"
+     3rd Culling                      →  no date at all
+     Seeds_Received / Planted         →  real transaction_date
+
+   The report used to read transaction_date only, so every transplanting and
+   culling row resolved to NaN and was skipped — which is why those columns
+   read 0 while Sold (from the DO system, which does carry a date) did not.
+   Resolve in the order the batch report actually records: the keyed date
+   first, then the remark, then when the row was written. */
+const _RE_LOG_DATE = /(?:Cull)?Date:\s*(\d{4}-\d{2}-\d{2})/i;
+function _logDate(l) {
+  if (l.transaction_date) return String(l.transaction_date).slice(0, 10);
+  const m = l.remark ? String(l.remark).match(_RE_LOG_DATE) : null;
+  if (m) return m[1];
+  return l.created_at ? String(l.created_at).slice(0, 10) : null;
+}
+
+/* Supabase caps a single request at 1000 rows. The movement report reads the
+   whole ledger, so it has to page or it silently reports on a fraction of the
+   batches. */
+async function fetchAllRows(buildQuery, pageSize = 1000) {
+  const all = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    all.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
 function _emptyMv() {
   return { seeds:0, planted:0, trans:0, premium:0, dtone:0, damaged:0, cull1:0, cull2:0, cull3:0, sold:0 };
 }
@@ -784,15 +823,22 @@ async function runSummaryMovement() {
   const toMs   = toStr   ? new Date(toStr).getTime() + 86400000 : Infinity;
 
   const [logsRes, dosRes, plotsRes] = await Promise.all([
-    _supabase.from('shared_inventory_logs')
-      .select('transaction_type, transaction_date, plot_name, batch_name, quantity_change')
+    // Every movement column except Sold comes from the batch report's ledger.
+    // remark + created_at are needed because that is where the keyed date
+    // lives for transplanting and culling rows (see _logDate).
+    // Sold is deliberately NOT read from here — it comes from the DO system
+    // below, so a row appearing in both could never be double counted.
+    fetchAllRows(() => _supabase.from('shared_inventory_logs')
+      .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
       // _categorise() only handles these types; fetching the rest of the
       // table (photos, audit notes, calibration) just burned DB CPU.
       .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
           'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
-          '1st_Culling', '2nd_Culling', '3rd_Culling', 'Sold']),
-    _supabase.from('shared_do_records')
-      .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5'),
+          '1st_Culling', '2nd_Culling', '3rd_Culling'])
+      .order('id', { ascending: true })),
+    fetchAllRows(() => _supabase.from('shared_do_records')
+      .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+      .order('id', { ascending: true })),
     _supabase.from('shared_plots').select('plot_name, nursery_name')
   ]);
   if (logsRes.error || dosRes.error || plotsRes.error) {
@@ -818,7 +864,7 @@ async function runSummaryMovement() {
     if (SUMMARY_SKIP_TYPES.has(l.transaction_type)) return;
     if (!passLoc(l.plot_name)) return;
     events.push({
-      date:  l.transaction_date || null,
+      date:  _logDate(l),
       plot:  l.plot_name  || '—',
       batch: l.batch_name || '—',
       type:  l.transaction_type,
@@ -1024,8 +1070,14 @@ async function runSummaryMovement() {
 
       <div class="text-[10px] font-bold text-[#8a7a68] mt-4 leading-relaxed">
         <strong class="text-[#3d2610]">Notes —</strong>
+        Which batch sits in which plot comes from the <strong>batch report</strong>: the transplanting record's
+        destination plot, quantity and keyed date create the (Plot · Batch) row, and every other column
+        (seeds, planted, damaged, 1st / 2nd / 3rd cull) is read from that same batch's report.
+        <em>Sold</em> is the only column sourced elsewhere — it comes from the <strong>Customer DO system</strong>
+        (<code>plot_n / batch_n / qty_n</code> on delivery orders); cancelled DOs are excluded.
+        Dates are the ones keyed into the batch report; where a stage was saved without one
+        (3rd culling), the record's save date is used.
         <em>B/F</em> is the cumulative net of all transactions <strong>before</strong> the From date for the same key.
-        Sold is taken from delivery (DO) line items <code>plot_n / batch_n / qty_n</code>; cancelled DOs are excluded.
         Audit, photo, and stock-calibration entries are not counted as movements.
         Pre-nursery plots populate <em>Planted</em> / <em>1st Cull</em>; main-nursery plots populate <em>Transplanted</em> / <em>Double Tone</em> / <em>2nd Cull</em>. Empty cells are zero.
       </div>
@@ -1096,7 +1148,8 @@ function _bpDrillCollect(kind, D) {
     });
   } else if (kind === 'trans') {
     rows.forEach(r => r.transLogs.forEach(l => list.push({
-      date:    l.transaction_date || l.created_at || null,
+      // The keyed transplanting date, not when the row happened to be written.
+      date:    _logDate(l),
       batch:   r.batch_name,
       breed:   r.breed_name,
       plot:    l.plot_name || '—',
@@ -1105,7 +1158,7 @@ function _bpDrillCollect(kind, D) {
     })));
   } else if (kind === 'cull') {
     const push = (r, l, stage) => list.push({
-      date:    l.transaction_date || l.created_at || null,
+      date:    _logDate(l),
       stage,
       batch:   r.batch_name,
       breed:   r.breed_name,
