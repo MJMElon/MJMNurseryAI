@@ -61,7 +61,8 @@
       <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Schedule</button>
       <button class="tab-btn"        onclick="switchTab('calc',this)"     data-i18n="tab.calc">💊 Dosage Calc</button>
       <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">💵 Monthly Payroll</button>
-      <button class="tab-btn"        onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
+      <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
+      <button class="tab-btn" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
     </div>
 
     <!-- WORK RECORD (default) — headline metrics + List / Analytics sub-views -->
@@ -322,6 +323,7 @@
         <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Piece Rate</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rate paid per unit of work <b>for this nursery</b>. Applies to every month from now on until you change it, and feeds Monthly Payroll.</div>
         <div id="setting-rate-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;"></div>
+        <div id="setting-rate-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);"></div>
       </div>
 
       <!-- WORKERS -->
@@ -432,6 +434,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=38"></script>
+<script src="plot_maintenance_script.js?v=39"></script>
 </body>
 </html>

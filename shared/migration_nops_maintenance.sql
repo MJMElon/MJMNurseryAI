@@ -175,3 +175,28 @@ BEGIN
     RAISE NOTICE 'nops_maint_piece_rates already per-nursery — nothing to do.';
   END IF;
 END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- 9. Piece-rate lock, one row per nursery.
+--    Setting > Piece Rate holds edits in a draft until "Save & Lock"
+--    is pressed; this row records that the rates are settled so a
+--    stray keystroke cannot quietly change what workers get paid.
+--    An admin can unlock to edit again.
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nops_maint_rate_lock (
+  nursery    TEXT PRIMARY KEY,          -- PN | BNN | UNN1 | UNN2
+  locked     BOOLEAN NOT NULL DEFAULT false,
+  locked_by  TEXT,
+  locked_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE nops_maint_rate_lock ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_rate_lock' AND policyname='Authenticated read maint') THEN
+    CREATE POLICY "Authenticated read maint" ON nops_maint_rate_lock FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_rate_lock' AND policyname='Authenticated write maint') THEN
+    CREATE POLICY "Authenticated write maint" ON nops_maint_rate_lock FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;

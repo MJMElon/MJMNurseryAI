@@ -502,34 +502,129 @@ function nurseryRates(n) {
   return pieceRates[n];
 }
 
+/* Rates are locked per nursery once agreed, so a stray keystroke can't quietly
+   change what workers get paid. Kept in nops_maint_rate_lock. */
+let rateLocks = { PN: false, BNN: false, UNN1: false, UNN2: false };
+const rateLocked = n => !!rateLocks[n];
+
+/* Typing edits a draft, not the live rates — nothing reaches the database or
+   the payroll until Save & Lock is pressed. */
+let _rateDraft = null;   // { nursery, values:{code:number|null} }
+
+function _seedRateDraft(n, force) {
+  if (force || !_rateDraft || _rateDraft.nursery !== n) {
+    const rates = nurseryRates(n);
+    _rateDraft = { nursery: n, values: {} };
+    PIECE_RATE_TYPES.forEach(rt => { _rateDraft.values[rt.code] = rates[rt.code] ?? null; });
+  }
+  return _rateDraft;
+}
+
+function _rateDirty(n) {
+  const rates = nurseryRates(n), d = _seedRateDraft(n);
+  return PIECE_RATE_TYPES.some(rt => (d.values[rt.code] ?? null) !== (rates[rt.code] ?? null));
+}
+
 function renderSettingRates() {
   const box = document.getElementById('setting-rate-list');
   if (!box) return;
-  const rates = nurseryRates(getNursery());
+  const n = getNursery();
+  const locked = rateLocked(n);
+  const d = _seedRateDraft(n);
+
   box.innerHTML = PIECE_RATE_TYPES.map(rt => `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:${locked ? '#f6f8f7' : '#fff'};border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
       <span style="font-size:12px;font-weight:700;color:var(--text-head);">${t(rt.key)}</span>
       <span style="display:flex;align-items:center;gap:5px;">
         <span style="font-size:11px;font-weight:700;color:var(--text-muted);">RM</span>
-        <input type="number" min="0" step="0.01" value="${rates[rt.code] ?? ''}" placeholder="0.00"
-          onchange="setPieceRate('${rt.code}', this.value)"
-          style="width:88px;height:32px;padding:0 8px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;">
+        <input type="number" min="0" step="0.01" value="${d.values[rt.code] ?? ''}" placeholder="0.00"
+          ${locked ? 'disabled' : ''} oninput="onRateInput('${rt.code}', this.value)"
+          style="width:88px;height:32px;padding:0 8px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;${locked ? 'background:#eceeed;color:var(--text-muted);cursor:not-allowed;' : ''}">
       </span>
     </div>`).join('');
+  renderRateActions();
 }
 
-function setPieceRate(code, val) {
+/* Save / lock bar under the rate cards. */
+function renderRateActions() {
+  const bar = document.getElementById('setting-rate-actions');
+  if (!bar) return;
   const n = getNursery();
-  const rates = nurseryRates(n);
+  if (rateLocked(n)) {
+    bar.innerHTML = `
+      <span style="font-size:12px;font-weight:700;color:var(--green-text);">🔒 ${t('rate.lockedMsg')}</span>
+      <button class="btn" style="font-size:12px;" onclick="unlockPieceRates()">🔓 ${t('rate.unlock')}</button>`;
+    return;
+  }
+  const dirty = _rateDirty(n);
+  bar.innerHTML = `
+    <button class="btn btn-primary" style="font-size:12px;" onclick="savePieceRates()">💾 ${t('rate.saveLock')}</button>
+    <span style="font-size:11px;font-weight:600;color:${dirty ? '#a16207' : 'var(--text-muted)'};">
+      ${dirty ? t('rate.unsaved') : t('rate.openMsg')}
+    </span>`;
+}
+
+function onRateInput(code, val) {
+  const n = getNursery();
+  if (rateLocked(n)) return;
+  const d = _seedRateDraft(n);
   const raw = String(val ?? '').trim();
-  rates[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
-  if (!_supabase) return;
-  const q = rates[code] === null
-    ? _supabase.from('nops_maint_piece_rates').delete().eq('nursery', n).eq('work_type', code)
-    : _supabase.from('nops_maint_piece_rates')
-        .upsert({ nursery: n, work_type: code, rate: rates[code] }, { onConflict: 'nursery,work_type' });
-  q.then(({ error }) => { if (error) console.warn('[maint] piece rate save failed:', error.message); });
+  d.values[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
+  renderRateActions();          // only the bar — retyping must not lose focus
+}
+
+/* Write all four rates for this nursery, then lock. */
+async function savePieceRates() {
+  const n = getNursery();
+  if (!isNopsAdmin) { alert('Only an administrator can change piece rates.'); return; }
+  if (rateLocked(n)) return;
+  const d = _seedRateDraft(n);
+  const rates = nurseryRates(n);
+  PIECE_RATE_TYPES.forEach(rt => { rates[rt.code] = d.values[rt.code] ?? null; });
+
+  if (_supabase) {
+    const rows = [], gone = [];
+    PIECE_RATE_TYPES.forEach(rt => {
+      if (rates[rt.code] === null) gone.push(rt.code);
+      else rows.push({ nursery: n, work_type: rt.code, rate: rates[rt.code] });
+    });
+    try {
+      if (rows.length) {
+        const { error } = await _supabase.from('nops_maint_piece_rates')
+          .upsert(rows, { onConflict: 'nursery,work_type' });
+        if (error) throw error;
+      }
+      if (gone.length) {
+        await _supabase.from('nops_maint_piece_rates').delete().eq('nursery', n).in('work_type', gone);
+      }
+      const { error: lockErr } = await _supabase.from('nops_maint_rate_lock')
+        .upsert({ nursery: n, locked: true, locked_by: (window.currentUserEmail || null) },
+                { onConflict: 'nursery' });
+      // A missing lock table must not lose the rates that just saved.
+      if (lockErr) console.warn('[maint] rate lock save failed:', lockErr.message);
+    } catch (e) {
+      alert('Could not save the piece rates: ' + (e.message || e) + '\n\nNothing was locked — try again.');
+      return;
+    }
+  }
+  rateLocks[n] = true;
   renderSettingRates(); renderPayroll();
+  alert(`Piece rates saved and locked for ${NURSERY_NAMES[n]}.`);
+}
+
+async function unlockPieceRates() {
+  const n = getNursery();
+  if (!isNopsAdmin) { alert('Only an administrator can unlock piece rates.'); return; }
+  if (!confirm(`Unlock the piece rates for ${NURSERY_NAMES[n]} so they can be edited?`)) return;
+  if (_supabase) {
+    const { error } = await _supabase.from('nops_maint_rate_lock')
+      .upsert({ nursery: n, locked: false, locked_by: (window.currentUserEmail || null) },
+              { onConflict: 'nursery' });
+    if (error) { alert('Could not unlock: ' + error.message); return; }
+  }
+  rateLocks[n] = false;
+  _seedRateDraft(n, true);      // start again from what is actually saved
+  renderSettingRates();
 }
 
 /* ── Workers (per nursery) ── */
@@ -720,6 +815,11 @@ const I18N = {
     'link.overridden':'Linked value is {x} — your {y} overrides it',
     'link.basis':'movement report closing balance',
     'link.negative':'Batch report nets to {x} here — check that plot\'s records.',
+    /* Piece rate save / lock */
+    'rate.saveLock':'Save & Lock', 'rate.unlock':'Unlock to edit',
+    'rate.lockedMsg':'Locked — these rates are in use by Monthly Payroll.',
+    'rate.openMsg':'Open for editing. Save & Lock when the rates are agreed.',
+    'rate.unsaved':'Unsaved changes — press Save & Lock to apply them.',
   },
   bm: {
     'top.month':'Bulan', 'top.nursery':'Tapak Semaian',
@@ -787,6 +887,11 @@ const I18N = {
     'link.overridden':'Nilai dari laporan ialah {x} — {y} yang anda isi mengatasinya',
     'link.basis':'baki akhir laporan pergerakan',
     'link.negative':'Laporan batch menunjukkan {x} di sini — sila semak rekod plot itu.',
+    /* Simpan / kunci kadar upah */
+    'rate.saveLock':'Simpan & Kunci', 'rate.unlock':'Buka untuk sunting',
+    'rate.lockedMsg':'Terkunci — kadar ini sedang digunakan oleh Gaji Bulanan.',
+    'rate.openMsg':'Boleh disunting. Tekan Simpan & Kunci apabila kadar dipersetujui.',
+    'rate.unsaved':'Perubahan belum disimpan — tekan Simpan & Kunci.',
   },
 };
 let currentLang = localStorage.getItem('mjm_lang') || 'en';
@@ -1110,7 +1215,36 @@ function autoSyncRecords() {
   renderRecords();
   persistRecords();
 }
+/* Show or hide the admin-only parts of the page. Called once MJMAccess has
+   answered — until then the Setting tab stays hidden, which is the safe
+   default if the access check is slow or fails outright. */
+function applyNopsAdminUI() {
+  const btn = document.getElementById('tab-btn-setting');
+  if (btn) btn.style.display = isNopsAdmin ? '' : 'none';
+  if (!isNopsAdmin) {
+    // If a non-admin is sitting on Setting (restored tab, cached page), move
+    // them back to Work Record rather than leaving the panel on screen.
+    const panel = document.getElementById('tab-setting');
+    if (panel && panel.classList.contains('active')) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const rec = document.getElementById('tab-record');
+      if (rec) rec.classList.add('active');
+      const recBtn = document.querySelector('.tab-btn');
+      if (recBtn) recBtn.classList.add('active');
+      renderRecords();
+    }
+  }
+}
+
 function switchTab(name, btn) {
+  // Setting holds piece rates and the worker list — admin only. The tab button
+  // is hidden for everyone else, but guard the switch too so a stale button, a
+  // restored tab or a console call can't get in either.
+  if (name === 'setting' && !isNopsAdmin) {
+    alert('Setting is for administrators only.\n\nAsk an admin if a piece rate, plot or worker needs changing.');
+    return;
+  }
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -3244,15 +3378,17 @@ async function initDb() {
         await MJMAccess.load(_supabase);
         isNopsAdmin = MJMAccess.isAdminOf('nursery_ops');
       } catch (e) { console.warn('[maint] access load failed:', e); }
+      applyNopsAdminUI();
     }
-    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, payRes] = await Promise.all([
+    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, payRes, lockRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
       _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
       _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_piece_rates').select('nursery, work_type, rate').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
-      _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] }))
+      _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] })),
+      _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] }))
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
@@ -3283,6 +3419,7 @@ async function initDb() {
     ((payRes && payRes.data) || []).forEach(r => {
       payrollData[payrollKey(r.nursery, r.month, r.work_type)] = r.data || {};
     });
+    ((lockRes && lockRes.data) || []).forEach(r => { rateLocks[r.nursery] = !!r.locked; });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
   renderAll();
