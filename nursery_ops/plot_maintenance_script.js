@@ -472,21 +472,22 @@ function _fmtRate(r) {
    Manuring, Weeding and Interrow Spraying — one table per work type, each
    starting on its own page.
 
-   Landscape A4 with 25 mm margins on all four sides. Landscape because the
-   table is a tick grid: three fixed columns, one column per worker, then the
-   capacity each worker earned. In portrait a worker column falls below 10 mm
-   once there are more than a handful of names, and the header stops being
-   readable. If the names still do not fit, the workers are split across
-   further pages with the Date / Plot / Capacity columns repeated, rather than
-   squeezed until they are illegible.
+   Portrait A4 with 25 mm margins on all four sides. That leaves 160 mm for a
+   tick grid of three fixed columns plus one per worker, so a worker column
+   lands around 9 mm — wide enough for a tick, far too narrow for a name
+   across it. The worker names are therefore set vertically in the header,
+   which is how a piece-rate tick sheet is normally printed and keeps every
+   name legible at full size. Past ten workers the sheet splits across further
+   pages with the Date / Plot / Capacity columns repeated, rather than
+   squeezing the columns until they are useless.
 
    Capacity only — no money. Pay is worked out in the Nursery Payroll System,
    which reads this same record. */
 function downloadPayrollPDF() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const PW = 297, PH = 210, MARGIN = 25;
-  const CONTENT_W = PW - MARGIN * 2;      // 247 mm
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 210, PH = 297, MARGIN = 25;
+  const CONTENT_W = PW - MARGIN * 2;      // 160 mm
   const MID = PW / 2;
 
   const n = getNursery(), m = getMonth();
@@ -555,6 +556,31 @@ function downloadPayrollPDF() {
     doc.setLineWidth(0.2);
   }
 
+  /* A worker-name header, set vertically. A 9 mm column cannot carry a name
+     across it, so the text runs bottom-to-top and stays full size. */
+  function vHeaderCell(x, y, w, h, text) {
+    doc.setFillColor(HEAD_FILL[0], HEAD_FILL[1], HEAD_FILL[2]);
+    doc.rect(x, y, w, h, 'F');
+    doc.setDrawColor(90, 90, 90); doc.setLineWidth(0.2);
+    doc.rect(x, y, w, h);
+    const str = String(text ?? ''); if (!str) return;
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0);
+    let size = 8.5;
+    for (;;) { doc.setFontSize(size); if (doc.getTextWidth(str) <= h - 4 || size <= 5) break; size -= 0.25; }
+    doc.setFontSize(size);
+    const tw = doc.getTextWidth(str);
+    // angle 90 runs the baseline upward from the anchor, so start low and
+    // centre the run along the cell height.
+    doc.text(str, x + w / 2 + size * 0.3528 * 0.35, y + (h + tw) / 2, { angle: 90 });
+  }
+
+  /* The tallest name in a chunk decides the header height. */
+  function headerHeightFor(chunk) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+    const longest = chunk.reduce((mx, w) => Math.max(mx, doc.getTextWidth(String(w))), 0);
+    return Math.max(20, Math.min(46, longest + 6));
+  }
+
   /* Title block at the top of a page. Returns the y to carry on from. */
   function titleBlock(typeLabel, part) {
     let y = MARGIN;
@@ -581,16 +607,16 @@ function downloadPayrollPDF() {
 
   /* Column widths for one chunk of workers. The three fixed columns and the
      per-worker total keep their size; the workers share what is left. */
-  const W_DATE = 26, W_PLOT = 18, W_CAP = 26, W_PER = 26;
-  const FIXED = W_DATE + W_PLOT + W_CAP + W_PER;
-  const MIN_WK = 12;
+  const W_DATE = 22, W_PLOT = 13, W_CAP = 21, W_PER = 21;
+  const FIXED = W_DATE + W_PLOT + W_CAP + W_PER;   // 77 mm, leaving 83 mm
+  const MIN_WK = 8;
   const maxPerPage = Math.max(1, Math.floor((CONTENT_W - FIXED) / MIN_WK));
 
   // Split the worker list only when it genuinely will not fit.
   const chunks = [];
   for (let i = 0; i < wk.length; i += maxPerPage) chunks.push(wk.slice(i, i + maxPerPage));
 
-  const ROW_H = 8, HEAD_H = 13;
+  const ROW_H = 8;
   let firstPage = true;
 
   TYPES.forEach(type => {
@@ -614,11 +640,12 @@ function downloadPayrollPDF() {
       const widths = [W_DATE, W_PLOT, W_CAP, ...chunk.map(() => wkW), W_PER];
       const iPer = widths.length - 1;
 
+      const HEAD_H = headerHeightFor(chunk);
       const drawHead = () => {
         cell(xs[0], y, widths[0], HEAD_H, t('pay.date'),    { bold: true, size: 8.5, fill: HEAD_FILL });
         cell(xs[1], y, widths[1], HEAD_H, t('pay.plot'),    { bold: true, size: 8.5, fill: HEAD_FILL });
         cell(xs[2], y, widths[2], HEAD_H, t('pay.plotCap'), { bold: true, size: 7.5, fill: HEAD_FILL });
-        chunk.forEach((w, i) => cell(xs[3 + i], y, widths[3 + i], HEAD_H, w, { bold: true, size: 7.5, wordSafe: true, fill: HEAD_FILL }));
+        chunk.forEach((w, i) => vHeaderCell(xs[3 + i], y, widths[3 + i], HEAD_H, w));
         cell(xs[iPer], y, widths[iPer], HEAD_H, t('pay.perWorker'), { bold: true, size: 7.5, fill: HEAD_FILL });
         y += HEAD_H;
       };
