@@ -346,7 +346,7 @@ function renderPayroll() {
 
   const wk = workers[n] || [];
   const rows = payrollRows();
-  const rate = pieceRates[_payrollView];
+  const rate = nurseryRates(n)[_payrollView];
   const store = payrollData[payrollKey(n, m, _payrollView)] || {};
 
   if (!wk.length) {
@@ -443,7 +443,7 @@ function downloadPayrollPDF() {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const n = getNursery(), m = getMonth(), cfg = PAYROLL_TYPES[_payrollView];
   const wk = workers[n] || [], rows = payrollRows();
-  const rate = pieceRates[_payrollView] || 0;
+  const rate = nurseryRates(n)[_payrollView] || 0;
   const store = payrollData[payrollKey(n, m, _payrollView)] || {};
 
   doc.setFont('times', 'bold'); doc.setFontSize(13);
@@ -489,17 +489,28 @@ const PIECE_RATE_TYPES = [
   { code: 'weeding',  key: 'jenis.weeding'  },
   { code: 'interrow', key: 'jenis.interrow' }
 ];
-let pieceRates = { pd: null, manuring: null, weeding: null, interrow: null };
+/* Piece rates are per nursery — BNN's rates are BNN's alone. There is no month
+   dimension, so whatever is set carries forward to every future month until it
+   is edited again. */
+let pieceRates = { PN: {}, BNN: {}, UNN1: {}, UNN2: {} };
+
+/* Rate card for a nursery, created on first use so a fresh nursery starts blank
+   rather than inheriting another nursery's numbers. */
+function nurseryRates(n) {
+  if (!pieceRates[n]) pieceRates[n] = {};
+  return pieceRates[n];
+}
 
 function renderSettingRates() {
   const box = document.getElementById('setting-rate-list');
   if (!box) return;
+  const rates = nurseryRates(getNursery());
   box.innerHTML = PIECE_RATE_TYPES.map(rt => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
       <span style="font-size:12px;font-weight:700;color:var(--text-head);">${t(rt.key)}</span>
       <span style="display:flex;align-items:center;gap:5px;">
         <span style="font-size:11px;font-weight:700;color:var(--text-muted);">RM</span>
-        <input type="number" min="0" step="0.01" value="${pieceRates[rt.code] ?? ''}" placeholder="0.00"
+        <input type="number" min="0" step="0.01" value="${rates[rt.code] ?? ''}" placeholder="0.00"
           onchange="setPieceRate('${rt.code}', this.value)"
           style="width:88px;height:32px;padding:0 8px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;">
       </span>
@@ -507,12 +518,15 @@ function renderSettingRates() {
 }
 
 function setPieceRate(code, val) {
+  const n = getNursery();
+  const rates = nurseryRates(n);
   const raw = String(val ?? '').trim();
-  pieceRates[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
+  rates[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
   if (!_supabase) return;
-  const q = pieceRates[code] === null
-    ? _supabase.from('nops_maint_piece_rates').delete().eq('work_type', code)
-    : _supabase.from('nops_maint_piece_rates').upsert({ work_type: code, rate: pieceRates[code] }, { onConflict: 'work_type' });
+  const q = rates[code] === null
+    ? _supabase.from('nops_maint_piece_rates').delete().eq('nursery', n).eq('work_type', code)
+    : _supabase.from('nops_maint_piece_rates')
+        .upsert({ nursery: n, work_type: code, rate: rates[code] }, { onConflict: 'nursery,work_type' });
   q.then(({ error }) => { if (error) console.warn('[maint] piece rate save failed:', error.message); });
   renderSettingRates(); renderPayroll();
 }
@@ -957,10 +971,14 @@ function renderAll() {
   syncNurseryCircles();
   // Big single-line header: "Batu Niah Nursery — Apr 2026"
   const bigHdr = `${NURSERY_NAMES[n] || lbl} — ${m}`;
-  ['record','payroll','setting'].forEach(k => {
+  ['record','payroll'].forEach(k => {
     const el = document.getElementById(`${k}-nursery-line`);
     if (el) el.textContent = bigHdr;
   });
+  // Setting has no month dimension — its values apply to every month — so its
+  // header names the nursery only.
+  const setHdr = document.getElementById('setting-nursery-line');
+  if (setHdr) setHdr.textContent = `${NURSERY_NAMES[n] || lbl} — Setting`;
   // Remember the last-viewed month & nursery (restored on next visit).
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   ['pd','manuring','weeding','interrow'].forEach(k => {
@@ -973,6 +991,9 @@ function renderAll() {
   if (chartView && chartView.classList.contains('active')) renderCharts();
   const payTab = document.getElementById('tab-payroll');
   if (payTab && payTab.classList.contains('active')) renderPayroll();
+  // Setting is entirely per-nursery (plots, rates, workers) — repaint it so
+  // switching nursery never leaves another nursery's lists on screen.
+  renderSettingPlots(); renderSettingRates(); renderSettingWorkers();
   // Re-render calculator if its tab is active (clear ticks since plots may differ between nurseries)
   const calcTab = document.getElementById('tab-calc');
   if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
@@ -2918,7 +2939,7 @@ async function initDb() {
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
       _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
       _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
-      _supabase.from('nops_maint_piece_rates').select('work_type, rate').then(r => r, () => ({ data: [] })),
+      _supabase.from('nops_maint_piece_rates').select('nursery, work_type, rate').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] }))
     ]);
@@ -2938,7 +2959,12 @@ async function initDb() {
       if (!customPlots[r.nursery].includes(r.plot)) customPlots[r.nursery].push(r.plot);
     });
     _mergeCustomPlots();
-    ((prRes && prRes.data) || []).forEach(r => { pieceRates[r.work_type] = r.rate; });
+    // Rates saved before they were per-nursery have no nursery column — apply
+    // those to every nursery so nothing already keyed in disappears.
+    ((prRes && prRes.data) || []).forEach(r => {
+      const targets = r.nursery ? [r.nursery] : Object.keys(pieceRates);
+      targets.forEach(n => { nurseryRates(n)[r.work_type] = r.rate; });
+    });
     ((wkRes && wkRes.data) || []).forEach(r => {
       if (!workers[r.nursery]) workers[r.nursery] = [];
       if (!workers[r.nursery].includes(r.name)) workers[r.nursery].push(r.name);

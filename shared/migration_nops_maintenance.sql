@@ -81,13 +81,16 @@ BEGIN
 END $$;
 
 -- ════════════════════════════════════════════════════════════════
--- 6. Setting tab — piece rates (one rate card for all nurseries)
---    and the per-nursery worker name list.
+-- 6. Setting tab — piece rates and the worker name list, both scoped
+--    to a nursery. Neither has a month column: whatever is set applies
+--    to every month from now on until it is edited again.
 -- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS nops_maint_piece_rates (
-  work_type  TEXT PRIMARY KEY,          -- pd | manuring | weeding | interrow
+  nursery    TEXT NOT NULL,             -- PN | BNN | UNN1 | UNN2
+  work_type  TEXT NOT NULL,             -- pd | manuring | weeding | interrow
   rate       NUMERIC(12,2) NOT NULL DEFAULT 0,
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (nursery, work_type)
 );
 
 CREATE TABLE IF NOT EXISTS nops_maint_workers (
@@ -133,5 +136,42 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='nops_maint_payroll' AND policyname='Authenticated write maint') THEN
     CREATE POLICY "Authenticated write maint" ON nops_maint_payroll FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- 8. Piece rates become per-nursery.
+--    Only does anything if the table was created by an earlier run of
+--    section 6, when rates were shared by every nursery. Existing rates
+--    are copied to all four nurseries so nothing keyed in is lost; edit
+--    each nursery's card afterwards to set them apart.
+--    Safe to re-run — it is a no-op once the column exists.
+-- ════════════════════════════════════════════════════════════════
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'nops_maint_piece_rates'
+      AND column_name  = 'nursery'
+  ) THEN
+    CREATE TEMP TABLE _pr_old AS SELECT work_type, rate FROM nops_maint_piece_rates;
+
+    ALTER TABLE nops_maint_piece_rates DROP CONSTRAINT IF EXISTS nops_maint_piece_rates_pkey;
+    ALTER TABLE nops_maint_piece_rates ADD COLUMN nursery TEXT;
+    DELETE FROM nops_maint_piece_rates;
+
+    INSERT INTO nops_maint_piece_rates (nursery, work_type, rate)
+    SELECT n, o.work_type, o.rate
+    FROM _pr_old o
+    CROSS JOIN unnest(ARRAY['PN','BNN','UNN1','UNN2']) AS n;
+
+    ALTER TABLE nops_maint_piece_rates ALTER COLUMN nursery SET NOT NULL;
+    ALTER TABLE nops_maint_piece_rates ADD PRIMARY KEY (nursery, work_type);
+
+    DROP TABLE _pr_old;
+    RAISE NOTICE 'nops_maint_piece_rates is now per-nursery.';
+  ELSE
+    RAISE NOTICE 'nops_maint_piece_rates already per-nursery — nothing to do.';
   END IF;
 END $$;

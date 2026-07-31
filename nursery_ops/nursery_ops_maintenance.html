@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=35">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=36">
 </head>
 <body>
 
@@ -316,14 +316,14 @@
       <!-- PIECE RATE -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
         <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Piece Rate</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rate paid per unit of work. Applies to every nursery and feeds Monthly Payroll.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rate paid per unit of work <b>for this nursery</b>. Applies to every month from now on until you change it, and feeds Monthly Payroll.</div>
         <div id="setting-rate-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;"></div>
       </div>
 
       <!-- WORKERS -->
       <div class="card" style="padding:18px;">
         <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Workers</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Worker names for this nursery. Used by Monthly Payroll and the Gaia work records.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Worker names for this nursery. Stays the same every month until you change it. Used by Monthly Payroll and the Gaia work records.</div>
         <div id="setting-worker-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;"></div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
           <input type="text" id="setting-new-worker" placeholder="Worker name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:220px;">
@@ -420,6 +420,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=33"></script>
+<script src="plot_maintenance_script.js?v=34"></script>
 </body>
 </html>
