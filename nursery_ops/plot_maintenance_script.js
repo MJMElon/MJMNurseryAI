@@ -355,14 +355,20 @@ function renderPayroll() {
   }
 
   const rateTxt = (rate === null || rate === undefined) ? '—' : String(rate);
+  // Column headers are capped at their own width so a long label (a worker's
+  // full name, "Capacity per worker") wraps onto a second line instead of
+  // stretching the column — the table is width:max-content, so without the
+  // cap the widest header decides the column width.
+  const payTh = (txt, w, cls) =>
+    `<th class="${cls || ''}" style="min-width:${w}px;"><div class="th-wrap" style="max-width:${w}px;">${txt}</div></th>`;
   let h = `<thead>
     <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)} — RM ${rateTxt}/${cfg.unit}</th></tr>
     <tr>
-      <th class="th-left" style="min-width:92px;">${t('pay.date')}</th>
-      <th style="min-width:64px;">${t('pay.plot')}</th>
-      <th style="min-width:100px;">${t('pay.plotCap')}</th>
-      ${wk.map(w => `<th style="min-width:86px;">${w}</th>`).join('')}
-      <th style="min-width:110px;">${t('pay.perWorker')}</th>
+      ${payTh(t('pay.date'), 92, 'th-left')}
+      ${payTh(t('pay.plot'), 64)}
+      ${payTh(t('pay.plotCap'), 108)}
+      ${wk.map(w => payTh(w, 108)).join('')}
+      ${payTh(t('pay.perWorker'), 112)}
     </tr></thead><tbody>`;
 
   const totals = {}; wk.forEach(w => totals[w] = 0);   // capacity earned per worker
