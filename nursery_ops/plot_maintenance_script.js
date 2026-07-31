@@ -655,7 +655,7 @@ let jenisInst      = null;
 const I18N = {
   en: {
     'top.month':'Month', 'top.nursery':'Nursery',
-    'btn.pdf':'⬇ PDF', 'btn.save':'💾 Save Schedule',
+    'btn.pdf':'⬇ Download Schedule PDF', 'btn.save':'💾 Save Schedule',
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
@@ -700,7 +700,7 @@ const I18N = {
   },
   bm: {
     'top.month':'Bulan', 'top.nursery':'Tapak Semaian',
-    'btn.pdf':'⬇ PDF', 'btn.save':'💾 Simpan Jadual',
+    'btn.pdf':'⬇ Muat Turun Jadual PDF', 'btn.save':'💾 Simpan Jadual',
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
@@ -2349,13 +2349,22 @@ function downloadPDF() {
 
   const PAGE_MARGIN = 8;
   function centeredX(tableW){ return (PW - tableW) / 2; }
+  /* Each P&D column is one colour top to bottom, matching the on-screen
+     schedule: PEST is green, DISEASE is amber. Header, chemical, bond and the
+     four summary rows all use their own column's shade, so you can read a
+     column straight down without losing track of which side you are on. */
   const PALETTE = {
     headerDark:  {fill:[8,92,51],   textColor:[255,255,255]},
-    headerP:     {fill:[196,239,209], textColor:[8,92,51]},
-    headerD:     {fill:[194,213,242], textColor:[24,69,140]},
-    chemP:       {fill:[235,250,240], textColor:[8,92,51]},
-    chemD:       {fill:[235,242,252], textColor:[24,69,140]},
-    sticker:     {fill:[255,247,219], textColor:[140,95,12]},
+    // PEST column — green
+    headerP:     {fill:[187,235,204], textColor:[22,101,52]},
+    chemP:       {fill:[220,252,231], textColor:[22,101,52]},
+    bondP:       {fill:[238,251,242], textColor:[22,101,52]},
+    summaryP:    {fill:[205,242,219], textColor:[22,101,52]},
+    // DISEASE column — amber
+    headerD:     {fill:[253,230,168], textColor:[146,64,14]},
+    chemD:       {fill:[254,243,199], textColor:[146,64,14]},
+    bondD:       {fill:[255,251,235], textColor:[146,64,14]},
+    summaryD:    {fill:[253,236,185], textColor:[146,64,14]},
     fert:        {fill:[255,238,210], textColor:[140,90,18]},
     altRow:      {fill:[247,250,248]},
     plain:       {fill:[255,255,255]},
@@ -2419,8 +2428,8 @@ function downloadPDF() {
       const x = startX + plotColW + wi*colW*2;
       const pStk = (c.P_sticker && c.P_sticker !== '—') ? `${c.P_sticker} ${c.P_sticker_dose}${c.P_sticker_unit}` : '—';
       const dStk = (c.D_sticker && c.D_sticker !== '—') ? `${c.D_sticker} ${c.D_sticker_dose}${c.D_sticker_unit}` : '—';
-      cell(x, y, colW, rowH, pStk, {...PALETTE.sticker, size:6.5});
-      cell(x + colW, y, colW, rowH, dStk, {...PALETTE.sticker, size:6.5});
+      cell(x, y, colW, rowH, pStk, {...PALETTE.bondP, size:6.5});
+      cell(x + colW, y, colW, rowH, dStk, {...PALETTE.bondD, size:6.5});
     });
     y += rowH;
 
@@ -2444,8 +2453,8 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH, t('sum.jumlahPlot'), {...PALETTE.summaryDark, style:'bold', size:8});
     W.forEach((w, wi) => {
       const x = startX + plotColW + wi*colW*2;
-      cell(x, y, colW, rowH, String(plots.filter(p=>s.pd[w]?.[p]?.P).length), {...PALETTE.summary, style:'bold', size:8});
-      cell(x+colW, y, colW, rowH, String(plots.filter(p=>s.pd[w]?.[p]?.D).length), {...PALETTE.summary, style:'bold', size:8});
+      cell(x, y, colW, rowH, String(plots.filter(p=>s.pd[w]?.[p]?.P).length), {...PALETTE.summaryP, style:'bold', size:8});
+      cell(x+colW, y, colW, rowH, String(plots.filter(p=>s.pd[w]?.[p]?.D).length), {...PALETTE.summaryD, style:'bold', size:8});
     });
     y += rowH;
 
@@ -2455,8 +2464,8 @@ function downloadPDF() {
       const x = startX + plotColW + wi*colW*2;
       const pSeed = sumSeedlings(pN, plots, p => s.pd[w]?.[p]?.P);
       const dSeed = sumSeedlings(pN, plots, p => s.pd[w]?.[p]?.D);
-      cell(x, y, colW, rowH, pSeed ? pSeed.toLocaleString() : '—', {...PALETTE.summary, size:8});
-      cell(x+colW, y, colW, rowH, dSeed ? dSeed.toLocaleString() : '—', {...PALETTE.summary, size:8});
+      cell(x, y, colW, rowH, pSeed ? pSeed.toLocaleString() : '—', {...PALETTE.summaryP, style:'bold', size:8});
+      cell(x+colW, y, colW, rowH, dSeed ? dSeed.toLocaleString() : '—', {...PALETTE.summaryD, style:'bold', size:8});
     });
     y += rowH;
 
@@ -2467,8 +2476,8 @@ function downloadPDF() {
       const x = startX + plotColW + wi*colW*2;
       const pSeed = sumSeedlings(pN, plots, p => s.pd[w]?.[p]?.P);
       const dSeed = sumSeedlings(pN, plots, p => s.pd[w]?.[p]?.D);
-      cell(x, y, colW, rowH, calcMaxChem(pSeed, c.P, c.P_dose, c.P_unit, 1), {...PALETTE.summary, style:'bold', size:8});
-      cell(x+colW, y, colW, rowH, calcMaxChem(dSeed, c.D, c.D_dose, c.D_unit, 1), {...PALETTE.summary, style:'bold', size:8});
+      cell(x, y, colW, rowH, calcMaxChem(pSeed, c.P, c.P_dose, c.P_unit, 1), {...PALETTE.summaryP, style:'bold', size:8});
+      cell(x+colW, y, colW, rowH, calcMaxChem(dSeed, c.D, c.D_dose, c.D_unit, 1), {...PALETTE.summaryD, style:'bold', size:8});
     });
     y += rowH;
 
@@ -2481,8 +2490,8 @@ function downloadPDF() {
       const dSeed = sumSeedlings(pN, plots, p => s.pd[w]?.[p]?.D);
       const pBond = (!pSeed || c.P === '—' || c.P_sticker === '—') ? '—' : calcMaxChem(pSeed, c.P_sticker, c.P_sticker_dose, c.P_sticker_unit, 1);
       const dBond = (!dSeed || c.D === '—' || c.D_sticker === '—') ? '—' : calcMaxChem(dSeed, c.D_sticker, c.D_sticker_dose, c.D_sticker_unit, 1);
-      cell(x, y, colW, rowH, pBond, {...PALETTE.summary, style:'bold', size:8});
-      cell(x+colW, y, colW, rowH, dBond, {...PALETTE.summary, style:'bold', size:8});
+      cell(x, y, colW, rowH, pBond, {...PALETTE.summaryP, style:'bold', size:8});
+      cell(x+colW, y, colW, rowH, dBond, {...PALETTE.summaryD, style:'bold', size:8});
     });
   }
 
@@ -2607,7 +2616,7 @@ function downloadPDF() {
     y += rowH;
     rounds.forEach((r, i) => {
       const x = startX + plotColW + i*colW;
-      cell(x, y, colW, rowH, t('pdf.merumput'), {...PALETTE.chemP, size:7});
+      cell(x, y, colW, rowH, t('pdf.merumput'), {...PALETTE.chemP, style:'bold', size:7});
     });
     y += rowH;
 
@@ -2665,7 +2674,7 @@ function downloadPDF() {
     xCursor = startX + plotColW;
     icfg.forEach(round => {
       round.forEach(c => {
-        cell(xCursor, y, colW, rowH, `Activator ${c.activator_dose}${c.activator_unit}`, {...PALETTE.sticker, size:7});
+        cell(xCursor, y, colW, rowH, `Activator ${c.activator_dose}${c.activator_unit}`, {...PALETTE.bondP, style:'bold', size:7});
         xCursor += colW;
       });
     });
