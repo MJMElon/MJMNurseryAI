@@ -340,7 +340,9 @@ function renderPayroll() {
   const n = getNursery(), m = getMonth();
   const cfg = PAYROLL_TYPES[_payrollView];
   const line = document.getElementById('payroll-form-line');
-  if (line) line.textContent = `Borang Tuntutan Gaji (${NURSERY_NAMES[n]}) — Bulan ${m}`;
+  if (line) line.textContent = `${t('pay.form')} (${NURSERY_NAMES[n]}) — ${t('pay.month')} ${m}`;
+  const hint = document.getElementById('payroll-hint');
+  if (hint) hint.textContent = t('pay.tickHint');
 
   const wk = workers[n] || [];
   const rows = payrollRows();
@@ -348,69 +350,68 @@ function renderPayroll() {
   const store = payrollData[payrollKey(n, m, _payrollView)] || {};
 
   if (!wk.length) {
-    tbl.innerHTML = `<tbody><tr><td style="padding:2rem;text-align:center;color:var(--text-faint);font-size:13px;">
-      Add worker names under <strong>Setting → Workers</strong> to build this form.</td></tr></tbody>`;
+    tbl.innerHTML = `<tbody><tr><td style="padding:2rem;text-align:center;color:var(--text-faint);font-size:13px;">${t('pay.noWorkers')}</td></tr></tbody>`;
     return;
   }
 
-  const rateTxt = (rate === null || rate === undefined) ? '—' : Number(rate).toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+  const rateTxt = (rate === null || rate === undefined) ? '—' : String(rate);
   let h = `<thead>
     <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)} — RM ${rateTxt}/${cfg.unit}</th></tr>
     <tr>
-      <th class="th-left" style="min-width:92px;">Tarikh</th>
-      <th style="min-width:64px;">Plot</th>
-      <th style="min-width:96px;">Kapasiti plot<br>(bibit)</th>
-      ${wk.map(w => `<th style="min-width:104px;">${w}</th>`).join('')}
-      <th style="min-width:104px;">Kapasiti Kerja<br>Setiap Orang (bibit)</th>
+      <th class="th-left" style="min-width:92px;">${t('pay.date')}</th>
+      <th style="min-width:64px;">${t('pay.plot')}</th>
+      <th style="min-width:100px;">${t('pay.plotCap')}</th>
+      ${wk.map(w => `<th style="min-width:86px;">${w}</th>`).join('')}
+      <th style="min-width:110px;">${t('pay.perWorker')}</th>
     </tr></thead><tbody>`;
 
-  const totals = {}; wk.forEach(w => totals[w] = 0);
+  const totals = {}; wk.forEach(w => totals[w] = 0);   // capacity earned per worker
   let capTotal = 0;
 
   if (!rows.length) {
-    h += `<tr><td colspan="${3 + wk.length + 1}" style="padding:1.6rem;text-align:center;color:var(--text-faint);">
-      No ${t(cfg.label)} records for this nursery and month yet — tick the schedule, then Sync from Schedule.</td></tr>`;
+    h += `<tr><td colspan="${3 + wk.length + 1}" style="padding:1.6rem;text-align:center;color:var(--text-faint);">${t('pay.noRows')}</td></tr>`;
   } else {
     rows.forEach(r => {
       const cells = store[r.id] || {};
-      let rowSum = 0;
-      wk.forEach(w => { const v = Number(cells[w] || 0); rowSum += v; totals[w] += v; });
-      const cap = (r.qty === 0 || r.qty) ? Number(r.qty) : 0;
+      // Date and plot capacity come straight from the work record.
+      const cap    = (r.qty === 0 || r.qty) ? Number(r.qty) : 0;
+      const ticked = wk.filter(w => cells[w]);
+      const share  = ticked.length ? cap / ticked.length : 0;   // capacity ÷ ticks
+      ticked.forEach(w => { totals[w] += share; });
       capTotal += cap;
       h += `<tr>
         <td class="th-left" style="font-weight:600;">${r.tarikh || '-'}</td>
         <td class="plot-td">${r.plot}</td>
         <td>${cap ? cap.toLocaleString() : '—'}</td>
-        ${wk.map(w => `<td style="padding:4px 6px;"><input type="number" min="0" value="${cells[w] ?? ''}"
-            onchange="setPayrollCell(${r.id},'${String(w).replace(/'/g, "\\'")}',this.value)"
-            style="width:100%;min-width:0;height:32px;padding:0 6px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;"></td>`).join('')}
-        <td style="font-weight:700;">${rowSum ? rowSum.toLocaleString() : '—'}</td>
+        ${wk.map(w => `<td class="check-td${cells[w] ? ' ticked' : ''}" onclick="togglePayrollTick(${r.id},'${String(w).replace(/'/g, "\\'")}')" title="${w}"></td>`).join('')}
+        <td style="font-weight:700;">${share ? Math.round(share).toLocaleString() : '—'}</td>
       </tr>`;
     });
   }
 
-  const grand = wk.reduce((sk, w) => sk + totals[w], 0);
+  // Total capacity = the sum of every worker's earned capacity.
+  const grand = wk.reduce((sum, w) => sum + totals[w], 0);
   h += `</tbody><tfoot>
-    <tr class="jumlah-tr"><td colspan="2">Jumlah (Capacity)</td><td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
-      ${wk.map(w => `<td>${totals[w] ? totals[w].toLocaleString() : '0'}</td>`).join('')}
-      <td>${grand ? grand.toLocaleString() : '0'}</td></tr>
-    <tr class="jumlah-tr"><td colspan="3">Piece Rate (RM)</td>
+    <tr class="jumlah-tr"><td colspan="2">${t('pay.totalCap')}</td><td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
+      ${wk.map(w => `<td>${Math.round(totals[w]).toLocaleString()}</td>`).join('')}
+      <td>${Math.round(grand).toLocaleString()}</td></tr>
+    <tr class="jumlah-tr"><td colspan="3">${t('pay.rate')}</td>
       ${wk.map(() => `<td>${rateTxt}</td>`).join('')}<td></td></tr>
-    <tr class="jumlah-tr"><td colspan="3">Total (RM)</td>
+    <tr class="jumlah-tr"><td colspan="3">${t('pay.totalRM')}</td>
       ${wk.map(w => `<td>${rate ? (totals[w] * rate).toFixed(2) : '0.00'}</td>`).join('')}
       <td>${rate ? (grand * rate).toFixed(2) : '0.00'}</td></tr>
   </tfoot>`;
   tbl.innerHTML = h;
 }
 
-function setPayrollCell(recId, worker, val) {
+/* Tick / untick a worker on a payroll row. */
+function togglePayrollTick(recId, worker) {
   const n = getNursery(), m = getMonth();
   const k = payrollKey(n, m, _payrollView);
   if (!payrollData[k]) payrollData[k] = {};
   if (!payrollData[k][recId]) payrollData[k][recId] = {};
-  const raw = String(val ?? '').trim();
-  if (raw === '') delete payrollData[k][recId][worker];
-  else payrollData[k][recId][worker] = Math.max(0, parseInt(raw) || 0);
+  if (payrollData[k][recId][worker]) delete payrollData[k][recId][worker];
+  else payrollData[k][recId][worker] = 1;
   renderPayroll();
   persistPayroll(n, m, _payrollView);
 }
@@ -438,13 +439,13 @@ function downloadPayrollPDF() {
   doc.setFont('times', 'bold'); doc.setFontSize(13);
   doc.text('Mega Jutamas Sdn Bhd', 148, 12, { align: 'center' });
   doc.setFontSize(11);
-  doc.text(`Borang Tuntutan Gaji (${NURSERY_NAMES[n]})`, 148, 18, { align: 'center' });
+  doc.text(`${t('pay.form')} (${NURSERY_NAMES[n]})`, 148, 18, { align: 'center' });
   doc.setFont('times', 'normal');
-  doc.text(`Bulan ${m}`, 148, 24, { align: 'center' });
+  doc.text(`${t('pay.month')} ${m}`, 148, 24, { align: 'center' });
   doc.setFontSize(9);
   doc.text(`${t(cfg.label)} — RM ${rate}/${cfg.unit}`, 148, 31, { align: 'center' });
 
-  const head = ['Tarikh', 'Plot', 'Kapasiti plot', ...wk, 'Kapasiti/Orang'];
+  const head = [t('pay.date'), t('pay.plot'), t('pay.plotCap'), ...wk, t('pay.perWorker')];
   const colW = [22, 16, 22, ...wk.map(() => Math.max(16, (200 - 60) / Math.max(1, wk.length))), 24];
   let y = 38;
   const drawRow = (cells, bold) => {
@@ -458,14 +459,16 @@ function downloadPayrollPDF() {
   rows.forEach(r => {
     if (y > 190) { doc.addPage(); y = 15; drawRow(head, true); }
     const cells = store[r.id] || {};
-    let rowSum = 0; wk.forEach(w => { const v = Number(cells[w] || 0); rowSum += v; totals[w] += v; });
     const cap = (r.qty === 0 || r.qty) ? Number(r.qty) : 0; capTotal += cap;
-    drawRow([r.tarikh || '-', r.plot, cap || '-', ...wk.map(w => cells[w] ?? ''), rowSum || '-']);
+    const ticked = wk.filter(w => cells[w]);
+    const share = ticked.length ? cap / ticked.length : 0;
+    ticked.forEach(w => { totals[w] += share; });
+    drawRow([r.tarikh || '-', r.plot, cap || '-', ...wk.map(w => cells[w] ? '✓' : ''), share ? Math.round(share) : '-']);
   });
   const grand = wk.reduce((sk, w) => sk + totals[w], 0);
-  drawRow(['Jumlah', '', capTotal || '-', ...wk.map(w => totals[w]), grand], true);
-  drawRow(['Piece Rate', '', '', ...wk.map(() => rate), ''], true);
-  drawRow(['Total (RM)', '', '', ...wk.map(w => (totals[w] * rate).toFixed(2)), (grand * rate).toFixed(2)], true);
+  drawRow([t('pay.totalCap'), '', capTotal || '-', ...wk.map(w => Math.round(totals[w])), Math.round(grand)], true);
+  drawRow([t('pay.rate'), '', '', ...wk.map(() => rate), ''], true);
+  drawRow([t('pay.totalRM'), '', '', ...wk.map(w => (totals[w] * rate).toFixed(2)), (grand * rate).toFixed(2)], true);
   doc.save(`Borang_Tuntutan_Gaji_${n}_${m.replace(' ', '_')}_${_payrollView}.pdf`);
 }
 
@@ -633,6 +636,12 @@ const I18N = {
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
     'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'💵 Monthly Payroll', 'tab.setting':'⚙️ Setting',
+    'pay.form':'Salary Claim Form', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
+    'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
+    'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
+    'pay.noWorkers':'Add worker names under Setting → Workers to build this form.',
+    'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
+    'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row.',
     'tab.calc':'💊 Dosage Calc',
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
@@ -672,6 +681,12 @@ const I18N = {
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
     'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'💵 Penggajian Bulanan', 'tab.setting':'⚙️ Tetapan',
+    'pay.form':'Borang Tuntutan Gaji', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
+    'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
+    'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
+    'pay.noWorkers':'Tambah nama pekerja di Tetapan → Pekerja untuk membina borang ini.',
+    'pay.noRows':'Tiada rekod untuk nurseri dan bulan ini — tandakan jadual, kemudian Sync from Schedule.',
+    'pay.tickHint':'Tandakan setiap pekerja yang membuat kerja. Kapasiti setiap pekerja = kapasiti plot ÷ bilangan tanda pada baris itu.',
     'tab.calc':'💊 Kira Dos',
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
@@ -2110,7 +2125,9 @@ function renderRecords() {
   tbody.innerHTML = html;
 }
 let _recSaveTimer = null;
+function _afterRecordChange() { try { renderPayroll(); } catch(_) {} }
 function persistRecords() {
+  _afterRecordChange();
   if (!_supabase || !_dbReady) return;
   clearTimeout(_recSaveTimer);
   _recSaveTimer = setTimeout(() => {
