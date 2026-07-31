@@ -299,7 +299,8 @@
           <div style="font-size:13px;font-weight:700;color:var(--text-head);">Mega Jutamas Sdn Bhd</div>
           <div style="font-size:12px;font-weight:600;color:var(--text-muted);" id="payroll-form-line"></div>
         </div>
-        <button class="btn" style="font-size:12px;" onclick="downloadPayrollPDF()">⬇ PDF</button>
+        <!-- One form covering all four work types, not just the open sub-tab. -->
+        <button class="btn" style="font-size:12px;" onclick="downloadPayrollPDF()" data-i18n="btn.claimPdf">⬇ Salary Claim Form (PDF)</button>
       </div>
       <div class="card"><div class="tbl-wrap"><table class="sched-table" id="payroll-table"></table></div></div>
       <div id="payroll-hint" style="font-size:11px;color:var(--text-faint);margin-top:8px;"></div>
@@ -434,6 +435,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=39"></script>
+<script src="plot_maintenance_script.js?v=40"></script>
 </body>
 </html>

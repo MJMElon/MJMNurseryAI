@@ -325,13 +325,36 @@ function switchPayrollView(type, btn) {
   renderPayroll();
 }
 
-function payrollRows() {
+function payrollRowsFor(type) {
   const n = getNursery();
   const plots = NURSERY_PLOTS[n] || [];
-  const jenis = PAYROLL_TYPES[_payrollView].jenis;
+  const jenis = PAYROLL_TYPES[type].jenis;
   return records
     .filter(r => r.jenis === jenis && plots.includes(r.plot))
     .sort((a, b) => plots.indexOf(a.plot) - plots.indexOf(b.plot));
+}
+function payrollRows() { return payrollRowsFor(_payrollView); }
+
+/* Capacity each worker earned on one work type: every ticked row hands its
+   plot capacity out equally among the workers ticked on it. Same arithmetic
+   the on-screen table uses, pulled out so the PDF can run it for all four
+   work types at once. */
+function payrollTotalsFor(type) {
+  const n = getNursery(), m = getMonth();
+  const wk = workers[n] || [];
+  const store = payrollData[payrollKey(n, m, type)] || {};
+  const perWorker = {}; wk.forEach(w => perWorker[w] = 0);
+  let capTotal = 0;
+  payrollRowsFor(type).forEach(r => {
+    const cells = store[r.id] || {};
+    const cap = recQty(r).value || 0;
+    capTotal += cap;
+    const ticked = wk.filter(w => cells[w]);
+    if (!ticked.length) return;
+    const share = cap / ticked.length;
+    ticked.forEach(w => { perWorker[w] += share; });
+  });
+  return { perWorker, capTotal };
 }
 
 function renderPayroll() {
@@ -439,48 +462,164 @@ function persistPayroll(n, m, type) {
   }, 400);
 }
 
+/* Print a piece rate at its real precision. Forcing 2 decimals showed a rate
+   of 0.015 as "0.01" while the money column was still worked out from 0.015,
+   so the form appeared not to add up. */
+function _fmtRate(r) {
+  const n = Number(r);
+  for (let d = 2; d <= 4; d++) {
+    if (Math.abs(n - Number(n.toFixed(d))) < 1e-9) return n.toFixed(d);
+  }
+  return n.toFixed(4);
+}
+
+/* ── Borang Tuntutan Gaji (salary claim form) ─────────────────────────────
+   Portrait A4, 25 mm margins, everything centred. One row per worker
+   showing the capacity earned on each of the four work types and the money
+   that comes to, rather than the old landscape tick-grid per work type —
+   which needed four separate files and ran off the page. */
 function downloadPayrollPDF() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const n = getNursery(), m = getMonth(), cfg = PAYROLL_TYPES[_payrollView];
-  const wk = workers[n] || [], rows = payrollRows();
-  const rate = nurseryRates(n)[_payrollView] || 0;
-  const store = payrollData[payrollKey(n, m, _payrollView)] || {};
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 210, PH = 297, MARGIN = 25;
+  const CONTENT_W = PW - MARGIN * 2;       // 160 mm
+  const MID = PW / 2;
 
-  doc.setFont('times', 'bold'); doc.setFontSize(13);
-  doc.text('Mega Jutamas Sdn Bhd', 148, 12, { align: 'center' });
-  doc.setFontSize(11);
-  doc.text(`${t('pay.form')} (${NURSERY_NAMES[n]})`, 148, 18, { align: 'center' });
-  doc.setFont('times', 'normal');
-  doc.text(`${t('pay.month')} ${m}`, 148, 24, { align: 'center' });
-  doc.setFontSize(9);
-  doc.text(`${t(cfg.label)} — RM ${rate}/${cfg.unit}`, 148, 31, { align: 'center' });
+  const n = getNursery(), m = getMonth();
+  const wk = workers[n] || [];
+  const rates = nurseryRates(n);
+  const TYPES = ['pd', 'manuring', 'weeding', 'interrow'];
 
-  const head = [t('pay.date'), t('pay.plot'), t('pay.plotCap'), ...wk, t('pay.perWorker')];
-  const colW = [22, 16, 22, ...wk.map(() => Math.max(16, (200 - 60) / Math.max(1, wk.length))), 24];
-  let y = 38;
-  const drawRow = (cells, bold) => {
-    doc.setFont('times', bold ? 'bold' : 'normal'); doc.setFontSize(8);
-    let x = 10;
-    cells.forEach((c, i) => { doc.rect(x, y, colW[i], 6); doc.text(String(c ?? ''), x + colW[i] - 1.5, y + 4, { align: 'right' }); x += colW[i]; });
-    y += 6;
-  };
-  drawRow(head, true);
-  const totals = {}; wk.forEach(w => totals[w] = 0); let capTotal = 0;
-  rows.forEach(r => {
-    if (y > 190) { doc.addPage(); y = 15; drawRow(head, true); }
-    const cells = store[r.id] || {};
-    const cap = recQty(r).value || 0; capTotal += cap;
-    const ticked = wk.filter(w => cells[w]);
-    const share = ticked.length ? cap / ticked.length : 0;
-    ticked.forEach(w => { totals[w] += share; });
-    drawRow([_tarikhDisplay(r.tarikh), r.plot, cap || '-', ...wk.map(w => cells[w] ? '✓' : ''), share ? Math.round(share) : '-']);
+  // Capacity + money per worker, per work type.
+  const byType = {};
+  TYPES.forEach(ty => { byType[ty] = payrollTotalsFor(ty); });
+  const earned = w => TYPES.reduce((s, ty) => s + (byType[ty].perWorker[w] || 0) * (rates[ty] || 0), 0);
+
+  // No | Worker | 4 work types | Total  →  10 + 42 + 4×21 + 24 = 160 mm
+  const COL = [10, 42, 21, 21, 21, 21, 24];
+  const X0 = MARGIN;
+  const colX = [];                       // left edge of each column
+  COL.reduce((x, w, i) => { colX[i] = x; return x + w; }, X0);
+
+  /* One bordered cell, text centred both ways and shrunk to fit. */
+  function cell(x, y, w, h, text, opt) {
+    const o = Object.assign({ bold: false, size: 9, fill: null, color: [0, 0, 0] }, opt || {});
+    if (o.fill) { doc.setFillColor(...o.fill); doc.rect(x, y, w, h, 'F'); }
+    doc.setDrawColor(80, 80, 80); doc.setLineWidth(0.2);
+    doc.rect(x, y, w, h);
+    const str = String(text ?? '');
+    if (!str) return;
+    doc.setFont('helvetica', o.bold ? 'bold' : 'normal');
+    doc.setTextColor(...o.color);
+    let size = o.size, lines;
+    for (;;) {
+      doc.setFontSize(size);
+      lines = doc.splitTextToSize(str, w - 3);
+      if (lines.length * size * 0.3528 * 1.15 <= h - 1.5 || size <= 5) break;
+      size -= 0.4;
+    }
+    const lh = size * 0.3528 * 1.15;
+    let ty = y + (h - lines.length * lh) / 2 + lh * 0.78;
+    lines.forEach(ln => { doc.text(ln, x + w / 2, ty, { align: 'center' }); ty += lh; });
+  }
+
+  const HEAD_FILL = [232, 240, 235], TOTAL_FILL = [219, 236, 226];
+
+  /* Title block + column headers. Returns the y to start rows at. */
+  function drawHeader(pageNo) {
+    let y = MARGIN;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+    doc.text('MEGA JUTAMAS SDN BHD', MID, y + 5, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text(t('pay.form').toUpperCase(), MID, y + 12, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    doc.text(`${NURSERY_NAMES[n]} (${n})`, MID, y + 19, { align: 'center' });
+    doc.text(`${t('pay.month')} ${m}`, MID, y + 25.5, { align: 'center' });
+    doc.setDrawColor(13, 122, 71); doc.setLineWidth(0.6);
+    doc.line(MARGIN, y + 29, PW - MARGIN, y + 29);
+    doc.setLineWidth(0.2);
+    y += 34;
+
+    // Two-row header: the four work types sit under one banner.
+    const H1 = 8, H2 = 9;
+    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, fill: HEAD_FILL });
+    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, fill: HEAD_FILL });
+    const capW = COL[2] + COL[3] + COL[4] + COL[5];
+    cell(colX[2], y, capW, H1, t('pay.capBy'), { bold: true, size: 8.5, fill: HEAD_FILL });
+    TYPES.forEach((ty, i) => {
+      cell(colX[2 + i], y + H1, COL[2 + i], H2, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
+    });
+    cell(colX[6], y, COL[6], H1 + H2, t('pay.totalEarn'), { bold: true, size: 8, fill: HEAD_FILL });
+    y += H1 + H2;
+
+    // Piece rate reference, so the money can be checked against the capacity.
+    const RH = 7;
+    cell(colX[0], y, COL[0] + COL[1], RH, t('pay.rate'), { bold: true, size: 8, fill: [246, 248, 247] });
+    TYPES.forEach((ty, i) => {
+      const r = rates[ty];
+      cell(colX[2 + i], y, COL[2 + i], RH,
+           (r === null || r === undefined) ? '—' : `${_fmtRate(r)}/${PAYROLL_TYPES[ty].unit}`,
+           { size: 7.5, fill: [246, 248, 247] });
+    });
+    cell(colX[6], y, COL[6], RH, '', { fill: [246, 248, 247] });
+    y += RH;
+
+    if (pageNo > 1) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+      doc.text(`Page ${pageNo}`, PW - MARGIN, MARGIN - 4, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+    }
+    return y;
+  }
+
+  const ROW_H = 9;
+  const FOOTER_RESERVE = 46;          // totals row + signature block
+  let page = 1;
+  let y = drawHeader(page);
+
+  if (!wk.length) {
+    cell(X0, y, CONTENT_W, 14, t('pay.noWorkers'), { size: 10 });
+    y += 14;
+  }
+
+  const fmtCap = v => v ? Math.round(v).toLocaleString() : '—';
+  const fmtRM  = v => v ? v.toFixed(2) : '—';
+
+  wk.forEach((w, i) => {
+    if (y + ROW_H > PH - MARGIN - FOOTER_RESERVE) { doc.addPage(); page++; y = drawHeader(page); }
+    const zebra = i % 2 ? [250, 252, 251] : null;
+    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8.5, fill: zebra });
+    cell(colX[1], y, COL[1], ROW_H, w,             { size: 9, fill: zebra });
+    TYPES.forEach((ty, k) => {
+      cell(colX[2 + k], y, COL[2 + k], ROW_H, fmtCap(byType[ty].perWorker[w]), { size: 9, fill: zebra });
+    });
+    cell(colX[6], y, COL[6], ROW_H, fmtRM(earned(w)), { bold: true, size: 9, fill: zebra });
+    y += ROW_H;
   });
-  const grand = wk.reduce((sk, w) => sk + totals[w], 0);
-  drawRow([t('pay.totalCap'), '', capTotal || '-', ...wk.map(w => Math.round(totals[w])), Math.round(grand)], true);
-  drawRow([t('pay.rate'), '', '', ...wk.map(() => rate), ''], true);
-  drawRow([t('pay.totalRM'), '', '', ...wk.map(w => (totals[w] * rate).toFixed(2)), (grand * rate).toFixed(2)], true);
-  doc.save(`Borang_Tuntutan_Gaji_${n}_${m.replace(' ', '_')}_${_payrollView}.pdf`);
+
+  // Grand totals.
+  const capSum = ty => wk.reduce((s, w) => s + (byType[ty].perWorker[w] || 0), 0);
+  const rmSum  = wk.reduce((s, w) => s + earned(w), 0);
+  cell(colX[0], y, COL[0] + COL[1], ROW_H + 1, t('pay.grandTotal'), { bold: true, size: 9, fill: TOTAL_FILL });
+  TYPES.forEach((ty, k) => {
+    cell(colX[2 + k], y, COL[2 + k], ROW_H + 1, fmtCap(capSum(ty)), { bold: true, size: 9, fill: TOTAL_FILL });
+  });
+  cell(colX[6], y, COL[6], ROW_H + 1, fmtRM(rmSum), { bold: true, size: 9.5, fill: TOTAL_FILL });
+  y += ROW_H + 1;
+
+  // Signature block.
+  y += 14;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+  const sigW = (CONTENT_W - 20) / 3;
+  [t('pay.preparedBy'), t('pay.checkedBy'), t('pay.approvedBy')].forEach((lbl, i) => {
+    const sx = MARGIN + i * (sigW + 10);
+    doc.setDrawColor(90, 90, 90); doc.setLineWidth(0.3);
+    doc.line(sx, y, sx + sigW, y);
+    doc.text(lbl, sx + sigW / 2, y + 5, { align: 'center' });
+  });
+
+  doc.save(`Borang_Tuntutan_Gaji_${n}_${m.replace(/\s+/g, '_')}.pdf`);
 }
 
 /* ── Piece rates (one rate card for all nurseries) ── */
@@ -762,6 +901,12 @@ const I18N = {
     'pay.noWorkers':'Add worker names under Setting → Workers to build this form.',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row.',
+    /* Salary claim form (PDF) */
+    'pay.no':'No.', 'pay.worker':'Worker Name',
+    'pay.capBy':'CAPACITY COMPLETED (SEEDLINGS)', 'pay.totalEarn':'Total Earned (RM)',
+    'pay.grandTotal':'GRAND TOTAL',
+    'pay.preparedBy':'Prepared by', 'pay.checkedBy':'Checked by', 'pay.approvedBy':'Approved by',
+    'btn.claimPdf':'⬇ Salary Claim Form (PDF)',
     'tab.calc':'💊 Dosage Calc',
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
@@ -832,6 +977,12 @@ const I18N = {
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
     'pay.noWorkers':'Tambah nama pekerja di Tetapan → Pekerja untuk membina borang ini.',
+    /* Borang tuntutan gaji (PDF) */
+    'pay.no':'Bil.', 'pay.worker':'Nama Pekerja',
+    'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
+    'pay.grandTotal':'JUMLAH BESAR',
+    'pay.preparedBy':'Disediakan oleh', 'pay.checkedBy':'Disemak oleh', 'pay.approvedBy':'Diluluskan oleh',
+    'btn.claimPdf':'⬇ Borang Tuntutan Gaji (PDF)',
     'pay.noRows':'Tiada rekod untuk nurseri dan bulan ini — tandakan jadual, kemudian Sync from Schedule.',
     'pay.tickHint':'Tandakan setiap pekerja yang membuat kerja. Kapasiti setiap pekerja = kapasiti plot ÷ bilangan tanda pada baris itu.',
     'tab.calc':'💊 Kira Dos',
