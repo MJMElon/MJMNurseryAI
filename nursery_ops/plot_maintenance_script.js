@@ -491,19 +491,44 @@ function downloadPayrollPDF() {
   const TYPES = ['pd', 'manuring', 'weeding', 'interrow'];
 
   // Capacity + money per worker, per work type.
+  //
+  // Capacity is fractional — a plot's quantity is split among the workers who
+  // ticked it (1,300 ÷ 3 = 433.33) — but the form prints whole seedlings. The
+  // money is therefore worked out from the ROUNDED capacity, so every printed
+  // row multiplies out: 433 × 0.02 really is 8.66. Paying from the unrounded
+  // figure would print "433" next to "8.67" and the form would not add up for
+  // whoever signs it. Column totals are likewise the sum of the printed
+  // values, so the page is consistent read either way.
+  // The money is kept in whole cents, worked out with the rate scaled to an
+  // integer. Doing it in floating point put 1,833 × 0.015 at 27.49499… so the
+  // form printed 27.49 where a calculator says 27.50.
   const byType = {};
   TYPES.forEach(ty => { byType[ty] = payrollTotalsFor(ty); });
-  const earned = w => TYPES.reduce((s, ty) => s + (byType[ty].perWorker[w] || 0) * (rates[ty] || 0), 0);
+  const rateScaled  = ty => Math.round((rates[ty] || 0) * 100000);   // 0.015 → 1500
+  const capOf       = (ty, w) => Math.round(byType[ty].perWorker[w] || 0);
+  const centsOf     = (ty, w) => Math.round(capOf(ty, w) * rateScaled(ty) / 1000);
+  const rmOf        = (ty, w) => centsOf(ty, w) / 100;
+  const earnedCents = w => TYPES.reduce((s, ty) => s + centsOf(ty, w), 0);
+  const earned      = w => earnedCents(w) / 100;
 
-  // No | Worker | 4 work types | Total  →  10 + 42 + 4×21 + 24 = 160 mm
-  const COL = [10, 42, 21, 21, 21, 21, 24];
+  // Each work type shows the capacity done AND what it earned, so it takes a
+  // pair of columns:
+  //   No | Worker | (Cap|RM) ×4 | Total  →  8 + 32 + 4×(14+11) + 20 = 160 mm
+  const C_NO = 8, C_NAME = 32, C_CAP = 13, C_RM = 12, C_TOTAL = 20;
+  const COL = [C_NO, C_NAME,
+               C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM,
+               C_TOTAL];
   const X0 = MARGIN;
   const colX = [];                       // left edge of each column
   COL.reduce((x, w, i) => { colX[i] = x; return x + w; }, X0);
+  const PAIR = i => 2 + i * 2;           // first column index of work type i
+  const I_TOTAL = COL.length - 1;
 
-  /* One bordered cell, text centred both ways and shrunk to fit. */
+  /* One bordered cell, text centred both ways and shrunk to fit.
+     nowrap: shrink until the text sits on ONE line. Numbers must never wrap —
+     "117.00" split as "117.0" / "0" reads as a different figure entirely. */
   function cell(x, y, w, h, text, opt) {
-    const o = Object.assign({ bold: false, size: 9, fill: null, color: [0, 0, 0] }, opt || {});
+    const o = Object.assign({ bold: false, size: 9, fill: null, color: [0, 0, 0], nowrap: false }, opt || {});
     if (o.fill) { doc.setFillColor(...o.fill); doc.rect(x, y, w, h, 'F'); }
     doc.setDrawColor(80, 80, 80); doc.setLineWidth(0.2);
     doc.rect(x, y, w, h);
@@ -512,12 +537,23 @@ function downloadPayrollPDF() {
     doc.setFont('helvetica', o.bold ? 'bold' : 'normal');
     doc.setTextColor(...o.color);
     let size = o.size, lines;
-    for (;;) {
-      doc.setFontSize(size);
-      lines = doc.splitTextToSize(str, w - 3);
-      if (lines.length * size * 0.3528 * 1.15 <= h - 1.5 || size <= 5) break;
-      size -= 0.4;
+    if (o.nowrap) {
+      const avail = w - 1.6;
+      for (;;) {
+        doc.setFontSize(size);
+        if (doc.getTextWidth(str) <= avail || size <= 4) break;
+        size -= 0.25;
+      }
+      lines = [str];
+    } else {
+      for (;;) {
+        doc.setFontSize(size);
+        lines = doc.splitTextToSize(str, w - 3);
+        if (lines.length * size * 0.3528 * 1.15 <= h - 1.5 || size <= 5) break;
+        size -= 0.4;
+      }
     }
+    doc.setFontSize(size);
     const lh = size * 0.3528 * 1.15;
     let ty = y + (h - lines.length * lh) / 2 + lh * 0.78;
     lines.forEach(ln => { doc.text(ln, x + w / 2, ty, { align: 'center' }); ty += lh; });
@@ -541,28 +577,29 @@ function downloadPayrollPDF() {
     doc.setLineWidth(0.2);
     y += 34;
 
-    // Two-row header: the four work types sit under one banner.
-    const H1 = 8, H2 = 9;
-    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, fill: HEAD_FILL });
-    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, fill: HEAD_FILL });
-    const capW = COL[2] + COL[3] + COL[4] + COL[5];
-    cell(colX[2], y, capW, H1, t('pay.capBy'), { bold: true, size: 8.5, fill: HEAD_FILL });
+    // Two-row header: work type on top, its Capacity / RM pair underneath.
+    const H1 = 9, H2 = 7;
+    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, size: 8, fill: HEAD_FILL });
+    cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, size: 8.5, fill: HEAD_FILL });
     TYPES.forEach((ty, i) => {
-      cell(colX[2 + i], y + H1, COL[2 + i], H2, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
+      const c = PAIR(i);
+      cell(colX[c], y, COL[c] + COL[c + 1], H1, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
+      cell(colX[c],     y + H1, COL[c],     H2, t('pay.capShort'), { bold: true, size: 6.5, fill: HEAD_FILL });
+      cell(colX[c + 1], y + H1, COL[c + 1], H2, t('pay.rmShort'),  { bold: true, size: 6.5, fill: HEAD_FILL });
     });
-    cell(colX[6], y, COL[6], H1 + H2, t('pay.totalEarn'), { bold: true, size: 8, fill: HEAD_FILL });
+    cell(colX[I_TOTAL], y, COL[I_TOTAL], H1 + H2, t('pay.totalEarn'), { bold: true, size: 7.5, fill: HEAD_FILL });
     y += H1 + H2;
 
     // Piece rate reference, so the money can be checked against the capacity.
     const RH = 7;
-    cell(colX[0], y, COL[0] + COL[1], RH, t('pay.rate'), { bold: true, size: 8, fill: [246, 248, 247] });
+    cell(colX[0], y, COL[0] + COL[1], RH, t('pay.rate'), { bold: true, size: 7.5, fill: [246, 248, 247] });
     TYPES.forEach((ty, i) => {
-      const r = rates[ty];
-      cell(colX[2 + i], y, COL[2 + i], RH,
-           (r === null || r === undefined) ? '—' : `${_fmtRate(r)}/${PAYROLL_TYPES[ty].unit}`,
-           { size: 7.5, fill: [246, 248, 247] });
+      const c = PAIR(i), r = rates[ty];
+      cell(colX[c], y, COL[c] + COL[c + 1], RH,
+           (r === null || r === undefined) ? '—' : `${_fmtRate(r)} / ${PAYROLL_TYPES[ty].unit}`,
+           { size: 7, nowrap: true, fill: [246, 248, 247] });
     });
-    cell(colX[6], y, COL[6], RH, '', { fill: [246, 248, 247] });
+    cell(colX[I_TOTAL], y, COL[I_TOTAL], RH, '', { fill: [246, 248, 247] });
     y += RH;
 
     if (pageNo > 1) {
@@ -589,23 +626,29 @@ function downloadPayrollPDF() {
   wk.forEach((w, i) => {
     if (y + ROW_H > PH - MARGIN - FOOTER_RESERVE) { doc.addPage(); page++; y = drawHeader(page); }
     const zebra = i % 2 ? [250, 252, 251] : null;
-    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8.5, fill: zebra });
-    cell(colX[1], y, COL[1], ROW_H, w,             { size: 9, fill: zebra });
+    cell(colX[0], y, COL[0], ROW_H, String(i + 1), { size: 8, fill: zebra });
+    cell(colX[1], y, COL[1], ROW_H, w,             { size: 8.5, fill: zebra });
     TYPES.forEach((ty, k) => {
-      cell(colX[2 + k], y, COL[2 + k], ROW_H, fmtCap(byType[ty].perWorker[w]), { size: 9, fill: zebra });
+      const c = PAIR(k);
+      cell(colX[c],     y, COL[c],     ROW_H, fmtCap(capOf(ty, w)), { size: 8, nowrap: true, fill: zebra });
+      cell(colX[c + 1], y, COL[c + 1], ROW_H, fmtRM(rmOf(ty, w)),   { size: 7.5, nowrap: true, fill: zebra });
     });
-    cell(colX[6], y, COL[6], ROW_H, fmtRM(earned(w)), { bold: true, size: 9, fill: zebra });
+    cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H, fmtRM(earned(w)), { bold: true, size: 8.5, nowrap: true, fill: zebra });
     y += ROW_H;
   });
 
-  // Grand totals.
-  const capSum = ty => wk.reduce((s, w) => s + (byType[ty].perWorker[w] || 0), 0);
-  const rmSum  = wk.reduce((s, w) => s + earned(w), 0);
-  cell(colX[0], y, COL[0] + COL[1], ROW_H + 1, t('pay.grandTotal'), { bold: true, size: 9, fill: TOTAL_FILL });
+  // Grand totals — capacity and money for each work type, then the payout.
+  // Totals summed in cents too, so a column of exact 2-dp figures cannot drift.
+  const capSum  = ty => wk.reduce((s, w) => s + capOf(ty, w), 0);
+  const rmSumOf = ty => wk.reduce((s, w) => s + centsOf(ty, w), 0) / 100;
+  const rmSum   = wk.reduce((s, w) => s + earnedCents(w), 0) / 100;
+  cell(colX[0], y, COL[0] + COL[1], ROW_H + 1, t('pay.grandTotal'), { bold: true, size: 8.5, fill: TOTAL_FILL });
   TYPES.forEach((ty, k) => {
-    cell(colX[2 + k], y, COL[2 + k], ROW_H + 1, fmtCap(capSum(ty)), { bold: true, size: 9, fill: TOTAL_FILL });
+    const c = PAIR(k);
+    cell(colX[c],     y, COL[c],     ROW_H + 1, fmtCap(capSum(ty)),  { bold: true, size: 8, nowrap: true, fill: TOTAL_FILL });
+    cell(colX[c + 1], y, COL[c + 1], ROW_H + 1, fmtRM(rmSumOf(ty)), { bold: true, size: 7.5, nowrap: true, fill: TOTAL_FILL });
   });
-  cell(colX[6], y, COL[6], ROW_H + 1, fmtRM(rmSum), { bold: true, size: 9.5, fill: TOTAL_FILL });
+  cell(colX[I_TOTAL], y, COL[I_TOTAL], ROW_H + 1, fmtRM(rmSum), { bold: true, size: 9, nowrap: true, fill: TOTAL_FILL });
   y += ROW_H + 1;
 
   // Signature block.
@@ -904,6 +947,7 @@ const I18N = {
     /* Salary claim form (PDF) */
     'pay.no':'No.', 'pay.worker':'Worker Name',
     'pay.capBy':'CAPACITY COMPLETED (SEEDLINGS)', 'pay.totalEarn':'Total Earned (RM)',
+    'pay.capShort':'Capacity', 'pay.rmShort':'RM',
     'pay.grandTotal':'GRAND TOTAL',
     'pay.preparedBy':'Prepared by', 'pay.checkedBy':'Checked by', 'pay.approvedBy':'Approved by',
     'btn.claimPdf':'⬇ Salary Claim Form (PDF)',
@@ -980,6 +1024,7 @@ const I18N = {
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
+    'pay.capShort':'Kapasiti', 'pay.rmShort':'RM',
     'pay.grandTotal':'JUMLAH BESAR',
     'pay.preparedBy':'Disediakan oleh', 'pay.checkedBy':'Disemak oleh', 'pay.approvedBy':'Diluluskan oleh',
     'btn.claimPdf':'⬇ Borang Tuntutan Gaji (PDF)',
