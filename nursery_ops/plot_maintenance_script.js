@@ -2063,21 +2063,19 @@ function pillCls(jenis) {
 /* ════════════════════════════════════════════════════════════════
    PLOT QUANTITY — linked to the Nursery Movement Report
    ────────────────────────────────────────────────────────────────
-   A work record's Quantity is the live seedling count standing in its
-   plot on the date the work was done. It is derived from the batch
-   report the same way operation_reports.html builds the movement
-   report, so the two always agree:
+   A work record's Quantity is the seedling count standing in its plot
+   on the date the work was done:
 
      per (plot, batch)  →  closing balance as at the record's date
-                           − any 2nd culling not yet counted by then
 
-   Why the second term: closing already deducts a 2nd culling once that
-   culling has been recorded. Subtracting the full 2nd-cull figure on top
-   would remove it twice for work done after the cull. Taking only the
-   part dated AFTER the record removes the dead seedlings exactly once,
-   whether the work happened before or after the culling was keyed —
-   which is the rule "closing balance − 2nd culled quantity" in both
-   directions.
+   That is the Closing column of the Nursery Movement Report for the
+   same plot, batch and date, so the two can be checked against each
+   other directly — B1 / 237 on 20 Apr 2026 reads 870 in both.
+
+   Closing is already net of 2nd culling (and 1st, 3rd, damaged and
+   sold) up to that date. Nothing is deducted on top: a culling dated
+   after the work had not happened yet when the work was done, so those
+   seedlings were still standing and still had to be sprayed.
 
    A blank Batch on the record means every batch standing in that plot,
    summed. Listing batches ("234, 237, 241") restricts it to those.
@@ -2213,15 +2211,16 @@ function linkedPlotQty(plot, batchStr, tarikh) {
   for (const ev of _mvEvents) {
     if (ev.plotKey !== pk) continue;
     if (wanted.length && !wanted.includes(ev.batchKey)) continue;
-    const b = (per[ev.batchKey] ||= { closing: 0, cull2After: 0, label: ev.batch });
+    const b = (per[ev.batchKey] ||= { closing: 0, label: ev.batch });
+    // Only movement up to the work date counts — anything dated later had
+    // not happened yet, so those seedlings were still standing.
     if (ev.ms <= cutoff) b.closing += _mvSigned(ev.type, ev.qty);
-    else if (ev.type === '2nd_Culling') b.cull2After += Math.abs(ev.qty);
   }
 
   const keys = Object.keys(per);
   if (!keys.length) return null;
   let raw = 0;
-  keys.forEach(k => { raw += per[k].closing - per[k].cull2After; });
+  keys.forEach(k => { raw += per[k].closing; });
   return {
     qty: Math.max(0, Math.round(raw)),
     raw: Math.round(raw),
@@ -2252,7 +2251,7 @@ function _qtyCell(r) {
     ? `all batches in plot ${r.plot}`
     : `batch ${i.batches.join(', ')}`;
   const when = i.asOf ? `as at ${i.asOf}` : 'standing today (no date keyed)';
-  const tip = `Linked from the batch report — ${scope}, ${when}. Closing balance less 2nd culled. Key a number here to override.`;
+  const tip = `Linked from the batch report — ${scope}, ${when}. This is the Nursery Movement Report's closing balance for the same plot, batch and date. Key a number here to override.`;
   return `<span class="qty-linked" title="${tip.replace(/"/g, '&quot;')}">🔗 ${txt}</span>`;
 }
 
@@ -2421,7 +2420,7 @@ function refreshLinkedQty() {
     : `🔗 Linked value is <b>${link.qty.toLocaleString()}</b> — your keyed ${Number(typed).toLocaleString()} overrides it`;
   const warn = link.raw < 0
     ? `<br><span style="color:#a83020;">Batch report nets to ${link.raw.toLocaleString()} here — check that plot's records.</span>` : '';
-  box.innerHTML = `${head}<br>${scope}, ${when} · closing balance less 2nd culled${warn}`;
+  box.innerHTML = `${head}<br>${scope}, ${when} · movement report closing balance${warn}`;
 }
 function closeRecModal(){ document.getElementById('rec-modal').classList.remove('open'); }
 function editRec(id){ const r=records.find(x=>x.id===id); if(_recLocked(r)) return _denyLocked(); openRecModal(r); }
