@@ -359,3 +359,15 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 #tab-calc .calc-result-card .lbl{font-size:14px !important;}
 #tab-calc .calc-result-card .val{font-size:30px !important;}
 #tab-calc .calc-result-card .val[style*="font-size:16px"]{font-size:22px !important;}
+
+/* ─── MONTHLY PAYROLL — breathing room + column alignment ─── */
+#tab-payroll .card{margin:0 6px;}
+#tab-payroll .tbl-wrap{padding:0 10px 10px;}
+#tab-payroll .sched-table{margin-top:0;}
+/* Footer totals sit in real columns (no colspan), so centre them like the body
+   and keep the row labels left-aligned. */
+#tab-payroll .sched-table tfoot td{text-align:center;vertical-align:middle;}
+#tab-payroll .sched-table tfoot td.th-left{text-align:left;white-space:nowrap;padding-left:16px;}
+#tab-payroll .sched-table thead th{padding:10px 8px;font-size:11px;}
+#tab-payroll .sched-table tbody td{padding:8px 8px;}
+#tab-payroll .check-td{padding:8px 6px;}

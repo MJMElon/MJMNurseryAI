@@ -392,12 +392,16 @@ function renderPayroll() {
   // Total capacity = the sum of every worker's earned capacity.
   const grand = wk.reduce((sum, w) => sum + totals[w], 0);
   h += `</tbody><tfoot>
-    <tr class="jumlah-tr"><td colspan="2">${t('pay.totalCap')}</td><td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
+    <tr class="jumlah-tr">
+      <td class="th-left">${t('pay.totalCap')}</td><td></td>
+      <td>${capTotal ? capTotal.toLocaleString() : '—'}</td>
       ${wk.map(w => `<td>${Math.round(totals[w]).toLocaleString()}</td>`).join('')}
       <td>${Math.round(grand).toLocaleString()}</td></tr>
-    <tr class="jumlah-tr"><td colspan="3">${t('pay.rate')}</td>
+    <tr class="jumlah-tr">
+      <td class="th-left">${t('pay.rate')}</td><td></td><td></td>
       ${wk.map(() => `<td>${rateTxt}</td>`).join('')}<td></td></tr>
-    <tr class="jumlah-tr"><td colspan="3">${t('pay.totalRM')}</td>
+    <tr class="jumlah-tr">
+      <td class="th-left">${t('pay.totalRM')}</td><td></td><td></td>
       ${wk.map(w => `<td>${rate ? (totals[w] * rate).toFixed(2) : '0.00'}</td>`).join('')}
       <td>${rate ? (grand * rate).toFixed(2) : '0.00'}</td></tr>
   </tfoot>`;
