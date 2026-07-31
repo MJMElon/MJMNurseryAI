@@ -514,7 +514,7 @@ function downloadPayrollPDF() {
   // Each work type shows the capacity done AND what it earned, so it takes a
   // pair of columns:
   //   No | Worker | (Cap|RM) ×4 | Total  →  8 + 32 + 4×(14+11) + 20 = 160 mm
-  const C_NO = 8, C_NAME = 32, C_CAP = 13, C_RM = 12, C_TOTAL = 20;
+  const C_NO = 7, C_NAME = 30, C_CAP = 11, C_RM = 15, C_TOTAL = 19;
   const COL = [C_NO, C_NAME,
                C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM, C_CAP, C_RM,
                C_TOTAL];
@@ -579,13 +579,13 @@ function downloadPayrollPDF() {
 
     // Two-row header: work type on top, its Capacity / RM pair underneath.
     const H1 = 9, H2 = 7;
-    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, size: 8, fill: HEAD_FILL });
+    cell(colX[0], y, COL[0], H1 + H2, t('pay.no'),     { bold: true, size: 8, nowrap: true, fill: HEAD_FILL });
     cell(colX[1], y, COL[1], H1 + H2, t('pay.worker'), { bold: true, size: 8.5, fill: HEAD_FILL });
     TYPES.forEach((ty, i) => {
       const c = PAIR(i);
       cell(colX[c], y, COL[c] + COL[c + 1], H1, t(PAYROLL_TYPES[ty].label), { bold: true, size: 7.5, fill: HEAD_FILL });
-      cell(colX[c],     y + H1, COL[c],     H2, t('pay.capShort'), { bold: true, size: 6.5, fill: HEAD_FILL });
-      cell(colX[c + 1], y + H1, COL[c + 1], H2, t('pay.rmShort'),  { bold: true, size: 6.5, fill: HEAD_FILL });
+      cell(colX[c],     y + H1, COL[c],     H2, t('pay.capShort'), { bold: true, size: 6.5, nowrap: true, fill: HEAD_FILL });
+      cell(colX[c + 1], y + H1, COL[c + 1], H2, t('pay.rmShort'),  { bold: true, size: 6.5, nowrap: true, fill: HEAD_FILL });
     });
     cell(colX[I_TOTAL], y, COL[I_TOTAL], H1 + H2, t('pay.totalEarn'), { bold: true, size: 7.5, fill: HEAD_FILL });
     y += H1 + H2;
@@ -621,7 +621,9 @@ function downloadPayrollPDF() {
   }
 
   const fmtCap = v => v ? Math.round(v).toLocaleString() : '—';
-  const fmtRM  = v => v ? v.toFixed(2) : '—';
+  // Currency in front of every money figure so a column of bare numbers is
+  // never mistaken for a capacity.
+  const fmtRM  = v => v ? `RM ${v.toFixed(2)}` : '—';
 
   wk.forEach((w, i) => {
     if (y + ROW_H > PH - MARGIN - FOOTER_RESERVE) { doc.addPage(); page++; y = drawHeader(page); }
@@ -688,15 +690,29 @@ function nurseryRates(n) {
    change what workers get paid. Kept in nops_maint_rate_lock. */
 let rateLocks = { PN: false, BNN: false, UNN1: false, UNN2: false };
 const rateLocked = n => !!rateLocks[n];
+/* Set when the piece-rate table could not be read — almost always because
+   migration section 8 (the per-nursery `nursery` column) has not been run.
+   Without this the load returned nothing and a missing migration was
+   indistinguishable from "no rates saved yet". */
+let _rateLoadErr = null;
 
 /* Typing edits a draft, not the live rates — nothing reaches the database or
    the payroll until Save & Lock is pressed. */
 let _rateDraft = null;   // { nursery, values:{code:number|null} }
 
+/* Re-seed the draft from the saved rates unless the user has actually typed
+   into it for this nursery.
+
+   This has to be keyed on "has been touched", not just "same nursery". The
+   page renders once at boot (applyLang → renderAll) BEFORE the Supabase load
+   returns, so the draft used to be seeded from empty rates and then never
+   refreshed when the real ones arrived — the boxes stayed blank however many
+   times they had been saved, and pressing Save & Lock wrote those blanks back
+   over the real rates. */
 function _seedRateDraft(n, force) {
-  if (force || !_rateDraft || _rateDraft.nursery !== n) {
+  if (force || !_rateDraft || _rateDraft.nursery !== n || !_rateDraft.touched) {
     const rates = nurseryRates(n);
-    _rateDraft = { nursery: n, values: {} };
+    _rateDraft = { nursery: n, touched: false, values: {} };
     PIECE_RATE_TYPES.forEach(rt => { _rateDraft.values[rt.code] = rates[rt.code] ?? null; });
   }
   return _rateDraft;
@@ -711,7 +727,9 @@ function renderSettingRates() {
   const box = document.getElementById('setting-rate-list');
   if (!box) return;
   const n = getNursery();
-  const locked = rateLocked(n);
+  // Freeze the boxes when the saved rates could not be read — they would look
+  // blank, and saving that would wipe real rates.
+  const locked = rateLocked(n) || !!_rateLoadErr;
   const d = _seedRateDraft(n);
 
   box.innerHTML = PIECE_RATE_TYPES.map(rt => `
@@ -732,6 +750,15 @@ function renderRateActions() {
   const bar = document.getElementById('setting-rate-actions');
   if (!bar) return;
   const n = getNursery();
+  if (_rateLoadErr) {
+    bar.innerHTML = `<span style="font-size:11.5px;font-weight:600;color:#a83020;line-height:1.5;">
+      ⚠️ Saved piece rates could not be read, so these boxes may be blank even though rates were saved.
+      Saving now would overwrite them.<br>
+      <span style="font-weight:500;color:var(--text-muted);">${_rateLoadErr}</span><br>
+      Run section 8 of <code>shared/migration_nops_maintenance.sql</code> in Supabase, then reload.
+    </span>`;
+    return;
+  }
   if (rateLocked(n)) {
     bar.innerHTML = `
       <span style="font-size:12px;font-weight:700;color:var(--green-text);">🔒 ${t('rate.lockedMsg')}</span>
@@ -752,6 +779,7 @@ function onRateInput(code, val) {
   const d = _seedRateDraft(n);
   const raw = String(val ?? '').trim();
   d.values[code] = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
+  d.touched = true;             // from here the draft outranks a re-render
   renderRateActions();          // only the bar — retyping must not lose focus
 }
 
@@ -760,6 +788,14 @@ async function savePieceRates() {
   const n = getNursery();
   if (!isNopsAdmin) { alert('Only an administrator can change piece rates.'); return; }
   if (rateLocked(n)) return;
+  // Never write before the saved rates have arrived — otherwise a save made
+  // during startup would push empty boxes over real values.
+  if (_supabase && !_dbReady) { alert('Still loading the saved rates — try again in a moment.'); return; }
+  if (_rateLoadErr) {
+    alert('The saved piece rates could not be read, so saving now would overwrite them with blanks.\n\n' +
+          _rateLoadErr + '\n\nRun section 8 of shared/migration_nops_maintenance.sql in Supabase, then reload.');
+    return;
+  }
   const d = _seedRateDraft(n);
   const rates = nurseryRates(n);
   PIECE_RATE_TYPES.forEach(rt => { rates[rt.code] = d.values[rt.code] ?? null; });
@@ -785,11 +821,19 @@ async function savePieceRates() {
       // A missing lock table must not lose the rates that just saved.
       if (lockErr) console.warn('[maint] rate lock save failed:', lockErr.message);
     } catch (e) {
-      alert('Could not save the piece rates: ' + (e.message || e) + '\n\nNothing was locked — try again.');
+      const msg = e.message || String(e);
+      // 42P10 / "no unique or exclusion constraint" and "column ... does not
+      // exist" both mean the same thing: migration section 8 has not been run.
+      const needsMigration = /nursery/i.test(msg) && /(column|constraint|conflict)/i.test(msg);
+      alert('Could not save the piece rates.\n\n' + msg +
+            (needsMigration
+              ? '\n\nThis nursery column is added by section 8 of shared/migration_nops_maintenance.sql. Run that in the Supabase SQL editor, then save again.'
+              : '\n\nNothing was locked — try again.'));
       return;
     }
   }
   rateLocks[n] = true;
+  _seedRateDraft(n, true);      // draft now matches what is stored
   renderSettingRates(); renderPayroll();
   alert(`Piece rates saved and locked for ${NURSERY_NAMES[n]}.`);
 }
@@ -947,7 +991,7 @@ const I18N = {
     /* Salary claim form (PDF) */
     'pay.no':'No.', 'pay.worker':'Worker Name',
     'pay.capBy':'CAPACITY COMPLETED (SEEDLINGS)', 'pay.totalEarn':'Total Earned (RM)',
-    'pay.capShort':'Capacity', 'pay.rmShort':'RM',
+    'pay.capShort':'Capacity', 'pay.rmShort':'Earned',
     'pay.grandTotal':'GRAND TOTAL',
     'pay.preparedBy':'Prepared by', 'pay.checkedBy':'Checked by', 'pay.approvedBy':'Approved by',
     'btn.claimPdf':'⬇ Salary Claim Form (PDF)',
@@ -1024,7 +1068,7 @@ const I18N = {
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
-    'pay.capShort':'Kapasiti', 'pay.rmShort':'RM',
+    'pay.capShort':'Kapasiti', 'pay.rmShort':'Diperoleh',
     'pay.grandTotal':'JUMLAH BESAR',
     'pay.preparedBy':'Disediakan oleh', 'pay.checkedBy':'Disemak oleh', 'pay.approvedBy':'Diluluskan oleh',
     'btn.claimPdf':'⬇ Borang Tuntutan Gaji (PDF)',
@@ -3604,6 +3648,10 @@ async function initDb() {
     _mergeCustomPlots();
     // Rates saved before they were per-nursery have no nursery column — apply
     // those to every nursery so nothing already keyed in disappears.
+    if (prRes && prRes.error) {
+      _rateLoadErr = prRes.error.message || String(prRes.error);
+      console.warn('[maint] piece rates could not be read:', _rateLoadErr);
+    }
     ((prRes && prRes.data) || []).forEach(r => {
       const targets = r.nursery ? [r.nursery] : Object.keys(pieceRates);
       targets.forEach(n => { nurseryRates(n)[r.work_type] = r.rate; });
