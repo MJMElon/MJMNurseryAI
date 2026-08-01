@@ -995,6 +995,18 @@ function persistState(n, m) {
   }
 }
 
+/* Ticks used to live only in this browser's memory until someone pressed
+   "Save Schedule". A tick looks like it did something — the box turns green —
+   so it was routinely lost on closing the tab, and nobody else ever saw it.
+   Every change to the schedule now writes itself, debounced so a run of ticks
+   is one request. "Save Schedule" still publishes the flat task list for the
+   worker app and takes the snapshot the "modified" highlight compares against. */
+let _stateSaveTimer = null;
+function persistStateSoon(n, m) {
+  clearTimeout(_stateSaveTimer);
+  _stateSaveTimer = setTimeout(() => persistState(n, m), 700);
+}
+
 /* Load a saved state for a nursery+month.
    Returns null → getState() falls back to defaults/seed.
    TODO(supabase): fetch row by (nursery, month); return its JSON or null.
@@ -1819,8 +1831,9 @@ function updatePDChem(w,f,v){
   else if (f === 'P_sticker') cfg.P_sticker_unit = getUnitForChem(v);
   else if (f === 'D_sticker') cfg.D_sticker_unit = getUnitForChem(v);
   renderPD();
+  persistStateSoon(getNursery(), getMonth());
 }
-function updatePDDose(w,f,v){ if(!canEditSchedule) return; getState(getNursery(),getMonth()).pdConfig[w][f]=v; renderPD(); }
+function updatePDDose(w,f,v){ if(!canEditSchedule) return; getState(getNursery(),getMonth()).pdConfig[w][f]=v; renderPD(); persistStateSoon(getNursery(), getMonth()); }
 
 function renderPD() {
   const n=getNursery(), m=getMonth(), s=getState(n,m), cfg=s.pdConfig, plots=NURSERY_PLOTS[n];
@@ -1916,6 +1929,7 @@ function togPD(n,m,w,plot,type,el){
   s.pd[w][plot][type]=!s.pd[w][plot][type];
   renderPD();          // full re-render so 'modified' class updates correctly
   autoSyncRecords();
+  persistStateSoon(n, m);
 }
 
 function toggleAllPD(w, type){
@@ -1929,6 +1943,7 @@ function toggleAllPD(w, type){
   });
   renderPD();
   autoSyncRecords();
+  persistStateSoon(n, m);
 }
 
 /* Saved-state snapshot for highlighting modifications after save */
@@ -1949,11 +1964,13 @@ function updateManuringChem(ri, ci, v){
   cfg.name = v;
   cfg.unit = getUnitForChem(v);
   renderManuring();
+  persistStateSoon(getNursery(), getMonth());
 }
 function updateManuringDose(ri, ci, v){
   if(!canEditSchedule) return;
   getState(getNursery(),getMonth()).manuringConfig[ri][ci].dose = v;
   renderManuring();
+  persistStateSoon(getNursery(), getMonth());
 }
 function addManuringRound(){
   if(!canEditSchedule) return;
@@ -2125,6 +2142,7 @@ function togManuring(n,m,plot,ri,ci,el){
   s.manuring[plot][ri][ci] = !s.manuring[plot][ri][ci];
   renderManuring();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 
 function toggleAllManuring(ri, ci){
@@ -2139,6 +2157,7 @@ function toggleAllManuring(ri, ci){
   });
   renderManuring();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 
 /* ════════════════════════════
@@ -2184,6 +2203,7 @@ function togWeeding(n,m,plot,r,el){
   el.classList.toggle('ticked',s.weeding[plot][r]);
   renderWeeding();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 function toggleAllWeeding(r){
   if(!canEditSchedule) return;
@@ -2196,6 +2216,7 @@ function toggleAllWeeding(r){
   });
   renderWeeding();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 
 /* ════════════════════════════
@@ -2207,11 +2228,13 @@ function updateInterrowChem(ri, ci, v){
   cfg.chem = v;
   cfg.chem_unit = getUnitForChem(v);
   renderInterrow();
+  persistStateSoon(getNursery(), getMonth());
 }
 function updateInterrowDose(ri, ci, f, v){
   if(!canEditSchedule) return;
   getState(getNursery(),getMonth()).interrowConfig[ri][ci][f] = v;
   renderInterrow();
+  persistStateSoon(getNursery(), getMonth());
 }
 function addInterrowRound(){
   if(!canEditSchedule) return;
@@ -2234,6 +2257,7 @@ function removeInterrowRound(){
   });
   renderInterrow();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 function addInterrowCol(ri){
   if(!canEditSchedule) return;
@@ -2257,6 +2281,7 @@ function removeInterrowCol(ri){
   });
   renderInterrow();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 
 function renderInterrow() {
@@ -2389,6 +2414,7 @@ function togInterrow(n,m,plot,ri,ci,el){
   s.interrow[plot][ri][ci] = !s.interrow[plot][ri][ci];
   renderInterrow();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 function toggleAllInterrow(ri, ci){
   if(!canEditSchedule) return;
@@ -2402,6 +2428,7 @@ function toggleAllInterrow(ri, ci){
   });
   renderInterrow();
   autoSyncRecords();
+  persistStateSoon(getNursery(), getMonth());
 }
 
 /* ════════════════════════════
