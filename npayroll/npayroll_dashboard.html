@@ -10,7 +10,7 @@
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=1">
+<link rel="stylesheet" href="npayroll_styles.css?v=2">
 </head>
 <body>
 
@@ -133,12 +133,12 @@
     <div class="bar">
       <div>
         <div class="bar-title">Worker System</div>
-        <div class="bar-sub">Every worker, filed under their section.</div>
+        <div class="bar-sub">Every worker, filed under their section. Add a worker from their own
+          section below and the section is already filled in.</div>
       </div>
       <div class="bar-actions">
         <label class="chk"><input type="checkbox" id="w-show-inactive" onchange="renderWorkers()"> Show inactive</label>
         <input type="text" id="w-search" class="sel" placeholder="Search name or role…" oninput="renderWorkers()">
-        <button class="btn btn-primary" onclick="openWorker()">+ Add Worker</button>
       </div>
     </div>
     <div id="worker-sections"></div>
@@ -173,9 +173,11 @@
     <div class="modal-body">
       <div class="frow"><label>Name *</label><input type="text" id="wf-name" placeholder="e.g. Asriawan"></div>
       <div class="grid2">
-        <div class="frow"><label>Section *</label><select id="wf-section"></select></div>
+        <div class="frow"><label>Section *</label>
+          <select id="wf-section" onchange="onWorkerSectionChange()"></select></div>
         <div class="frow"><label>Role</label><input type="text" id="wf-role" placeholder="e.g. Sprayer, Driver"></div>
       </div>
+      <div class="fhint" id="wf-section-hint"></div>
       <div class="grid2">
         <div class="frow"><label>Worker No.</label><input type="text" id="wf-no" placeholder="optional"></div>
         <div class="frow"><label>Status</label>
@@ -246,6 +248,6 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=2"></script>
+<script src="npayroll_script.js?v=3"></script>
 </body>
 </html>

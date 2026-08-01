@@ -114,13 +114,21 @@ function renderWorkers() {
           ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="removeWorker(${w.id})">Remove</button>` : ''}
         </td>
       </tr>`).join('')
-      : `<tr><td colspan="5" class="empty">No worker in this section yet.</td></tr>`;
+      // While a search is running an empty section means "nothing matched",
+      // not "nobody works here" — offering to add someone there would be wrong.
+      : q
+        ? `<tr><td colspan="5" class="empty">No match in this section.</td></tr>`
+        : `<tr><td colspan="5" class="empty">No worker in this section yet.
+             <button class="btn btn-sm wsec-add-inline" onclick="openWorker(null,'${sec.code}')"
+                     >+ Add to ${esc(sec.code)}</button></td></tr>`;
 
     return `
       <div class="wsec">
         <div class="wsec-head">
           <span class="wsec-name">${esc(sec.name)}</span>
           <span class="wsec-count">${list.length} worker${list.length === 1 ? '' : 's'}</span>
+          <button class="btn btn-sm wsec-add" onclick="openWorker(null,'${sec.code}')"
+                  title="Add a worker to ${esc(sec.name)}">+ Add Worker</button>
         </div>
         <div class="wsec-body"><div class="tbl-wrap"><table>
           <thead><tr><th style="width:44px;">No.</th><th class="l">Name</th><th class="l">Role</th>
@@ -139,18 +147,33 @@ function fillSectionSelect(el, includeAll, selected) {
 }
 
 let editWorkerId = null;
-function openWorker(id) {
+/* `section` is the section the button was pressed in. Every section heads its
+   own Add Worker button, so the section is known before the form opens and
+   nobody has to remember to change it — filing a Batu Niah sprayer under PN
+   because the form opened on PN is the mistake this removes. It stays a
+   select so a worker can still be moved. */
+function openWorker(id, section) {
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const w = id ? workers.find(x => x.id === id) : null;
   editWorkerId = w ? w.id : null;
-  $('worker-modal-title').textContent = w ? 'Edit Worker' : 'Add Worker';
-  fillSectionSelect($('wf-section'), false, w?.section || 'BNN');
+  fillSectionSelect($('wf-section'), false, w?.section || section || SECTIONS[0].code);
+  onWorkerSectionChange();               // titles the modal with that section
   $('wf-name').value   = w?.full_name || '';
   $('wf-role').value   = w?.role || '';
   $('wf-no').value     = w?.worker_no || '';
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
   $('wf-remark').value = w?.remark || '';
   $('worker-modal').classList.add('open');
+  $('wf-name').focus();
+}
+
+/* Keep the modal saying, in words, where this worker is about to be filed —
+   in the title and under the select, so it is read either way. */
+function onWorkerSectionChange() {
+  const code  = $('wf-section').value;
+  const label = SECTION_NAME[code] || code;
+  $('worker-modal-title').textContent = `${editWorkerId ? 'Edit' : 'Add'} Worker — ${label}`;
+  $('wf-section-hint').textContent = `Filed under ${label}.`;
 }
 
 async function saveWorker() {
