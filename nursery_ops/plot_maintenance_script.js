@@ -970,7 +970,21 @@ let _dbReady     = false; // guards writes until the initial DB load lands
    DB call will drop in (marked TODO(supabase)). The editable state already
    lives in `appState`, so nothing is lost within a session.
 ════════════════════════════ */
-function stateKey(n, m) { return `${n}_${m}`; }   // future DB row id (nursery+month)
+function stateKey(n, m) { return `${n}_${m}`; }
+
+/* Tell the user when the schedule on screen was carried forward from an
+   earlier month and has not been saved for this one yet — otherwise a full
+   sheet looks like it was already set up for this month. */
+function updateCarryNotice() {
+  const box = document.getElementById('carry-notice');
+  if (!box) return;
+  const n = getNursery(), m = getMonth();
+  const from = appState[n]?.[m]?._carriedFrom;
+  if (!from) { box.style.display = 'none'; box.textContent = ''; return; }
+  box.style.display = '';
+  box.innerHTML = `↩️ Carried forward from <b>${from}</b> — this is last month's schedule. ` +
+                  `Change anything and it saves as <b>${m}</b>'s own.`;
+}   // future DB row id (nursery+month)
 
 /* Persist the editable state for one nursery+month.
    TODO(supabase): upsert row (nursery, month) with the fields below. */
@@ -988,6 +1002,9 @@ function persistState(n, m) {
     _savedPd:       s._savedPd,
   };
   dbStateCache[stateKey(n, m)] = JSON.parse(JSON.stringify(_payload));
+  delete s._carriedFrom;          // it is this month's own schedule now
+  s._touched = true;              // survives the post-load reset below
+  updateCarryNotice();
   if (_supabase) {
     _supabase.from('nops_maint_state')
       .upsert({ nursery: n, month: m, payload: _payload, updated_at: new Date().toISOString() }, { onConflict: 'nursery,month' })
@@ -1005,6 +1022,33 @@ let _stateSaveTimer = null;
 function persistStateSoon(n, m) {
   clearTimeout(_stateSaveTimer);
   _stateSaveTimer = setTimeout(() => persistState(n, m), 700);
+}
+
+/* Sortable key for a "Aug 2026" month label — 202608. */
+function monthOrder(label) {
+  const m = String(label || '').trim().match(/^([A-Za-z]{3})\s+(\d{4})$/);
+  if (!m) return null;
+  const i = MONTHS_SHORT.indexOf(m[1].slice(0, 1).toUpperCase() + m[1].slice(1, 3).toLowerCase());
+  return i < 0 ? null : Number(m[2]) * 100 + (i + 1);
+}
+
+/* The most recent month BEFORE this one that has a saved schedule.
+   A new month starts from the last one that was set rather than blank: tick
+   July and save it, and August opens showing July's schedule. Change August
+   and save, and September then starts from August, not July. Going back to an
+   earlier month never inherits from a later one. */
+function carryForwardFrom(n, month) {
+  const want = monthOrder(month);
+  if (want == null) return null;
+  let best = null, bestOrd = -1;
+  Object.keys(dbStateCache).forEach(k => {
+    if (!k.startsWith(n + '_')) return;
+    const lbl = k.slice(n.length + 1);
+    const ord = monthOrder(lbl);
+    if (ord == null || ord >= want) return;      // strictly earlier only
+    if (ord > bestOrd) { bestOrd = ord; best = lbl; }
+  });
+  return best;
 }
 
 /* Load a saved state for a nursery+month.
@@ -1238,6 +1282,24 @@ function getState(nursery, month) {
       appState[nursery][month] = persisted;
       return appState[nursery][month];
     }
+    // Nothing saved for this month — start from the last month that was set,
+    // so a new month opens with the schedule already in place rather than
+    // blank. It stays a copy: nothing is written until someone ticks or saves,
+    // and the month it came from is untouched.
+    const from = carryForwardFrom(nursery, month);
+    if (from) {
+      const inherited = loadPersistedState(nursery, from);   // already a deep copy
+      if (inherited) {
+        migrateManuringShape(inherited, NURSERY_PLOTS[nursery]);
+        migrateInterrowShape(inherited, NURSERY_PLOTS[nursery]);
+        // Snapshot what was carried in, so nothing shows as "modified" until
+        // this month is actually changed.
+        inherited._savedPd = JSON.parse(JSON.stringify(inherited.pd || {}));
+        inherited._carriedFrom = from;
+        appState[nursery][month] = inherited;
+        return appState[nursery][month];
+      }
+    }
     const plots = NURSERY_PLOTS[nursery];
     const s = {
       pdConfig:       defaultPDConfig(),
@@ -1432,6 +1494,7 @@ function renderAll() {
     if (el) el.textContent = bigHdr;
   });
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
+  updateCarryNotice();
   // Re-render analytics when its sub-view inside Work Record is showing
   const chartView = document.getElementById('recview-chart');
   if (chartView && chartView.classList.contains('active')) renderCharts();
@@ -3699,7 +3762,16 @@ async function initDb() {
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
-      if (appState[r.nursery]) delete appState[r.nursery][r.month]; // rebuild from DB
+    });
+    // The page renders once before this load returns, so the open month already
+    // holds a blank state built when the cache was empty. Drop every month that
+    // has not actually been edited yet, so each is rebuilt from what the
+    // database now holds — its own saved schedule, or the one carried forward
+    // from the last month that was set. Anything edited in the meantime stays.
+    Object.keys(appState).forEach(n => {
+      Object.keys(appState[n] || {}).forEach(m => {
+        if (!appState[n][m] || !appState[n][m]._touched) delete appState[n][m];
+      });
     });
     if (recRes.data && Array.isArray(recRes.data.records) && recRes.data.records.length) {
       records = recRes.data.records;
