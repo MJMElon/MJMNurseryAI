@@ -385,7 +385,7 @@ function renderPayroll() {
   let h = `<thead>
     <tr><th class="wk-th" colspan="${3 + wk.length + 1}">${t(cfg.label)}</th></tr>
     <tr>
-      ${payTh(t('pay.date'), 92, 'th-left')}
+      ${payTh(t('pay.date'), 92)}
       ${payTh(t('pay.plot'), 64)}
       ${payTh(t('pay.plotCap'), 108)}
       ${wk.map(w => payTh(w, 108)).join('')}
@@ -408,7 +408,7 @@ function renderPayroll() {
       ticked.forEach(w => { totals[w] += share; });
       capTotal += cap;
       h += `<tr>
-        <td class="th-left" style="font-weight:600;">${_tarikhDisplay(r.tarikh)}</td>
+        <td style="font-weight:600;white-space:nowrap;">${_tarikhDisplay(r.tarikh)}</td>
         <td class="plot-td">${r.plot}</td>
         <td>${cap ? cap.toLocaleString() : '—'}</td>
         ${wk.map(w => `<td class="check-td${cells[w] ? ' ticked' : ''}" onclick="togglePayrollTick(${r.id},'${String(w).replace(/'/g, "\\'")}')" title="${w}"></td>`).join('')}
