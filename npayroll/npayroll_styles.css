@@ -180,7 +180,12 @@ tfoot td.l { text-align: left; }
 .frow input:focus, .frow select:focus, .frow textarea:focus {
   border-color: var(--ink); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
 .frow input[readonly] { background: #f8fafc; color: var(--text-muted); }
-.fhint { font-size: 11px; font-weight: 700; color: var(--ink-dark); background: var(--ink-light);
-         border-radius: 7px; padding: 6px 10px; margin: -4px 0 13px; }
+.fhint { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700;
+         color: var(--ink-dark); background: var(--ink-light); border-radius: 7px;
+         padding: 7px 11px; margin: 0 0 15px; }
+.fhint-btn { margin-left: auto; font-family: inherit; font-size: 10px; font-weight: 900;
+             letter-spacing: .06em; color: var(--ink-dark); background: var(--white);
+             border: 1.5px solid var(--ink-mid); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+.fhint-btn:hover { background: var(--ink-mid); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }

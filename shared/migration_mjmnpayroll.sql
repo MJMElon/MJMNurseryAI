@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_piece_rates (
   unit        TEXT,                              -- beg | tray | pokok | hari …
   rate        NUMERIC(12,4) NOT NULL DEFAULT 0,  -- RM per unit
   category    TEXT,                              -- transplanting | seedlings | maintenance | other
+  group_code  TEXT,                              -- MN | PN | Machinery
   active      BOOLEAN NOT NULL DEFAULT true,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ DEFAULT now(),
@@ -61,7 +62,8 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_piece_rates (
   updated_by  TEXT
 );
 
-CREATE INDEX IF NOT EXISTS mjmnpayroll_piece_rates_cat_idx ON mjmnpayroll_piece_rates (category);
+CREATE INDEX IF NOT EXISTS mjmnpayroll_piece_rates_cat_idx   ON mjmnpayroll_piece_rates (category);
+CREATE INDEX IF NOT EXISTS mjmnpayroll_piece_rates_group_idx ON mjmnpayroll_piece_rates (group_code);
 
 -- ── 3. Work entries ─────────────────────────────────────────────
 --    What each worker did, for the sheets that are keyed here rather than

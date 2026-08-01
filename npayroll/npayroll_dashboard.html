@@ -10,7 +10,7 @@
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=2">
+<link rel="stylesheet" href="npayroll_styles.css?v=3">
 </head>
 <body>
 
@@ -149,13 +149,16 @@
     <div class="bar">
       <div>
         <div class="bar-title">Piece Rate</div>
-        <div class="bar-sub">What each job pays, per unit. Used by the payroll sheets.</div>
-      </div>
-      <div class="bar-actions">
-        <button class="btn btn-primary" onclick="openRate()">+ Add Job</button>
+        <div class="bar-sub">What each job pays, per unit, grouped MN · PN · Machinery.
+          Add a job from its own group below and the group is already filled in.</div>
       </div>
     </div>
-    <div class="card"><div class="tbl-wrap"><table id="rate-table"></table></div></div>
+    <div id="rate-setup" class="warn hidden">
+      <b>⚠️ Grouping is not switched on yet.</b>
+      Run <code>shared/fix_npayroll_rate_groups.sql</code> in the Supabase SQL Editor, then reload.
+      Jobs still save; they just cannot be filed under MN, PN or Machinery until then.
+    </div>
+    <div id="rate-groups"></div>
     <p class="foot-note">A rate is copied onto a work entry when it is keyed, so changing it here never restates a month already paid.</p>
   </section>
 
@@ -171,13 +174,16 @@
     <div class="modal-top"><div class="modal-title" id="worker-modal-title">Add Worker</div>
       <button class="modal-x" onclick="closeModal('worker-modal')">&times;</button></div>
     <div class="modal-body">
-      <div class="frow"><label>Name *</label><input type="text" id="wf-name" placeholder="e.g. Asriawan"></div>
-      <div class="grid2">
-        <div class="frow"><label>Section *</label>
-          <select id="wf-section" onchange="onWorkerSectionChange()"></select></div>
-        <div class="frow"><label>Role</label><input type="text" id="wf-role" placeholder="e.g. Sprayer, Driver"></div>
+      <!-- No section to fill in: it comes from the section the Add Worker
+           button was pressed in. Shown here only so it is never a surprise. -->
+      <div class="fhint">
+        <span id="wf-section-hint"></span>
+        <button type="button" class="fhint-btn hidden" id="wf-move-btn" onclick="showWorkerSectionSelect()">Move…</button>
       </div>
-      <div class="fhint" id="wf-section-hint"></div>
+      <div class="frow hidden" id="wf-section-row"><label>Move to section</label>
+        <select id="wf-section" onchange="onWorkerSectionChange()"></select></div>
+      <div class="frow"><label>Name *</label><input type="text" id="wf-name" placeholder="e.g. Asriawan"></div>
+      <div class="frow"><label>Role</label><input type="text" id="wf-role" placeholder="e.g. Sprayer, Driver"></div>
       <div class="grid2">
         <div class="frow"><label>Worker No.</label><input type="text" id="wf-no" placeholder="optional"></div>
         <div class="frow"><label>Status</label>
@@ -198,6 +204,13 @@
     <div class="modal-top"><div class="modal-title" id="rate-modal-title">Add Job</div>
       <button class="modal-x" onclick="closeModal('rate-modal')">&times;</button></div>
     <div class="modal-body">
+      <!-- Like a worker's section, the group comes from the button pressed. -->
+      <div class="fhint">
+        <span id="rf-group-hint"></span>
+        <button type="button" class="fhint-btn hidden" id="rf-move-btn" onclick="showRateGroupSelect()">Move…</button>
+      </div>
+      <div class="frow hidden" id="rf-group-row"><label>Move to group</label>
+        <select id="rf-group" onchange="onRateGroupChange()"></select></div>
       <div class="frow"><label>Job Description *</label><input type="text" id="rf-job" placeholder="e.g. Transplant seedling into polybag"></div>
       <div class="grid2">
         <div class="frow"><label>Unit</label><input type="text" id="rf-unit" placeholder="e.g. beg, tray, pokok"></div>
@@ -248,6 +261,6 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=3"></script>
+<script src="npayroll_script.js?v=4"></script>
 </body>
 </html>

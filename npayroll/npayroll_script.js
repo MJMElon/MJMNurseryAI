@@ -148,15 +148,17 @@ function fillSectionSelect(el, includeAll, selected) {
 
 let editWorkerId = null;
 /* `section` is the section the button was pressed in. Every section heads its
-   own Add Worker button, so the section is known before the form opens and
-   nobody has to remember to change it — filing a Batu Niah sprayer under PN
-   because the form opened on PN is the mistake this removes. It stays a
-   select so a worker can still be moved. */
+   own Add Worker button, so the section is known before the form opens — there
+   is no location to fill in, and no filing a Batu Niah sprayer under PN because
+   the form happened to open on PN. Editing can still move somebody, but that is
+   behind "Move…" rather than a field to answer every time. */
 function openWorker(id, section) {
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const w = id ? workers.find(x => x.id === id) : null;
   editWorkerId = w ? w.id : null;
   fillSectionSelect($('wf-section'), false, w?.section || section || SECTIONS[0].code);
+  $('wf-section-row').classList.add('hidden');
+  $('wf-move-btn').classList.toggle('hidden', !w);   // only an existing worker moves
   onWorkerSectionChange();               // titles the modal with that section
   $('wf-name').value   = w?.full_name || '';
   $('wf-role').value   = w?.role || '';
@@ -167,13 +169,21 @@ function openWorker(id, section) {
   $('wf-name').focus();
 }
 
-/* Keep the modal saying, in words, where this worker is about to be filed —
-   in the title and under the select, so it is read either way. */
+/* Keep the modal saying, in words, where this worker is filed — in the title
+   and again in the body, so it is read either way. */
 function onWorkerSectionChange() {
   const code  = $('wf-section').value;
   const label = SECTION_NAME[code] || code;
   $('worker-modal-title').textContent = `${editWorkerId ? 'Edit' : 'Add'} Worker — ${label}`;
   $('wf-section-hint').textContent = `Filed under ${label}.`;
+}
+
+/* Correcting a worker who ended up in the wrong section. Hidden until asked
+   for, so adding a worker never puts the question in front of anyone. */
+function showWorkerSectionSelect() {
+  $('wf-section-row').classList.remove('hidden');
+  $('wf-move-btn').classList.add('hidden');
+  $('wf-section').focus();
 }
 
 async function saveWorker() {
@@ -226,42 +236,101 @@ async function removeWorker(id) {
 const CAT_LABEL = { transplanting:'Transplanting', seedlings:'Seedlings Collection',
                     maintenance:'Work Maintenance', other:'Other', '':'Any sheet' };
 
-function renderRates() {
-  const rows = rates.length ? rates.map((r, i) => `
-    <tr>
-      <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
-      <td class="l" style="font-weight:700;color:var(--text-head);">${esc(r.job_desc)}</td>
-      <td>${esc(r.unit || '—')}</td>
-      <td class="money">${rateTxt(r.rate)}</td>
-      <td>${esc(CAT_LABEL[r.category || ''] || r.category)}</td>
-      <td><span class="pill ${r.active === false ? 'pill-off' : 'pill-on'}">${r.active === false ? 'Inactive' : 'Active'}</span></td>
-      <td class="r" style="white-space:nowrap;">
-        <button class="btn btn-sm" onclick="openRate(${r.id})">Edit</button>
-        ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="removeRate(${r.id})">Remove</button>` : ''}
-      </td>
-    </tr>`).join('')
-    : `<tr><td colspan="7" class="empty">No job yet — press “+ Add Job”.</td></tr>`;
+/* The three groups a job is filed under. A separate question from `category`
+   above, which says which sheet offers the job — a Main Nursery job can be a
+   transplanting job, so both are kept. */
+const RATE_GROUPS = [
+  { code:'MN',        name:'MN — Main Nursery' },
+  { code:'PN',        name:'PN — Pre Nursery'  },
+  { code:'Machinery', name:'Machinery'         }
+];
+const RATE_GROUP_NAME = Object.fromEntries(RATE_GROUPS.map(g => [g.code, g.name]));
+/* False until the group_code column exists — see loadRates. */
+let _rateGroupCol = true;
 
-  $('rate-table').innerHTML = `
-    <thead><tr>
-      <th style="width:44px;">No.</th><th class="l">Job Description</th><th style="width:110px;">Unit</th>
-      <th style="width:130px;">Piece Rate</th><th style="width:170px;">Used For</th>
-      <th style="width:100px;">Status</th><th style="width:150px;"></th>
-    </tr></thead><tbody>${rows}</tbody>`;
+function renderRates() {
+  const codes = RATE_GROUPS.map(g => g.code);
+  const ungrouped = rates.filter(r => !codes.includes(r.group_code));
+  // "Not grouped yet" is shown only when something is actually sitting in it,
+  // so a tidy list never carries an empty fourth block.
+  const blocks = RATE_GROUPS.concat(
+    ungrouped.length ? [{ code:'', name:'Not grouped yet' }] : []);
+
+  $('rate-groups').innerHTML = blocks.map(g => {
+    const list = g.code ? rates.filter(r => r.group_code === g.code) : ungrouped;
+    const rows = list.length ? list.map((r, i) => `
+      <tr>
+        <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
+        <td class="l" style="font-weight:700;color:var(--text-head);">${esc(r.job_desc)}</td>
+        <td>${esc(r.unit || '—')}</td>
+        <td class="money">${rateTxt(r.rate)}</td>
+        <td>${esc(CAT_LABEL[r.category || ''] || r.category)}</td>
+        <td><span class="pill ${r.active === false ? 'pill-off' : 'pill-on'}">${r.active === false ? 'Inactive' : 'Active'}</span></td>
+        <td class="r" style="white-space:nowrap;">
+          <button class="btn btn-sm" onclick="openRate(${r.id})">Edit</button>
+          ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="removeRate(${r.id})">Remove</button>` : ''}
+        </td>
+      </tr>`).join('')
+      : `<tr><td colspan="7" class="empty">No job in this group yet.${
+          g.code ? ` <button class="btn btn-sm wsec-add-inline" onclick="openRate(null,'${g.code}')"
+                            >+ Add to ${esc(g.code)}</button>` : ''}</td></tr>`;
+
+    return `
+      <div class="wsec">
+        <div class="wsec-head">
+          <span class="wsec-name">${esc(g.name)}</span>
+          <span class="wsec-count">${list.length} job${list.length === 1 ? '' : 's'}</span>
+          ${g.code ? `<button class="btn btn-sm wsec-add" onclick="openRate(null,'${g.code}')"
+                              title="Add a job to ${esc(g.name)}">+ Add Job</button>` : ''}
+        </div>
+        <div class="wsec-body"><div class="tbl-wrap"><table>
+          <thead><tr>
+            <th style="width:44px;">No.</th><th class="l">Job Description</th><th style="width:110px;">Unit</th>
+            <th style="width:130px;">Piece Rate</th><th style="width:170px;">Used For</th>
+            <th style="width:100px;">Status</th><th style="width:150px;"></th>
+          </tr></thead><tbody>${rows}</tbody>
+        </table></div></div>
+      </div>`;
+  }).join('');
 }
 
-let editRateId = null;
-function openRate(id) {
+let editRateId  = null;
+let rateGroup   = 'MN';
+/* `group` is the group whose Add Job button was pressed, so the group is
+   settled before the form opens — same as a worker's section. */
+function openRate(id, group) {
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const r = id ? rates.find(x => x.id === id) : null;
   editRateId = r ? r.id : null;
-  $('rate-modal-title').textContent = r ? 'Edit Job' : 'Add Job';
+  rateGroup  = (r && r.group_code) || group || RATE_GROUPS[0].code;
+  const label = RATE_GROUP_NAME[rateGroup] || rateGroup;
+  $('rate-modal-title').textContent = `${r ? 'Edit' : 'Add'} Job — ${label}`;
+  $('rf-group-hint').textContent = _rateGroupCol
+    ? `Filed under ${label}.`
+    : `Grouping is off until shared/fix_npayroll_rate_groups.sql is run.`;
+  $('rf-group-row').classList.add('hidden');
+  $('rf-move-btn').classList.toggle('hidden', !r || !_rateGroupCol);
+  $('rf-group').innerHTML = RATE_GROUPS.map(g => `<option value="${g.code}">${esc(g.name)}</option>`).join('');
+  $('rf-group').value  = rateGroup;
   $('rf-job').value    = r?.job_desc || '';
   $('rf-unit').value   = r?.unit || '';
   $('rf-rate').value   = (r && r.rate != null) ? r.rate : '';
   $('rf-cat').value    = r?.category || '';
   $('rf-active').value = (r && r.active === false) ? '0' : '1';
   $('rate-modal').classList.add('open');
+  $('rf-job').focus();
+}
+
+function onRateGroupChange() {
+  rateGroup = $('rf-group').value;
+  const label = RATE_GROUP_NAME[rateGroup] || rateGroup;
+  $('rate-modal-title').textContent = `${editRateId ? 'Edit' : 'Add'} Job — ${label}`;
+  $('rf-group-hint').textContent = `Filed under ${label}.`;
+}
+function showRateGroupSelect() {
+  $('rf-group-row').classList.remove('hidden');
+  $('rf-move-btn').classList.add('hidden');
+  $('rf-group').focus();
 }
 
 async function saveRate() {
@@ -278,6 +347,9 @@ async function saveRate() {
     updated_at: new Date().toISOString(),
     updated_by: userEmail || null
   };
+  // Writing a column the table does not have fails the whole save, so hold
+  // the group back until the migration has been run.
+  if (_rateGroupCol) row.group_code = rateGroup;
   $('rf-save').disabled = true;
   try {
     let error;
@@ -815,6 +887,14 @@ async function loadRates() {
     .select('*').order('sort_order').order('job_desc');
   if (error) { flagSetup(error.message); return; }
   rates = data || [];
+
+  /* MN / PN / Machinery live in group_code, added after the module shipped.
+     Ask the database rather than guessing: on an empty table there is no row
+     to read the column names off, and a save that names a column the table
+     does not have fails outright. */
+  const probe = await _supabase.from('mjmnpayroll_piece_rates').select('group_code').limit(1);
+  _rateGroupCol = !probe.error;
+  $('rate-setup').classList.toggle('hidden', _rateGroupCol);
 }
 async function loadEntries() {
   const { data, error } = await _supabase.from('mjmnpayroll_work_entries')
