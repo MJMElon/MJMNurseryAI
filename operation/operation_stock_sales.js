@@ -588,6 +588,7 @@
     // ── Monthly Maturity Allocation ──────────────────────────────────────────
     let allMatGroups = [];
     let plotAllocations = {};
+    let doUnmatchedLines = [];
     let activeMonthKey = null;
     let activeMonthKeys = [];
     let historyMonthKeys = [];
@@ -600,12 +601,17 @@
 
     async function loadMaturity() {
         try {
-            const [transRes, plotsRes, allocRes] = await Promise.all([
+            const [transRes, plotsRes, allocRes, doRes] = await Promise.all([
                 _supabase.from('shared_inventory_logs')
-                    .select('batch_name,plot_name,breed_name,quantity_change,created_at')
+                    .select('batch_name,plot_name,breed_name,quantity_change,created_at,transaction_date')
                     .in('transaction_type', ['Transplanted','Transplanted_Premium','Transplanted_DoubleTone']),
                 _supabase.from('shared_plots').select('plot_name,nursery_name'),
-                _supabase.from('shared_plot_allocations').select('*').then(r => r, e => ({ data: [], error: e }))
+                _supabase.from('shared_plot_allocations').select('*').then(r => r, e => ({ data: [], error: e })),
+                // Issued DOs are the official stock deduction: each carries up to
+                // 5 "Nursery Collection Details" lines (plot_N / batch_N / qty_N).
+                _supabase.from('shared_do_records')
+                    .select('do_number, total_qty, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+                    .then(r => r, e => ({ data: [], error: e }))
             ]);
 
             const trans = transRes.data || [];
@@ -630,13 +636,16 @@
 
             const groups = {};
             trans.forEach(l => {
+                // Real transplant date keyed in the Batch Record; created_at is
+                // only the fallback for very old rows saved without a date.
+                const effDate = l.transaction_date || l.created_at;
                 const k = (l.batch_name||'') + '||' + (l.plot_name||'');
                 if (!groups[k]) groups[k] = {
                     batch: l.batch_name, plot: l.plot_name, breed: l.breed_name,
-                    qty: 0, firstDate: l.created_at
+                    qty: 0, firstDate: effDate
                 };
                 groups[k].qty += (l.quantity_change || 0);
-                if (l.created_at < groups[k].firstDate) groups[k].firstDate = l.created_at;
+                if (effDate < groups[k].firstDate) groups[k].firstDate = effDate;
                 if (!groups[k].breed && l.breed_name) groups[k].breed = l.breed_name;
             });
 
@@ -651,10 +660,13 @@
                     location: resolveLocation(g.plot),
                     qty: g.qty,
                     afterCulling: Math.round(g.qty * 0.9),
+                    doDeducted: 0,
                     transplantDate: t,
                     matureDate
                 };
             });
+
+            applyDoDeductions(allMatGroups, doRes?.data || []);
 
             plotAllocations = {};
             (allocRes?.data || []).forEach(a => {
@@ -682,7 +694,7 @@
             renderMaturityTable();
         } catch(e) {
             console.warn('Maturity load error:', e);
-            document.getElementById('maturity-rows').innerHTML = `<tr><td colspan="12" class="text-center py-8 text-[10px] text-red-500 font-bold uppercase tracking-widest">Failed to load maturity data</td></tr>`;
+            document.getElementById('maturity-rows').innerHTML = `<tr><td colspan="13" class="text-center py-8 text-[10px] text-red-500 font-bold uppercase tracking-widest">Failed to load maturity data</td></tr>`;
         }
     }
 
@@ -752,27 +764,68 @@
         else document.addEventListener('click', closeHistoryOnOutside, { once: true });
     }
 
-    let _orderCollectionRatio = {};
+    // ── DO-based stock deduction ─────────────────────────────────────────────
+    // Every issued DO's "Nursery Collection Details" lines (plot_N / batch_N /
+    // qty_N) are the official record of stock leaving a plot. Names are read
+    // forgivingly, same as Batch Detail Tab 6 and the Summary report:
+    //   • batch "239." / " 239" → 239 (punctuation & spaces dropped)
+    //   • plot  "U15 (UPB PREMIER HYBRID)" → U15 (label/breed suffix dropped)
+    //   • qty blank on the ONLY filled line → fall back to the DO's total qty
+    const _normBatchKey = v => String(v == null ? '' : v).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const _normPlotKey  = v => String(v == null ? '' : v).trim().toUpperCase()
+                                  .replace(/^PLOT\s*:?\s*/, '')
+                                  .split(/[\s(,\[]/)[0].replace(/[^0-9A-Z\-]/g, '');
 
-    function rebuildOrderCollectionRatioCache() {
-        _orderCollectionRatio = {};
-        (allCustomerOrders || []).forEach(o => {
-            if (o.totalQty > 0) {
-                _orderCollectionRatio[o.id] = (o.totalCollected || 0) / o.totalQty;
-            } else {
-                _orderCollectionRatio[o.id] = 0;
+    // Mutates each group: g.doDeducted = qty issued via DOs for that batch+plot.
+    // DO lines that match no row are collected into doUnmatchedLines so no
+    // quantity silently disappears (wrong/missing batch, unknown plot, …).
+    function applyDoDeductions(groups, doRecords) {
+        doUnmatchedLines = [];
+
+        // Index rows by normalized batch+plot. If two raw names normalize to
+        // the same key, deduct into the earliest-maturing row (deterministic).
+        const groupByNorm = {};
+        groups.forEach(g => {
+            const nk = _normBatchKey(g.batch) + '||' + _normPlotKey(g.plot);
+            if (!groupByNorm[nk] || g.transplantDate < groupByNorm[nk].transplantDate) groupByNorm[nk] = g;
+        });
+
+        (doRecords || []).forEach(d => {
+            if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
+            let filled = 0;
+            for (let i = 1; i <= 5; i++) if (_normPlotKey(d[`plot_${i}`])) filled++;
+            for (let i = 1; i <= 5; i++) {
+                const plotKey = _normPlotKey(d[`plot_${i}`]);
+                if (!plotKey) continue;
+                let qty = Number(d[`qty_${i}`] || 0);
+                if (!qty && filled === 1) qty = Number(d.total_qty || 0); // single-line DO
+                if (!qty) continue;
+                const target = groupByNorm[_normBatchKey(d[`batch_${i}`]) + '||' + plotKey];
+                if (target) {
+                    target.doDeducted += qty;
+                } else {
+                    doUnmatchedLines.push({
+                        do_number: d.do_number || '—',
+                        plot: String(d[`plot_${i}`] || '').trim(),
+                        batch: String(d[`batch_${i}`] || '').trim(),
+                        qty
+                    });
+                }
             }
         });
     }
 
-    function collectedForAllocations(rowAllocs) {
-        if (!rowAllocs.length) return 0;
-        let sum = 0;
-        rowAllocs.forEach(a => {
-            const ratio = _orderCollectionRatio[a.order_id] || 0;
-            sum += Math.round((a.allocated_qty || 0) * ratio);
-        });
-        return sum;
+    function renderDoUnmatched() {
+        const el = document.getElementById('maturity-unmatched');
+        if (!el) return;
+        if (!doUnmatchedLines.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+        const totalQty = doUnmatchedLines.reduce((s, u) => s + u.qty, 0);
+        const shown = doUnmatchedLines.slice(0, 5)
+            .map(u => `DO ${escapeHtml(u.do_number)} (${escapeHtml(u.plot || '?')} / ${escapeHtml(u.batch || 'no batch')}: ${u.qty.toLocaleString()})`)
+            .join(', ');
+        const more = doUnmatchedLines.length > 5 ? ` and ${doUnmatchedLines.length - 5} more` : '';
+        el.innerHTML = `⚠ ${doUnmatchedLines.length} DO line(s) totalling ${totalQty.toLocaleString()} seedlings don't match any row above — check the plot/batch keyed on the DO: ${shown}${more}`;
+        el.classList.remove('hidden');
     }
 
     function plotStatusPill(status) {
@@ -787,8 +840,6 @@
     }
 
     function renderMaturityTable() {
-        rebuildOrderCollectionRatioCache();
-
         const tbody = document.getElementById('maturity-rows');
         const tfoot = document.getElementById('maturity-foot');
 
@@ -799,6 +850,7 @@
         if (!rows.length) {
             tbody.innerHTML = `<tr><td colspan="13" class="text-center py-10 text-slate-400"><div class="text-2xl mb-1">🌱</div><div class="text-[10px] font-bold uppercase tracking-widest">No maturity allocations for this month</div></td></tr>`;
             tfoot.innerHTML = '';
+            renderDoUnmatched();
             return;
         }
 
@@ -807,7 +859,7 @@
             const alloc = plotAllocations[r.key] || { plot_status: 'no_status', reserved_for: '', reserved_qty: 0, premium: false };
             const rowAllocs = allocsForBatch(r.key);
             const allocSum  = rowAllocs.reduce((s, a) => s + (a.allocated_qty || 0), 0);
-            const collected = collectedForAllocations(rowAllocs);
+            const collected = r.doDeducted || 0;
             const plotBalance       = r.afterCulling - collected;
             const afterDeductReserve = plotBalance - allocSum;
 
@@ -850,7 +902,7 @@
                         </div>
                     </td>
                     <td class="col-plot num text-blue-700">${collected.toLocaleString()}</td>
-                    <td class="col-plot num font-black mat-sep-r ${plotBalance < 0 ? 'text-red-600' : 'text-slate-800'}">${plotBalance.toLocaleString()}</td>
+                    <td class="col-plot num font-black mat-sep-r ${plotBalance <= 0 ? 'text-red-600' : 'text-slate-800'}">${plotBalance.toLocaleString()}${plotBalance <= 0 ? '<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-red-600 text-white align-middle">Sold Out</span>' : ''}</td>
                     <td class="col-alloc">${reservHtml}</td>
                     <td class="col-alloc num font-black text-slate-700">${allocSum.toLocaleString()}</td>
                     <td class="col-alloc num font-black ${afterDeductReserve < 0 ? 'text-red-600' : afterDeductReserve === 0 ? 'text-slate-400' : 'text-emerald-700'}">${afterDeductReserve.toLocaleString()}</td>
@@ -881,6 +933,8 @@
                 <td class="num text-slate-900">${totReserved.toLocaleString()}</td>
                 <td class="num ${totAfterDeduct < 0 ? 'text-red-600' : 'text-emerald-700'}">${totAfterDeduct.toLocaleString()}</td>
             </tr>`;
+
+        renderDoUnmatched();
     }
 
     async function updateAllocation(el) {

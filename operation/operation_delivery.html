@@ -1027,7 +1027,28 @@
             document.getElementById('edit-do-btn-trigger').classList.add('hidden');
         }
 
-        async function saveEditDO() { 
+        // Batch is compulsory on every DO line: the Monthly Maturity Allocation
+        // deducts plot stock from the DO's plot+batch, so a line without a batch
+        // can't be deducted anywhere. Returns line numbers (1-based) that have
+        // plot/breed/qty keyed in but no batch.
+        function linesMissingBatch(container) {
+            const missing = [];
+            let n = 0, filled = 0;
+            container.querySelectorAll('.item-row').forEach(itemRow => {
+                n++;
+                const plot  = (itemRow.querySelector('.item-plot').value || '').trim();
+                const breed = (itemRow.querySelector('.item-breed').value || '').trim();
+                const qty   = parseInt(itemRow.querySelector('.item-qty').value) || 0;
+                const batch = (itemRow.querySelector('.item-batch').value || '').trim();
+                if (plot || breed || qty > 0 || batch) filled++;
+                if ((plot || breed || qty > 0) && !batch) missing.push(n);
+            });
+            // No collection lines at all → the DO couldn't deduct from any plot.
+            if (filled === 0) missing.push(1);
+            return missing;
+        }
+
+        async function saveEditDO() {
             if (typeof MJMAccess !== 'undefined' && !MJMAccess.requireOperationAction('orders', 'manage')) return;
             const doId = document.getElementById('manage-do-id').value; 
             const newNum = document.getElementById('mng-do-num').value; 
@@ -1044,6 +1065,11 @@
                 if (newQty > theoreticalBalance) {
                     return alert(`Cannot update: New Quantity (${newQty}) exceeds available AL Balance (${theoreticalBalance})!`);
                 }
+            }
+
+            const missingBatch = linesMissingBatch(document.getElementById('items_container_mng'));
+            if (missingBatch.length) {
+                return alert(`Cannot save: every DO needs at least one collection line, and Batch is required on each line (check line ${missingBatch.join(', ')}). The batch tells the system which plot stock this DO deducts from.`);
             }
 
             const btn = document.getElementById('save-edit-do-btn');
@@ -1236,11 +1262,18 @@
                     if (numInput) numInput.value = doNum;
                 }
                 if(doTotalQty > parentAL._calc_balance) {
-                    alert(`Cannot save DO ${doNum}: Quantity (${doTotalQty}) exceeds available AL Balance (${parentAL._calc_balance})!`); 
-                    row.classList.add('bg-red-50'); 
-                    continue; 
-                } 
-                
+                    alert(`Cannot save DO ${doNum}: Quantity (${doTotalQty}) exceeds available AL Balance (${parentAL._calc_balance})!`);
+                    row.classList.add('bg-red-50');
+                    continue;
+                }
+
+                const missingBatch = linesMissingBatch(document.getElementById(`items_container_${rId}`));
+                if (missingBatch.length) {
+                    alert(`Cannot save DO ${doNum}: every DO needs at least one collection line, and Batch is required on each line (check line ${missingBatch.join(', ')}).`);
+                    row.classList.add('bg-red-50');
+                    continue;
+                }
+
                 let doPayload = { do_number: doNum, al_number: targetAL, delivery_date: doDate, remark: customerName, total_qty: doTotalQty, status: 'Delivered', image_url: base64Image }; 
                 const itemRows = document.getElementById(`items_container_${rId}`).querySelectorAll('.item-row'); let idx = 1; 
                 itemRows.forEach(itemRow => { 

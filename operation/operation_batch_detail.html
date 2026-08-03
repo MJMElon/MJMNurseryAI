@@ -3381,6 +3381,7 @@
                             breed_name: breed,
                             plot_name: destPlot,
                             quantity_change: qty,
+                            transaction_date: dateVal || null,
                             remark: `Transplanted from tray [${sourceTray}] to Main Plot [${destPlot}]. Date: ${dateVal}${mapSuffix}`
                         }));
                     } else if (destType === 'premium') {
@@ -3390,6 +3391,7 @@
                             breed_name: breed,
                             plot_name: 'PREMIUM CARE',
                             quantity_change: qty,
+                            transaction_date: dateVal || null,
                             remark: `Moved from tray [${sourceTray}] to PREMIUM CARE tray. Date: ${dateVal}${mapSuffix}`
                         }));
                         trayUpdates.push({ tray_name: 'PREMIUM CARE', qty });
@@ -3400,6 +3402,7 @@
                             breed_name: breed,
                             plot_name: 'DOUBLE-TONE',
                             quantity_change: qty,
+                            transaction_date: dateVal || null,
                             remark: `Moved from tray [${sourceTray}] to DOUBLE-TONE tray. Date: ${dateVal}${mapSuffix}`
                         }));
                         trayUpdates.push({ tray_name: 'DOUBLE-TONE', qty });
