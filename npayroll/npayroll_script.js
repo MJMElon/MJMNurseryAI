@@ -48,26 +48,46 @@ let maint = { records: [], ticks: {}, rates: {}, workers: {}, localWorkers: {} }
    same way here, or the salary claim would price a different set of names than
    the sheet it is priced from shows. Kept identical to isGeneralWorker in
    nursery_ops/plot_maintenance_script.js. */
-const MAINT_NURSERIES  = ['PN', 'BNN', 'UNN1', 'UNN2'];
-const GENERAL_ROLE     = /general|pekerja am|buruh am/i;
-const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
-const roleOf = w => String(w.role || w.job_title || '');
+const MAINT_NURSERIES = ['PN', 'BNN', 'UNN1', 'UNN2'];
 
-/* Three rules, in order: the worker's own switch settles it; else, if the
-   nursery names the role at all, only those carrying it count; else everyone
-   bar the plainly non-general roles. `maint_general` is the switch and the
-   only rule that cannot be wrong — the role lists are a starting guess. */
+/* The roles a worker can hold. One list, offered in every section. */
+const ROLES = [
+  'Field Conductor',
+  'Assistant Field Conductor',
+  'Water Pump Operator',
+  'General Worker',
+  'Driver',
+  'Gardener'
+];
+/* Of those, the ones the Work Maintenance tick sheets take. Anything else on
+   the list is a known role and is simply not general nursery work — a Gardener
+   or a Water Pump Operator who does spray a plot is handled by the per-worker
+   switch, not by widening this. */
+const MAINT_ROLE       = /^general\s*worker$|pekerja am|buruh am/i;
+/* Only reached by rows keyed before the list existed, where the role is free
+   text or blank. */
+const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
+
+const roleOf = w => String(w.role || w.job_title || '').trim();
+const isKnownRole = r => ROLES.some(x => x.toLowerCase() === String(r).trim().toLowerCase());
+
+/* In order: the worker's own switch settles it; then the role, which since the
+   list exists answers outright; and only for a role keyed before the list —
+   free text or blank — the two older guesses. */
 function isGeneralWorker(w, nurseryNamesTheRole) {
   if (w.active === false) return false;
   if (w.maint_general === true)  return true;
   if (w.maint_general === false) return false;
-  if (nurseryNamesTheRole) return GENERAL_ROLE.test(roleOf(w));
-  return !NON_GENERAL_ROLE.test(roleOf(w));
+  const r = roleOf(w);
+  if (MAINT_ROLE.test(r))  return true;    // General Worker
+  if (isKnownRole(r))      return false;   // another role off the list
+  if (nurseryNamesTheRole) return false;   // nursery labels its people; this one is not labelled
+  return !NON_GENERAL_ROLE.test(r);
 }
 /* Does this nursery label its general workers by role? */
 function nurseryNamesRole(n) {
   return workers.some(w => String(w.section || '').trim().toUpperCase() === n &&
-                           w.active !== false && GENERAL_ROLE.test(roleOf(w)));
+                           w.active !== false && MAINT_ROLE.test(roleOf(w)));
 }
 /* Is this worker on the Work Maintenance sheets? Used by the list and the
    worker form, so what is shown is what the sheets actually do. */
@@ -152,8 +172,7 @@ function renderWorkers() {
     const rows = list.length ? list.map((w, i) => `
       <tr>
         <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
-        <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}${
-          w.worker_no ? `<div style="font-size:11px;font-weight:400;color:var(--text-faint);">${esc(w.worker_no)}</div>` : ''}</td>
+        <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}</td>
         <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
           ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
@@ -194,6 +213,18 @@ function fillSectionSelect(el, includeAll, selected) {
   if (selected != null) el.value = selected;
 }
 
+/* The role list, plus whatever this worker already holds if it predates the
+   list — dropping it silently would rewrite somebody's role on an unrelated
+   edit. */
+function fillRoleSelect(current) {
+  const cur = String(current || '').trim();
+  const extra = (cur && !isKnownRole(cur)) ? [cur] : [];
+  $('wf-role').innerHTML = '<option value="">— Choose role —</option>' +
+    ROLES.concat(extra).map(r =>
+      `<option value="${esc(r)}">${esc(r)}${extra.includes(r) ? ' (old)' : ''}</option>`).join('');
+  $('wf-role').value = cur;
+}
+
 let editWorkerId = null;
 /* `section` is the section the button was pressed in. Every section heads its
    own Add Worker button, so the section is known before the form opens — there
@@ -209,8 +240,7 @@ function openWorker(id, section) {
   $('wf-move-btn').classList.toggle('hidden', !w);   // only an existing worker moves
   onWorkerSectionChange();               // titles the modal with that section
   $('wf-name').value   = w?.full_name || '';
-  $('wf-role').value   = w?.role || '';
-  $('wf-no').value     = w?.worker_no || '';
+  fillRoleSelect(w?.role || w?.job_title || '');
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
   $('wf-remark').value = w?.remark || '';
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
@@ -235,10 +265,12 @@ function onWorkerRoleChange() {
     const named = nurseryNamesRole(sec);
     $('wf-maint').checked = isGeneralWorker({ role: $('wf-role').value, active: true }, named);
   }
+  const r = $('wf-role').value.trim();
   const why = _maintExplicit ? 'Set on this worker.'
-    : nurseryNamesRole(sec)
-      ? `Guessed from the role — ${SECTION_NAME[sec] || sec} labels its general workers, so only those roles are ticked. Change it here if that is wrong.`
-      : 'Guessed from the role. Change it here if that is wrong.';
+    : MAINT_ROLE.test(r) ? 'From the role: a General Worker is on the sheets.'
+    : isKnownRole(r)     ? `From the role: a ${r} is not general nursery work. Tick the box to put them on the sheets anyway.`
+    : r                  ? `"${r}" is not on the role list. Pick a role, or set this box yourself.`
+    :                      'Pick a role, or set this box yourself.';
   $('wf-maint-why').textContent = _maintGeneralCol ? why
     : 'Guessed from the role. Run shared/fix_npayroll_maint_general.sql to set it per worker.';
 }
@@ -268,7 +300,6 @@ async function saveWorker() {
     full_name: name,
     section:   $('wf-section').value,
     role:      $('wf-role').value.trim() || null,
-    worker_no: $('wf-no').value.trim() || null,
     active:    $('wf-active').value === '1',
     remark:    $('wf-remark').value.trim() || null,
     // Kept in step so anything still reading the original columns agrees.

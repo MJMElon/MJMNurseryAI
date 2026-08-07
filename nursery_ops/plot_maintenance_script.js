@@ -942,16 +942,23 @@ let _linkAt        = 0;
 
    Rule 3 alone is guesswork against a list of roles nobody can finish
    enumerating, which is why rule 1 exists. */
-const GENERAL_ROLE     = /general|pekerja am|buruh am/i;
+/* The role list the payroll module offers; kept in step with ROLES there. */
+const ROLES = ['Field Conductor', 'Assistant Field Conductor', 'Water Pump Operator',
+               'General Worker', 'Driver', 'Gardener'];
+const MAINT_ROLE       = /^general\s*worker$|pekerja am|buruh am/i;
 const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
-const roleOf = r => String(r.role || r.job_title || '');
+const roleOf = r => String(r.role || r.job_title || '').trim();
+const isKnownRole = r => ROLES.some(x => x.toLowerCase() === String(r).trim().toLowerCase());
 
 function isGeneralWorker(r, nurseryNamesTheRole) {
   if (r.active === false) return false;
   if (r.maint_general === true)  return true;
   if (r.maint_general === false) return false;
-  if (nurseryNamesTheRole) return GENERAL_ROLE.test(roleOf(r));
-  return !NON_GENERAL_ROLE.test(roleOf(r));
+  const role = roleOf(r);
+  if (MAINT_ROLE.test(role)) return true;    // General Worker
+  if (isKnownRole(role))     return false;   // another role off the list
+  if (nurseryNamesTheRole)   return false;   // labelled nursery, unlabelled worker
+  return !NON_GENERAL_ROLE.test(role);
 }
 
 /* Turn the whole register into nursery → [name], applying the rules above per
@@ -961,7 +968,7 @@ function generalWorkersByNursery(rows) {
   const by = {};
   MAINT_NURSERIES.forEach(n => {
     const mine = (rows || []).filter(r => String(r.section || '').trim().toUpperCase() === n);
-    const named = mine.some(r => r.active !== false && GENERAL_ROLE.test(roleOf(r)));
+    const named = mine.some(r => r.active !== false && MAINT_ROLE.test(roleOf(r)));
     const names = mine.filter(r => isGeneralWorker(r, named))
                       .map(r => String(r.full_name || '').trim())
                       .filter(Boolean);

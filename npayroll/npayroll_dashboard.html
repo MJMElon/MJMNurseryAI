@@ -10,7 +10,7 @@
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=5">
+<link rel="stylesheet" href="npayroll_styles.css?v=6">
 </head>
 <body>
 
@@ -188,9 +188,13 @@
       <div class="frow hidden" id="wf-section-row"><label>Move to section</label>
         <select id="wf-section" onchange="onWorkerSectionChange()"></select></div>
       <div class="frow"><label>Name *</label><input type="text" id="wf-name" placeholder="e.g. Asriawan"></div>
-      <div class="frow"><label>Role</label>
-        <input type="text" id="wf-role" placeholder="e.g. General Worker, Field Conductor"
-               oninput="onWorkerRoleChange()"></div>
+      <div class="grid2">
+        <!-- Filled from ROLES; the same list in every section. -->
+        <div class="frow"><label>Role</label>
+          <select id="wf-role" onchange="onWorkerRoleChange()"></select></div>
+        <div class="frow"><label>Status</label>
+          <select id="wf-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+      </div>
       <!-- Decides whether this person gets a column on the Work Maintenance
            tick sheets. Guessed from the role until it is set here. -->
       <div class="frow" id="wf-maint-row">
@@ -199,11 +203,6 @@
           <input type="checkbox" id="wf-maint" onchange="_maintExplicit=true;onWorkerRoleChange();"> General worker — give them a column on the tick sheets
         </label>
         <div id="wf-maint-why" style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:4px;"></div>
-      </div>
-      <div class="grid2">
-        <div class="frow"><label>Worker No.</label><input type="text" id="wf-no" placeholder="optional"></div>
-        <div class="frow"><label>Status</label>
-          <select id="wf-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
       </div>
       <div class="frow"><label>Remark</label><textarea id="wf-remark" rows="2"></textarea></div>
     </div>
@@ -277,6 +276,6 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=6"></script>
+<script src="npayroll_script.js?v=8"></script>
 </body>
 </html>
