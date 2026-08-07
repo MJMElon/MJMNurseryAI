@@ -365,11 +365,25 @@ function renderPayroll() {
   const line = document.getElementById('payroll-form-line');
   if (line) line.textContent = `${t('pay.form')} (${NURSERY_NAMES[n]}) — ${t('pay.month')} ${m}`;
   const hint = document.getElementById('payroll-hint');
-  if (hint) hint.textContent = t('pay.tickHint');
+  if (hint) hint.textContent = t('pay.tickHint') + (isLinked(n) ? ' ' + t('pay.linkedNote') : '');
 
   const wk = workers[n] || [];
   const rows = payrollRows();
   const store = payrollData[payrollKey(n, m, _payrollView)] || {};
+
+  /* Somebody ticked this month who is no longer a general worker of this
+     nursery — renamed, moved or deactivated on the register. Their ticks are
+     still in the database but no longer have a column, so their capacity has
+     dropped out of the totals. Say so rather than let a figure change
+     silently. */
+  const off = document.getElementById('payroll-offreg');
+  if (off) {
+    const known = new Set(wk);
+    const gone = [...new Set(Object.values(store).flatMap(c =>
+      Object.keys(c || {}).filter(name => c[name] && !known.has(name))))].sort();
+    off.style.display = gone.length ? 'block' : 'none';
+    off.textContent = gone.length ? `${t('pay.offRegister')} ${gone.join(', ')}` : '';
+  }
 
   if (!wk.length) {
     tbl.innerHTML = `<tbody><tr><td style="padding:2rem;text-align:center;color:var(--text-faint);font-size:13px;">${t('pay.noWorkers')}</td></tr></tbody>`;
@@ -893,21 +907,110 @@ async function unlockPieceRates() {
   renderSettingRates();
 }
 
-/* ── Workers (per nursery) ── */
-let workers = { PN: [], BNN: [], UNN1: [], UNN2: [] };
+/* ── Workers (per nursery) ────────────────────────────────────────────────
+   Names come from the Worker System in the Nursery Payroll System, so one
+   register covers both modules: add, rename or deactivate somebody there and
+   the tick sheets here follow, this month included. Only the general workers
+   of that nursery are taken — a nursery's own section, minus the roles that
+   are plainly not doing spraying or weeding.
+
+   The `workers` map is what the rest of this file reads; it is rebuilt from
+   the register, falling back per nursery to the module's own old list so a
+   nursery not yet on the register still has its sheet. */
+const MAINT_NURSERIES = ['PN', 'BNN', 'UNN1', 'UNN2'];
+let workers        = { PN: [], BNN: [], UNN1: [], UNN2: [] };  // resolved, what the page uses
+let _linkedWorkers = {};                                       // from mjmnpayroll_workers
+let _localWorkers  = { PN: [], BNN: [], UNN1: [], UNN2: [] };  // from nops_maint_workers
+let _linkErr       = null;
+let _linkAt        = 0;
+
+/* Roles that are not general nursery work. An exclusion list rather than a
+   list of accepted roles on purpose: a role nobody thought of ("Sprayer",
+   "Pekerja Am", or none at all) should still appear on the sheet, whereas a
+   list of accepted roles would quietly empty it. */
+const NON_GENERAL_ROLE = /driver|pemandu|supervisor|penyelia|mandor|kerani|clerk|mekanik|mechanic|security|pengawal|foreman|operator/i;
+function isGeneralWorker(r) {
+  return r.active !== false && !NON_GENERAL_ROLE.test(String(r.role || r.job_title || ''));
+}
+
+async function loadLinkedWorkers() {
+  if (!_supabase) return;
+  _linkAt = Date.now();
+  const res = await _supabase.from('mjmnpayroll_workers')
+    .select('id, full_name, section, role, job_title, active')
+    .then(r => r, e => ({ error: e }));
+  if (res.error) {
+    // The payroll module may simply not be set up yet — keep the old list.
+    _linkErr = res.error.message || String(res.error);
+    _linkedWorkers = {};
+    resolveWorkers();
+    return;
+  }
+  _linkErr = null;
+  const by = {};
+  (res.data || []).forEach(r => {
+    const n = String(r.section || '').trim().toUpperCase();
+    // UNE and Driver are their own sections in the register and belong to no
+    // nursery sheet, so matching the nursery keeps them out on its own.
+    if (!MAINT_NURSERIES.includes(n)) return;
+    if (!isGeneralWorker(r)) return;
+    const name = String(r.full_name || '').trim();
+    if (!name) return;
+    (by[n] ||= []).push(name);
+  });
+  MAINT_NURSERIES.forEach(n => {
+    if (by[n]) by[n] = [...new Set(by[n])].sort((a, b) => a.localeCompare(b));
+  });
+  _linkedWorkers = by;
+  resolveWorkers();
+}
+
+function resolveWorkers() {
+  MAINT_NURSERIES.forEach(n => {
+    const linked = _linkedWorkers[n] || [];
+    workers[n] = linked.length ? linked.slice() : (_localWorkers[n] || []).slice();
+  });
+}
+function isLinked(n) { return (_linkedWorkers[n] || []).length > 0; }
+
+/* Pick up an amendment made in the payroll module while this page is open.
+   Throttled — opening the Worker Record tab twice in a row should not fire
+   two reads. */
+function refreshLinkedWorkers(force) {
+  if (!_supabase || !_dbReady) return;
+  if (!force && Date.now() - _linkAt < 15000) return;
+  loadLinkedWorkers().then(() => { renderPayroll(); renderSettingWorkers(); });
+}
 
 function renderSettingWorkers() {
   const box = document.getElementById('setting-worker-list');
   if (!box) return;
   const n = getNursery();
+  const linked = isLinked(n);
   const list = workers[n] || [];
+  const note = document.getElementById('setting-worker-note');
+  const add  = document.getElementById('setting-worker-add');
+
+  if (note) note.innerHTML = linked
+    ? `Linked from the <b>Worker System</b> in the Nursery Payroll System —
+       the general workers filed under ${NURSERY_NAMES[n]}. Add or change somebody
+       <a href="../npayroll/npayroll_dashboard.html" style="color:var(--green-text);font-weight:700;">there</a>
+       and this list follows, for this month too.`
+    : `No general worker is on the <b>Worker System</b> register for ${NURSERY_NAMES[n]} yet, so this
+       module's own list is being used. Once somebody is added
+       <a href="../npayroll/npayroll_dashboard.html" style="color:var(--green-text);font-weight:700;">there</a>
+       the register takes over.${_linkErr ? ` <span style="color:var(--text-faint);">(${_linkErr})</span>` : ''}`;
+  if (add) add.style.display = linked ? 'none' : 'flex';
+
   box.innerHTML = list.length
     ? list.map(w => `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
           <span style="font-size:12px;font-weight:700;color:var(--text-head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${w}</span>
-          <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeWorker('${String(w).replace(/'/g, "\\'")}')">Remove</button>
+          ${linked
+            ? '<span style="font-size:10px;font-weight:700;color:var(--green-text);white-space:nowrap;">🔗 linked</span>'
+            : `<button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeWorker('${String(w).replace(/'/g, "\\'")}')">Remove</button>`}
         </div>`).join('')
-    : '<div style="font-size:12px;color:var(--text-faint);">No workers added yet for this nursery.</div>';
+    : '<div style="font-size:12px;color:var(--text-faint);">No workers for this nursery yet.</div>';
 }
 
 function addWorkerFromSetting() {
@@ -915,9 +1018,15 @@ function addWorkerFromSetting() {
   const name = (el?.value || '').trim();
   if (!name) { alert('Key in a worker name first.'); return; }
   const n = getNursery();
-  if (!workers[n]) workers[n] = [];
-  if (workers[n].some(w => w.toLowerCase() === name.toLowerCase())) { alert(`"${name}" is already on this nursery's list.`); return; }
-  workers[n].push(name);
+  if (isLinked(n)) {
+    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System in the Nursery Payroll System.\n\n` +
+          `Add the worker there and they will appear here — a name added here would be overwritten on the next load.`);
+    return;
+  }
+  if (!_localWorkers[n]) _localWorkers[n] = [];
+  if (_localWorkers[n].some(w => w.toLowerCase() === name.toLowerCase())) { alert(`"${name}" is already on this nursery's list.`); return; }
+  _localWorkers[n].push(name);
+  resolveWorkers();
   persistWorker(n, name, false);
   if (el) el.value = '';
   renderSettingWorkers(); renderPayroll();
@@ -925,8 +1034,14 @@ function addWorkerFromSetting() {
 
 function removeWorker(name) {
   const n = getNursery();
+  if (isLinked(n)) {
+    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System in the Nursery Payroll System.\n\n` +
+          `Remove or deactivate the worker there instead.`);
+    return;
+  }
   if (!confirm(`Remove worker "${name}" from ${NURSERY_NAMES[n]}?`)) return;
-  workers[n] = (workers[n] || []).filter(w => w !== name);
+  _localWorkers[n] = (_localWorkers[n] || []).filter(w => w !== name);
+  resolveWorkers();
   persistWorker(n, name, true);
   renderSettingWorkers(); renderPayroll();
 }
@@ -1081,7 +1196,9 @@ const I18N = {
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
-    'pay.noWorkers':'Add worker names under Setting → Workers to build this form.',
+    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them in the Nursery Payroll System and they will appear here.',
+    'pay.linkedNote':'Worker names come from the Worker System in the Nursery Payroll System and follow any change made there.',
+    'pay.offRegister':'⚠ Ticked this month but no longer a general worker of this nursery on the register, so their capacity is not counted:',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
     /* Salary claim form (PDF) */
@@ -1160,7 +1277,9 @@ const I18N = {
     'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
-    'pay.noWorkers':'Tambah nama pekerja di Tetapan → Pekerja untuk membina borang ini.',
+    'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di Sistem Penggajian Nurseri dan nama akan muncul di sini.',
+    'pay.linkedNote':'Nama pekerja diambil daripada Worker System di Sistem Penggajian Nurseri dan mengikut sebarang pindaan di sana.',
+    'pay.offRegister':'⚠ Ditanda bulan ini tetapi bukan lagi pekerja am nurseri ini dalam daftar, jadi kapasiti mereka tidak dikira:',
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja', 'pay.workersRange':'Pekerja', 'pay.ofTotal':'daripada',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
@@ -1607,8 +1726,10 @@ function switchTab(name, btn) {
   if (panel) panel.classList.add('active');
   if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
   if (name==='calc')    renderCalc();
-  if (name==='setting') { renderSettingPlots(); renderSettingRates(); renderSettingWorkers(); }
-  if (name==='payroll') renderPayroll();
+  // Re-read the register on the way in, so an amendment made in the payroll
+  // module a moment ago is already reflected without reloading the page.
+  if (name==='setting') { renderSettingPlots(); renderSettingRates(); renderSettingWorkers(); refreshLinkedWorkers(); }
+  if (name==='payroll') { renderPayroll(); refreshLinkedWorkers(); }
 }
 
 /* Work Record sub-views: the maintenance list and the analytics charts. */
@@ -3750,13 +3871,16 @@ async function initDb() {
       } catch (e) { console.warn('[maint] access load failed:', e); }
       applyNopsAdminUI();
     }
-    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, payRes, lockRes] = await Promise.all([
+    const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, regRes, payRes, lockRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
       _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
       _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_piece_rates').select('nursery, work_type, rate').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
+      // The register the worker names really come from — see loadLinkedWorkers.
+      _supabase.from('mjmnpayroll_workers').select('id, full_name, section, role, job_title, active')
+        .then(r => r, e => ({ error: e })),
       _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] }))
     ]);
@@ -3795,10 +3919,31 @@ async function initDb() {
       const targets = r.nursery ? [r.nursery] : Object.keys(pieceRates);
       targets.forEach(n => { nurseryRates(n)[r.work_type] = r.rate; });
     });
+    // This module's own old list — now only the fallback for a nursery that
+    // is not on the payroll register yet.
     ((wkRes && wkRes.data) || []).forEach(r => {
-      if (!workers[r.nursery]) workers[r.nursery] = [];
-      if (!workers[r.nursery].includes(r.name)) workers[r.nursery].push(r.name);
+      if (!_localWorkers[r.nursery]) _localWorkers[r.nursery] = [];
+      if (!_localWorkers[r.nursery].includes(r.name)) _localWorkers[r.nursery].push(r.name);
     });
+    _linkAt = Date.now();
+    if (regRes && regRes.error) {
+      _linkErr = regRes.error.message || String(regRes.error);
+      console.warn('[maint] worker register could not be read:', _linkErr);
+    } else {
+      _linkErr = null;
+      const by = {};
+      ((regRes && regRes.data) || []).forEach(r => {
+        const n = String(r.section || '').trim().toUpperCase();
+        if (!MAINT_NURSERIES.includes(n) || !isGeneralWorker(r)) return;
+        const name = String(r.full_name || '').trim();
+        if (name) (by[n] ||= []).push(name);
+      });
+      MAINT_NURSERIES.forEach(n => {
+        if (by[n]) by[n] = [...new Set(by[n])].sort((a, b) => a.localeCompare(b));
+      });
+      _linkedWorkers = by;
+    }
+    resolveWorkers();
     ((payRes && payRes.data) || []).forEach(r => {
       payrollData[payrollKey(r.nursery, r.month, r.work_type)] = r.data || {};
     });

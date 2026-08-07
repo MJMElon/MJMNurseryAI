@@ -41,7 +41,32 @@ let isAdmin   = false;
 let _tablesOk = true;
 
 /* Work-maintenance data, mirrored from the Nursery Operation module. */
-let maint = { records: [], ticks: {}, rates: {}, workers: {} };
+let maint = { records: [], ticks: {}, rates: {}, workers: {}, localWorkers: {} };
+
+/* The Work Maintenance tick sheets take their worker names from the Worker
+   System below — a nursery's own section, general workers only. Resolve it the
+   same way here, or the salary claim would price a different set of names than
+   the sheet it is priced from shows. Kept identical to isGeneralWorker in
+   nursery_ops/plot_maintenance_script.js. */
+const MAINT_NURSERIES  = ['PN', 'BNN', 'UNN1', 'UNN2'];
+const NON_GENERAL_ROLE = /driver|pemandu|supervisor|penyelia|mandor|kerani|clerk|mekanik|mechanic|security|pengawal|foreman|operator/i;
+
+function resolveMaintWorkers() {
+  const by = {};
+  workers.forEach(w => {
+    const n = String(w.section || '').trim().toUpperCase();
+    if (!MAINT_NURSERIES.includes(n)) return;                 // UNE, Driver
+    if (w.active === false) return;
+    if (NON_GENERAL_ROLE.test(String(w.role || w.job_title || ''))) return;
+    const name = String(w.full_name || '').trim();
+    if (name) (by[n] ||= []).push(name);
+  });
+  maint.workers = {};
+  MAINT_NURSERIES.forEach(n => {
+    const linked = [...new Set(by[n] || [])].sort((a, b) => a.localeCompare(b));
+    maint.workers[n] = linked.length ? linked : (maint.localWorkers[n] || []);
+  });
+}
 
 const money = v => 'RM ' + (Number(v) || 0).toFixed(2);
 /* A rate may carry more than two decimals (0.015). Printing it as "0.01"
@@ -210,6 +235,7 @@ async function saveWorker() {
     if (error) throw error;
     closeModal('worker-modal');
     await loadWorkers();
+    resolveMaintWorkers();          // the maintenance sheets read this register
     renderWorkers();
   } catch (e) {
     alert('Could not save the worker.\n\n' + (e.message || e));
@@ -229,6 +255,7 @@ async function removeWorker(id) {
   const { error } = await q;
   if (error) { alert('Could not update: ' + error.message); return; }
   await loadWorkers();
+  resolveMaintWorkers();
   renderWorkers();
 }
 
@@ -559,8 +586,8 @@ function renderMaint() {
 
   if (!wk.length) {
     $('maint-table').innerHTML = `<tbody><tr><td class="empty">
-      No worker on the Work Maintenance list for ${esc(NURSERY_FULL[n] || n)}.
-      Add them under Nursery Operation → Work Maintenance → Setting → Workers.
+      No general worker for ${esc(NURSERY_FULL[n] || n)} on the Worker System register.
+      Add them under Worker System and they appear on the Work Maintenance sheet too.
     </td></tr></tbody>`;
     $('maint-note').textContent = '';
     return;
@@ -917,9 +944,10 @@ async function loadMaint() {
     _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] }))
   ]);
 
-  maint.workers = {};
+  // The maintenance module's own old list — only the fallback now.
+  maint.localWorkers = {};
   ((wkRes && wkRes.data) || []).forEach(r => {
-    (maint.workers[r.nursery] ||= []).push(r.name);
+    (maint.localWorkers[r.nursery] ||= []).push(r.name);
   });
   maint.rates = {};
   ((rateRes && rateRes.data) || []).forEach(r => {
@@ -980,6 +1008,7 @@ $('global-month').addEventListener('change', async () => {
     fillSectionSelect($('monthly-section'),  true, '');
 
     await Promise.all([loadWorkers(), loadRates(), loadEntries(), loadMaint()]);
+    resolveMaintWorkers();
 
     let tab = 'payroll', sub = 'maint';
     try { tab = localStorage.getItem('npayroll_tab') || tab; sub = localStorage.getItem('npayroll_sub') || sub; } catch (_) {}

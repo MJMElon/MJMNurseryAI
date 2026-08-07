@@ -306,6 +306,7 @@
         <button class="btn" style="font-size:12px;" onclick="downloadPayrollPDF()" data-i18n="btn.claimPdf">⬇ Salary Claim Form (PDF)</button>
       </div>
       <div class="card"><div class="tbl-wrap"><table class="sched-table" id="payroll-table"></table></div></div>
+      <div id="payroll-offreg" style="display:none;font-size:11.5px;font-weight:700;color:#92400e;background:var(--gold-bg);border:1.5px solid var(--gold-border);border-radius:var(--r-sm);padding:9px 12px;margin-top:8px;"></div>
       <div id="payroll-hint" style="font-size:11px;color:var(--text-faint);margin-top:8px;"></div>
     </div>
 
@@ -333,9 +334,9 @@
       <!-- WORKERS -->
       <div class="card" style="padding:18px;">
         <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Workers</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Worker names for this nursery. Stays the same every month until you change it. Used by Monthly Payroll and the Gaia work records.</div>
+        <div id="setting-worker-note" style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;"></div>
         <div id="setting-worker-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
+        <div id="setting-worker-add" style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
           <input type="text" id="setting-new-worker" placeholder="Worker name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:220px;">
           <button class="btn btn-primary" style="font-size:12px;" onclick="addWorkerFromSetting()">➕ Add Worker</button>
         </div>
@@ -438,6 +439,6 @@
 <script src="../shared/shared_access.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=50"></script>
+<script src="plot_maintenance_script.js?v=51"></script>
 </body>
 </html>
