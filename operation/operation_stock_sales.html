@@ -524,7 +524,7 @@
                             <th class="text-right mat-sep-r">After 10% Culling</th>
                             <!-- Plot status -->
                             <th>Status</th>
-                            <th class="text-right">Total Collected</th>
+                            <th class="text-right">DO Deducted</th>
                             <th class="text-right mat-sep-r">Plot Balance</th>
                             <!-- Customer allocation -->
                             <th>Customers (drag here)</th>
@@ -538,13 +538,16 @@
                     <tfoot id="maturity-foot"></tfoot>
                 </table>
             </div>
+            <div id="maturity-unmatched" class="hidden text-[9px] font-bold text-amber-700 bg-amber-50 border-t border-amber-200 px-3 py-1.5"></div>
         </div>
 
         <div class="text-[9px] text-slate-500 mt-2 px-1 leading-snug">
             <span class="font-black uppercase tracking-wider text-slate-700">Notes</span> —
-            <strong>Plot Balance</strong> = After 10% Culling − Total Collected (what's still in the plot).
+            <strong>Maturity Date</strong> = transplant date keyed in the Batch Record + 9 months.
+            <strong>DO Deducted</strong> = seedlings issued via Delivery Orders keyed to this plot + batch (cancelled DOs excluded).
+            <strong>Plot Balance</strong> = After 10% Culling − DO Deducted (what's still in the plot; negative means over-issued).
             <strong>After Deduct Reserve</strong> = Plot Balance − Reserved Qty (what's still free to allocate).
-            <strong>Plot Status</strong> defaults to <em>No Status</em>; an admin opens it for collection. Total Collected is computed from customer order collections proportionally to allocations.
+            <strong>Plot Status</strong> defaults to <em>No Status</em>; an admin opens it for collection.
         </div>
     </div>
 

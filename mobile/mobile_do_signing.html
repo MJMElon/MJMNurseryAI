@@ -282,7 +282,7 @@
         </div>
         <!-- Nursery / Breed selection -->
         <div>
-          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Collection Details (Nursery / Breed / Qty)</label>
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Collection Details (Nursery / Breed / Batch / Qty)</label>
           <div id="manual-item-rows" class="space-y-2"></div>
           <button onclick="addManualItemRow()" class="text-[10px] font-bold text-blue-600 mt-2 hover:underline">+ Add Item Row</button>
         </div>
@@ -316,6 +316,7 @@
 <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
 <datalist id="nursery-list"></datalist>
 <datalist id="breed-list"></datalist>
+<datalist id="batch-list"></datalist>
 
 <!-- ══════════════════════════════════════════════
      CHOICE MODAL — Take Photo or Key in Manually
@@ -583,14 +584,25 @@ function compressImage(base64, maxWidth = 1400, quality = 0.82) {
 // ════════════════════════════════════════════════════════
 let plotsData = [];
 let breedsData = [];
+let batchesData = [];
 
 async function loadDropdownData() {
-  const [{ data: plots }, { data: breeds }] = await Promise.all([
+  const [{ data: plots }, { data: breeds }, { data: batches }] = await Promise.all([
     _supabase.from('shared_plots').select('plot_name, nursery_name'),
     _supabase.from('shared_breeds').select('name'),
+    _supabase.from('operation_batches').select('name').order('name', { ascending: false }),
   ]);
   plotsData  = plots  || [];
   breedsData = breeds || [];
+  batchesData = batches || [];
+
+  const batchList = document.getElementById('batch-list');
+  batchesData.forEach(b => {
+    if (b.name) {
+      const opt = document.createElement('option'); opt.value = b.name;
+      batchList.appendChild(opt);
+    }
+  });
 
   // Populate datalists
   const nurseryList = document.getElementById('nursery-list');
@@ -1157,6 +1169,7 @@ function addManualItemRow(nursery, breed, qty) {
   const html = '<div class="flex gap-2 items-center" id="manual-row-' + idx + '">' +
     '<div class="flex-1"><select class="search-input text-xs manual-nursery" style="padding:8px 10px;">' + nursOpts + '</select></div>' +
     '<div class="flex-1"><select class="search-input text-xs manual-breed" style="padding:8px 10px;">' + breedOpts + '</select></div>' +
+    '<div style="width:72px;"><input type="text" list="batch-list" class="search-input text-xs manual-batch" style="padding:8px 10px;" placeholder="Batch*"></div>' +
     '<div style="width:80px;"><input type="number" class="search-input text-xs manual-qty" style="padding:8px 10px;" placeholder="Qty" value="' + (qty || '') + '" oninput="recalcManualTotal()"></div>' +
     '<button onclick="document.getElementById(\'manual-row-\'+' + idx + ').remove();recalcManualTotal()" class="text-red-400 hover:text-red-600 font-bold text-sm shrink-0">✕</button>' +
   '</div>';
@@ -1189,11 +1202,27 @@ async function saveNewDO() {
     alert(`Qty (${doQty}) exceeds remaining balance (${activeAL.balance_quantity}).`); return;
   }
 
+  // Batch is compulsory on every collection line — the Monthly Maturity
+  // Allocation deducts plot stock from the DO's plot+batch, so a line
+  // without a batch can't be deducted anywhere.
+  const manualRows = document.querySelectorAll('#manual-item-rows > div');
+  let missingBatch = [], filledLines = 0, lineNo = 0;
+  manualRows.forEach(row => {
+    lineNo++;
+    const plot = row.querySelector('.manual-nursery')?.value || '';
+    const breed = row.querySelector('.manual-breed')?.value || '';
+    const qty = parseInt(row.querySelector('.manual-qty')?.value) || 0;
+    const batch = (row.querySelector('.manual-batch')?.value || '').trim();
+    if (plot || breed || qty || batch) filledLines++;
+    if ((plot || breed || qty) && !batch) missingBatch.push(lineNo);
+  });
+  if (filledLines === 0) { alert('Please fill in at least one collection line (plot + batch + qty).'); return; }
+  if (missingBatch.length) { alert('Batch is required on every line. Missing batch on line(s): ' + missingBatch.join(', ') + '.'); return; }
+
   const btn = document.getElementById('btn-save-do');
   btn.textContent = 'Saving…'; btn.disabled = true;
 
-  // Collect item rows (plot/breed/qty)
-  const manualRows = document.querySelectorAll('#manual-item-rows > div');
+  // Collect item rows (plot/breed/batch/qty)
   const payload = {
     do_number:     doNum,
     al_number:     activeAL.al_number,
@@ -1207,10 +1236,12 @@ async function saveNewDO() {
     if (itemIdx > 5) return;
     const plot = row.querySelector('.manual-nursery')?.value || '';
     const breed = row.querySelector('.manual-breed')?.value || '';
+    const batch = (row.querySelector('.manual-batch')?.value || '').trim();
     const qty = parseInt(row.querySelector('.manual-qty')?.value) || 0;
-    if (plot || breed || qty) {
+    if (plot || breed || batch || qty) {
       payload['plot_' + itemIdx] = plot;
       payload['breed_' + itemIdx] = breed;
+      payload['batch_' + itemIdx] = batch;
       payload['qty_' + itemIdx] = qty;
       itemIdx++;
     }
