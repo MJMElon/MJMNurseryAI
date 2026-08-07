@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_workers (
 -- cleanly instead of needing the table dropped.
 ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS section TEXT;
 ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS role    TEXT;
+-- Does this worker get a column on the Work Maintenance tick sheets?
+-- NULL = not answered, work it out from the role. See fix_npayroll_maint_general.sql.
+ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS maint_general BOOLEAN;
 
 -- Carry anything already filed under the old columns across.
 UPDATE mjmnpayroll_workers SET section = nursery   WHERE section IS NULL AND nursery   IS NOT NULL;

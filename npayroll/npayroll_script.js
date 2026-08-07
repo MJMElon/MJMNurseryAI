@@ -49,21 +49,43 @@ let maint = { records: [], ticks: {}, rates: {}, workers: {}, localWorkers: {} }
    the sheet it is priced from shows. Kept identical to isGeneralWorker in
    nursery_ops/plot_maintenance_script.js. */
 const MAINT_NURSERIES  = ['PN', 'BNN', 'UNN1', 'UNN2'];
-const NON_GENERAL_ROLE = /driver|pemandu|supervisor|penyelia|mandor|kerani|clerk|mekanik|mechanic|security|pengawal|foreman|operator/i;
+const GENERAL_ROLE     = /general|pekerja am|buruh am/i;
+const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
+const roleOf = w => String(w.role || w.job_title || '');
+
+/* Three rules, in order: the worker's own switch settles it; else, if the
+   nursery names the role at all, only those carrying it count; else everyone
+   bar the plainly non-general roles. `maint_general` is the switch and the
+   only rule that cannot be wrong — the role lists are a starting guess. */
+function isGeneralWorker(w, nurseryNamesTheRole) {
+  if (w.active === false) return false;
+  if (w.maint_general === true)  return true;
+  if (w.maint_general === false) return false;
+  if (nurseryNamesTheRole) return GENERAL_ROLE.test(roleOf(w));
+  return !NON_GENERAL_ROLE.test(roleOf(w));
+}
+/* Does this nursery label its general workers by role? */
+function nurseryNamesRole(n) {
+  return workers.some(w => String(w.section || '').trim().toUpperCase() === n &&
+                           w.active !== false && GENERAL_ROLE.test(roleOf(w)));
+}
+/* Is this worker on the Work Maintenance sheets? Used by the list and the
+   worker form, so what is shown is what the sheets actually do. */
+function onMaintSheet(w) {
+  const n = String(w.section || '').trim().toUpperCase();
+  if (!MAINT_NURSERIES.includes(n)) return false;
+  return isGeneralWorker(w, nurseryNamesRole(n));
+}
 
 function resolveMaintWorkers() {
-  const by = {};
-  workers.forEach(w => {
-    const n = String(w.section || '').trim().toUpperCase();
-    if (!MAINT_NURSERIES.includes(n)) return;                 // UNE, Driver
-    if (w.active === false) return;
-    if (NON_GENERAL_ROLE.test(String(w.role || w.job_title || ''))) return;
-    const name = String(w.full_name || '').trim();
-    if (name) (by[n] ||= []).push(name);
-  });
   maint.workers = {};
   MAINT_NURSERIES.forEach(n => {
-    const linked = [...new Set(by[n] || [])].sort((a, b) => a.localeCompare(b));
+    const named = nurseryNamesRole(n);
+    const linked = [...new Set(workers
+      .filter(w => String(w.section || '').trim().toUpperCase() === n)   // UNE, Driver excluded
+      .filter(w => isGeneralWorker(w, named))
+      .map(w => String(w.full_name || '').trim())
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b));
     maint.workers[n] = linked.length ? linked : (maint.localWorkers[n] || []);
   });
 }
@@ -132,7 +154,8 @@ function renderWorkers() {
         <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
         <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}${
           w.worker_no ? `<div style="font-size:11px;font-weight:400;color:var(--text-faint);">${esc(w.worker_no)}</div>` : ''}</td>
-        <td class="l">${esc(w.role || '—')}</td>
+        <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
+          ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
         <td class="r" style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="openWorker(${w.id})">Edit</button>
@@ -190,8 +213,34 @@ function openWorker(id, section) {
   $('wf-no').value     = w?.worker_no || '';
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
   $('wf-remark').value = w?.remark || '';
+  _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
+  $('wf-maint').checked = w ? onMaintSheet(w) : true;
+  onWorkerRoleChange();
   $('worker-modal').classList.add('open');
   $('wf-name').focus();
+}
+
+/* The tick box starts on whatever the role implies, so an existing worker
+   opens showing what the sheets are actually doing today. Typing a role
+   re-guesses it — until somebody sets the box themselves, after which their
+   answer stands and the role stops moving it. */
+let _maintExplicit = false;
+function onWorkerRoleChange() {
+  const row = $('wf-maint-row');
+  const sec = $('wf-section').value;
+  const nursery = MAINT_NURSERIES.includes(sec);
+  row.classList.toggle('hidden', !nursery);        // UNE and Driver have no sheet
+  if (!nursery) return;
+  if (!_maintExplicit) {
+    const named = nurseryNamesRole(sec);
+    $('wf-maint').checked = isGeneralWorker({ role: $('wf-role').value, active: true }, named);
+  }
+  const why = _maintExplicit ? 'Set on this worker.'
+    : nurseryNamesRole(sec)
+      ? `Guessed from the role — ${SECTION_NAME[sec] || sec} labels its general workers, so only those roles are ticked. Change it here if that is wrong.`
+      : 'Guessed from the role. Change it here if that is wrong.';
+  $('wf-maint-why').textContent = _maintGeneralCol ? why
+    : 'Guessed from the role. Run shared/fix_npayroll_maint_general.sql to set it per worker.';
 }
 
 /* Keep the modal saying, in words, where this worker is filed — in the title
@@ -201,6 +250,7 @@ function onWorkerSectionChange() {
   const label = SECTION_NAME[code] || code;
   $('worker-modal-title').textContent = `${editWorkerId ? 'Edit' : 'Add'} Worker — ${label}`;
   $('wf-section-hint').textContent = `Filed under ${label}.`;
+  if ($('wf-maint-row')) onWorkerRoleChange();
 }
 
 /* Correcting a worker who ended up in the wrong section. Hidden until asked
@@ -227,6 +277,8 @@ async function saveWorker() {
     updated_at: new Date().toISOString(),
     updated_by: userEmail || null
   };
+  // Writing a column the table does not have fails the whole save.
+  if (_maintGeneralCol && MAINT_NURSERIES.includes(row.section)) row.maint_general = $('wf-maint').checked;
   $('wf-save').disabled = true;
   try {
     let error;
@@ -904,10 +956,16 @@ function downloadMonthlyPDF() {
 }
 
 /* ════════════ LOAD ════════════ */
+let _maintGeneralCol = true;
 async function loadWorkers() {
   const { data, error } = await _supabase.from('mjmnpayroll_workers').select('*').order('full_name');
   if (error) { flagSetup(error.message); return; }
   workers = data || [];
+  // On an empty table there is no row to read the column names off, so ask.
+  const probe = await _supabase.from('mjmnpayroll_workers').select('maint_general').limit(1);
+  _maintGeneralCol = !probe.error;
+  const w = $('worker-setup');
+  if (w) w.classList.toggle('hidden', _maintGeneralCol);
 }
 async function loadRates() {
   const { data, error } = await _supabase.from('mjmnpayroll_piece_rates')

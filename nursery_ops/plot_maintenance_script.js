@@ -924,20 +924,59 @@ let _localWorkers  = { PN: [], BNN: [], UNN1: [], UNN2: [] };  // from nops_main
 let _linkErr       = null;
 let _linkAt        = 0;
 
-/* Roles that are not general nursery work. An exclusion list rather than a
-   list of accepted roles on purpose: a role nobody thought of ("Sprayer",
-   "Pekerja Am", or none at all) should still appear on the sheet, whereas a
-   list of accepted roles would quietly empty it. */
-const NON_GENERAL_ROLE = /driver|pemandu|supervisor|penyelia|mandor|kerani|clerk|mekanik|mechanic|security|pengawal|foreman|operator/i;
-function isGeneralWorker(r) {
-  return r.active !== false && !NON_GENERAL_ROLE.test(String(r.role || r.job_title || ''));
+/* Who counts as a general worker. Three rules, in order:
+
+   1. The worker's own switch. "General worker (Work Maintenance)" on the
+      worker's record in the payroll module settles it outright. This is the
+      only rule that cannot be wrong, so anything ticked or unticked there
+      wins over everything below.
+
+   2. Whether the nursery names the role at all. If ANY worker in that nursery
+      carries a role saying general worker, then that nursery labels its
+      general workers and only those count — a Field Conductor filed in UNN1
+      is not one of them.
+
+   3. Otherwise, everyone except the roles that plainly are not general work.
+      For a nursery that leaves the role blank, listing everybody is far
+      better than listing nobody.
+
+   Rule 3 alone is guesswork against a list of roles nobody can finish
+   enumerating, which is why rule 1 exists. */
+const GENERAL_ROLE     = /general|pekerja am|buruh am/i;
+const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
+const roleOf = r => String(r.role || r.job_title || '');
+
+function isGeneralWorker(r, nurseryNamesTheRole) {
+  if (r.active === false) return false;
+  if (r.maint_general === true)  return true;
+  if (r.maint_general === false) return false;
+  if (nurseryNamesTheRole) return GENERAL_ROLE.test(roleOf(r));
+  return !NON_GENERAL_ROLE.test(roleOf(r));
+}
+
+/* Turn the whole register into nursery → [name], applying the rules above per
+   nursery. Shared by the boot load and the live refresh so the two can never
+   drift apart. */
+function generalWorkersByNursery(rows) {
+  const by = {};
+  MAINT_NURSERIES.forEach(n => {
+    const mine = (rows || []).filter(r => String(r.section || '').trim().toUpperCase() === n);
+    const named = mine.some(r => r.active !== false && GENERAL_ROLE.test(roleOf(r)));
+    const names = mine.filter(r => isGeneralWorker(r, named))
+                      .map(r => String(r.full_name || '').trim())
+                      .filter(Boolean);
+    if (names.length) by[n] = [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  });
+  return by;
 }
 
 async function loadLinkedWorkers() {
   if (!_supabase) return;
   _linkAt = Date.now();
-  const res = await _supabase.from('mjmnpayroll_workers')
-    .select('id, full_name, section, role, job_title, active')
+  // select('*') rather than named columns: the register gains columns over
+  // time (maint_general), and naming one the table does not have yet would
+  // fail the whole read.
+  const res = await _supabase.from('mjmnpayroll_workers').select('*')
     .then(r => r, e => ({ error: e }));
   if (res.error) {
     // The payroll module may simply not be set up yet — keep the old list.
@@ -947,21 +986,9 @@ async function loadLinkedWorkers() {
     return;
   }
   _linkErr = null;
-  const by = {};
-  (res.data || []).forEach(r => {
-    const n = String(r.section || '').trim().toUpperCase();
-    // UNE and Driver are their own sections in the register and belong to no
-    // nursery sheet, so matching the nursery keeps them out on its own.
-    if (!MAINT_NURSERIES.includes(n)) return;
-    if (!isGeneralWorker(r)) return;
-    const name = String(r.full_name || '').trim();
-    if (!name) return;
-    (by[n] ||= []).push(name);
-  });
-  MAINT_NURSERIES.forEach(n => {
-    if (by[n]) by[n] = [...new Set(by[n])].sort((a, b) => a.localeCompare(b));
-  });
-  _linkedWorkers = by;
+  // UNE and Driver are their own sections in the register and belong to no
+  // nursery sheet, so matching the nursery keeps them out on its own.
+  _linkedWorkers = generalWorkersByNursery(res.data || []);
   resolveWorkers();
 }
 
@@ -3879,8 +3906,7 @@ async function initDb() {
       _supabase.from('nops_maint_piece_rates').select('nursery, work_type, rate').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
       // The register the worker names really come from — see loadLinkedWorkers.
-      _supabase.from('mjmnpayroll_workers').select('id, full_name, section, role, job_title, active')
-        .then(r => r, e => ({ error: e })),
+      _supabase.from('mjmnpayroll_workers').select('*').then(r => r, e => ({ error: e })),
       _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] }))
     ]);
@@ -3931,17 +3957,7 @@ async function initDb() {
       console.warn('[maint] worker register could not be read:', _linkErr);
     } else {
       _linkErr = null;
-      const by = {};
-      ((regRes && regRes.data) || []).forEach(r => {
-        const n = String(r.section || '').trim().toUpperCase();
-        if (!MAINT_NURSERIES.includes(n) || !isGeneralWorker(r)) return;
-        const name = String(r.full_name || '').trim();
-        if (name) (by[n] ||= []).push(name);
-      });
-      MAINT_NURSERIES.forEach(n => {
-        if (by[n]) by[n] = [...new Set(by[n])].sort((a, b) => a.localeCompare(b));
-      });
-      _linkedWorkers = by;
+      _linkedWorkers = generalWorkersByNursery((regRes && regRes.data) || []);
     }
     resolveWorkers();
     ((payRes && payRes.data) || []).forEach(r => {
