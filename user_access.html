@@ -56,6 +56,8 @@
   .preset-normal:hover { background:#eff6ff; border-color:#bfdbfe; color:#1e3a8a; }
   .preset-none:hover   { background:#f1f5f9; border-color:#cbd5e1; color:#475569; }
 
+  .mod-access-link { display:inline-flex; align-items:center; gap:7px; padding:9px 15px; border-radius:12px; border:1.5px solid #e2e8f0; background:white; color:#334155; font-size:12px; font-weight:800; text-decoration:none; transition:all .15s; }
+  .mod-access-link:hover { border-color:#94a3b8; background:#f8fafc; transform:translateY(-1px); }
   .user-row { padding:18px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid #f1f5f9; transition:background .15s; }
   .user-row:hover { background:#f8fafc; }
   .user-row:last-child { border-bottom:none; }
@@ -123,6 +125,24 @@
   <p class="text-[11px] text-slate-500 text-center">
     Looking for someone who isn't listed? Switch to <strong>All Accounts</strong> — Salesweb customer sign-ups are there, with an <strong>Open Access</strong> button to promote them.
   </p>
+
+  <!-- This page opens and closes whole modules. What somebody may DO inside
+       one is set on that module's own User Access, linked here so every one
+       of them is reachable from a single place. -->
+  <div class="card p-6 space-y-3">
+    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Inside Each Module</div>
+    <p class="text-[12px] text-slate-500 leading-relaxed">
+      This page decides which modules a person may open. To set what they can do <strong>inside</strong> one —
+      which pages appear, and which buttons work — open that module's own User Access:
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <a href="operation/operation_user_access.html"     class="mod-access-link">🌱 Nursery Seedling Stock</a>
+      <a href="nursery_ops/nursery_ops_user_access.html" class="mod-access-link">🌿 Nursery Operation</a>
+      <a href="audit/audit_user_access.html"             class="mod-access-link">📋 Nursery Audit</a>
+      <a href="npayroll/npayroll_user_access.html"       class="mod-access-link">💵 Nursery Payroll</a>
+      <a href="scan/scan_user_access.html"               class="mod-access-link">🔖 FC Scan Portal</a>
+    </div>
+  </div>
 
 </div>
 

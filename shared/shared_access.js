@@ -74,26 +74,32 @@
     }
     out.manage_users = !!perms.manage_users;
     out.can_verify_operation = !!perms.can_verify_operation;
-    // Per-page access INSIDE the operation module, managed from the module's
-    // own User Access page. Shape: { batch:'admin'|'normal'|'none', ... }.
-    // A missing key means "allowed" (default 'normal') so existing users are
-    // unaffected until an admin explicitly locks a page.
-    if (perms.operation_pages && typeof perms.operation_pages === 'object') {
-      out.operation_pages = {};
-      for (const [k, v] of Object.entries(perms.operation_pages)) {
-        if (VALID_LEVELS.has(v)) out.operation_pages[k] = v;
-      }
-    }
-    // Per-function access inside the operation module (see header comment).
-    // Booleans only; a page key that isn't a plain object is dropped so a
-    // corrupted value falls back to the legacy fields for that page.
-    if (perms.operation_actions && typeof perms.operation_actions === 'object') {
-      out.operation_actions = {};
-      for (const [page, acts] of Object.entries(perms.operation_actions)) {
-        if (!acts || typeof acts !== 'object' || Array.isArray(acts)) continue;
+    // Per-page and per-function access INSIDE a module, managed from that
+    // module's own User Access page. Any `<module>_pages` / `<module>_actions`
+    // key is carried through, so adding a module needs no change here.
+    //
+    //   <module>_pages   { batch:'admin'|'normal'|'none', ... }
+    //                    a missing key means "allowed" (default 'normal'), so
+    //                    existing users are unaffected until a page is locked
+    //   <module>_actions { batch:{ view:true, verify:false, ... }, ... }
+    //                    booleans only; a page whose value is not a plain
+    //                    object is dropped, so a corrupted value falls back to
+    //                    the legacy fields for that page rather than denying
+    for (const [key, val] of Object.entries(perms)) {
+      if (!val || typeof val !== 'object' || Array.isArray(val)) continue;
+      if (/_pages$/.test(key)) {
         const clean = {};
-        for (const [a, v] of Object.entries(acts)) clean[a] = !!v;
-        out.operation_actions[page] = clean;
+        for (const [k, v] of Object.entries(val)) if (VALID_LEVELS.has(v)) clean[k] = v;
+        out[key] = clean;
+      } else if (/_actions$/.test(key)) {
+        const clean = {};
+        for (const [page, acts] of Object.entries(val)) {
+          if (!acts || typeof acts !== 'object' || Array.isArray(acts)) continue;
+          const one = {};
+          for (const [a, v] of Object.entries(acts)) one[a] = !!v;
+          clean[page] = one;
+        }
+        out[key] = clean;
       }
     }
     return out;
@@ -152,10 +158,14 @@
           if (p.modules[k] && p.modules[k] !== 'none') { anyAccess = true; break; }
         }
       }
-      if (!anyAccess && p.operation_actions) {
-        for (const k in p.operation_actions) {
-          const acts = p.operation_actions[k];
-          if (acts && Object.keys(acts).some(a => acts[a])) { anyAccess = true; break; }
+      if (!anyAccess) {
+        for (const key in p) {
+          if (!/_actions$/.test(key) || !p[key]) continue;
+          for (const page in p[key]) {
+            const acts = p[key][page];
+            if (acts && Object.keys(acts).some(a => acts[a])) { anyAccess = true; break; }
+          }
+          if (anyAccess) break;
         }
       }
       if (!anyAccess) {
@@ -250,6 +260,44 @@
 
   function canOpenOperationPage(name) { return canDoOperation(name, 'view'); }
 
+  // ── The same gate, for any module ────────────────────────────────
+  // canDo('nursery_ops', 'maintenance', 'edit_schedule')
+  //
+  // Reads permissions.<module>_actions.<page>, which the module's own User
+  // Access page writes. When that entry is present it is authoritative: the
+  // module must be open, the page must be ticked open, and the function must
+  // be ticked. When it is absent nothing has been decided for this user, so
+  // the answer is the module level — the behaviour before per-function access
+  // existed, which keeps every existing user working until an admin sets them.
+  //
+  // Operation keeps its own function above: it carries legacy fields
+  // (can_verify_operation, reports/audit_trail stored under modules) that this
+  // generic version has no business knowing about.
+  function canDo(moduleName, page, action) {
+    if (moduleName === 'operation') return canDoOperation(page, action);
+    const p = permissions();
+    if (!canAccess(moduleName)) return false;
+    const acts = p[moduleName + '_actions'] && p[moduleName + '_actions'][page];
+    if (acts) {
+      if (!acts.view) return false;          // page closed → every function closed
+      if (action === 'view') return true;
+      return !!acts[action];
+    }
+    // Nothing set for this user: the module level decides, as it always did.
+    return true;
+  }
+  function canOpenPage(moduleName, page) { return canDo(moduleName, page, 'view'); }
+
+  // Click-time guard for write actions: true when allowed, otherwise alerts
+  // and returns false so the caller can bail out.
+  function requireAction(moduleName, page, action, message) {
+    if (canDo(moduleName, page, action)) return true;
+    try {
+      alert(message || 'Access denied — you do not have permission for this action. Ask an admin to grant it in User Access.');
+    } catch (e) { /* non-browser context */ }
+    return false;
+  }
+
   // Convenience for batch-detail tab review gating.
   function canReviewOperation() { return canDoOperation('batch', 'review'); }
 
@@ -285,6 +333,9 @@
     canOpenOperationPage,
     canDoOperation,
     requireOperationAction,
+    canDo,
+    canOpenPage,
+    requireAction,
     guard
   };
 })(window);

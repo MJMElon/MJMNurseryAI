@@ -20,6 +20,9 @@
               letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s;
               box-shadow:0 3px 10px rgba(13,148,136,.10); }
   .tool-btn:hover { background:#ccfbf1; transform:translateY(-1px); }
+  .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
+  .tool-btn-access:hover { background:#ffe4e6; }
+  .hidden { display:none !important; }
 
   /* ── Chalkboard ─────────────────────────────────────────── */
   .board-frame { background:linear-gradient(135deg,#a9743f,#8b5e34 40%,#75491f); border-radius:22px; padding:12px;
@@ -82,10 +85,12 @@
 
   <!-- Small tool buttons -->
   <div class="flex flex-wrap items-center justify-center gap-3 mb-7">
-    <a class="tool-btn" href="nursery_ops_seeds.html">🌰 Seeds Management</a>
-    <a class="tool-btn" href="nursery_ops_plot_life.html">🌱 Life of Plot</a>
-    <a class="tool-btn" href="nursery_ops_maintenance.html">🛠️ Work Maintenance</a>
-    <a class="tool-btn" href="nursery_ops_settings.html">⏱️ Motion Study Settings</a>
+    <a class="tool-btn" data-page="seeds"       href="nursery_ops_seeds.html">🌰 Seeds Management</a>
+    <a class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html">🌱 Life of Plot</a>
+    <a class="tool-btn" data-page="maintenance" href="nursery_ops_maintenance.html">🛠️ Work Maintenance</a>
+    <a class="tool-btn" data-page="motion"      href="nursery_ops_settings.html">⏱️ Motion Study Settings</a>
+    <!-- Shown only to users who may change other people's access. -->
+    <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html">🔐 User Access</a>
   </div>
 
   <!-- Live chalkboard: the month's work schedule -->
@@ -195,6 +200,23 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
     }
     const u = MJMAccess.user();
     document.getElementById('who').textContent = u.full_name || u.email || '';
+    // Per-page access, set on this module's own User Access. A page the user
+    // may not open should not be offered to them.
+    // Fails OPEN if shared_access.js is an older cached copy without these
+    // helpers: a stale script must not hide the module from people entitled
+    // to it. Wrapped so one missing helper cannot bounce the whole page.
+    try {
+      const may = (page, act) => typeof MJMAccess.canDo !== 'function' ||
+                                 MJMAccess.canDo('nursery_ops', page, act || 'view');
+      document.querySelectorAll('.tool-btn[data-page]').forEach(a => {
+        if (!may(a.dataset.page)) a.style.display = 'none';
+      });
+      if (!may('schedule', 'edit_schedule')) {
+        const eb = document.getElementById('edit-btn');
+        if (eb) eb.style.display = 'none';
+      }
+      if (MJMAccess.canManageUsers()) document.getElementById('user-access-btn').classList.remove('hidden');
+    } catch (_) { /* keep the dashboard usable */ }
     const now = new Date();
     boardMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     await loadBoard();

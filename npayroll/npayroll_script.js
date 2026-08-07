@@ -127,6 +127,43 @@ function monthLabel(m) { const [y, mo] = String(m).split('-'); return `${MONTHS_
 function maintMonthLabel(m) { return monthLabel(m); }
 
 /* ════════════ TABS ════════════ */
+/* Can this user open a tab or use a function on it? Set on this module's
+   own User Access page; unset means the module level decides, as before. */
+function may(page, action) {
+  // Fail OPEN if the helper is an older cached copy without canDo: this
+  // module has always been governed by the module level, and a stale script
+  // must not lock everybody out of a payroll they are entitled to.
+  if (typeof MJMAccess === 'undefined' || typeof MJMAccess.canDo !== 'function') return true;
+  return MJMAccess.canDo('npayroll', page, action || 'view');
+}
+/* Guard a write. Allows it when the helper is too old to know about it,
+   matching `may` above. */
+function mayDo(page, action, message) {
+  if (typeof MJMAccess === 'undefined' || typeof MJMAccess.requireAction !== 'function') return true;
+  return MJMAccess.requireAction('npayroll', page, action, message);
+}
+/* Hide every tab and sub-tab this user may not open, and land them on one
+   they can. */
+function applyPageAccess() {
+  document.querySelectorAll('.subtab[data-sub]').forEach(b => {
+    if (!may(b.dataset.sub)) b.style.display = 'none';
+  });
+  const tabPages = { workers: 'workers', rates: 'rates' };
+  Object.entries(tabPages).forEach(([tab, page]) => {
+    if (!may(page)) {
+      const b = document.querySelector(`.tab[data-tab="${tab}"]`);
+      if (b) b.style.display = 'none';
+    }
+  });
+  const payrollSubs = ['maint', 'transpl', 'seedling', 'monthly'];
+  if (!payrollSubs.some(may)) {
+    const b = document.querySelector('.tab[data-tab="payroll"]');
+    if (b) b.style.display = 'none';
+  }
+}
+/* The first tab or sub-tab this user can actually open. */
+function firstOpen(candidates) { return candidates.find(may) || null; }
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -178,7 +215,7 @@ function renderWorkers() {
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
         <td class="r" style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="openWorker(${w.id})">Edit</button>
-          ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="removeWorker(${w.id})">Remove</button>` : ''}
+          ${may('workers','remove') ? `<button class="btn btn-sm btn-danger" onclick="removeWorker(${w.id})">Remove</button>` : ''}
         </td>
       </tr>`).join('')
       // While a search is running an empty section means "nothing matched",
@@ -232,6 +269,8 @@ let editWorkerId = null;
    the form happened to open on PN. Editing can still move somebody, but that is
    behind "Move…" rather than a field to answer every time. */
 function openWorker(id, section) {
+  if (!mayDo('workers', 'manage',
+      'You do not have permission to add or edit workers. Ask an admin to grant it in User Access.')) return;
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const w = id ? workers.find(x => x.id === id) : null;
   editWorkerId = w ? w.id : null;
@@ -328,7 +367,8 @@ async function saveWorker() {
 async function removeWorker(id) {
   const w = workers.find(x => x.id === id);
   if (!w) return;
-  if (!isAdmin) { alert('Only an administrator can remove a worker.'); return; }
+  if (!mayDo('workers', 'remove',
+      'You do not have permission to remove a worker. Ask an admin to grant it in User Access.')) return;
   // Deleting takes their pay entries with it, so offer the safe option first.
   const ok = confirm(`Remove ${w.full_name}?\n\nOK = delete permanently (their work entries go too).\n` +
                      `Cancel = keep the record and mark them Inactive.`);
@@ -378,7 +418,7 @@ function renderRates() {
         <td><span class="pill ${r.active === false ? 'pill-off' : 'pill-on'}">${r.active === false ? 'Inactive' : 'Active'}</span></td>
         <td class="r" style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="openRate(${r.id})">Edit</button>
-          ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="removeRate(${r.id})">Remove</button>` : ''}
+          ${may('rates','remove') ? `<button class="btn btn-sm btn-danger" onclick="removeRate(${r.id})">Remove</button>` : ''}
         </td>
       </tr>`).join('')
       : `<tr><td colspan="7" class="empty">No job in this group yet.${
@@ -409,6 +449,8 @@ let rateGroup   = 'MN';
 /* `group` is the group whose Add Job button was pressed, so the group is
    settled before the form opens — same as a worker's section. */
 function openRate(id, group) {
+  if (!mayDo('rates', 'manage',
+      'You do not have permission to set piece rates. Ask an admin to grant it in User Access.')) return;
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const r = id ? rates.find(x => x.id === id) : null;
   editRateId = r ? r.id : null;
@@ -477,7 +519,8 @@ async function saveRate() {
 async function removeRate(id) {
   const r = rates.find(x => x.id === id);
   if (!r) return;
-  if (!isAdmin) { alert('Only an administrator can remove a job.'); return; }
+  if (!mayDo('rates', 'remove',
+      'You do not have permission to remove a job. Ask an admin to grant it in User Access.')) return;
   // Entries keep their own copy of the rate, so removing the job here cannot
   // change a month that has already been keyed.
   if (!confirm(`Remove "${r.job_desc}"?\n\nWork already keyed against it keeps its own rate and stays correct.`)) return;
@@ -539,6 +582,9 @@ const fmtDay = d => {
 
 let editEntryId = null, entryCategory = null;
 function openEntry(category, id) {
+  const page = category === 'transplanting' ? 'transpl' : 'seedling';
+  if (!mayDo(page, 'manage',
+      'You do not have permission to key in this work. Ask an admin to grant it in User Access.')) return;
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
   const e = id ? entries.find(x => x.id === id) : null;
   editEntryId = e ? e.id : null;
@@ -872,6 +918,8 @@ function pdfFooterNote(doc, y) {
 }
 
 function downloadMaintPDF() {
+  if (!mayDo('maint', 'export',
+      'You do not have permission to download the salary claim form.')) return;
   const n = $('maint-nursery').value, month = monthValue(), monthTxt = maintMonthLabel(month);
   const wk = maint.workers[n] || [];
   if (!wk.length) { alert('No worker on the Work Maintenance list for this nursery.'); return; }
@@ -943,6 +991,8 @@ function downloadMaintPDF() {
 }
 
 function downloadMonthlyPDF() {
+  if (!mayDo('monthly', 'export',
+      'You do not have permission to download the monthly payroll.')) return;
   const list = monthlyRows().filter(r => r.total > 0);
   if (!list.length) { alert('Nothing earned this month yet.'); return; }
   const sec = $('monthly-section').value;
@@ -1086,6 +1136,8 @@ $('global-month').addEventListener('change', async () => {
     const u = MJMAccess.user();
     userEmail = u.email || '';
     isAdmin   = MJMAccess.isAdminOf('npayroll');
+    // One missing helper must not take the whole module down with it.
+    try { if (MJMAccess.canManageUsers()) $('user-access-tab').classList.remove('hidden'); } catch (_) {}
     $('who').textContent = u.full_name || u.email || '';
 
     let savedMonth = null;
@@ -1099,8 +1151,16 @@ $('global-month').addEventListener('change', async () => {
     await Promise.all([loadWorkers(), loadRates(), loadEntries(), loadMaint()]);
     resolveMaintWorkers();
 
+    applyPageAccess();
+
     let tab = 'payroll', sub = 'maint';
     try { tab = localStorage.getItem('npayroll_tab') || tab; sub = localStorage.getItem('npayroll_sub') || sub; } catch (_) {}
+    // A remembered tab this user may no longer open would leave them on a
+    // blank screen, so fall back to the first one they can.
+    if (!may(sub)) sub = firstOpen(['maint', 'transpl', 'seedling', 'monthly']) || sub;
+    const tabOpen = { payroll: !!firstOpen(['maint','transpl','seedling','monthly']),
+                      workers: may('workers'), rates: may('rates') };
+    if (!tabOpen[tab]) tab = ['payroll','workers','rates'].find(t => tabOpen[t]) || tab;
     if ($('sub-' + sub)) switchSub(sub);
     if ($('tab-' + tab)) switchTab(tab);
 

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Access — Nursery Audit</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23ea580c%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_module_access.js?v=1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+<script>
+MJMModuleAccess.init({
+  module: 'audit',
+  title:  'Nursery Audit',
+  moduleLabel: 'Audit',
+  icon:   '📋',
+  accent: 'orange',
+  back:   { href: 'audit_home.html', label: 'Back to Main Page' },
+  pages: [
+    { key:'plot_audit', label:'Plot Condition Audit', desc:'Pest, animal and disease infestation, and leaf condition',
+      actions:[
+        { key:'record', label:'Record a new audit',        desc:'Walk a plot and submit its condition audit' },
+        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove an audit already submitted' }
+      ]},
+    { key:'height', label:'Seedling Height Audit', desc:'Three sampled heights per plot, with photo evidence',
+      actions:[
+        { key:'record', label:'Record a new audit',        desc:'Measure and submit heights for a plot' },
+        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a height audit already submitted' }
+      ]},
+    { key:'papan', label:'Papan Tanda Audit', desc:'Height, accuracy and visibility of every papan tanda',
+      actions:[
+        { key:'record', label:'Record a new audit',        desc:'Audit the papan tanda on a plot' },
+        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a papan tanda audit' }
+      ]},
+    { key:'maintenance', label:'Maintenance Audit', desc:'Verify completed manuring, weeding, racun and interrow work',
+      actions:[
+        { key:'record', label:'Record a new audit',        desc:'Check work on site and submit the audit' },
+        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a maintenance audit' },
+        { key:'verify', label:'Verify audit results',      desc:'Sign off another auditor’s findings',
+          adminOnly:true, highlight:true, chip:'Verify Audits' }
+      ]},
+    { key:'report', label:'Audit Report', desc:'The monthly roll-up of every audit',
+      actions:[
+        { key:'export', label:'Download the report', desc:'Export the monthly audit report' }
+      ]}
+  ]
+});
+</script>
+</body>
+</html>

@@ -43,6 +43,8 @@
     <button class="tab active" data-tab="payroll" onclick="switchTab('payroll')">💵 Payroll</button>
     <button class="tab"        data-tab="workers" onclick="switchTab('workers')">👷 Worker System</button>
     <button class="tab"        data-tab="rates"   onclick="switchTab('rates')">🏷️ Piece Rate</button>
+    <!-- Shown only to users who may change other people's access. -->
+    <a class="tab tab-access hidden" id="user-access-tab" href="npayroll_user_access.html">🔐 User Access</a>
   </nav>
 
   <div id="setup" class="warn hidden">

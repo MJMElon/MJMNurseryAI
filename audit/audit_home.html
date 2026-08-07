@@ -382,6 +382,25 @@
         </div>
       </a>
 
+      <!-- User Access — revealed only for users with the Manage Users flag -->
+      <a class="audit-card fade-in" id="audit-user-access" href="audit_user_access.html" style="display:none;background:linear-gradient(135deg,#3f1d1d 0%,#7f2a2a 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
+        <div class="audit-card-blob" style="background:#c2410c"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#fecdd3">Administration</div>
+          <div class="card-title">User Access</div>
+          <div class="card-desc">For users opened to this module: set which audits they can open, record, edit and verify.</div>
+          <div class="card-tags">
+            <span class="card-tag">Pages</span>
+            <span class="card-tag">Functions</span>
+            <span class="card-tag">User Roles</span>
+          </div>
+        </div>
+      </a>
+
     </div><!-- /audit-cards -->
 
     <!-- INFO STRIP -->
@@ -436,6 +455,28 @@
 
 <script src="audit_lang.js"></script>
 <script src="audit_supabase.js"></script>
+<!-- The portal's permission helper, for the User Access card only. Audit has
+     its own sign-in, so skip the helper's whole-system gate: it must never
+     redirect an auditor who reached this page through the audit login. -->
+<script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script>
+/* Reveal User Access only for a portal-signed-in user who may change other
+   people's access. Somebody who came through the audit login has no portal
+   session, so the card stays hidden — it fails closed. */
+(async () => {
+  try {
+    const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+    await MJMAccess.load(supa);
+    if (MJMAccess.user() && MJMAccess.canManageUsers()) {
+      const c = document.getElementById('audit-user-access');
+      if (c) c.style.display = 'block';
+    }
+  } catch (e) { /* no portal session — card stays hidden */ }
+})();
+</script>
 <script>
 /* ── Auth ── */
 const userRaw = localStorage.getItem('mjm_user');

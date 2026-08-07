@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Access — Nursery Operation Management</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_module_access.js?v=1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+<script>
+MJMModuleAccess.init({
+  module: 'nursery_ops',
+  title:  'Nursery Operation Management',
+  moduleLabel: 'Nursery Ops',
+  icon:   '🌿',
+  accent: 'teal',
+  back:   { href: 'nursery_ops_dashboard.html', label: 'Back to Main Page' },
+  pages: [
+    { key:'schedule', label:'Work Schedule', desc:'The monthly nursery work schedule on the main board',
+      actions:[
+        { key:'edit_schedule', label:'Edit the schedule', desc:'Open Edit Schedule and change the month’s planned work' }
+      ]},
+    { key:'seeds', label:'Seeds Management', desc:'Seed lots, germination and sowing records',
+      actions:[
+        { key:'manage', label:'Add, edit & delete seed records', desc:'Key in new seed lots and change existing ones' }
+      ]},
+    { key:'plot_life', label:'Life of Plot', desc:'The history of every plot, stage by stage',
+      actions:[
+        { key:'manage', label:'Edit plot life records', desc:'Change the stages and dates recorded against a plot' }
+      ]},
+    { key:'maintenance', label:'Work Maintenance', desc:'Work records, spraying schedule, dosage and the worker record',
+      actions:[
+        { key:'add_record',   label:'Add & edit work records', desc:'Key in a maintenance job, or change one already keyed' },
+        { key:'tick_schedule',label:'Tick and save the schedule', desc:'Set which plots are treated in each week of the month' },
+        { key:'worker_record',label:'Tick the Worker Record', desc:'Mark which worker did which job, feeding the salary claim' },
+        { key:'setting',      label:'Open Setting (piece rates, plots, workers)', desc:'Change piece rates, add plots — the money side of the module',
+          adminOnly:true, highlight:true, chip:'Maintenance Setting' }
+      ]},
+    { key:'motion', label:'Motion Study Settings', desc:'Standard timings used to plan the work',
+      actions:[
+        { key:'manage', label:'Edit motion study timings', desc:'Change the standard time allowed for each job' }
+      ]}
+  ]
+});
+</script>
+</body>
+</html>
