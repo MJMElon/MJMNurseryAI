@@ -395,6 +395,8 @@
   <a href="${esc(BACK.href)}" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; ${esc(BACK.label)}</a>
   <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Module User Access</span>
   <div class="justify-self-end flex items-center gap-2">
+    ${cfg.portal ? `<a href="${esc(cfg.portal.href)}" target="_blank" rel="noopener"
+       class="text-[10px] font-bold ${A.text} hover:brightness-90 uppercase tracking-widest bg-white px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors whitespace-nowrap">${esc(cfg.portal.label)} &#8599;</a>` : ''}
     <div class="w-8 h-8 ${A.hdr} rounded-lg flex items-center justify-center text-white font-black text-xs">AI</div>
   </div>
 </div>

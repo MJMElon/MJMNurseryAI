@@ -9,16 +9,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
-<script src="../shared/shared_module_access.js?v=1"></script>
+<script src="../shared/shared_module_access.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
 <script>
-/* The FC Scan Portal is served from scan.mjmnursery.com, a separate site
-   from this one, so its page list could not be read from here. The single
-   entry below is what is certain — the portal itself, open or closed. Send
-   the portal's page names and the functions on each and they drop straight
-   into `pages` below; everything else on this screen already works. */
+/* The FC Scan Portal is served from scan.mjmnursery.com, a separate site from
+   this one, so its pages are listed here as they are told to us rather than
+   read from the code. Send the rest and they drop into `pages` below. */
 MJMModuleAccess.init({
   module: 'scan',
   title:  'FC Scan Portal',
@@ -26,15 +24,26 @@ MJMModuleAccess.init({
   icon:   '🔖',
   accent: 'violet',
   back:   { href: '../index.html', label: 'Module Selection' },
+  // The portal itself opens in a new tab: it is a different site, so going
+  // "back" to it would otherwise mean leaving this one behind.
+  portal: { href: 'https://scan.mjmnursery.com', label: 'Back to Portal' },
   note:   `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
+           For each of them, tick exactly what they can do in the Scan Portal — and whether they can
+           <strong>change other users' roles</strong>.
            <br><br>
            <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
-             ⚠️ The Scan Portal runs on <strong>scan.mjmnursery.com</strong>, a separate site, so only the portal itself is
-             listed below so far. Tell us its pages and the functions on each and they will appear here like the other modules.
+             The Scan Portal runs on <strong>scan.mjmnursery.com</strong>, a separate site. Its pages are listed here as
+             they are given to us — tell us any that are missing and they will appear alongside the rest.
            </span>`,
   pages: [
     { key:'portal', label:'FC Scan Portal', desc:'Scanning and the records it produces',
-      actions:[] }
+      actions:[] },
+    { key:'maintenance', label:'Maintenance', desc:'Maintenance work recorded through the Scan Portal',
+      actions:[
+        { key:'record', label:'Record maintenance work', desc:'Scan and submit a maintenance record' },
+        { key:'edit',   label:'Edit & delete records',   desc:'Change or remove a maintenance record already submitted' },
+        { key:'export', label:'Download records',        desc:'Export the maintenance records' }
+      ]}
   ]
 });
 </script>
