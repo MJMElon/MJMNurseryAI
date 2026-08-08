@@ -1009,7 +1009,7 @@
                 //    overrides its own numbers with the AL's values so that
                 //    any AL amendment flows through here automatically.
                 _supabase.from('shared_al_orders')
-                    .select('al_number,order_number,order_date,customer_name,quantity_ordered,balance_quantity,status,created_at')
+                    .select('al_number,order_number,order_date,customer_name,quantity_ordered,balance_quantity,status,remark,created_at')
                     .then(r => r, e => ({ data: null, error: e })),
                 // ── DO records drive the Collected-qty-by-month chart.
                 //    A DO row IS a collection: the customer signed for the
@@ -1096,6 +1096,14 @@
                 let totalQty       = it.qty;
                 let totalCollected = monthCollected;
                 let balance        = totalQty - totalCollected;
+                // An AL is treated as cancelled if its status column is
+                // "Cancelled" OR the remark carries a "[CANCELLED]" prefix
+                // (the pattern the AL Manager writes when a user cancels
+                // an AL without changing the status column directly).
+                const alCancelled  = !!al && (
+                    al.status === 'Cancelled' ||
+                    /\[CANCELLED\]/i.test(String(al.remark || ''))
+                );
                 if (al) {
                     const alQty = Number(al.quantity_ordered);
                     const alBal = Number(al.balance_quantity);
@@ -1107,9 +1115,18 @@
                         balance = Math.max(0, totalQty - totalCollected);
                     }
                 }
+                // Cancelling the AL kills the order for fulfillment
+                // purposes — zero the balance so it stops inflating the
+                // "pending to collect" totals in Customer Order Management.
+                if (alCancelled) {
+                    balance = 0;
+                    totalCollected = 0;
+                }
 
                 let derivedStatus = o.status;
-                if (o.status !== 'Cancelled' && o.status !== 'Pending Payment') {
+                if (alCancelled) {
+                    derivedStatus = 'Cancelled';
+                } else if (o.status !== 'Cancelled' && o.status !== 'Pending Payment') {
                     if      (totalCollected === 0)         derivedStatus = 'Paid · Pending Pickup';
                     else if (totalCollected >= totalQty)   derivedStatus = 'Completed';
                     else                                   derivedStatus = 'Partial · ' + Math.round((totalCollected/totalQty)*100) + '%';
@@ -1124,6 +1141,7 @@
                     totalAmount: o.total ?? it.amt,
                     rawStatus: o.status,
                     derivedStatus,
+                    alCancelled,
                     paymentMethod: o.payment_terms || 'cash',
                     collectionsByMonth: colByMonth,
                     bookingsByMonth: bookByMonth,
@@ -1518,10 +1536,15 @@
             if (isCash && isUnpaid) return false;
 
             if (search && !(r.orderNumber || '').toLowerCase().includes(search) && !(r.customer || '').toLowerCase().includes(search)) return false;
+            // A cancelled AL kills the order for every non-`all` view — the
+            // grid's Active / Outstanding / Completed lists all treat it the
+            // same as a raw `rawStatus === 'Cancelled'` row so nothing
+            // dead-ends in "pending to collect".
+            const isCancelled = r.rawStatus === 'Cancelled' || r.alCancelled;
             if (filter === 'all') return true;
-            if (filter === 'active')      return r.rawStatus !== 'Cancelled';
-            if (filter === 'outstanding') return r.rawStatus !== 'Cancelled' && r.balance > 0;
-            if (filter === 'completed')   return r.rawStatus !== 'Cancelled' && r.totalCollected >= r.totalQty && r.totalQty > 0;
+            if (filter === 'active')      return !isCancelled;
+            if (filter === 'outstanding') return !isCancelled && r.balance > 0;
+            if (filter === 'completed')   return !isCancelled && r.totalCollected >= r.totalQty && r.totalQty > 0;
             return true;
         });
 
@@ -1570,6 +1593,11 @@
             const idx = startIdx + pageIdx;
             const orderMonth = r.orderDate ? r.orderDate.toLocaleString('en-MY',{month:'short',year:'numeric'}) : '—';
             const [pillCls, pillTxt] = pillFor(r.derivedStatus, r.paymentMethod);
+            // Row-level cancel marker: any strike-through / muted styling
+            // applies to both raw-cancelled and AL-cancelled rows.
+            const rowCancelled = r.rawStatus === 'Cancelled' || r.alCancelled;
+            const rowStyle = rowCancelled ? 'style="background:#fef2f2"' : '';
+            const cancelStrike = rowCancelled ? 'style="text-decoration:line-through;color:#a83020"' : '';
             const cellsHtml = months.map((m, i) => {
                 const collected = r.collectionsByMonth[m.key] || 0;
                 const booked    = r.bookingsByMonth[m.key]    || 0;
@@ -1588,16 +1616,16 @@
                 return `<td class="${cls}">${inner}</td>`;
             }).join('');
             return `
-                <tr>
+                <tr ${rowStyle}>
                     <td class="t-cust">${idx + 1}</td>
-                    <td class="t-cust"><span class="cust-link" data-pickup data-cust="${escapeHtml(r.customer || '')}" data-order="${escapeHtml(r.orderNumber || '')}">${escapeHtml(r.customer || '—')}</span><div class="t-sub">${escapeHtml(r.orderNumber || '')}${r.alNumber ? ' · <span style="color:#1d4ed8;font-weight:900;">AL ' + escapeHtml(r.alNumber) + '</span>' : ''}</div></td>
-                    <td>${orderMonth}</td>
+                    <td class="t-cust"><span class="cust-link" ${cancelStrike} data-pickup data-cust="${escapeHtml(r.customer || '')}" data-order="${escapeHtml(r.orderNumber || '')}">${escapeHtml(r.customer || '—')}</span><div class="t-sub" ${cancelStrike}>${escapeHtml(r.orderNumber || '')}${r.alNumber ? ' · <span style="color:#1d4ed8;font-weight:900;">AL ' + escapeHtml(r.alNumber) + '</span>' : ''}</div></td>
+                    <td ${cancelStrike}>${orderMonth}</td>
                     <td><span class="pill-status ${pillCls}">${escapeHtml(pillTxt)}</span></td>
-                    <td class="font-black">${r.totalQty.toLocaleString()}</td>
+                    <td class="font-black" ${cancelStrike}>${r.totalQty.toLocaleString()}</td>
                     ${cellsHtml}
-                    <td class="t-tot">${r.totalCollected.toLocaleString()}</td>
-                    <td class="t-tot${r.balance < 0 ? ' text-red-600' : r.balance === 0 ? ' text-emerald-700' : ''}">${r.balance.toLocaleString()}</td>
-                    <td class="t-tot">${fmtRM(r.totalAmount)}</td>
+                    <td class="t-tot" ${cancelStrike}>${r.totalCollected.toLocaleString()}</td>
+                    <td class="t-tot${r.balance < 0 ? ' text-red-600' : r.balance === 0 ? ' text-emerald-700' : ''}" ${cancelStrike}>${r.balance.toLocaleString()}</td>
+                    <td class="t-tot" ${cancelStrike}>${fmtRM(r.totalAmount)}</td>
                 </tr>`;
         }).join('');
 
