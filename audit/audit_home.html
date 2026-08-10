@@ -104,31 +104,33 @@
     .section-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:12px;padding-left:2px}
 
     /* AUDIT CARDS */
-    /* Two-up on a phone: with only an icon and a title on each, every module
-       fits on one screen instead of six tall cards to scroll past. */
-    .audit-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+    .audit-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:24px}
     .audit-card{border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative}
     .audit-card:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.14),0 3px 10px rgba(0,0,0,.08)}
     .audit-card:active{transform:scale(.98)}
-    .audit-card-body{padding:22px 14px 20px;position:relative;z-index:1;min-height:158px;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+    .audit-card-body{padding:22px 20px 20px;position:relative;z-index:1}
     .audit-card-blob{position:absolute;top:-30px;right:-30px;width:150px;height:150px;border-radius:50%;opacity:.15;z-index:0}
-    .card-icon{width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.17);
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-      box-shadow:0 4px 14px rgba(0,0,0,.14),inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .18s}
-    .audit-card:hover .card-icon{transform:scale(1.06)}
-    .card-icon svg{width:32px;height:32px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    /* Two lines' worth of room whether the title needs one or two, so the
-       tiles line up in a grid instead of jostling by a few pixels. */
-    .card-title{font-size:15px;font-weight:700;line-height:1.25;color:#fff;margin:0;
-      display:flex;align-items:center;justify-content:center;min-height:2.5em}
+    .card-icon-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .card-icon{width:50px;height:50px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .card-arrow{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-arrow svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .card-title{font-size:20px;font-weight:700;line-height:1.2;margin-bottom:8px;color:#fff}
+    .card-desc{font-size:13px;line-height:1.5;opacity:.75;color:rgba(255,255,255,.75);margin-bottom:16px}
+    /* tag pills as circles */
+    .card-tags{display:flex;flex-wrap:wrap;gap:8px}
+    .card-tag{font-size:10px;font-weight:600;padding:5px 11px;border-radius:20px;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);text-align:center;line-height:1.3}
 
     /* card themes */
     .card-audit{background:linear-gradient(135deg,#1a4d1a 0%,#2d7a2d 100%)}
+    .card-audit .card-label{color:var(--g200)}
     .card-audit .audit-card-blob{background:#5aab5a}
     .card-height{background:linear-gradient(135deg,#0f4c52 0%,#177a83 100%)}
+    .card-height .card-label{color:var(--teal100)}
     .card-height .audit-card-blob{background:#26b5c2}
     .card-papan{background:linear-gradient(135deg,#7c2d12 0%,#c2410c 100%)}
+    .card-papan .card-label{color:#fed7aa}
     .card-papan .audit-card-blob{background:#fb923c}
 
     /* INFO STRIP */
@@ -219,13 +221,10 @@
         padding: 28px 32px !important;
       }
       .audit-cards {
+        display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
         gap: 16px !important;
       }
-      .audit-card-body { min-height: 190px; }
-      .card-icon { width: 78px; height: 78px; }
-      .card-icon svg { width: 38px; height: 38px; }
-      .card-title { font-size: 17px; }
       .alert-section {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
@@ -292,8 +291,19 @@
       <a class="audit-card card-audit fade-in" href="audit_plot_audit.html">
         <div class="audit-card-blob"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 1</div>
           <div class="card-title" data-t="home_plot">Plot Condition Audit</div>
+          <div class="card-desc">Record pest levels, rat activity, leaf disease, and leaf colour per plot across all nursery sites.</div>
+          <div class="card-tags">
+            <span class="card-tag">Pest Infestation</span>
+            <span class="card-tag">Animal Infestation</span>
+            <span class="card-tag">Disease Infestation</span>
+            <span class="card-tag">Leaf Condition</span>
+          </div>
         </div>
       </a>
 
@@ -301,8 +311,16 @@
       <a class="audit-card card-height fade-in" href="audit_height_index.html">
         <div class="audit-card-blob"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 2</div>
           <div class="card-title" data-t="home_height">Seedling Height Audit</div>
+          <div class="card-desc">Measure and record seedling heights with 3 samples per plot. Auto-calculates average. Requires 3 photos per record.</div>
+          <div class="card-tags">
+            <span class="card-tag">Seedling Height</span>
+          </div>
         </div>
       </a>
 
@@ -310,8 +328,18 @@
       <a class="audit-card card-papan fade-in" href="audit_papan_index.html">
         <div class="audit-card-blob"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 3</div>
           <div class="card-title" data-t="home_papan">Papan Tanda Audit</div>
+          <div class="card-desc">Audit the condition of every papan tanda across all transplant plots.</div>
+          <div class="card-tags">
+            <span class="card-tag">Height 1.5M</span>
+            <span class="card-tag">Data Correct</span>
+            <span class="card-tag">Clear &amp; Visible</span>
+          </div>
         </div>
       </a>
 
@@ -319,8 +347,19 @@
       <a class="audit-card fade-in" href="audit_maintenance_index.html" style="background:linear-gradient(135deg,#1e3a5f 0%,#2d5986 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
         <div class="audit-card-blob" style="background:#4a90d9"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#bfdbfe">Module 4</div>
           <div class="card-title" data-t="home_maintenance">Maintenance Audit</div>
+          <div class="card-desc">Audit completed maintenance tasks from workers. Verify work quality on-site with photo evidence.</div>
+          <div class="card-tags">
+            <span class="card-tag">Manuring</span>
+            <span class="card-tag">Weeding</span>
+            <span class="card-tag">Racun</span>
+            <span class="card-tag">Interrow Spray</span>
+          </div>
         </div>
       </a>
 
@@ -328,8 +367,18 @@
       <a class="audit-card fade-in" href="audit_report.html" style="background:linear-gradient(135deg,#1a3a1a 0%,#2d5a2d 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
         <div class="audit-card-blob" style="background:#3d8c3d"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#b5dfb5">Monthly Report</div>
           <div class="card-title">Audit Report</div>
+          <div class="card-desc">Generate monthly audit summary by nursery and module. Printable PDF format.</div>
+          <div class="card-tags">
+            <span class="card-tag">PN</span>
+            <span class="card-tag">Main Nursery</span>
+            <span class="card-tag">Print PDF</span>
+          </div>
         </div>
       </a>
 
@@ -337,8 +386,18 @@
       <a class="audit-card fade-in" id="audit-user-access" href="audit_user_access.html" style="display:none;background:linear-gradient(135deg,#3f1d1d 0%,#7f2a2a 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
         <div class="audit-card-blob" style="background:#c2410c"></div>
         <div class="audit-card-body">
-          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg></div>
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#fecdd3">Administration</div>
           <div class="card-title">User Access</div>
+          <div class="card-desc">For users opened to this module: set which audits they can open, record, edit and verify.</div>
+          <div class="card-tags">
+            <span class="card-tag">Pages</span>
+            <span class="card-tag">Functions</span>
+            <span class="card-tag">User Roles</span>
+          </div>
         </div>
       </a>
 
