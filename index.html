@@ -105,7 +105,7 @@
 <div class="beam beam-v bv1"></div><div class="beam beam-v bv2"></div><div class="beam beam-v bv3"></div>
 
 <!-- ═══════════════════════════════════════════════════════ LOGIN SCREEN -->
-<div id="auth-screen" style="display:none" class="min-h-screen items-center justify-center p-4 relative">
+<div id="auth-screen" style="display:flex" class="min-h-screen items-center justify-center p-4 relative">
   <div class="auth-card rounded-[2.5rem] w-full max-w-md p-10 relative z-10">
     <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
     <div class="corner corner-bl"></div><div class="corner corner-br"></div>
@@ -416,17 +416,12 @@
 
   document.getElementById('yr').textContent = new Date().getFullYear();
 
-  // The first screen decision cancels the safety net below, so whichever
-  // answer arrives first is the only screen the user ever sees.
-  var _screenDecided = false;
   function showAuth() {
-    _screenDecided = true;
     hubScreen.style.display='none';
     document.getElementById('pending-screen').style.display='none';
     authScreen.style.display='flex';
   }
   function showHub()  {
-    _screenDecided = true;
     authScreen.style.display='none';
     document.getElementById('pending-screen').style.display='none';
     hubScreen.style.display='block';
@@ -557,27 +552,7 @@
     sessionStorage.setItem('mjm_session_active', '1');
   }
 
-  // Decide the first screen as early as possible. getSession() reads local
-  // storage, so a signed-out visitor gets the login form straight away; a
-  // signed-in one waits the moment it takes to check their access and is
-  // shown the module grid — never the login form on the way to it.
-  // Skipped when the URL carries a session, which is still being read.
-  if (!_hashHasToken) {
-    _supabase.auth.getSession().then(function (r) {
-      if (!_screenDecided && !(r && r.data && r.data.session)) showAuth();
-    }).catch(function () {});
-  }
-  // Safety net: if nothing decides within a few seconds, show the login form
-  // rather than leave a blank page.
-  setTimeout(function () { if (!_screenDecided) showAuth(); }, 4000);
-
-  // Reading shared_profiles needs the auth lock, and onAuthStateChange is
-  // called while that lock is held — awaiting a query inside the callback
-  // deadlocks until the lock times out. That wait is what left the login
-  // screen up for seconds before the module grid appeared. Do the sync
-  // decisions in the callback and defer the query by a tick, which is what
-  // the FC Portal already does.
-  _supabase.auth.onAuthStateChange((event, session) => {
+  _supabase.auth.onAuthStateChange(async (event, session) => {
     if (isLoggingOut) return;
     if (event === 'PASSWORD_RECOVERY') {
       isRecovering = true;
@@ -588,12 +563,7 @@
     }
     if (isRecovering) return;
     if (event === 'SIGNED_OUT' || !session) { showAuth(); return; }
-    if (session) setTimeout(function () { enterWithSession(session); }, 0);
-  });
-
-  async function enterWithSession(session) {
-    if (isLoggingOut || isRecovering) return;
-    {
+    if (session) {
       let canEnter = true;
       let profile  = null;
       try {
@@ -609,7 +579,6 @@
         console.warn('[ops-gate] profile read threw (failing open):', e);
       }
       if (!canEnter) {
-        _screenDecided = true;   // this IS the answer; the safety net must not replace it
         document.getElementById('pending-email').textContent = session.user.email || '—';
         authScreen.style.display = 'none';
         hubScreen.style.display = 'none';
@@ -629,7 +598,7 @@
       applyModuleVisibility(profile);
       showHub();
     }
-  }
+  });
 </script>
 <script>
   (function () {
