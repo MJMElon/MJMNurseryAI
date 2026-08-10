@@ -38,11 +38,29 @@ modules. Admin means `permissions.modules.audit === 'admin'`, falling back to
 `audit_role`/`role` being `admin` for accounts that predate permissions. The
 login caches both in `mjm_user`, so the check works offline.
 
-It is a UI gate only. Every REST call in `audit_supabase.js` is sent with the
-anon key rather than the signed-in user's token, so `auth.uid()` is NULL
-server-side and no RLS policy can currently tell an admin from an auditor.
-Enforcing this in the database means first making `sbFetch` attach the session
-access token.
+It is a UI gate. The database can now back it up — `sbFetch` sends the
+signed-in user's token, so `auth.uid()` resolves — but no admin-only delete
+policy has been added yet.
+
+## Signing in to the database
+
+`sbFetch` and `uploadPhoto` send the session access token from
+`sb-<ref>-auth-token`, refreshing it when it has aged out, and fall back to the
+anon key when there is no session.
+
+This matters because the only policies on the `audit_*` tables are
+`audit_module_read` / `audit_module_write` from
+`../shared/migration_rls_hardening.sql`, both `TO authenticated` and both
+calling `_mjm_has_module('audit', …)`, which needs `auth.uid()`. Sent as anon,
+a SELECT is filtered to zero rows **silently** — RLS filters, it does not error
+— so the screen shows "no records" while the rows sit in the table, and an
+INSERT is refused, which strands records in the offline queue. Do not put the
+anon key back on these calls.
+
+A user whose session has lapsed gets a warning banner rather than an empty
+list. Anyone using the app also needs `permissions.modules.audit` set to
+`admin` or `normal` in `shared_profiles`, or `_mjm_has_module` returns false
+and they see nothing.
 
 ## Supabase
 
