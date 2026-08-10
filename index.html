@@ -380,7 +380,15 @@
 
   const _STAFF_MODULE_VALUES = ['admin','normal','view','edit','manage','read','write','full','staff'];
   function hasOpsAccess(profile) {
-    if (!profile) return false;
+    // No row came back at all. That is not "this person has no access" — it
+    // means the read was filtered by RLS, or their profile is keyed to a
+    // different id than the one they signed in with. Locking out on it left a
+    // full admin (manage_users: true) stranded on the Pending screen. The
+    // catch below already lets a FAILED read through; a read that simply
+    // returns nothing is the same situation, so treat it the same.
+    // A genuine new signup still gets a row (created by the signup trigger)
+    // with no permissions on it, and still lands on Pending as it should.
+    if (!profile) return true;
     const p = profile.permissions || {};
     if (p.manage_users || p.can_verify_operation) return true;
     if (p.modules && typeof p.modules === 'object') {
