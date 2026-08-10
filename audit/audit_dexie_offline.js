@@ -176,7 +176,7 @@ async function syncNow(){
   console.log('[Sync] Starting:', pending.length, 'pending');
   refreshBadge();
 
-  let ok=0, fail=0;
+  let ok=0, fail=0, lastErr='';
 
   for(const item of pending){
     try{
@@ -213,6 +213,8 @@ async function syncNow(){
 
     }catch(e){
       fail++;
+      lastErr = (e && e.message ? e.message : String(e))
+        .replace(/^Supabase error /,'').slice(0,110);
       const retries = (item.retries||0)+1;
       console.error('[Sync] ❌', item.id, item.table, e.message, 'try:', retries);
       const db = await getDB();
@@ -234,7 +236,10 @@ async function syncNow(){
     setTimeout(()=>{ if(typeof loadRecords==='function') loadRecords(); }, 500);
     setTimeout(()=>{ if(typeof loadAll==='function') loadAll(); }, 500);
   }
-  if(fail>0) showToast('⚠ '+fail+' record'+(fail>1?'s':'')+' failed to sync');
+  /* Show why, not just that. The reason is almost always a rejection from
+     Supabase (duplicate id, missing batch/task, RLS), not the network — and
+     tapping again will never fix it, so the reason has to reach the phone. */
+  if(fail>0) showToast('⚠ '+fail+' failed to sync: '+(lastErr||'unknown error'));
 }
 
 /* ================================================================
