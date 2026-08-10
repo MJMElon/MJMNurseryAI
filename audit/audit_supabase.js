@@ -78,6 +78,117 @@ async function accessToken() {
    from the console, so the real gate is the RLS delete policy on the
    audit_* tables (shared/migration_audit_admin_delete.sql). Keep both.
 ================================================================ */
+/* ================================================================
+   PAGE ACCESS
+
+   audit_user_access.html has always written audit_actions.<page> and
+   audit_pages.<page> into shared_profiles, but nothing in the audit
+   module ever read them — the pages gated on the role string in
+   mjm_user instead. So unticking "Audit Report" for an auditor saved
+   correctly and changed nothing they could see. Two access systems for
+   one module; this is the audit side finally reading the portal's.
+
+   Inferred from the filename so there is one gate rather than one per
+   page. Keys match the `pages` list in audit_user_access.html.
+================================================================ */
+const AUDIT_PAGE_KEYS = {
+  'audit_plot_audit.html':        'plot_audit',
+  'audit_height_index.html':      'height',
+  'audit_papan_index.html':       'papan',
+  'audit_maintenance_index.html': 'maintenance',
+  'audit_report.html':            'report'
+};
+
+function canOpenAuditPage(page) {
+  try {
+    const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+    const p = u.permissions || {};
+    // audit_actions is authoritative; audit_pages mirrors it.
+    const acts = p.audit_actions && p.audit_actions[page];
+    if (acts) return !!acts.view;
+    const lvl = p.audit_pages && p.audit_pages[page];
+    if (lvl) return lvl !== 'none';
+    // Nothing configured for this user: unchanged behaviour, everything open.
+    // Deliberately not gated on modules.audit — most auditors have never had
+    // that set, and using it here would lock out the whole team at once.
+    return true;
+  } catch (e) { return true; }
+}
+
+/* Pull the current permissions down so a revoked page stops working on the
+   next page load rather than at the next login. */
+async function refreshAuditPermissions() {
+  try {
+    if (!navigator.onLine) return false;
+    const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+    if (!u.id) return false;
+    const rows = await sbFetch(
+      `shared_profiles?select=permissions,role,user_type&id=eq.${encodeURIComponent(u.id)}`);
+    if (!rows || !rows.length) return false;
+    u.permissions = rows[0].permissions || null;
+    if (rows[0].role) u.role = rows[0].role;
+    localStorage.setItem('mjm_user', JSON.stringify(u));
+    return true;
+  } catch (e) { return false; }
+}
+
+/* Send them back to the menu and explain there, rather than blanking the page
+   under a half-initialised script. */
+function denyAuditPage(page) {
+  location.replace('audit_home.html#no-access=' + encodeURIComponent(page));
+}
+
+/* The other end of that redirect. Lives here so audit_home needs no changes. */
+function showNoAccessNotice() {
+  const m = /#no-access=([\w-]+)/.exec(location.hash || '');
+  if (!m) return;
+  history.replaceState(null, '', location.pathname);   // don't re-fire on reload
+  const b = document.createElement('div');
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;padding:11px 16px;' +
+    'background:#b45309;color:#fff;font-size:12.5px;font-weight:600;text-align:center;' +
+    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;cursor:pointer";
+  b.textContent = '🔒 You no longer have access to that page. Ask an admin to switch it ' +
+                  'back on in User Access.';
+  b.onclick = () => b.remove();
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 9000);
+}
+
+/* Hide links to pages this user may not open, so the menu matches reality. */
+function hideDeniedAuditLinks() {
+  Object.keys(AUDIT_PAGE_KEYS).forEach(file => {
+    if (canOpenAuditPage(AUDIT_PAGE_KEYS[file])) return;
+    document.querySelectorAll('a[href*="' + file + '"]').forEach(a => {
+      a.style.display = 'none';
+    });
+  });
+}
+
+function currentAuditPageKey() {
+  return AUDIT_PAGE_KEYS[(location.pathname.split('/').pop() || '').toLowerCase()];
+}
+
+/* Runs while the document is still parsing — this file is loaded above each
+   page's own script — so a page we already know is off limits redirects
+   before anything of it is built. */
+(function denyEarly() {
+  const page = currentAuditPageKey();
+  if (page && !canOpenAuditPage(page)) denyAuditPage(page);
+})();
+
+async function applyAuditAccess() {
+  const page = currentAuditPageKey();
+  showNoAccessNotice();
+  hideDeniedAuditLinks();
+
+  // Confirm against the server, in case it changed since they last signed in.
+  if (await refreshAuditPermissions()) {
+    if (page && !canOpenAuditPage(page)) { denyAuditPage(page); return; }
+    hideDeniedAuditLinks();
+  }
+}
+document.addEventListener('DOMContentLoaded', applyAuditAccess);
+
 /* A signed-in user whose session has lapsed falls back to the anon key, and
    anon reads come back empty rather than failing — the screen would just say
    "no records" again. Say so instead. */

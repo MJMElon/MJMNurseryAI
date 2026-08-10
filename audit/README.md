@@ -31,6 +31,22 @@ Note the naming: the audit pages are `*_index.html`, not `*.html`. Everything in
 this folder carries the `audit_` prefix, including `audit_icon-192.png` and
 `audit_icon-512.png`.
 
+## Page access
+
+`audit_user_access.html` writes `audit_actions.<page>` and `audit_pages.<page>`
+into `shared_profiles`. Those are now enforced by `applyAuditAccess()` in
+`audit_supabase.js`, which infers the page key from the filename
+(`AUDIT_PAGE_KEYS`), so there is one gate rather than one per page and adding a
+page means adding a line to that map.
+
+For a long time nothing read those values — the pages gated on the role string
+in `mjm_user` instead — so unticking a page in User Access saved correctly and
+changed nothing the auditor could see. Do not add a second role check here.
+
+A page with nothing configured stays open, and the gate deliberately does not
+require `modules.audit`: hardly any auditor has ever had it set, and requiring
+it here would lock out the whole team at once.
+
 ## Who may delete
 
 `isAuditAdmin()` in `audit_supabase.js` — one definition, used by all four
@@ -58,9 +74,14 @@ INSERT is refused, which strands records in the offline queue. Do not put the
 anon key back on these calls.
 
 A user whose session has lapsed gets a warning banner rather than an empty
-list. Anyone using the app also needs `permissions.modules.audit` set to
-`admin` or `normal` in `shared_profiles`, or `_mjm_has_module` returns false
-and they see nothing.
+list.
+
+`../shared/fix_audit_supabase_link.sql` replaces those two policies with
+`audit_read` / `audit_insert` / `audit_update`, which ask only that the caller
+is signed in and is not a customer, plus an admin-only `audit_delete`. The
+original pair also demanded `permissions.modules.audit`, which auditors have
+never had — signing up through the audit login creates a profile row with no
+permissions at all — so they saw nothing even once the token was correct.
 
 ## Supabase
 
