@@ -354,12 +354,22 @@
 </div>
 
 <script>
-  // ── Detect recovery link FIRST before doing anything else ──
+  // ── Detect a sign-in arriving in the URL FIRST, before anything else ──
   const _hash = window.location.hash;
-  const _isRecoveryLink = _hash.includes('type=recovery') || _hash.includes('access_token');
+  // A session in the URL: a password-recovery link, or one handed over from
+  // another MJM site — the FC Scan Portal's "Module Selection" button does
+  // this, because a different domain cannot share this one's stored sign-in.
+  // Either way the gate below must not wipe it before supabase-js reads it.
+  const _hashHasToken = _hash.includes('access_token') || _hash.includes('code=');
+  // Only a real recovery link puts the page into "set a new password" mode.
+  // Treating every token as recovery stranded a handed-over session on the
+  // login screen: isRecovering was set, so onAuthStateChange bailed out and
+  // the hub never appeared.
+  const _isRecoveryLink = _hash.includes('type=recovery');
 
-  // ── Session gate: require fresh login on new window (skip for recovery links) ──
-  if (!_isRecoveryLink && !sessionStorage.getItem('mjm_session_active')) {
+  // ── Session gate: require fresh login on new window (skip when the URL
+  //    carries a session) ──
+  if (!_hashHasToken && !sessionStorage.getItem('mjm_session_active')) {
     Object.keys(localStorage).forEach(k => { if (k.startsWith('sb-')) localStorage.removeItem(k); });
     localStorage.removeItem('mjm_user');
   }
