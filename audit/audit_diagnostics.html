@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>Audit Diagnostics</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:14px 12px 40px;background:#0f2410;color:#e8f2e8;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5}
+  h1{font-size:15px;margin:0 0 4px;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  .sub{opacity:.6;margin-bottom:14px;font-size:11px}
+  .grp{background:#16341a;border:1px solid #24512a;border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .grp h2{font-size:12px;margin:0 0 8px;color:#8fdc9a;letter-spacing:.4px;text-transform:uppercase}
+  .row{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:flex-start}
+  .row:last-child{border-bottom:0}
+  .k{flex:0 0 42%;opacity:.72;word-break:break-word}
+  .v{flex:1;word-break:break-all;white-space:pre-wrap}
+  .ok{color:#6ee787}.bad{color:#ff8f8f}.warn{color:#ffcc66}.dim{opacity:.55}
+  .verdict{background:#1e1207;border:1px solid #7a4a12;border-radius:10px;padding:12px;margin-bottom:12px;
+           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.55}
+  .verdict.good{background:#0d2b12;border-color:#2e7d3a}
+  .verdict b{display:block;margin-bottom:5px;font-size:14px}
+  button{width:100%;padding:13px;margin-top:8px;border:0;border-radius:9px;font-size:14px;font-weight:700;
+         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}
+  .b1{background:#f59e0b;color:#231301}
+  .b2{background:#2e7d3a;color:#fff}
+  .b3{background:#24512a;color:#cfe9d2}
+</style>
+</head>
+<body>
+<h1>Audit Diagnostics</h1>
+<div class="sub" id="stamp">running…</div>
+
+<div id="verdict" class="verdict"><b>Checking…</b>Give it a couple of seconds.</div>
+
+<div class="grp"><h2>1 · Is the new code on this phone</h2><div id="g-build"></div></div>
+<div class="grp"><h2>2 · Session</h2><div id="g-session"></div></div>
+<div class="grp"><h2>3 · Reading the audit table</h2><div id="g-rest"></div></div>
+<div class="grp"><h2>4 · Your permissions</h2><div id="g-perm"></div></div>
+<div class="grp"><h2>5 · Service worker &amp; cache</h2><div id="g-sw"></div></div>
+
+<button class="b1" onclick="hardReset()">Force update — clear cache &amp; reload</button>
+<button class="b2" onclick="reLogin()">Sign out &amp; sign in again</button>
+<button class="b3" onclick="location.href='audit_home.html'">Back to Audit</button>
+
+<script>
+const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
+const AUTH_KEY = 'sb-kibqjztozokohqmhqqqf-auth-token';
+
+/* Everything here is deliberately standalone — it must not depend on the very
+   files whose freshness it is testing. */
+function row(where, k, v, cls) {
+  const d = document.createElement('div'); d.className = 'row';
+  d.innerHTML = '<div class="k"></div><div class="v ' + (cls || '') + '"></div>';
+  d.children[0].textContent = k;
+  d.children[1].textContent = v;
+  document.getElementById(where).appendChild(d);
+}
+
+function decodeJwt(tok) {
+  try {
+    const p = tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(p + '==='.slice((p.length + 3) % 4)))));
+  } catch (e) { return null; }
+}
+
+const findings = [];
+
+async function run() {
+  document.getElementById('stamp').textContent =
+    new Date().toString() + '  ·  ' + location.host;
+
+  /* ── 1. Is the deployed audit_supabase.js the new one, and is the service
+         worker handing over a stale copy of it? ───────────────────────── */
+  let newCodeOnNetwork = false, newCodeServed = false;
+  try {
+    // A unique query string cannot match anything in the SW cache, so this
+    // one always comes from the network — it shows what is deployed.
+    const net = await fetch('audit_supabase.js?cachebust=' + Date.now(), { cache: 'no-store' });
+    newCodeOnNetwork = (await net.text()).includes('async function accessToken');
+    // This one goes through the service worker, which serves JS cache-first —
+    // it shows what the app is actually running.
+    const served = await fetch('audit_supabase.js');
+    newCodeServed = (await served.text()).includes('async function accessToken');
+  } catch (e) { row('g-build', 'fetch failed', e.message, 'bad'); }
+
+  row('g-build', 'deployed on the server', newCodeOnNetwork ? 'NEW ✓' : 'OLD ✗',
+      newCodeOnNetwork ? 'ok' : 'bad');
+  row('g-build', 'what this phone runs', newCodeServed ? 'NEW ✓' : 'OLD (cached) ✗',
+      newCodeServed ? 'ok' : 'bad');
+  if (!newCodeOnNetwork) findings.push('NOT_DEPLOYED');
+  else if (!newCodeServed) findings.push('STALE_CACHE');
+
+  /* ── 2. Session ──────────────────────────────────────────────────────── */
+  const raw = localStorage.getItem(AUTH_KEY);
+  let sess = null;
+  row('g-session', 'mjm_user present', localStorage.getItem('mjm_user') ? 'yes' : 'no',
+      localStorage.getItem('mjm_user') ? 'ok' : 'warn');
+  row('g-session', 'supabase session key', raw ? 'present (' + raw.length + ' chars)' : 'MISSING',
+      raw ? 'ok' : 'bad');
+  if (raw) {
+    row('g-session', 'stored as', raw.trim()[0] === '{' ? 'plain JSON ✓' : 'other: ' + raw.slice(0, 12),
+        raw.trim()[0] === '{' ? 'ok' : 'bad');
+    try { sess = JSON.parse(raw); } catch (e) { row('g-session', 'parse error', e.message, 'bad'); }
+  }
+  if (!sess || !sess.access_token) {
+    row('g-session', 'access token', 'NONE — requests fall back to anon', 'bad');
+    findings.push('NO_SESSION');
+  } else {
+    const exp = (sess.expires_at || 0) * 1000;
+    const mins = Math.round((exp - Date.now()) / 60000);
+    row('g-session', 'expires', exp ? new Date(exp).toLocaleString() + '  (' + mins + ' min)' : 'unknown',
+        mins > 1 ? 'ok' : 'warn');
+    row('g-session', 'refresh token', sess.refresh_token ? 'present' : 'MISSING',
+        sess.refresh_token ? 'ok' : 'warn');
+    const claims = decodeJwt(sess.access_token) || {};
+    row('g-session', 'token role', claims.role || '(none)', claims.role === 'authenticated' ? 'ok' : 'bad');
+    row('g-session', 'user id', claims.sub || '(none)', claims.sub ? 'dim' : 'bad');
+    row('g-session', 'email', claims.email || '(none)', 'dim');
+    if (mins <= 1) findings.push('EXPIRED');
+  }
+
+  /* ── 3. The same read, as anon and as the user ───────────────────────── */
+  const url = SUPA_URL + '/rest/v1/audit_height_records?select=*&order=created_at.desc';
+  async function probe(label, token, target) {
+    try {
+      const r = await fetch(url, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token } });
+      const body = await r.text();
+      let n = null; try { n = JSON.parse(body).length; } catch (e) {}
+      row(target, label + ' — status', String(r.status), r.ok ? 'ok' : 'bad');
+      row(target, label + ' — rows', n === null ? body.slice(0, 200) : String(n),
+          n > 0 ? 'ok' : (r.ok ? 'bad' : 'bad'));
+      return { status: r.status, n: n, body: body };
+    } catch (e) {
+      row(target, label + ' — failed', e.message, 'bad');
+      return { status: 0, n: null, body: e.message };
+    }
+  }
+
+  const anonRead = await probe('anon key', SUPA_KEY, 'g-rest');
+  let userRead = null;
+  if (sess && sess.access_token) userRead = await probe('your login', sess.access_token, 'g-rest');
+  else row('g-rest', 'your login', 'skipped — no session', 'warn');
+
+  /* ── 4. Permissions the RLS policy actually checks ───────────────────── */
+  if (sess && sess.access_token) {
+    const claims = decodeJwt(sess.access_token) || {};
+    try {
+      const r = await fetch(SUPA_URL + '/rest/v1/shared_profiles?select=email,role,permissions&id=eq.' +
+                            encodeURIComponent(claims.sub || ''),
+                            { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + sess.access_token } });
+      const body = await r.text();
+      row('g-perm', 'profile read status', String(r.status), r.ok ? 'ok' : 'bad');
+      let rows = []; try { rows = JSON.parse(body); } catch (e) {}
+      if (!rows.length) {
+        row('g-perm', 'your profile row', 'NOT FOUND for this user id', 'bad');
+        findings.push('NO_PROFILE');
+      } else {
+        const p = rows[0];
+        const lvl = p.permissions && p.permissions.modules && p.permissions.modules.audit;
+        row('g-perm', 'email', p.email || '—', 'dim');
+        row('g-perm', 'role', p.role || '—', 'dim');
+        row('g-perm', 'modules.audit', lvl || 'NOT SET',
+            (lvl === 'admin' || lvl === 'normal') ? 'ok' : 'bad');
+        if (lvl !== 'admin' && lvl !== 'normal') findings.push('NO_AUDIT_PERM');
+      }
+    } catch (e) { row('g-perm', 'failed', e.message, 'bad'); }
+  } else {
+    row('g-perm', 'skipped', 'no session to check with', 'warn');
+  }
+
+  /* ── 5. Service worker and caches ────────────────────────────────────── */
+  try {
+    const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+    row('g-sw', 'registrations', String(regs.length), 'dim');
+    regs.forEach((r, i) => row('g-sw', 'sw[' + i + '] scope', r.scope, 'dim'));
+    const keys = await caches.keys();
+    row('g-sw', 'caches', keys.join(', ') || '(none)', 'dim');
+  } catch (e) { row('g-sw', 'failed', e.message, 'bad'); }
+
+  verdict(anonRead, userRead);
+}
+
+function verdict(anonRead, userRead) {
+  const el = document.getElementById('verdict');
+  let title, body, good = false;
+
+  if (findings.includes('NOT_DEPLOYED')) {
+    title = 'The fix has not been published yet';
+    body = 'The server is still serving the old audit_supabase.js. The GitHub Pages ' +
+           'deploy has not finished or has not run. Wait a few minutes and reload this page.';
+  } else if (findings.includes('STALE_CACHE')) {
+    title = 'This phone is running the old cached code';
+    body = 'The new file is on the server but the service worker is still handing out ' +
+           'the old one. Tap "Force update" below, then open the audit module again.';
+  } else if (findings.includes('NO_SESSION')) {
+    title = 'You are not signed in to the database';
+    body = 'There is no Supabase session on this phone, so every request goes out as ' +
+           'anon and the audit tables return nothing. Tap "Sign out & sign in again".';
+  } else if (findings.includes('EXPIRED')) {
+    title = 'Your session has expired and could not be refreshed';
+    body = 'Tap "Sign out & sign in again".';
+  } else if (findings.includes('NO_PROFILE')) {
+    title = 'Your login has no profile row';
+    body = 'There is no shared_profiles row whose id matches your auth user id, so the ' +
+           'audit policy cannot grant you anything. Send this screen over — this needs an SQL fix.';
+  } else if (findings.includes('NO_AUDIT_PERM')) {
+    title = 'Your account has no access to the audit module';
+    body = 'modules.audit is not set to admin or normal in shared_profiles, so the RLS ' +
+           'policy filters every row away. Grant the Audit module in User Access, or ' +
+           'send this screen over for the SQL.';
+  } else if (userRead && userRead.n > 0) {
+    title = 'Everything checks out'; good = true;
+    body = 'Your login can read ' + userRead.n + ' record(s). If a list still looks empty, ' +
+           'it is a filter on that screen — the nursery tab or the month — not access.';
+  } else if (userRead && userRead.status && userRead.status !== 200) {
+    title = 'The database refused the read';
+    body = 'Status ' + userRead.status + '. ' + String(userRead.body).slice(0, 240);
+  } else if (userRead && userRead.n === 0 && anonRead && anonRead.n === 0) {
+    title = 'Signed in correctly, but still no rows';
+    body = 'The read succeeded and returned zero rows even as your own user. Either the ' +
+           'policy is filtering on something else, or the table really is empty. ' +
+           'Send this screen over.';
+  } else {
+    title = 'Inconclusive';
+    body = 'Send this screen over.';
+  }
+
+  el.className = 'verdict' + (good ? ' good' : '');
+  el.innerHTML = '<b></b>';
+  el.firstChild.textContent = title;
+  el.appendChild(document.createTextNode(body));
+}
+
+async function hardReset() {
+  try {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch (e) {}
+  location.reload(true);
+}
+
+function reLogin() {
+  localStorage.removeItem('mjm_user');
+  localStorage.removeItem('mjm_cached_creds');
+  localStorage.removeItem(AUTH_KEY);
+  sessionStorage.clear();
+  location.href = 'audit_index.html';
+}
+
+run();
+</script>
+</body>
+</html>

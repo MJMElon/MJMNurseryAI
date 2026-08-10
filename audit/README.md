@@ -73,6 +73,19 @@ go to the `audit-photos` storage bucket.
 `../shared/shared_supabase.js` already holds; it has not been merged because
 these pages load plain REST helpers rather than the supabase-js client.
 
+## When the app shows no records
+
+Open `audit_diagnostics.html` on the affected device. It reports, in order:
+whether the deployed `audit_supabase.js` is current and whether the service
+worker is handing over a stale copy of it, whether a session exists and what
+role its token carries, the same read run as anon and as the signed-in user,
+and the account's `modules.audit` level. It ends with a plain-language verdict
+and a button that clears the service worker and caches.
+
+It is deliberately standalone — no shared scripts — because it has to be able
+to test the freshness of the very files it would otherwise depend on. Keep it
+out of the service worker's precache list for the same reason.
+
 ## After you change anything
 
 Bump `VER` in `audit_sw.js`. JS, CSS and images are served cache-first, so
