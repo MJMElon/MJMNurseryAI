@@ -31,6 +31,19 @@ Note the naming: the audit pages are `*_index.html`, not `*.html`. Everything in
 this folder carries the `audit_` prefix, including `audit_icon-192.png` and
 `audit_icon-512.png`.
 
+## Who may delete
+
+`isAuditAdmin()` in `audit_supabase.js` — one definition, used by all four
+modules. Admin means `permissions.modules.audit === 'admin'`, falling back to
+`audit_role`/`role` being `admin` for accounts that predate permissions. The
+login caches both in `mjm_user`, so the check works offline.
+
+It is a UI gate only. Every REST call in `audit_supabase.js` is sent with the
+anon key rather than the signed-in user's token, so `auth.uid()` is NULL
+server-side and no RLS policy can currently tell an admin from an auditor.
+Enforcing this in the database means first making `sbFetch` attach the session
+access token.
+
 ## Supabase
 
 Project `kibqjztozokohqmhqqqf` — the same one the rest of the system uses.

@@ -211,14 +211,10 @@ function renderPapanAlerts(){
 }
 
 /* --- RENDER AUDIT LIST --- */
-// Get user role from localStorage
-function isAdmin(){
-  try{
-    const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');
-    const role=(u.role||'').toLowerCase();
-    return role==='admin'||role==='administrator';
-  }catch(e){return false;}
-}
+/* Was a local copy of the admin rule. It now defers to isAuditAdmin() in
+   audit_supabase.js so every audit module answers this the same way — the
+   local copy is why papan gated deletes and the plot module never did. */
+function isAdmin(){ return isAuditAdmin(); }
 
 function renderAuditList(){
   const listEl=document.getElementById('audit-list');
@@ -323,7 +319,7 @@ function renderBatchTable(){
       </div>
       <div class="audit-item-actions">
         <button class="btn-view-audit" onclick="openEditBatch('${b.uid}')">Edit</button>
-        <button class="btn-audit-now" style="background:var(--danger-text)" onclick="confirmDeleteBatch('${b.uid}')">Delete</button>
+        ${isAuditAdmin()?`<button class="btn-audit-now" style="background:var(--danger-text)" onclick="confirmDeleteBatch('${b.uid}')">Delete</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -572,11 +568,23 @@ function editFromDetail(){const audit=audits.find(a=>a.uid===detailId);if(audit)
 function deleteFromDetail(){if(detailId)confirmDelete(detailId);}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');}
-function confirmDeleteBatch(uid){deleteTarget=uid;deleteType='batch';document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){
+  if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
+  deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');
+}
+function confirmDeleteBatch(uid){
+  if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
+  deleteTarget=uid;deleteType='batch';document.getElementById('modal-overlay').classList.add('show');
+}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
   if(!deleteTarget)return;
+  /* Checked again here: the modal's Delete button is reachable on its own. */
+  if(!isAuditAdmin()){
+    deleteTarget=null;
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast(t('err_delete_admin_only'));return;
+  }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);
   try{

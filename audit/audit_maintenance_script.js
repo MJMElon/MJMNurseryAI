@@ -345,10 +345,19 @@ function openLightbox(src){document.getElementById('lightbox-img').src=src;docum
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){
+  if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
+  deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
+}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
   if(!deleteTarget)return;
+  /* Checked again here: the modal's Delete button is reachable on its own. */
+  if(!isAuditAdmin()){
+    deleteTarget=null;
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast(t('err_delete_admin_only'));return;
+  }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);
   try{

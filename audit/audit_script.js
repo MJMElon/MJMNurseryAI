@@ -140,7 +140,7 @@ function renderList(){
       </div>
       <div class="record-actions" onclick="event.stopPropagation()">
         <button class="icon-btn edit-btn" onclick="openEdit('${r.uid}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="icon-btn del-btn"  onclick="confirmDelete('${r.uid}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>
+        ${isAuditAdmin()?`<button class="icon-btn del-btn"  onclick="confirmDelete('${r.uid}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>`:''}
       </div>
     </div>`).join('');
 }
@@ -317,10 +317,19 @@ function openLightbox(src){
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){
+  if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
+  deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
+}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
   if(!deleteTarget)return;
+  /* Checked again here: the modal's Delete button is reachable on its own. */
+  if(!isAuditAdmin()){
+    deleteTarget=null;
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast(t('err_delete_admin_only'));return;
+  }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);
   try{

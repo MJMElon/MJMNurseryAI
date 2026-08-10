@@ -644,18 +644,31 @@
 
       const userId = data.user.id;
 
-      // Fetch profile
-      const { data: profile, error: profileError } = await _supa
-        .from('profiles')
-        .select('full_name, role, audit_role, email, phone')
+      // Fetch profile. The table is shared_profiles — `profiles` was renamed
+      // by migration_rename_and_new_tables.sql and no longer exists, so this
+      // lookup used to fail silently and everyone logged in as their email
+      // prefix with the role "Auditor".
+      //
+      // select('*') rather than a column list: shared_profiles gained columns
+      // over time and naming one that is missing fails the whole row, which is
+      // the same silent fallback all over again. RLS limits this to the
+      // caller's own row.
+      const { data: profile } = await _supa
+        .from('shared_profiles')
+        .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       const name = profile?.full_name || email.split('@')[0];
       const role = profile?.role || 'Auditor';
 
       const auditRole = profile?.audit_role || null;
-      const userObj = { id: userId, name, role, audit_role: auditRole, email, phone: profile?.phone || '' };
+      // permissions travels with the session so the audit pages can tell an
+      // admin from an auditor while offline, the same way the portal does.
+      const userObj = { id: userId, name, role, audit_role: auditRole, email,
+                        phone: profile?.phone || '',
+                        user_type: profile?.user_type || null,
+                        permissions: profile?.permissions || null };
 
       // Save session + cache credentials for offline login
       localStorage.setItem('mjm_user', JSON.stringify(userObj));
@@ -744,9 +757,13 @@
     try{
       const { data, error } = await _supa.auth.signUp({ email, password });
       if(error) throw error;
-      // Save full_name to profiles
+      // Save full_name to shared_profiles (`profiles` was renamed away).
+      // The on_auth_user_created trigger already wrote id/email/full_name;
+      // this only adds the role, and its error is deliberately ignored — with
+      // email confirmation on there is no session yet, so it runs as anon and
+      // RLS may refuse it. The account itself is already created either way.
       if(data.user){
-        await _supa.from('profiles').upsert({
+        await _supa.from('shared_profiles').upsert({
           id:        data.user.id,
           email:     email,
           full_name: name,

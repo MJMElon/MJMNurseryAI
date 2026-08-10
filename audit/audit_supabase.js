@@ -6,6 +6,37 @@
 const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
 
+/* ================================================================
+   WHO MAY DELETE
+
+   Deleting an audit record is admin-only. This lives here, once, because
+   every audit page loads this file — four copies of the same rule is how
+   plot ended up with no gate at all while papan had one.
+
+   This only decides what the screen offers. It is trivially bypassable
+   from the console, so the real gate is the RLS delete policy on the
+   audit_* tables (shared/migration_audit_admin_delete.sql). Keep both.
+================================================================ */
+function isAuditAdmin() {
+  try {
+    // The portal's own answer, when the page has the shared layer loaded.
+    if (typeof MJMAccess !== 'undefined' && MJMAccess.isAdminOf) {
+      if (MJMAccess.isAdminOf('audit')) return true;
+    }
+    const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+
+    // Same permissions blob the portal uses, cached at login so this still
+    // works with no signal.
+    const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
+    if (mod === 'admin') return true;
+
+    // Fallback for accounts that predate permissions: audit_role wins over
+    // role, matching how audit_home.html picks a role.
+    const role = (u.audit_role || u.role || '').toLowerCase();
+    return role === 'admin' || role === 'administrator';
+  } catch (e) { return false; }
+}
+
 async function sbFetch(path, options = {}) {
   const url = `${SUPA_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
