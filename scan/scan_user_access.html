@@ -32,18 +32,42 @@ MJMModuleAccess.init({
            <strong>change other users' roles</strong>.
            <br><br>
            <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
-             The Scan Portal runs on <strong>scan.mjmnursery.com</strong>, a separate site. Its pages are listed here as
-             they are given to us — tell us any that are missing and they will appear alongside the rest.
+             <strong>Plot Status</strong> and <strong>Maintenance</strong> are also limited by nursery — switch
+             <em>All nurseries</em> off for someone and tick only the ones they should see. Scanning and
+             Issue Collection DO are open to everyone in the portal and are not controlled here.
            </span>`,
   pages: [
     { key:'portal', label:'FC Scan Portal', desc:'Scanning and the records it produces',
       actions:[] },
+    { key:'plot_status', label:'Plot Status', desc:'Daily plot stage reporting',
+      actions:[
+        { key:'report', label:'Report a plot stage', desc:'Submit today\u2019s stage for a plot' }
+      ]},
     { key:'maintenance', label:'Maintenance', desc:'Maintenance work recorded through the Scan Portal',
       actions:[
         { key:'record', label:'Record maintenance work', desc:'Scan and submit a maintenance record' },
         { key:'edit',   label:'Edit & delete records',   desc:'Change or remove a maintenance record already submitted' },
         { key:'export', label:'Download records',        desc:'Export the maintenance records' }
       ]}
+  ],
+  scopes: [
+    {
+      key:      'plot_status_nurseries',
+      label:    'Nurseries',
+      desc:     'Which nurseries this person sees in Plot Status and Maintenance',
+      allLabel: 'All nurseries',
+      emptyText:'No nurseries found in shared_plots yet.',
+      // Read from the plots themselves, so a nursery added later shows up here
+      // without anyone editing this file.
+      options: async (supa) => {
+        const { data, error } = await supa
+          .from('shared_plots')
+          .select('nursery_name')
+          .not('nursery_name', 'is', null);
+        if (error) throw error;
+        return [...new Set((data || []).map(r => r.nursery_name).filter(Boolean))].sort();
+      }
+    }
   ]
 });
 </script>

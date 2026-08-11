@@ -63,6 +63,10 @@
     const A       = ACCENTS[cfg.accent] || ACCENTS.emerald;
     const MODULE  = cfg.module;
     const PAGES   = cfg.pages || [];
+    const SCOPES  = cfg.scopes || [];
+    // Filled in before first render; a scope's choices can come from the
+    // database (nursery names) rather than being hardcoded here.
+    const scopeOptions = {};
     const ACT_KEY = MODULE + '_actions';
     const PG_KEY  = MODULE + '_pages';
     const BACK    = cfg.back || { href:'../index.html', label:'Back to Main Page' };
@@ -193,6 +197,59 @@
         </div>`;
     }
 
+    /* ── Scopes ──────────────────────────────────────────────────────
+       A page answers "may they open it?". A scope answers "how much of
+       it do they see?" — for the Scan Portal, which nurseries.
+
+       Stored as a bare array on permissions, e.g.
+         plot_status_nurseries: ['BNN']
+       and ABSENT when the answer is "all of them". Absent-means-all is
+       the reader's existing rule (lib/access.js in the FC portal), and
+       keeping it that way means nobody who has never been near this
+       screen is quietly narrowed to nothing. */
+    function scopeValue(perms, s) {
+      const v = perms[s.key];
+      return Array.isArray(v) ? v : null;          // null = everything
+    }
+
+    function scopeCardHtml(s, perms) {
+      const sel  = scopeValue(perms, s);
+      const all  = sel === null;
+      const opts = (scopeOptions[s.key] || []).map(o => `
+          <label class="act-row" for="d-scope-${s.key}-${o}">
+            <input type="checkbox" class="act-chk" id="d-scope-${s.key}-${o}"
+                   data-scope="${s.key}" value="${esc(o)}" ${!all && sel.includes(o) ? 'checked' : ''}>
+            <span><span class="block font-bold text-slate-800 text-[13px] leading-tight">${esc(o)}</span></span>
+          </label>`).join('');
+      return `
+        <div class="page-card" id="d-scope-card-${s.key}">
+          <div class="page-card-head">
+            <div>
+              <div class="font-black text-slate-800 text-sm">${esc(s.label)}</div>
+              <div class="text-[11px] text-slate-500">${esc(s.desc || '')}</div>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer shrink-0">
+              <span class="text-[9px] font-black uppercase tracking-widest ${A.text}" id="d-scope-all-label-${s.key}">${esc(s.allLabel || 'All')}</span>
+              <span class="tog">
+                <input type="checkbox" id="d-scope-all-${s.key}" data-scope-all="${s.key}" ${all ? 'checked' : ''}>
+                <span class="tog-slider"></span>
+              </span>
+            </label>
+          </div>
+          <div class="page-card-acts" id="d-scope-list-${s.key}">
+            ${opts || `<div class="text-[11px] text-slate-400 py-2">${esc(s.emptyText || 'Nothing to choose from yet.')}</div>`}
+          </div>
+        </div>`;
+    }
+
+    function syncScopeCard(scopeKey) {
+      const allEl = $('d-scope-all-' + scopeKey);
+      if (!allEl) return;
+      const list = $('d-scope-list-' + scopeKey);
+      // "All" and a hand-picked list are alternatives, so show only one.
+      if (list) list.style.display = allEl.checked ? 'none' : '';
+    }
+
     function syncPageCard(pageKey) {
       const view = $('d-view-' + pageKey).checked;
       $('d-card-' + pageKey).classList.toggle('page-off', !view);
@@ -215,7 +272,9 @@
       $('d-level').innerHTML =
         `<span class="chip chip-${lvl === 'admin' ? 'admin' : 'normal'}">Module level · ${LEVEL_LABEL[lvl] || lvl}</span>
          <span class="chip chip-info">set on main portal</span>`;
-      $('d-pages').innerHTML = PAGES.map(d => pageCardHtml(d, effectiveActions(editingPerms, d))).join('');
+      $('d-pages').innerHTML = PAGES.map(d => pageCardHtml(d, effectiveActions(editingPerms, d))).join('')
+                             + SCOPES.map(s => scopeCardHtml(s, editingPerms)).join('');
+      SCOPES.forEach(s => syncScopeCard(s.key));
       $('d-manage-users').checked = !!editingPerms.manage_users;
       $('drawer').classList.add('open');
       $('drawer-backdrop').classList.add('open');
@@ -259,6 +318,21 @@
         next[PG_KEY][d.key]  = view ? 'normal' : 'none';
       });
 
+      SCOPES.forEach(sc => {
+        const allEl = $('d-scope-all-' + sc.key);
+        if (!allEl) return;
+        if (allEl.checked) {
+          // Absent means "everything" to the reader, so remove the key rather
+          // than writing out every option — a nursery added later is then
+          // included automatically instead of silently missing.
+          delete next[sc.key];
+        } else {
+          next[sc.key] = Array.from(
+            document.querySelectorAll(`input[data-scope="${sc.key}"]:checked`)
+          ).map(el => el.value);
+        }
+      });
+
       const manageEl = $('d-manage-users');
       const me = MJMAccess.user();
       if (me && editingUid === me.id && editingPerms.manage_users && !manageEl.checked
@@ -289,6 +363,7 @@
     });
     document.addEventListener('change', (e) => {
       if (e.target.matches('input[data-view-page]')) syncPageCard(e.target.dataset.viewPage);
+      if (e.target.matches('input[data-scope-all]')) syncScopeCard(e.target.dataset.scopeAll);
     });
     $('d-close').addEventListener('click', closeDrawer);
     $('d-cancel').addEventListener('click', closeDrawer);
@@ -314,6 +389,19 @@
         $('forbidden').classList.remove('hidden');
         return;
       }
+
+      // A scope's choices may come from the database (the nursery list), so
+      // resolve them before anyone can open a drawer. A failure here leaves
+      // the scope card empty rather than taking the whole page down.
+      await Promise.all(SCOPES.map(async sc => {
+        try {
+          const v = typeof sc.options === 'function' ? await sc.options(supa) : sc.options;
+          scopeOptions[sc.key] = Array.isArray(v) ? v : [];
+        } catch (e) {
+          console.error('scope options failed for ' + sc.key, e);
+          scopeOptions[sc.key] = [];
+        }
+      }));
 
       const { data, error } = await supa
         .from('shared_profiles')
