@@ -83,11 +83,14 @@
                         <div class="do-pager hidden flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
                 <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest do-pager-info">—</div>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="doPagePrev()"
-                        class="do-pager-prev px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
-                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page">Page 1 of 1</span>
-                    <button type="button" onclick="doPageNext()"
-                        class="do-pager-next px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
+                    <button type="button" onclick="doPagePrev()" title="Previous page"
+                        class="do-pager-prev w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 text-lg font-black hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page px-2">Page 1 of 1</span>
+                    <button type="button" onclick="doPageNext()" title="Next page"
+                        class="do-pager-next w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 text-lg font-black hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-3">Go to</span>
+                    <input type="number" min="1" placeholder="#" onkeydown="if(event.key==='Enter'){doPageGoTo(this.value);this.value='';}" onchange="doPageGoTo(this.value);this.value='';"
+                        class="do-pager-goto w-16 h-9 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-black text-center focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                 </div>
             </div>
 <div class="overflow-x-auto relative z-30">
@@ -113,11 +116,14 @@
             <div class="do-pager hidden flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-100">
                 <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest do-pager-info">—</div>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="doPagePrev()"
-                        class="do-pager-prev px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
-                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page">Page 1 of 1</span>
-                    <button type="button" onclick="doPageNext()"
-                        class="do-pager-next px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
+                    <button type="button" onclick="doPagePrev()" title="Previous page"
+                        class="do-pager-prev w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 text-lg font-black hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                    <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest do-pager-page px-2">Page 1 of 1</span>
+                    <button type="button" onclick="doPageNext()" title="Next page"
+                        class="do-pager-next w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 text-lg font-black hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-3">Go to</span>
+                    <input type="number" min="1" placeholder="#" onkeydown="if(event.key==='Enter'){doPageGoTo(this.value);this.value='';}" onchange="doPageGoTo(this.value);this.value='';"
+                        class="do-pager-goto w-16 h-9 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-black text-center focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                 </div>
             </div>
         </div>
@@ -384,9 +390,29 @@
                 el.innerText = `Page ${doCurrentPage} of ${totalPages}`);
             document.querySelectorAll('.do-pager-prev').forEach(el => el.disabled = doCurrentPage <= 1);
             document.querySelectorAll('.do-pager-next').forEach(el => el.disabled = doCurrentPage >= totalPages);
+            // Give the Go-To input a sensible max so the browser refuses out-of-range typing.
+            document.querySelectorAll('.do-pager-goto').forEach(el => { el.max = totalPages; el.disabled = totalPages <= 1; });
         }
         function doPagePrev() { if (doCurrentPage > 1) { doCurrentPage--; renderDOTable(); document.getElementById('do-records-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
         function doPageNext() { doCurrentPage++; renderDOTable(); document.getElementById('do-records-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        // Jump to a specific page. Clamp to [1, totalPages] so a typo cannot land the
+        // user on an empty page; totalPages lives on the button state (data attr would
+        // be another way, but reading the disabled-next flag is enough to detect the
+        // upper bound during clamping — simpler still, we just recompute from the
+        // label the pager just wrote).
+        function doPageGoTo(raw) {
+            const n = parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < 1) return;
+            // Recover totalPages from the pager label ("Page X of Y") so we don't need
+            // to duplicate state; falls back to allowing the jump if the label is
+            // missing (renderDOTable will re-clamp).
+            const label = document.querySelector('.do-pager-page')?.innerText || '';
+            const m = label.match(/of\s+(\d+)/i);
+            const totalPages = m ? parseInt(m[1], 10) : n;
+            doCurrentPage = Math.min(Math.max(1, n), Math.max(1, totalPages));
+            renderDOTable();
+            document.getElementById('do-records-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
         // Searching restarts at page 1 so results are never hidden on a later page.
         function onDOSearchInput() { doCurrentPage = 1; renderDOTable(); }
 
