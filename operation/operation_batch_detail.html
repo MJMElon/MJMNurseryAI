@@ -4587,11 +4587,14 @@
 
                 const mimeMatch = dataUrl.match(/^data:([^;,]+)/);
                 const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+                // image/svg+xml → svg, image/x-ms-bmp → msbmp, image/heic → heic.
                 const ext = mime === 'application/pdf' ? 'pdf'
-                          : mime === 'image/png'        ? 'png'
                           : mime === 'image/jpeg'       ? 'jpg'
-                          : mime === 'image/webp'       ? 'webp'
-                          : mime === 'image/gif'        ? 'gif'
+                          : /^image\//i.test(mime)
+                              ? (mime.slice(6).toLowerCase()
+                                     .replace(/^x-/, '')
+                                     .replace(/\+.*$/, '')
+                                     .replace(/[^a-z0-9]/g, '') || 'img')
                           : 'bin';
                 const blob = await fetch(dataUrl).then(r => r.blob());
                 const safeBatch = String(batchId || 'batch').replace(/[^A-Za-z0-9_-]/g, '_');
@@ -6926,7 +6929,8 @@ Thank you.`;
                                     <span class="text-[10px] font-black text-[#c07820] uppercase tracking-wider pointer-events-none whitespace-nowrap">🗺️ Attach Map</span>
                                 </div>
                                 </div>
-                                <input type="file" id="${rowId}-doc-input" class="hidden" accept="image/*,.pdf"
+                                <input type="file" id="${rowId}-doc-input" class="hidden"
+                                    accept="image/*,.pdf,.heic,.heif,.avif,.webp,.tif,.tiff,.bmp,.svg,.jfif,.jpe"
                                     onchange="handleT6DocUpload(this,'${rowId}')">
                                 <div id="${rowId}-doc-preview" class="hidden items-center gap-1.5 p-2 border border-[#e8dcc8] rounded-xl bg-white shadow-sm h-[45px]">
                                     <div class="w-8 h-8 rounded-lg bg-[#f0f8ec] border border-[#c3e6cb] flex items-center justify-center shrink-0 text-base" id="${rowId}-doc-icon">📄</div>
