@@ -6930,10 +6930,10 @@ Thank you.`;
                                 <input type="file" id="${rowId}-doc-input" class="hidden"
                                     accept="image/*,.pdf,.heic,.heif,.avif,.webp,.tif,.tiff,.bmp,.svg,.jfif,.jpe"
                                     onchange="handleT6DocUpload(this,'${rowId}')">
-                                <div id="${rowId}-doc-preview" class="hidden items-center gap-1.5 p-2 border border-[#e8dcc8] rounded-xl bg-white shadow-sm h-[45px]">
+                                <div id="${rowId}-doc-preview" class="hidden w-full items-center gap-1.5 p-2 border border-[#e8dcc8] rounded-xl bg-white shadow-sm min-h-[45px]">
                                     <div class="w-8 h-8 rounded-lg bg-[#f0f8ec] border border-[#c3e6cb] flex items-center justify-center shrink-0 text-base" id="${rowId}-doc-icon">📄</div>
-                                    <div class="flex-1 overflow-hidden">
-                                        <div class="text-[9px] font-black text-[#3d2610] uppercase tracking-wider truncate" id="${rowId}-doc-name">document.pdf</div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[9px] font-black text-[#3d2610] uppercase tracking-wider break-words leading-snug" id="${rowId}-doc-name">document.pdf</div>
                                     </div>
                                     <div class="flex gap-1 shrink-0">
                                         <button type="button" title="View"
