@@ -51,7 +51,7 @@
   KEY IDs — Tab 6 (3rd Culling)
   #t6-plot-rows · #t6-no-plots · #t6-totals-row
   #t6-done-count · #t6-plot-count
-  #t6-total-transplanted · #t6-total-balance · #t6-avg-cull-rate
+  #t6-total-transplanted · #t6-total-culled · #t6-avg-cull-rate
   .t6-plot-row · .t6-balance(hidden) · .t6-culled-input · .t6-cull-rate-cell
   NOTE: .t6-balance is now a hidden input (auto = transplanted qty)
   ============================================================ -->
@@ -1399,10 +1399,10 @@
                                             <div class="text-3xl font-black text-[#3d2610]" id="t6-total-transplanted">0</div>
                                             <div class="text-[9px] font-bold text-[#8a7a68] uppercase tracking-widest mt-1">across all plots</div>
                                         </div>
-                                        <div class="bg-[#f0f8ec] border border-[#c3e6cb] rounded-xl p-5 flex flex-col gap-1">
-                                            <div class="text-[9px] font-black text-[#4a7a2e] uppercase tracking-widest">💚 Remaining Balance</div>
-                                            <div class="text-3xl font-black text-[#4a7a2e]" id="t6-total-balance">—</div>
-                                            <div class="text-[9px] font-bold text-[#4a7a2e] uppercase tracking-widest mt-1">after sales</div>
+                                        <div class="bg-[#fff5f5] border border-[#f8d7da] rounded-xl p-5 flex flex-col gap-1">
+                                            <div class="text-[9px] font-black text-[#a83020] uppercase tracking-widest">✂️ Total Culled Quantity</div>
+                                            <div class="text-3xl font-black text-[#a83020]" id="t6-total-culled">—</div>
+                                            <div class="text-[9px] font-bold text-[#a83020] uppercase tracking-widest mt-1">across all plots</div>
                                         </div>
                                         <div class="bg-[#fff5f5] border border-[#f8d7da] rounded-xl p-5 flex flex-col gap-1">
                                             <div class="text-[9px] font-black text-[#a83020] uppercase tracking-widest">✂️ Avg Cull Rate</div>
@@ -7151,7 +7151,7 @@ Thank you.`;
 
             // Dashboard
             document.getElementById('t6-total-transplanted').innerText = totTransplanted.toLocaleString();
-            document.getElementById('t6-total-balance').innerText      = totBalance > 0 ? totBalance.toLocaleString() : '—';
+            document.getElementById('t6-total-culled').innerText        = totCulled > 0 ? totCulled.toLocaleString() : '—';
             document.getElementById('t6-avg-cull-rate').innerText      = avgStr;
 
             // Totals footer
