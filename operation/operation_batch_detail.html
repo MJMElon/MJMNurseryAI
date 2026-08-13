@@ -1426,10 +1426,10 @@
                                     </div>
                                 </div>
 
-                                <!-- Column headers: Plot → Transplanted → 2nd Culled → Sales → Balance → 3rd Culled Qty → 3rd Culled % → Transfer → Drone Map -->
-                                <div class="hidden lg:grid gap-2 px-6 pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 0.8fr 0.5fr 0.45fr 0.45fr 0.5fr 0.6fr 1.0fr 1.2fr;">
+                                <!-- Column headers: Plot → Transplanted → 2nd Culled → Sales → Balance → 3rd Culled (qty over %) → Transfer → Drone Map -->
+                                <div class="hidden lg:grid gap-2 pl-[41px] pr-[41px] pt-4 pb-2 text-[9px] font-black text-[#8a7a68] uppercase tracking-widest t-tidy" style="grid-template-columns: 0.8fr 0.75fr 0.45fr 0.45fr 0.5fr 0.6fr 0.95fr 1.0fr;">
                                     <span>Main Plot</span>
-                                    <span>Transplanted</span>
+                                    <span class="!whitespace-nowrap">Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
                                     <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled DOs excluded)">Sales</span>
                                     <span title="Auto: Transplanted − 2nd Culled − Sales − Transferred out">Balance</span>
@@ -1450,7 +1450,7 @@
 
                                 <!-- Totals footer -->
                                 <div id="t6-totals-row" class="hidden mx-6 mb-6 mt-1 p-4 bg-[#fdfaf4] rounded-xl border border-[#e8dcc8]">
-                                    <div class="hidden lg:grid gap-2 items-center text-sm font-black t-tidy" style="grid-template-columns: 0.8fr 0.5fr 0.45fr 0.45fr 0.5fr 0.6fr 1.0fr 1.2fr;">
+                                    <div class="hidden lg:grid gap-2 items-center text-sm font-black t-tidy" style="grid-template-columns: 0.8fr 0.75fr 0.45fr 0.45fr 0.5fr 0.6fr 0.95fr 1.0fr;">
                                         <div class="text-[10px] font-black text-[#8a7a68] uppercase tracking-widest">TOTALS</div>
                                         <div class="text-[#3d2610]" id="t6-tot-transplanted">0</div>
                                         <div></div>
@@ -6849,7 +6849,7 @@ Thank you.`;
 
                 container.insertAdjacentHTML('beforeend', `
                     <div id="${rowId}" class="t6-plot-row border ${rowBg} rounded-xl overflow-hidden">
-                        <div class="grid grid-cols-1 lg:grid-cols-[0.8fr_0.5fr_0.45fr_0.45fr_0.5fr_0.6fr_1.0fr_1.2fr] gap-2 p-4 items-start t-tidy">
+                        <div class="grid grid-cols-1 lg:grid-cols-[0.8fr_0.75fr_0.45fr_0.45fr_0.5fr_0.6fr_0.95fr_1.0fr] gap-2 p-4 items-start t-tidy">
 
                             <!-- Plot -->
                             <div class="flex flex-col gap-0.5 pt-1">
