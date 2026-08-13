@@ -6825,14 +6825,22 @@ Thank you.`;
                 const rowBg    = p.destType === 'premium'    ? 'bg-[#faf5ff] border-[#e9d5ff]'
                                 : p.destType === 'doubletone' ? 'bg-[#ecfeff] border-[#a5f3fc]'
                                 : 'bg-[#fdfaf4] border-[#e8dcc8]';
-                // AUTO balance = transplanted − 2nd culled (dead) − sales.
-                const dead2   = p.dead2 || 0;
-                const sales   = p.sales || 0;
-                const autoBal = Math.max(0, (p.qty || 0) - dead2 - sales);
+                // AUTO balance = transplanted − 2nd culled (dead) − sales − transferred out.
+                //
+                // Seedlings moved to another plot are still alive, and the target
+                // plot is appended as its own row carrying that quantity. Leaving
+                // them in this row counts them twice: once as culled here, and
+                // again as the target's own sales and culled. N18 transferring
+                // 397 to N18-R is the case this fixes.
+                const moved   = p.savedTransferQty || 0;
+                const _n      = t6AutoNumbers(p, moved);
+                const dead2   = _n.dead2;
+                const sales   = _n.sales;
+                const autoBal = _n.bal;
                 // AUTO 3rd culled = 2nd culled + balance — fully calculated,
                 // not editable by hand. A computed 0 (e.g. everything sold) is
                 // real data and shows/saves as 0 rather than blank.
-                const autoCulled = dead2 + autoBal;
+                const autoCulled = _n.culled;
                 const cullVal  = autoCulled;
 
                 container.insertAdjacentHTML('beforeend', `
@@ -6871,8 +6879,8 @@ Thank you.`;
                             <!-- Balance — AUTO: transplanted − 2nd culled − sales -->
                             <div>
                                 <div class="text-[9px] font-black text-[#8a7a68] uppercase lg:hidden mb-0.5">Balance</div>
-                                <div class="input-style bg-[#f0f8ec] font-black text-[#4a7a2e] flex items-center text-sm"
-                                    title="Auto: Transplanted − 2nd Culled − Sales">${autoBal.toLocaleString()}</div>
+                                <div class="input-style bg-[#f0f8ec] font-black text-[#4a7a2e] flex items-center text-sm t6-balance-display"
+                                    title="Auto: Transplanted − 2nd Culled − Sales − Transferred out">${autoBal.toLocaleString()}</div>
                                 <input type="hidden" class="t6-balance" data-transplanted="${p.qty}" value="${autoBal}">
                             </div>
 
@@ -6898,8 +6906,8 @@ Thank you.`;
                             <div>
                                 <div class="text-[9px] font-black text-[#0891b2] uppercase lg:hidden mb-0.5">Transfer</div>
                                 <div class="flex items-center gap-1.5">
-                                    <div class="select-wrapper flex-1 min-w-0"><select class="input-style !text-[#0891b2] t6-transfer-plot !text-xs !py-2">${getPlotOptionsHTML()}</select></div>
-                                    <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-transfer-qty !text-xs !py-2 w-[72px] shrink-0" placeholder="Qty" value="${p.savedTransferQty ?? ''}">
+                                    <div class="select-wrapper flex-1 min-w-0"><select class="input-style !text-[#0891b2] t6-transfer-plot !text-xs !py-2" onchange="recalcT6Transfer(${i})">${getPlotOptionsHTML()}</select></div>
+                                    <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-transfer-qty !text-xs !py-2 w-[72px] shrink-0" placeholder="Qty" value="${p.savedTransferQty ?? ''}" oninput="recalcT6Transfer(${i})">
                                 </div>
                             </div>
 
@@ -6992,6 +7000,43 @@ Thank you.`;
                 });
             }, 0);
 
+            calcT6();
+        }
+
+        /* Balance and 3rd-culled for one plot row. Kept as a single function
+           because the initial render and the live recalc below both need it —
+           two copies of this arithmetic is how a screen ends up disagreeing
+           with what it saves. */
+        function t6AutoNumbers(p, moved) {
+            const dead2 = p.dead2 || 0;
+            const sales = p.sales || 0;
+            const bal   = Math.max(0, (p.qty || 0) - dead2 - sales - (moved || 0));
+            return { dead2, sales, bal, culled: dead2 + bal };
+        }
+
+        /* A transfer moves living seedlings out of this plot, so it changes the
+           balance and therefore the culled qty. Recompute as it is typed: the
+           save reads .t6-culled-input, so without this, keying a transfer and
+           saving in one sitting would persist the pre-transfer number even
+           though the screen shows the new one after a reload. */
+        function recalcT6Transfer(rowIdx) {
+            const rowEl = document.getElementById(`t6-row-${rowIdx}`);
+            const p     = t6_plotData[rowIdx];
+            if (!rowEl || !p) return;
+            const plotEl = rowEl.querySelector('.t6-transfer-plot');
+            const qtyEl  = rowEl.querySelector('.t6-transfer-qty');
+            // No target plot chosen means nothing has moved yet.
+            const moved  = (plotEl && plotEl.value) ? (parseInt(qtyEl && qtyEl.value) || 0) : 0;
+            const n      = t6AutoNumbers(p, moved);
+
+            const balEl = rowEl.querySelector('.t6-balance');
+            if (balEl) balEl.value = n.bal;
+            const balDisp = rowEl.querySelector('.t6-balance-display');
+            if (balDisp) balDisp.innerText = n.bal.toLocaleString();
+            const cullEl = rowEl.querySelector('.t6-culled-input');
+            if (cullEl) cullEl.value = n.culled;
+
+            calcT6Row(`t6-row-${rowIdx}`);
             calcT6();
         }
 
