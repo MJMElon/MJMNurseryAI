@@ -6946,7 +6946,8 @@ Thank you.`;
                         <div class="border-t border-dashed border-[#cfe9ef] bg-[#f7fdfe] px-4 py-3">
                             <div class="flex items-center justify-between gap-2">
                                 <button type="button" onclick="toggleT6TransferPanel(${i})"
-                                    class="flex items-center gap-2 min-w-0 text-left hover:opacity-70 transition-opacity">
+                                    title="Show or hide this plot's transfers"
+                                    class="flex-1 min-w-0 flex items-center gap-2 text-left px-2 py-1.5 -ml-2 rounded-lg hover:bg-[#cffafe] transition-colors">
                                     <span id="${rowId}-tr-caret" class="text-[#0891b2] text-xs font-black w-3 shrink-0">▾</span>
                                     <span class="text-[12px] font-black text-[#0891b2] uppercase tracking-widest truncate">↘ Transfer from ${p.plot}</span>
                                     <span id="${rowId}-tr-count" class="text-[11px] font-bold text-[#0891b2] opacity-70 shrink-0"></span>
