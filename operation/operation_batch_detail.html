@@ -6944,16 +6944,23 @@ Thank you.`;
                         </div>
                         ${p.transferFrom ? '' : `
                         <div class="border-t border-dashed border-[#cfe9ef] bg-[#f7fdfe] px-4 py-3">
-                            <div class="flex items-center justify-between gap-2 mb-2">
-                                <div class="text-[9px] font-black text-[#0891b2] uppercase tracking-widest">↘ Transfer from ${p.plot}</div>
+                            <div class="flex items-center justify-between gap-2">
+                                <button type="button" onclick="toggleT6TransferPanel(${i})"
+                                    class="flex items-center gap-2 min-w-0 text-left hover:opacity-70 transition-opacity">
+                                    <span id="${rowId}-tr-caret" class="text-[#0891b2] text-xs font-black w-3 shrink-0">▾</span>
+                                    <span class="text-[12px] font-black text-[#0891b2] uppercase tracking-widest truncate">↘ Transfer from ${p.plot}</span>
+                                    <span id="${rowId}-tr-count" class="text-[11px] font-bold text-[#0891b2] opacity-70 shrink-0"></span>
+                                </button>
                                 <button type="button" onclick="addT6TransferRecord(${i})"
-                                    class="shrink-0 px-3 py-1.5 bg-[#0891b2] text-white text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0e7490] transition-colors">+ Add Record</button>
+                                    class="shrink-0 px-3 py-2 bg-[#0891b2] text-white text-[11px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0e7490] transition-colors">+ Add Record</button>
                             </div>
-                            <div class="hidden sm:grid grid-cols-[1.1fr_1.1fr_0.8fr_30px] gap-2 pb-1 text-[8px] font-black text-[#8a7a68] uppercase tracking-widest">
-                                <span>Date Transferred</span><span>To Plot</span><span>Quantity</span><span></span>
+                            <div id="${rowId}-tr-body" class="mt-2">
+                                <div class="hidden sm:grid grid-cols-[1.1fr_1.1fr_0.8fr_32px] gap-2 pb-1 text-[10px] font-black text-[#8a7a68] uppercase tracking-widest">
+                                    <span>Date Transferred</span><span>To Plot</span><span>Quantity</span><span></span>
+                                </div>
+                                <div id="${rowId}-transfers" class="flex flex-col gap-2"></div>
+                                <div id="${rowId}-transfers-empty" class="text-[12px] font-bold text-[#8a7a68] py-1">No transfer recorded.</div>
                             </div>
-                            <div id="${rowId}-transfers" class="flex flex-col gap-2"></div>
-                            <div id="${rowId}-transfers-empty" class="text-[10px] font-bold text-[#8a7a68] py-1">No transfer recorded.</div>
                         </div>`}
                     </div>
                 `);
@@ -7054,15 +7061,15 @@ Thank you.`;
         function t6TransferRecordHtml(rowIdx, rec) {
             rec = rec || {};
             return `
-                <div class="t6-transfer-rec grid grid-cols-[1.1fr_1.1fr_0.8fr_30px] gap-2 items-center">
-                    <input type="date" class="input-style t6-tr-date !text-xs !py-2"
+                <div class="t6-transfer-rec grid grid-cols-[1.1fr_1.1fr_0.8fr_32px] gap-2 items-center">
+                    <input type="date" class="input-style t6-tr-date !text-sm !py-2.5"
                         value="${rec.date || ''}" onchange="recalcT6Transfer(${rowIdx})">
-                    <div class="select-wrapper w-full"><select class="input-style !text-[#0891b2] t6-tr-plot !text-xs !py-2 w-full"
+                    <div class="select-wrapper w-full"><select class="input-style !text-[#0891b2] t6-tr-plot !text-sm !py-2.5 w-full"
                         onchange="recalcT6Transfer(${rowIdx})">${getPlotOptionsHTML()}</select></div>
-                    <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-tr-qty !text-xs !py-2"
+                    <input type="number" min="0" class="input-style !text-[#0891b2] font-black t6-tr-qty !text-sm !py-2.5"
                         placeholder="Qty" value="${rec.qty ?? ''}" oninput="recalcT6Transfer(${rowIdx})">
                     <button type="button" title="Remove this transfer"
-                        class="w-7 h-7 bg-[#fff5f5] text-[#a83020] rounded-lg hover:bg-[#f8d7da] text-xs font-black flex items-center justify-center"
+                        class="w-8 h-8 bg-[#fff5f5] text-[#a83020] rounded-lg hover:bg-[#f8d7da] text-sm font-black flex items-center justify-center"
                         onclick="removeT6TransferRecord(this, ${rowIdx})">✕</button>
                 </div>`;
         }
@@ -7070,6 +7077,8 @@ Thank you.`;
         function addT6TransferRecord(rowIdx, rec) {
             const host = document.getElementById(`t6-row-${rowIdx}-transfers`);
             if (!host) return;
+            const body = document.getElementById(`t6-row-${rowIdx}-tr-body`);
+            if (body && body.classList.contains('hidden')) toggleT6TransferPanel(rowIdx);
             host.insertAdjacentHTML('beforeend', t6TransferRecordHtml(rowIdx, rec));
             // The options only exist once the markup is in the document.
             if (rec && rec.target) {
@@ -7091,6 +7100,23 @@ Thank you.`;
             const host  = document.getElementById(`t6-row-${rowIdx}-transfers`);
             const empty = document.getElementById(`t6-row-${rowIdx}-transfers-empty`);
             if (host && empty) empty.classList.toggle('hidden', host.children.length > 0);
+            // Show the tally on the header, so a folded panel still says what is
+            // in it rather than looking empty.
+            const count = document.getElementById(`t6-row-${rowIdx}-tr-count`);
+            if (count && host) {
+                const n = host.children.length;
+                count.innerText = n ? `(${n})` : '';
+            }
+        }
+
+        /* Fold a plot's transfer list away. Visual only — the lines stay in the
+           DOM, so they keep counting towards the balance and keep saving. */
+        function toggleT6TransferPanel(rowIdx) {
+            const body  = document.getElementById(`t6-row-${rowIdx}-tr-body`);
+            const caret = document.getElementById(`t6-row-${rowIdx}-tr-caret`);
+            if (!body) return;
+            const collapsed = body.classList.toggle('hidden');
+            if (caret) caret.innerText = collapsed ? '▸' : '▾';
         }
 
         /* Transfers move living seedlings out of this plot, so they change the
