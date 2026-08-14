@@ -236,6 +236,9 @@ ORDER  BY i.row_no;
 --     double-counting those seedlings out of the source plot.
 --     Decide per row: correct the existing record's target, or delete the
 --     matching row from tmp_transfer_import before running section 4.
+--     The one known case — batch 224, N18, 397, recorded as N18-R but N1 on
+--     the sheet — is handled by shared/fix_n18_transfer_target.sql. Run that
+--     first and this list comes back empty.
 SELECT i.row_no, b.batch_name, i.from_plot, i.qty,
        i.to_plot        AS sheet_says,
        l.plot_name      AS already_recorded_as,
