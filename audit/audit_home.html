@@ -363,6 +363,10 @@
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
           <span data-t="back_portal">Back to Portal</span>
         </a>
+        <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back End</span>
+        </a>
         <button class="lang-toggle-btn" onclick="toggleLang()">BM</button>
       </div>
       <div class="header-user-btn" onclick="showLogout()" style="margin-left:8px">
@@ -434,28 +438,6 @@
         </div>
         <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
-      <a class="fc-card fade-in" href="audit_report.html">
-        <div class="fc-ico" style="background:#e9f7e9">
-          <svg viewBox="0 0 24 24" style="stroke:#1a5c1a"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl">Audit Report</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MONTHLY REPORT</div>
-          <div class="fc-desc">Monthly summary by nursery, printable PDF</div>
-        </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-      </a>
-      <a class="fc-card fade-in" href="audit_user_access.html" id="audit-user-access" style="display:none">
-        <div class="fc-ico" style="background:#fdeaea">
-          <svg viewBox="0 0 24 24" style="stroke:#991b1b"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl">User Access</div>
-          <div class="fc-sub"><span class="fc-dot"></span>ADMINISTRATION</div>
-          <div class="fc-desc">Set which audits each user may open and record</div>
-        </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-      </a>
     </div><!-- /audit-cards -->
 
     <!-- INFO STRIP -->
@@ -510,27 +492,19 @@
 
 <script src="audit_lang.js"></script>
 <script src="audit_supabase.js"></script>
-<!-- The portal's permission helper, for the User Access card only. Audit has
-     its own sign-in, so skip the helper's whole-system gate: it must never
-     redirect an auditor who reached this page through the audit login. -->
-<script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../shared/shared_supabase.js"></script>
-<script src="../shared/shared_access.js"></script>
+<!-- The portal permission layer used to load here for the User Access card.
+     That card lives on the back end now and nothing on the auditor view
+     reads MJMAccess, so the three scripts came out: an auditor on nursery
+     signal no longer waits on a CDN and two shared files to see the page. -->
 <script>
-/* Reveal User Access only for a portal-signed-in user who may change other
-   people's access. Somebody who came through the audit login has no portal
-   session, so the card stays hidden — it fails closed. */
-(async () => {
-  try {
-    const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
-    await MJMAccess.load(supa);
-    if (MJMAccess.user() && MJMAccess.canManageUsers()) {
-      const c = document.getElementById('audit-user-access');
-      if (c) c.style.display = 'flex';   // .fc-card is a flex row
-    }
-  } catch (e) { /* no portal session — card stays hidden */ }
-})();
+/* The report and user access moved to the back end (audit_admin.html), so
+   this page is now purely the auditor view. An admin gets here by entering
+   the portal from the back end — show them the way back, or the only route
+   out is signing in again. */
+if (typeof isAuditAdmin === 'function' && isAuditAdmin()) {
+  const b = document.getElementById('backend-btn');
+  if (b) b.style.display = 'flex';
+}
 </script>
 <script>
 /* ── Auth ── */
