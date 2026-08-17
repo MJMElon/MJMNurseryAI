@@ -186,10 +186,42 @@ END $$;
 
 
 -- ────────────────────────────────────────────────────────────────
--- 3. VERIFY — read the output of these three before closing the editor
+-- 3. PHOTOS
+--
+--    The audit forms require a photo, upload it to the audit-photos
+--    bucket, and then render the /object/public/ URL — so the bucket has
+--    to exist, be public to read, and be writable by signed-in staff. It
+--    is created here rather than only in fix_audit_supabase_link.sql so
+--    that running this one file leaves the audit module working.
+-- ────────────────────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('audit-photos', 'audit-photos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "audit_photos_read"   ON storage.objects;
+DROP POLICY IF EXISTS "audit_photos_insert" ON storage.objects;
+DROP POLICY IF EXISTS "audit_photos_update" ON storage.objects;
+
+CREATE POLICY "audit_photos_read" ON storage.objects
+  FOR SELECT TO public
+  USING (bucket_id = 'audit-photos');
+CREATE POLICY "audit_photos_insert" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'audit-photos');
+CREATE POLICY "audit_photos_update" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING      (bucket_id = 'audit-photos')
+  WITH CHECK (bucket_id = 'audit-photos');
+
+
+-- ────────────────────────────────────────────────────────────────
+-- 4. VERIFY — read the output of these before closing the editor
 -- ────────────────────────────────────────────────────────────────
 
--- 3a. Four policies per table, all TO authenticated.
+-- 4a. The photo bucket exists and is public.
+SELECT id, name, public FROM storage.buckets WHERE id = 'audit-photos';
+
+-- 4b. Four policies per table, all TO authenticated.
 SELECT tablename,
        policyname,
        cmd,
@@ -199,7 +231,7 @@ SELECT tablename,
    AND tablename LIKE 'audit\_%'
  ORDER BY tablename, cmd, policyname;
 
--- 3b. Staff accounts that the gate will now admit. An auditor who is
+-- 4c. Staff accounts that the gate will now admit. An auditor who is
 --     missing from this list is missing a shared_profiles row — that is
 --     a separate problem and the policies cannot fix it.
 SELECT u.email,
@@ -212,7 +244,7 @@ SELECT u.email,
   LEFT JOIN public.shared_profiles p ON p.id = u.id
  ORDER BY passes_staff_gate NULLS FIRST, u.email;
 
--- 3c. Signed-in users with no profile row at all. These accounts fail
+-- 4d. Signed-in users with no profile row at all. These accounts fail
 --     every gate above, because the gate has nothing to read. If the
 --     blocked auditor appears here, create their shared_profiles row
 --     (User Access) — do not loosen the policies further.

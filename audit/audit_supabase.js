@@ -292,7 +292,17 @@ const sb = {
       headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token || SUPA_KEY}`, 'Content-Type': mime, 'x-upsert': 'true' },
       body: blob
     });
-    if (!res.ok) { console.error('Photo upload failed', await res.text()); return null; }
+    if (!res.ok) {
+      /* Returning null here meant the reason died in the console: a missing
+         audit-photos bucket and a storage policy refusing the write looked
+         identical to the caller. Keep returning null so existing callers
+         behave, but record why so the toast can say it. */
+      const body = await res.text();
+      console.error('Photo upload failed', res.status, body);
+      sb.lastPhotoError = 'Photo upload failed ' + res.status + ': ' + body.slice(0, 120);
+      return null;
+    }
+    sb.lastPhotoError = null;
     return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
   }
 };

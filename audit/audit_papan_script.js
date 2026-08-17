@@ -474,7 +474,7 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   // no remarks field
 
   // Photo
-  renderPapanPhotoSlot(formState.photo||null);
+  renderPapanPhoto(formState.photo||null);
   setView('audit-form');
 }
 
@@ -503,32 +503,43 @@ async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
   const compressed=await compressPhoto(input.files[0]);
   formState.photo=compressed;
-  renderPapanPhotoSlot(compressed);
+  renderPapanPhoto(compressed);
   input.value='';
 }
-function renderPapanPhotoSlot(src){
-  const slot=document.getElementById('papan-photo-slot');
-  if(!slot)return;
-  while(slot.firstChild)slot.removeChild(slot.firstChild);
+/* Show or hide the picked photo.
+
+   This used to write into #papan-photo-slot and bail at `if(!slot)return`
+   when it was missing — and it is missing: this page's markup is a drop
+   zone plus a hidden preview (#papan-photo-drop / #papan-photo-preview /
+   #papan-photo-img), from a redesign the script never caught up with. So
+   picking a photo stored it in formState, compressed and ready, and drew
+   nothing. The box stayed on "Tambah Gambar" and the whole thing looked
+   like a failed upload when nothing had actually failed yet.
+
+   Named for what it renders now, so the next markup change breaks loudly
+   instead of silently. */
+function renderPapanPhoto(src){
+  const drop = document.getElementById('papan-photo-drop');
+  const wrap = document.getElementById('papan-photo-preview');
+  const img  = document.getElementById('papan-photo-img');
+  if(!wrap || !img){
+    console.warn('[Papan] photo preview elements missing — check the markup');
+    return;
+  }
   if(src){
-    slot.classList.add('has-photo');
-    const img=document.createElement('img');img.src=src;img.alt='photo';slot.appendChild(img);
-    const btn=document.createElement('button');btn.className='photo-slot-clear';btn.textContent='×';
-    btn.onclick=e=>{e.stopPropagation();formState.photo=null;renderPapanPhotoSlot(null);};
-    slot.appendChild(btn);
+    img.src = src;
+    wrap.style.display = 'block';
+    if(drop) drop.style.display = 'none';
   }else{
-    slot.classList.remove('has-photo');
-    const num=document.createElement('div');num.className='photo-slot-num';num.textContent='1';
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');
-    svg.innerHTML='<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/>';
-    const lbl=document.createElement('span');lbl.className='photo-slot-label';lbl.textContent='Papan';
-    slot.appendChild(num);slot.appendChild(svg);slot.appendChild(lbl);
+    img.removeAttribute('src');
+    wrap.style.display = 'none';
+    if(drop) drop.style.display = '';
   }
 }
 function clearPhoto(e){
   if(e)e.stopPropagation();
   formState.photo=null;
-  renderPapanPhotoSlot(null);
+  renderPapanPhoto(null);
   document.getElementById('papan-photo-input').value='';
 }
 

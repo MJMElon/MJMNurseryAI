@@ -179,6 +179,14 @@ function describeSbError(e){
   if(p.status === 401 || /JWT|token/i.test(p.message)){
     return 'Login expired. Sign in again — the record is kept on this phone.';
   }
+  if(/photo upload rejected/i.test(p.raw)){
+    // sb records the storage reason; without it this is just "failed".
+    const why = (typeof sb !== 'undefined' && sb.lastPhotoError) || '';
+    return 'Photo did not upload'
+         + (/not found|404/i.test(why) ? ' — the audit-photos bucket is missing' : '')
+         + (/403|row-level|policy/i.test(why) ? ' — storage permission refused it' : '')
+         + '. The record and photo are kept on this phone.';
+  }
   if(p.code === '23505') return 'Already saved (duplicate record).';
   if(p.code === '23503') return 'A linked record (batch or task) is missing.';
   if(/timeout/i.test(p.raw)) return 'Server did not answer in time — will retry.';
@@ -200,10 +208,16 @@ async function smartSave(table, method, payload, editId=null){
       for(const f of Object.keys(clean)){
         const v = clean[f];
         if(v && typeof v==='string' && v.startsWith('data:')){
+          /* A failed upload used to become clean[f] = null and the record
+             saved anyway — photo-less, silently, on a form that marks the
+             photo required. Fail the online save instead: the catch below
+             queues it, the photo is kept in IndexedDB, and the sync retries
+             it. Slower, but the photo survives. */
           photoUploads.push(
-            uploadPhoto(table, f, v)
-              .then(url => { clean[f] = url; })
-              .catch(() => { clean[f] = null; }) // don't block save on photo fail
+            uploadPhoto(table, f, v).then(url => {
+              if(!url) throw new Error('photo upload rejected for '+f);
+              clean[f] = url;
+            })
           );
         }
       }
@@ -281,14 +295,21 @@ async function syncNow(){
           const [,rKey,rField] = v.split(':');
           const data = await loadPhoto(rKey, rField);
           if(data){
-            try{
-              p[f] = await uploadPhoto(item.table, rField, data);
-              await removePhotos(rKey);
-            }catch(e){ p[f]=null; }
+            /* removePhotos() used to run whether or not the upload worked,
+               because uploadPhoto returns null on failure rather than
+               throwing — so a rejected upload deleted the only copy of the
+               photo. Delete the local one only once it is safely uploaded,
+               and let a failure abort the item so it retries with the photo
+               still in hand. */
+            const url = await uploadPhoto(item.table, rField, data);
+            if(!url) throw new Error('photo upload rejected for '+rField);
+            p[f] = url;
+            await removePhotos(rKey);
           } else { p[f]=null; }
         } else if(v.startsWith('data:')){
-          try{ p[f] = await uploadPhoto(item.table, f, v); }
-          catch(e){ p[f]=null; }
+          const url = await uploadPhoto(item.table, f, v);
+          if(!url) throw new Error('photo upload rejected for '+f);
+          p[f] = url;
         }
       }
 
