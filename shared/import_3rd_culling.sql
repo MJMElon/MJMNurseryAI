@@ -1,5 +1,5 @@
 -- ================================================================
--- MJM — key the office 3rd Culling record into the batch reports
+-- MJM — key the office 3rd Culling record in as the DRONE MAP QTY
 -- Source: 3rd_Culling.pdf (84 lines, 24,571 seedlings, batches 222-240,
 --         17/12/2025 -> 19/07/2026)
 --
@@ -7,18 +7,15 @@
 -- report; nothing is written until section 6. Safe to re-run.
 --
 -- WHAT THIS WRITES
---   * one 3rd_Culling row per batch + plot, carrying the office figure, in
---     the exact shape the report page writes it
---   * one Review_Rejection row per batch that has a problem, which is what
---     puts a batch in the "Amendment Needed" list on the Batch Record page
+--   * the office figure into Map Qty on each plot's 3rd Culling row, leaving
+--     the 3rd Culled Qty as the report's own calculation
+--   * one Review_Rejection row per batch whose Map Qty and 3rd Culled Qty do
+--     not tally, which is what puts a batch in the "Amendment Needed" list
 --
--- WORTH KNOWING BEFORE YOU RUN IT
---   The report page does not take the 3rd Culled figure from the record --
---   it CALCULATES it as (transplanted + transferred in - sales - transferred
---   out). So where the office figure and that calculation disagree, the page
---   will keep showing its own number, and re-saving that batch from the page
---   would overwrite the office figure. That disagreement is exactly what
---   section 5(e) lists and what the amendment rows are raised for.
+-- The page already treats these two disagreeing as something an admin has to
+-- explain -- saving such a plot prompts for a reason. This import does not
+-- write that reason, so the prompt still appears and the explanation is the
+-- admin's, not a guess made here.
 -- ================================================================
 
 
@@ -26,8 +23,8 @@
 -- 0. HELPERS
 --    The page reads the D/O collection lines forgivingly -- "239." and " 239"
 --    are both batch 239, "U15 (UPB PREMIER HYBRID)" is plot U15. Sales have
---    to be worked out the same way here or the comparison is meaningless.
---    Both functions are dropped again in section 9.
+--    to be worked out the same way here or the 3rd Culled Qty this computes
+--    will not be the one the page shows. Dropped again in section 9.
 -- ----------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _c3_plot(v text) RETURNS text AS $fn$
   SELECT regexp_replace(
@@ -147,33 +144,33 @@ INSERT INTO tmp_c3_import (row_no, cdate, plot, batch_no, qty) VALUES
   (84, DATE '2026-06-30', 'N4', 238, 396);
 
 -- Sanity: should be 84 rows / 24,571 seedlings.
-SELECT count(*) AS rows_loaded, sum(qty) AS total_culled,
+SELECT count(*) AS rows_loaded, sum(qty) AS total_map_qty,
        min(cdate) AS earliest, max(cdate) AS latest
 FROM   tmp_c3_import;
 
 
 -- ----------------------------------------------------------------
--- 2. ONE FIGURE PER BATCH + PLOT
---    The report holds a single 3rd Culled figure per plot, but the sheet
---    writes a plot on more than one line when it was culled over several
---    days (B10/232, B13/232, B14/234, N1/230). Those lines add up.
+-- 2. ONE MAP QTY PER BATCH + PLOT
+--    A plot's row carries a single Map Qty, but the sheet writes a plot on
+--    more than one line when it was culled over several days (B10/232,
+--    B13/232, B14/234, N1/230). Those lines add up.
 -- ----------------------------------------------------------------
 DROP TABLE IF EXISTS tmp_c3_sheet;
 CREATE TABLE tmp_c3_sheet AS
 SELECT batch_no,
        upper(btrim(plot))       AS plot_key,
        min(plot)                AS plot,
-       sum(qty)::int            AS qty,
+       sum(qty)::int            AS map_qty,
        count(*)::int            AS sheet_lines,
        max(cdate)               AS last_culled,
        string_agg(qty::text, ' + ' ORDER BY cdate, row_no) AS parts
 FROM   tmp_c3_import
 GROUP  BY batch_no, upper(btrim(plot));
 
-SELECT count(*) AS plot_records, sum(qty) AS total_culled FROM tmp_c3_sheet;
+SELECT count(*) AS plot_records, sum(map_qty) AS total_map_qty FROM tmp_c3_sheet;
 
 -- The lines that were combined, so you can check them against the paper.
-SELECT batch_no, plot, sheet_lines, parts, qty AS total
+SELECT batch_no, plot, sheet_lines, parts, map_qty AS total
 FROM   tmp_c3_sheet WHERE sheet_lines > 1 ORDER BY batch_no, plot;
 
 
@@ -193,7 +190,7 @@ JOIN   (SELECT DISTINCT batch_name FROM shared_inventory_logs
 
 
 -- ----------------------------------------------------------------
--- 4. WHAT THE REPORT ITSELF WORKS OUT FOR EACH PLOT
+-- 4. THE 3rd CULLED QTY, AS THE REPORT CALCULATES IT
 --    Rebuilt exactly as tab 6 builds it:
 --      qty      = transplanted (main + D-Tone, premium excluded)
 --                 + everything transferred INTO the plot
@@ -307,9 +304,9 @@ LEFT   JOIN tmp_c3_sales s ON s.batch_key = _c3_batch(r.batch_name) AND s.plot_k
 -- 5. PRE-FLIGHT -- read every one of these before running section 6
 -- ----------------------------------------------------------------
 
--- (a) Sheet batch numbers with NO batch in the system. These cannot be keyed
---     in at all, and are raised as amendments in section 7.
-SELECT s.batch_no, count(*) AS sheet_plots, sum(s.qty) AS seedlings,
+-- (a) Sheet batch numbers with NO batch in the system. Nothing can be keyed
+--     in for these; they are raised as amendments in section 7.
+SELECT s.batch_no, count(*) AS sheet_plots, sum(s.map_qty) AS map_qty,
        string_agg(s.plot, ', ' ORDER BY s.plot) AS plots
 FROM   tmp_c3_sheet s
 LEFT   JOIN tmp_c3_batch b USING (batch_no)
@@ -321,51 +318,52 @@ SELECT batch_no, string_agg(batch_name, ' | ' ORDER BY batch_name) AS candidates
 FROM   tmp_c3_batch WHERE name_choices > 1 GROUP BY batch_no ORDER BY batch_no;
 
 -- (c) The plot has no row in that batch's 3rd Culling report -- it was never
---     transplanted for this batch and nothing was transferred into it. The
---     figure has nowhere to sit; raised as an amendment.
-SELECT s.batch_no, b.batch_name, s.plot, s.qty
+--     transplanted for this batch and nothing was transferred into it, so
+--     there is no Map Qty box to put the figure in. Raised as an amendment.
+SELECT s.batch_no, b.batch_name, s.plot, s.map_qty
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 LEFT   JOIN tmp_c3_calc c ON c.batch_name = b.batch_name AND c.plot_key = s.plot_key
 WHERE  c.batch_name IS NULL
 ORDER  BY s.batch_no, s.plot;
 
--- (d) A 3rd_Culling record already exists with a DIFFERENT figure. Section 6
---     replaces it with the office figure -- this is what will change.
+-- (d) A Map Qty is already recorded and the sheet says something different.
+--     Section 6 replaces it -- this is what will change.
 SELECT b.batch_name, s.plot,
-       l.quantity_change AS currently_recorded,
-       s.qty             AS office_sheet,
-       s.qty - l.quantity_change AS difference
+       substring(l.remark FROM 'MapQty:\s*(\d+)')::int AS currently_recorded,
+       s.map_qty                                       AS office_sheet,
+       s.map_qty - substring(l.remark FROM 'MapQty:\s*(\d+)')::int AS difference
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 JOIN   shared_inventory_logs l
   ON   l.transaction_type = '3rd_Culling'
  AND   l.batch_name = b.batch_name
  AND   upper(btrim(l.plot_name)) = s.plot_key
-WHERE  l.quantity_change IS DISTINCT FROM s.qty
+WHERE  l.remark ~ 'MapQty:\s*\d+'
+  AND  substring(l.remark FROM 'MapQty:\s*(\d+)')::int IS DISTINCT FROM s.map_qty
 ORDER  BY b.batch_name, s.plot;
 
--- (e) THE ONE THAT MATTERS. The office figure against what the report page
---     calculates for that plot. Every row here becomes an amendment.
+-- (e) THE ONE THAT MATTERS. Map Qty against the 3rd Culled Qty the report
+--     calculates. Every row here becomes an amendment.
 SELECT b.batch_name, s.plot,
-       s.qty          AS office_sheet,
-       c.auto_culled  AS report_calculates,
-       s.qty - c.auto_culled AS difference,
+       s.map_qty      AS map_qty,
+       c.auto_culled  AS culled_qty,
+       s.map_qty - c.auto_culled AS difference,
        c.plot_qty, c.dead2, c.sales, c.moved_out, c.balance
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 JOIN   tmp_c3_calc  c ON c.batch_name = b.batch_name AND c.plot_key = s.plot_key
-WHERE  s.qty <> c.auto_culled
-ORDER  BY abs(s.qty - c.auto_culled) DESC;
+WHERE  s.map_qty <> c.auto_culled
+ORDER  BY abs(s.map_qty - c.auto_culled) DESC;
 
--- (g) Plots that already carry MORE THAN ONE 3rd_Culling record — the same
---     plot under both MAIN and D-Tone. The office sheet gives one figure per
---     plot, so section 6 would collapse those two records into one. Check
---     these before running it; if the split matters, key those plots in by
---     hand on the page instead and delete their rows from tmp_c3_sheet.
+-- (f) Plots that already carry MORE THAN ONE 3rd_Culling record -- the same
+--     plot under both MAIN and D-Tone. The sheet gives one figure per plot,
+--     so section 6 would collapse those two records into one. Check these
+--     first; if the split matters, delete those plots from tmp_c3_sheet and
+--     key their Map Qty in by hand on the page.
 SELECT b.batch_name, s.plot, count(*) AS existing_records,
        string_agg(coalesce(substring(l.remark FROM 'DestType:\s*(\w+)'), '?')
-                  || ' = ' || l.quantity_change, ', ') AS records
+                  || ' culled ' || l.quantity_change, ', ') AS records
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 JOIN   shared_inventory_logs l
@@ -376,10 +374,10 @@ GROUP  BY b.batch_name, s.plot
 HAVING count(*) > 1
 ORDER  BY b.batch_name, s.plot;
 
--- (f) For information only, NOT an amendment: plots the report has for these
---     batches that the office sheet does not mention. Usually just plots not
---     3rd-culled yet.
-SELECT c.batch_name, c.plot_name, c.plot_qty, c.auto_culled AS would_calculate
+-- (g) For information only, NOT an amendment: plots the report has for these
+--     batches that the office sheet gives no map qty for. Usually just plots
+--     not 3rd-culled yet. Their rows are left completely alone.
+SELECT c.batch_name, c.plot_name, c.plot_qty, c.auto_culled AS culled_qty
 FROM   tmp_c3_calc c
 JOIN   tmp_c3_batch b ON b.batch_name = c.batch_name AND b.name_choices = 1
 LEFT   JOIN tmp_c3_sheet s ON s.batch_no = b.batch_no AND s.plot_key = c.plot_key
@@ -388,41 +386,57 @@ ORDER  BY c.batch_name, c.plot_name;
 
 
 -- ----------------------------------------------------------------
--- 6. KEY IN THE OFFICE FIGURES
---    One 3rd_Culling row per batch + plot, in the shape the report writes:
---    the quantity on quantity_change, and the working in the remark. Any
---    existing record for the same batch + plot is replaced, so re-running
---    this is safe. Only plots that HAVE a row in the report are written --
---    the rest are raised as amendments in section 7.
+-- 6. KEY THE MAP QTY IN
+--    The 3rd Culled Qty stays the report's own calculation -- only Map Qty
+--    comes from the office sheet. An attached drone map, and any mismatch
+--    note an admin has already written, are carried across untouched.
+--    Re-running replaces rather than duplicates.
 -- ----------------------------------------------------------------
 DROP TABLE IF EXISTS tmp_c3_write;
 CREATE TABLE tmp_c3_write AS
 SELECT b.batch_name,
        c.plot_name,
        c.plot_key,
-       s.qty                                   AS culled,
+       s.map_qty,
+       c.auto_culled                           AS culled,
        c.plot_qty                              AS transplanted,
-       greatest(0, s.qty - c.dead2)            AS balance,
+       c.balance,
        c.dead2,
        c.sales,
        c.dest_type,
-       c.auto_culled,
        s.last_culled,
        CASE WHEN c.plot_qty > 0
-            THEN to_char(round((s.qty::numeric / c.plot_qty) * 100, 2), 'FM999990.00')
-            ELSE '0' END                       AS cull_pct
+            THEN to_char(round((c.auto_culled::numeric / c.plot_qty) * 100, 2), 'FM999990.00')
+            ELSE '0' END                       AS cull_pct,
+       -- whatever the existing record already carried, kept as-is
+       (SELECT substring(x.remark FROM 'MismatchNote:(\S+)')
+          FROM shared_inventory_logs x
+         WHERE x.transaction_type = '3rd_Culling' AND x.batch_name = b.batch_name
+           AND upper(btrim(x.plot_name)) = s.plot_key
+         ORDER BY x.created_at DESC LIMIT 1)   AS mismatch_note,
+       (SELECT substring(x.remark FROM 'DocName:(\S+)')
+          FROM shared_inventory_logs x
+         WHERE x.transaction_type = '3rd_Culling' AND x.batch_name = b.batch_name
+           AND upper(btrim(x.plot_name)) = s.plot_key AND x.remark ~ 'DocUrl:'
+         ORDER BY x.created_at DESC LIMIT 1)   AS doc_name,
+       (SELECT substring(x.remark FROM 'DocUrl:(\S+)')
+          FROM shared_inventory_logs x
+         WHERE x.transaction_type = '3rd_Culling' AND x.batch_name = b.batch_name
+           AND upper(btrim(x.plot_name)) = s.plot_key AND x.remark ~ 'DocUrl:'
+         ORDER BY x.created_at DESC LIMIT 1)   AS doc_url
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 JOIN   tmp_c3_calc  c ON c.batch_name = b.batch_name AND c.plot_key = s.plot_key;
 
--- Out with the old figure for those plots...
+-- Out with the plot's old record...
 DELETE FROM shared_inventory_logs l
 USING  tmp_c3_write w
 WHERE  l.transaction_type = '3rd_Culling'
   AND  l.batch_name = w.batch_name
   AND  upper(btrim(l.plot_name)) = w.plot_key;
 
--- ...in with the office one.
+-- ...in with the same row carrying the office Map Qty. The remark is written
+-- exactly as the page writes it, so the page reads every part of it back.
 INSERT INTO shared_inventory_logs
   (transaction_type, batch_name, breed_name, plot_name,
    quantity_change, transaction_date, remark)
@@ -441,7 +455,14 @@ SELECT '3rd_Culling',
          || ', 2ndCulled: '         || w.dead2
          || ', Sales: '             || w.sales
          || ', DestType: '          || w.dest_type
-         || ' Source: OfficeSheet ' || to_char(w.last_culled, 'YYYY-MM-DD')
+         || ' MapQty: '             || w.map_qty
+         || CASE WHEN w.mismatch_note IS NOT NULL
+                 THEN ' MismatchNote:' || w.mismatch_note ELSE '' END
+         || CASE WHEN w.doc_url IS NOT NULL
+                 THEN CASE WHEN w.doc_name IS NOT NULL
+                           THEN ' DocName:' || w.doc_name ELSE '' END
+                      || ' DocUrl:' || w.doc_url
+                 ELSE '' END
 FROM   tmp_c3_write w;
 
 
@@ -449,25 +470,25 @@ FROM   tmp_c3_write w;
 -- 7. RAISE THE AMENDMENTS
 --    A Review_Rejection row against the cull_3 stage is what the Batch Record
 --    page reads for its "Amendment Needed" list, and the batch report shows
---    the remark on the 3rd Culling tab. One row per batch, listing everything
+--    the remark on the 3rd Culling tab. One row per batch, listing every plot
 --    that needs looking at. Re-running replaces the previous one.
 -- ----------------------------------------------------------------
 DROP TABLE IF EXISTS tmp_c3_issues;
 CREATE TABLE tmp_c3_issues AS
--- the office figure disagrees with what the report calculates
+-- Map Qty and the calculated 3rd Culled Qty do not tally
 SELECT b.batch_name,
-       s.plot || ': office sheet ' || s.qty || ', report calculates '
-              || c.auto_culled || ' (' || CASE WHEN s.qty > c.auto_culled THEN '+' ELSE '' END
-              || (s.qty - c.auto_culled) || ')' AS issue,
+       s.plot || ': map qty ' || s.map_qty || ', 3rd culled qty '
+              || c.auto_culled || ' (' || CASE WHEN s.map_qty > c.auto_culled THEN '+' ELSE '' END
+              || (s.map_qty - c.auto_culled) || ')' AS issue,
        1 AS sort_order
 FROM   tmp_c3_sheet s
 JOIN   tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
 JOIN   tmp_c3_calc  c ON c.batch_name = b.batch_name AND c.plot_key = s.plot_key
-WHERE  s.qty <> c.auto_culled
+WHERE  s.map_qty <> c.auto_culled
 UNION ALL
 -- the plot has no row in this batch's report at all
 SELECT b.batch_name,
-       s.plot || ': office sheet ' || s.qty
+       s.plot || ': map qty ' || s.map_qty
               || ', but this plot has no row in the batch''s 3rd Culling report'
               || ' (not transplanted for this batch, nothing transferred in)' AS issue,
        2 AS sort_order
@@ -479,7 +500,7 @@ UNION ALL
 -- the batch number matches more than one batch, so nothing could be keyed in
 SELECT b.batch_name,
        'Batch number ' || b.batch_no || ' on the office sheet matches more than'
-         || ' one batch name, so its figures were not keyed in.' AS issue,
+         || ' one batch name, so its map qty was not keyed in.' AS issue,
        3 AS sort_order
 FROM   tmp_c3_batch b
 WHERE  b.name_choices > 1;
@@ -489,7 +510,7 @@ USING  (SELECT DISTINCT batch_name FROM tmp_c3_issues) d
 WHERE  l.transaction_type = 'Review_Rejection'
   AND  l.batch_name = d.batch_name
   AND  l.plot_name  = 'cull_3'
-  AND  l.remark LIKE '3rd Culling office sheet%';
+  AND  l.remark LIKE '3rd Culling map qty%';
 
 INSERT INTO shared_inventory_logs
   (transaction_type, batch_name, plot_name, quantity_change, remark)
@@ -497,22 +518,29 @@ SELECT 'Review_Rejection',
        batch_name,
        'cull_3',
        0,
-       '3rd Culling office sheet — ' || count(*) || ' item(s) to check. '
+       '3rd Culling map qty does not tally — ' || count(*) || ' plot(s) to check. '
          || string_agg(issue, ' | ' ORDER BY sort_order, issue)
 FROM   tmp_c3_issues
 GROUP  BY batch_name;
+
+-- A batch that USED to be flagged and now tallies loses its amendment.
+DELETE FROM shared_inventory_logs l
+WHERE  l.transaction_type = 'Review_Rejection'
+  AND  l.plot_name = 'cull_3'
+  AND  l.remark LIKE '3rd Culling map qty%'
+  AND  NOT EXISTS (SELECT 1 FROM tmp_c3_issues i WHERE i.batch_name = l.batch_name);
 
 
 -- ----------------------------------------------------------------
 -- 8. WHAT LANDED
 -- ----------------------------------------------------------------
 
--- Per batch: plots on the sheet, plots keyed in, and how many need amending.
+-- Per batch: plots on the sheet, map qtys keyed in, and how many to amend.
 SELECT s.batch_no,
        coalesce(b.batch_name, '(no batch)')            AS batch_name,
        count(*)                                        AS plots_on_sheet,
-       sum(s.qty)                                      AS sheet_culled,
-       count(w.plot_key)                               AS plots_keyed_in,
+       sum(s.map_qty)                                  AS sheet_map_qty,
+       count(w.plot_key)                               AS map_qty_keyed_in,
        (SELECT count(*) FROM tmp_c3_issues i WHERE i.batch_name = b.batch_name) AS to_amend
 FROM   tmp_c3_sheet s
 LEFT   JOIN tmp_c3_batch b ON b.batch_no = s.batch_no AND b.name_choices = 1
@@ -520,21 +548,21 @@ LEFT   JOIN tmp_c3_write w ON w.batch_name = b.batch_name AND w.plot_key = s.plo
 GROUP  BY s.batch_no, b.batch_name
 ORDER  BY s.batch_no;
 
--- Totals. keyed_in_culled should equal the sheet minus anything section 5(a),
--- 5(b) or 5(c) listed.
-SELECT (SELECT count(*) FROM tmp_c3_sheet)                AS plot_records_on_sheet,
-       (SELECT sum(qty) FROM tmp_c3_sheet)                AS sheet_culled,
-       (SELECT count(*) FROM tmp_c3_write)                AS keyed_in_records,
-       (SELECT sum(culled) FROM tmp_c3_write)             AS keyed_in_culled,
+-- Totals.
+SELECT (SELECT count(*) FROM tmp_c3_sheet)                 AS plot_records_on_sheet,
+       (SELECT sum(map_qty) FROM tmp_c3_sheet)             AS sheet_map_qty,
+       (SELECT count(*) FROM tmp_c3_write)                 AS rows_written,
+       (SELECT sum(map_qty) FROM tmp_c3_write)             AS map_qty_written,
+       (SELECT sum(culled) FROM tmp_c3_write)              AS culled_qty_calculated,
        (SELECT count(DISTINCT batch_name) FROM tmp_c3_issues) AS batches_needing_amendment,
-       (SELECT count(*) FROM tmp_c3_issues)               AS items_to_amend;
+       (SELECT count(*) FROM tmp_c3_issues)                AS plots_to_amend;
 
 -- The amendment rows exactly as the batch report will show them.
 SELECT batch_name, remark
 FROM   shared_inventory_logs
 WHERE  transaction_type = 'Review_Rejection'
   AND  plot_name = 'cull_3'
-  AND  remark LIKE '3rd Culling office sheet%'
+  AND  remark LIKE '3rd Culling map qty%'
 ORDER  BY batch_name;
 
 
