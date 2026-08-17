@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-17f */
+/* BUILD: 2026-08-17g */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -187,6 +187,12 @@ async function applyAuditAccess() {
     if (page && !canOpenAuditPage(page)) { denyAuditPage(page); return; }
     hideDeniedAuditLinks();
   }
+
+  /* Anything drawn from the cached permissions — the admin-only Back End
+     link, say — was decided before this refresh landed, so a role changed
+     in User Access would not show until the load after next. Tell the page
+     the fresh answer is in. */
+  document.dispatchEvent(new Event('mjm-audit-access-ready'));
 }
 document.addEventListener('DOMContentLoaded', applyAuditAccess);
 

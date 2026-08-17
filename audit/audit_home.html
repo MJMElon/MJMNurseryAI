@@ -501,10 +501,15 @@
    this page is now purely the auditor view. An admin gets here by entering
    the portal from the back end — show them the way back, or the only route
    out is signing in again. */
-if (typeof isAuditAdmin === 'function' && isAuditAdmin()) {
+function syncBackendLink(){
   const b = document.getElementById('backend-btn');
-  if (b) b.style.display = 'flex';
+  if (b && typeof isAuditAdmin === 'function')
+    b.style.display = isAuditAdmin() ? 'flex' : 'none';
 }
+syncBackendLink();
+/* Again once the server's answer arrives — a role granted in User Access
+   would otherwise not appear until the load after next. */
+document.addEventListener('mjm-audit-access-ready', syncBackendLink);
 </script>
 <script>
 /* ── Auth ── */
