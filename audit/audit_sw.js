@@ -1,5 +1,5 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER v10
+   MJM NURSERY AUDIT — SERVICE WORKER v11
    
    Strategy:
    - On install: cache ALL files immediately
@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-1787200000';
+const VER = 'mjm-1787300000';
 
 const ALL_FILES = [
   './audit_index.html',
@@ -38,13 +38,21 @@ const ALL_FILES = [
 self.addEventListener('install', e => {
   console.log('[SW] Installing', VER);
   self.skipWaiting(); // activate immediately
+  /* cache.add() goes through the browser's HTTP cache, and Pages serves
+     these assets with a max-age. So a version bump could open a brand new
+     cache and fill it with the SAME stale files the old one had — the
+     version changes, the code does not, and a deploy looks like it never
+     happened. {cache:'reload'} forces the network copy. */
   e.waitUntil(
     caches.open(VER).then(cache =>
       Promise.allSettled(
         ALL_FILES.map(url =>
-          cache.add(url).catch(err =>
-            console.warn('[SW] Failed to cache:', url, err.message)
-          )
+          fetch(url, { cache: 'reload' })
+            .then(res => {
+              if (!res || res.status !== 200) throw new Error('HTTP ' + (res && res.status));
+              return cache.put(url, res);
+            })
+            .catch(err => console.warn('[SW] Failed to cache:', url, err.message))
         )
       )
     )
@@ -122,11 +130,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* JS / CSS / images / fonts — cache first, update in background */
+  /* JS / CSS / images / fonts — cache first, update in background.
+     The background refresh also has to bypass the HTTP cache, or it just
+     re-stores the stale copy it was meant to replace and the app stays a
+     deploy behind indefinitely. */
   e.respondWith(
     caches.match(e.request).then(cached => {
-      /* Return cache immediately */
-      const fetchPromise = fetch(e.request).then(res => {
+      const fetchPromise = fetch(e.request.url, { cache: 'reload' }).then(res => {
         if (res && res.status === 200) {
           const clone = res.clone();
           caches.open(VER).then(c => c.put(e.request, clone));

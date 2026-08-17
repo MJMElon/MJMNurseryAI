@@ -1,3 +1,4 @@
+/* BUILD: 2026-08-17c */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table
@@ -501,10 +502,24 @@ function triggerPapanPhoto(){
 }
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
-  const compressed=await compressPhoto(input.files[0]);
+  const file=input.files[0];
+  /* compressPhoto resolves null when FileReader fails, and the result went
+     straight into formState — so an unreadable file cleared the photo and
+     drew nothing, which is indistinguishable from the picker never having
+     opened. Say something either way. */
+  let compressed=null;
+  try{
+    compressed=await compressPhoto(file);
+  }catch(e){
+    console.error('[Papan] compressPhoto threw', e);
+  }
+  input.value='';
+  if(!compressed){
+    showToast('Could not read that image ('+(file.type||'unknown type')+'). Try Kamera, or pick a JPG.', 5000);
+    return;                       // keep whatever photo was already there
+  }
   formState.photo=compressed;
   renderPapanPhoto(compressed);
-  input.value='';
 }
 /* Show or hide the picked photo.
 
