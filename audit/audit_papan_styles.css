@@ -202,7 +202,7 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
 .btn-modal-delete{height:44px;border-radius:var(--r-md);background:var(--danger-text);border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
 
 /* TOAST */
-.toast{position:fixed;bottom:calc(var(--tab-h) + 16px);left:50%;transform:translateX(-50%) translateY(8px);background:var(--g900);color:#fff;padding:10px 20px;border-radius:var(--r-full);font-size:13px;font-weight:500;white-space:nowrap;opacity:0;pointer-events:none;z-index:9999;transition:all .28s ease}
+.toast{position:fixed;bottom:calc(var(--tab-h) + 16px);left:50%;transform:translateX(-50%) translateY(8px);background:var(--g900);color:#fff;padding:10px 20px;font-size:13px;font-weight:500;white-space:normal;max-width:min(92vw,420px);width:max-content;text-align:center;line-height:1.45;border-radius:14px;opacity:0;pointer-events:none;z-index:9999;transition:all .28s ease}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* LOADING */
