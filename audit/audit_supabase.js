@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-17d */
+/* BUILD: 2026-08-17e */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -207,6 +207,14 @@ async function warnIfSessionLapsed() {
     b.textContent = '⚠ Session expired — tap to sign in again, or records will not load';
     b.onclick = () => { window.location.href = 'audit_index.html'; };
     document.body.appendChild(b);
+
+    /* It is position:fixed with nothing making room for it, so it sat on top
+       of the header — covering the sign-in route on the very page telling you
+       to sign in. Push the page down by however tall it actually is; it wraps
+       to two lines on a narrow phone, so measure rather than assume. */
+    const makeRoom = () => { document.body.style.paddingTop = b.offsetHeight + 'px'; };
+    makeRoom();
+    window.addEventListener('resize', makeRoom);
   } catch (e) {}
 }
 document.addEventListener('DOMContentLoaded', warnIfSessionLapsed);

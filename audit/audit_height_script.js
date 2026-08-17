@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-17d */
+/* BUILD: 2026-08-17e */
 /* ================================================================
    MJM NURSERY — SEEDLING HEIGHT SYSTEM
    height_script.js — Supabase connected
