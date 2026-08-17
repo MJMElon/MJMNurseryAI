@@ -97,6 +97,11 @@ function selectNursery(nursery, el){
   el.classList.add('active');
   document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
   renderAuditList();
+  /* The three counters are per-nursery, but only loadAll() ever refreshed
+     them — so switching tabs re-rendered the list and left the previous
+     nursery's numbers sitting above it. Landing on PN (empty) and tapping
+     BNN gave "Total 0 / Pending 0" over a list with a plot in it. */
+  updateStats();
 }
 
 /* --- STATS --- */
@@ -108,13 +113,33 @@ function updateStats(){
   document.getElementById('stat-pending').textContent=pending;
   document.getElementById('stat-pass').textContent=passed;
   // Badge on audit tab — total pending across ALL nurseries
-  const allPending=getLatestBatchPerPlot().filter(b=>!getAuditForBatch(b.uid)).length;
+  const latestAll=getLatestBatchPerPlot();
+  const allPending=latestAll.filter(b=>!getAuditForBatch(b.uid)).length;
   const auditTab=document.querySelector('[data-t="audit"]');
   let badge=auditTab?auditTab.querySelector('.tab-badge'):null;
   if(allPending>0&&auditTab){
     if(!badge){badge=document.createElement('span');badge.className='tab-badge';auditTab.appendChild(badge);}
     badge.textContent=allPending;
   } else if(badge) badge.remove();
+
+  /* Same count, split per nursery, on the nursery tabs themselves.
+     The total at the bottom says work exists somewhere; this says where,
+     so a pending plot on BNN is visible while standing on PN instead of
+     needing a tap through all four tabs to find it. */
+  document.querySelectorAll('.nursery-filter-btn').forEach(btn=>{
+    const n=btn.dataset.n;
+    if(!n) return;
+    const count=latestAll.filter(b=>b.nursery===n&&!getAuditForBatch(b.uid)).length;
+    let dot=btn.querySelector('.nursery-badge');
+    if(count>0){
+      if(!dot){dot=document.createElement('span');dot.className='nursery-badge';btn.appendChild(dot);}
+      dot.textContent=count;
+      btn.setAttribute('aria-label',NURSERY_LABELS[n]+' — '+count+' pending');
+    } else {
+      if(dot) dot.remove();
+      btn.removeAttribute('aria-label');
+    }
+  });
 }
 
 /* ================================================================

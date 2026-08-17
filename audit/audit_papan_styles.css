@@ -265,6 +265,7 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
 
 /* NURSERY FILTER BUTTONS — inside dark header */
 .nursery-filter-btn{
+  position:relative;              /* anchors .nursery-badge */
   height:36px;border-radius:var(--r-md);
   font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;
   border:1.5px solid rgba(255,255,255,.25);
@@ -272,6 +273,21 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
   color:rgba(255,255,255,.8);
   cursor:pointer;transition:all .15s;
   -webkit-tap-highlight-color:transparent;
+}
+
+/* Pending count for THAT nursery. Same red as the bottom audit tab, on
+   purpose: one signal, read the same way wherever it appears. Without
+   it the count only existed for whichever tab happened to be open, so
+   a pending plot on BNN was invisible while standing on PN. */
+.nursery-badge{
+  position:absolute;top:-6px;right:-6px;
+  min-width:17px;height:17px;padding:0 4px;
+  background:#dc2626;color:#fff;
+  font-size:9px;font-weight:700;line-height:1;
+  border-radius:var(--r-full);
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--g800);   /* lifts it off the header */
+  pointer-events:none;
 }
 .nursery-filter-btn.active{
   background:#fff;color:var(--g800);border-color:#fff;
