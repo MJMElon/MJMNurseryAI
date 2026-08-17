@@ -6687,39 +6687,86 @@ Thank you.`;
                         sourceDest: fromMatch ? fromMatch[2] : 'main'
                     });
                 });
+                // Oldest movement first, by the date it happened rather than
+                // the day it was keyed in — so a plot's list reads in the same
+                // order as the office sheet.
+                savedTransfers.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
             }
 
             // Pre-fill each transfer's SOURCE row and append the TARGET plot as
             // its own row so its culled qty can be keyed in later.
             const injectTransfers = () => {
+                // Several movements can land on the same plot — from different
+                // source plots, on different days. That is still ONE plot, so
+                // they add up into one row. Giving each its own row would also
+                // count that plot's 2nd-culled and sales figures once per row.
+                const byTarget = new Map();
                 savedTransfers.forEach(t => {
-                    if (t.source) {
-                        const src = t6_plotData.find(p => !p.transferFrom && p.plot === t.source
-                            && p.destType === t.sourceDest);
-                        if (src) {
-                            (src.savedTransfers = src.savedTransfers || [])
-                                .push({ target: t.target, qty: t.qty, date: t.date });
-                        }
+                    const key = _t6PlotKey(t.target);
+                    if (!key) return;
+                    const cur = byTarget.get(key);
+                    if (cur) {
+                        cur.qty += t.qty || 0;
+                        cur.records++;
+                        if (t.source) cur.sources.add(t.source);
+                    } else {
+                        byTarget.set(key, {
+                            plot:    t.target,
+                            qty:     t.qty || 0,
+                            records: 1,
+                            sources: new Set(t.source ? [t.source] : [])
+                        });
                     }
-                    let saved = savedCull3Map[`${t.target}|main`];
+                });
+
+                byTarget.forEach((v, key) => {
+                    const from = Array.from(v.sources).join(', ');
+                    // A plot that was transplanted into AND transferred into is
+                    // one plot: add the seedlings to the row already there.
+                    const existing = t6_plotData.find(p => _t6PlotKey(p.plot) === key);
+                    if (existing) {
+                        existing.qty += v.qty;
+                        existing.transferFrom = existing.transferFrom
+                            ? `${existing.transferFrom}, ${from}` : from;
+                        return;
+                    }
+                    let saved = savedCull3Map[`${v.plot}|main`];
                     if (!saved) {
-                        const q = legacyCull3Queue[t.target];
+                        const q = legacyCull3Queue[v.plot];
                         saved = (q && q.length) ? q.shift() : {};
                     }
-                    const tKey = String(t.target || '').trim().toUpperCase();
                     t6_plotData.push({
-                        plot:         t.target,
-                        qty:          t.qty,
-                        destType:     'main',
-                        transferFrom: t.source || '—',
-                        dead2:        dead2Map[tKey] || 0,
-                        sales:        salesMap[tKey] || 0,
-                        savedBalance: saved.balance ?? null,
-                        savedCulled:  saved.culled  ?? null,
-                        savedDocUrl:  saved.docUrl  ?? null,
-                        savedDocName: saved.docName ?? null,
-                        savedMapQty:  saved.mapQty  ?? null
+                        plot:          v.plot,
+                        qty:           v.qty,
+                        destType:      'main',
+                        transferFrom:  from || '—',
+                        // Only rows that exist BECAUSE of a transfer group under
+                        // the transferred-plots heading and carry Edit/Delete.
+                        isTransferRow: true,
+                        recordCount:   v.records,
+                        dead2:         dead2Map[key] || 0,
+                        sales:         salesMap[key] || 0,
+                        savedBalance:  saved.balance ?? null,
+                        savedCulled:   saved.culled  ?? null,
+                        savedDocUrl:   saved.docUrl  ?? null,
+                        savedDocName:  saved.docName ?? null,
+                        savedMapQty:   saved.mapQty  ?? null
                     });
+                });
+
+                // Hang every movement on the row it LEFT from. That row can
+                // itself be a transfer target — seedlings moved into a "-R"
+                // plot are routinely moved on again from there — so this runs
+                // after the loop above, once every row exists. Matching on the
+                // plot name alone (rows are one per plot) rather than also on
+                // dest type, or a D-Tone plot's transfers would find no home
+                // and be dropped by the next save.
+                savedTransfers.forEach(t => {
+                    if (!t.source) return;
+                    const src = t6_plotData.find(p => _t6PlotKey(p.plot) === _t6PlotKey(t.source));
+                    if (!src) return;
+                    (src.savedTransfers = src.savedTransfers || [])
+                        .push({ target: t.target, qty: t.qty, date: t.date });
                 });
             };
 
@@ -6861,8 +6908,8 @@ Thank you.`;
                             <div class="flex flex-col gap-0.5 pt-1">
                                 <div class="text-sm font-black text-[#3d2610]">${p.plot}</div>
                                 <div class="text-[9px] font-bold text-[#8a7a68] uppercase tracking-widest">${typeLabel}</div>
-                                ${p.transferFrom ? `<div class="text-[8px] font-black text-[#0891b2] uppercase tracking-widest">↘ Transferred from ${p.transferFrom}</div>
-                                <div class="flex gap-1 mt-1">
+                                ${p.transferFrom ? `<div class="text-[8px] font-black text-[#0891b2] uppercase tracking-widest">↘ Transferred from ${p.transferFrom}</div>` : ''}
+                                ${p.isTransferRow ? `<div class="flex gap-1 mt-1">
                                     <button type="button" class="px-2 py-1 bg-[#f0f8ff] border border-[#bee3f8] text-[#2b6cb0] text-[8px] font-black uppercase tracking-widest rounded hover:bg-[#bee3f8]" title="Change this transfer's plot or quantity" onclick="editT6Transfer(${i})">✏️ Edit</button>
                                     <button type="button" class="px-2 py-1 bg-[#fff5f5] border border-[#f8d7da] text-[#a83020] text-[8px] font-black uppercase tracking-widest rounded hover:bg-[#f8d7da]" title="Delete this transfer — removes this row" onclick="deleteT6Transfer(${i})">🗑 Delete</button>
                                 </div>` : ''}
@@ -6980,7 +7027,7 @@ Thank you.`;
             // order — which the save loop and calcT6 both index by position.
             // Collapsing only hides them; they still save and still count.
             const transferRows = Array.from(container.querySelectorAll('.t6-plot-row'))
-                .filter((_, idx) => t6_plotData[idx] && t6_plotData[idx].transferFrom);
+                .filter((_, idx) => t6_plotData[idx] && t6_plotData[idx].isTransferRow);
             if (transferRows.length) {
                 const head = document.createElement('div');
                 head.className = 'mt-4';
@@ -7049,6 +7096,12 @@ Thank you.`;
            because the initial render and the live recalc below both need it —
            two copies of this arithmetic is how a screen ends up disagreeing
            with what it saves. */
+        /* One plot, one key. Matches how transplants are already merged, so a
+           plot written "n1" on one record and "N1 " on another is the same row. */
+        function _t6PlotKey(v) {
+            return String(v == null ? '' : v).trim().toUpperCase();
+        }
+
         function t6AutoNumbers(p, moved) {
             const dead2 = p.dead2 || 0;
             const sales = p.sales || 0;
@@ -7321,10 +7374,17 @@ Thank you.`;
         // in the records untouched.
         async function deleteT6Transfer(idx) {
             const p = t6_plotData[idx];
-            if (!p || !p.transferFrom) return;
+            if (!p || !p.isTransferRow) return;
             const batchId = document.getElementById('f-batchno').value.trim();
             if (!batchId) return;
-            if (!confirm(`Delete the transfer to plot "${p.plot}" (${(p.qty || 0).toLocaleString()} seedlings)?\n\nThis row will be removed. Any culled qty already saved for this plot stays in the records.`)) return;
+            // The row is every movement into this plot, so deleting it deletes
+            // all of them — say so plainly when there is more than one.
+            const sources = _t6TransferSources(p);
+            const n = p.recordCount || 1;
+            const what = n > 1
+                ? `all ${n} transfers into plot "${p.plot}" (${(p.qty || 0).toLocaleString()} seedlings from ${sources.join(', ')})`
+                : `the transfer to plot "${p.plot}" (${(p.qty || 0).toLocaleString()} seedlings)`;
+            if (!confirm(`Delete ${what}?\n\nThis row will be removed. Any culled qty already saved for this plot stays in the records.`)) return;
             try {
                 const { data: rows, error: selErr } = await _supabase.from('shared_inventory_logs')
                     .select('id, remark')
@@ -7333,11 +7393,12 @@ Thank you.`;
                     .eq('plot_name', p.plot);
                 if (selErr) throw selErr;
                 let matches = rows || [];
-                if (p.transferFrom && p.transferFrom !== '—') {
-                    const bySource = matches.filter(r => (r.remark || '').includes(`From: [${p.transferFrom}|`));
+                if (sources.length) {
+                    const bySource = matches.filter(r =>
+                        sources.some(s => (r.remark || '').includes(`From: [${s}|`)));
                     if (bySource.length) matches = bySource;
                 }
-                const ids = matches.slice(0, 1).map(r => r.id); // one transfer per click
+                const ids = (n > 1 ? matches : matches.slice(0, 1)).map(r => r.id);
                 if (ids.length) {
                     const { error } = await _supabase.from('shared_inventory_logs').delete().in('id', ids);
                     if (error) throw error;
@@ -7351,11 +7412,24 @@ Thank you.`;
 
         // Edit a transferred-plot row: change the transfer's target plot and/or
         // quantity in place, then re-sync so the row reflects the new values.
+        // The sources named on a transferred-plot row, as a list.
+        function _t6TransferSources(p) {
+            return String((p && p.transferFrom) || '')
+                .split(',').map(s => s.trim()).filter(s => s && s !== '—');
+        }
+
         async function editT6Transfer(idx) {
             const p = t6_plotData[idx];
-            if (!p || !p.transferFrom) return;
+            if (!p || !p.isTransferRow) return;
             const batchId = document.getElementById('f-batchno').value.trim();
             if (!batchId) return;
+            // One row can now stand for several movements. Editing "the"
+            // transfer would be a guess at which one, and each source plot's
+            // own Transfer panel edits them individually anyway.
+            if ((p.recordCount || 1) > 1) {
+                showToast(`${p.plot} has ${p.recordCount} transfers into it. Edit them under "Transfer from ${_t6TransferSources(p)[0] || '…'}" on the source plot.`, 'error');
+                return;
+            }
 
             const newPlot = (prompt('Transfer to which plot?', p.plot) || '').trim();
             if (!newPlot) return;
@@ -7372,8 +7446,10 @@ Thank you.`;
                     .eq('plot_name', p.plot);
                 if (selErr) throw selErr;
                 let matches = rows || [];
-                if (p.transferFrom && p.transferFrom !== '—') {
-                    const bySource = matches.filter(r => (r.remark || '').includes(`From: [${p.transferFrom}|`));
+                const editSources = _t6TransferSources(p);
+                if (editSources.length) {
+                    const bySource = matches.filter(r =>
+                        editSources.some(s => (r.remark || '').includes(`From: [${s}|`)));
                     if (bySource.length) matches = bySource;
                 }
                 const target = matches[0];
