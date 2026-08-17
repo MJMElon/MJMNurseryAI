@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-17c */
+/* BUILD: 2026-08-17d */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table
@@ -265,7 +265,17 @@ function renderAuditList(){
 
   document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'');
 
-  function makeCard(b, showActions){
+  /* opts.canView  — may open the read-only detail of a finished audit
+     opts.canAudit — may start or redo an audit
+
+     These used to be one flag, so the completion list passed isAdmin() for
+     both and a non-admin got no buttons at all — not even View, which the
+     line above it says everyone should have. Viewing a finished audit and
+     rewriting one are different rights; they are two flags now. */
+  function makeCard(b, opts){
+    const o = (opts===true)  ? {canView:true,  canAudit:true}
+            : (opts===false) ? {canView:false, canAudit:false}
+            : (opts || {});
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const chips=audit?`<div class="audit-checks">
@@ -273,14 +283,14 @@ function renderAuditList(){
       <span class="check-chip ${chipClass(audit.infoCorrect)}">Info: ${audit.infoCorrect}</span>
       <span class="check-chip ${chipClass(audit.condition)}">Height: ${audit.condition}</span>
     </div>`:'';
-    const actions=showActions?(audit
-      ?`<div class="audit-item-actions">
-          <button class="btn-view-audit" onclick="openDetail('${audit.uid}')">View</button>
-          <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',true,'${audit.uid}')">Re-audit</button>
-        </div>`
-      :`<div class="audit-item-actions">
-          <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>
-        </div>`):'';
+    const btns=[];
+    if(audit && o.canView)
+      btns.push(`<button class="btn-view-audit" onclick="openDetail('${audit.uid}')">View</button>`);
+    if(audit && o.canAudit)
+      btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',true,'${audit.uid}')">Re-audit</button>`);
+    if(!audit && o.canAudit)
+      btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>`);
+    const actions=btns.length?`<div class="audit-item-actions">${btns.join('')}</div>`:'';
     return `<div class="audit-item status-${status}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
@@ -295,7 +305,8 @@ function renderAuditList(){
 
   // Plots to audit (pending only)
   if(pending.length){
-    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,true)).join('');
+    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot))
+      .map(b=>makeCard(b,{canView:true,canAudit:true})).join('');
   } else {
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
@@ -305,7 +316,8 @@ function renderAuditList(){
     if(compSection)compSection.style.display='block';
     document.getElementById('completion-count').textContent=audited.length+' audited';
     const admin=isAdmin();
-    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,admin)).join('');
+    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot))
+      .map(b=>makeCard(b,{canView:true,canAudit:admin})).join('');
   } else {
     if(compSection)compSection.style.display='none';
   }
