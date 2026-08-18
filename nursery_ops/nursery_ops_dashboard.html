@@ -70,10 +70,14 @@
 </head>
 <body>
 
-<div class="bg-white border-b border-teal-100 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
-  <a href="../index.html" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-teal-600 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; Module Selection</a>
-  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Operation Management</span>
-  <div class="justify-self-end flex items-center gap-2">
+<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<!-- Page sub-header: keeps the old module title + user chip below the ribbon -->
+<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
+  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Operation Management</span>
+  <div class="flex items-center gap-2">
     <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
     <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
   </div>
