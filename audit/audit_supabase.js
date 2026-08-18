@@ -1,3 +1,4 @@
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -186,6 +187,12 @@ async function applyAuditAccess() {
     if (page && !canOpenAuditPage(page)) { denyAuditPage(page); return; }
     hideDeniedAuditLinks();
   }
+
+  /* Anything drawn from the cached permissions — the admin-only Back End
+     link, say — was decided before this refresh landed, so a role changed
+     in User Access would not show until the load after next. Tell the page
+     the fresh answer is in. */
+  document.dispatchEvent(new Event('mjm-audit-access-ready'));
 }
 document.addEventListener('DOMContentLoaded', applyAuditAccess);
 
@@ -204,8 +211,18 @@ async function warnIfSessionLapsed() {
     b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;padding:9px 14px;' +
       'background:#b45309;color:#fff;font-size:12px;font-weight:700;text-align:center;cursor:pointer';
     b.textContent = '⚠ Session expired — tap to sign in again, or records will not load';
-    b.onclick = () => { window.location.href = 'audit_index.html'; };
+    b.onclick = () => {
+      window.location.href = window.MJMAuditLogin ? MJMAuditLogin.url() : '../index.html';
+    };
     document.body.appendChild(b);
+
+    /* It is position:fixed with nothing making room for it, so it sat on top
+       of the header — covering the sign-in route on the very page telling you
+       to sign in. Push the page down by however tall it actually is; it wraps
+       to two lines on a narrow phone, so measure rather than assume. */
+    const makeRoom = () => { document.body.style.paddingTop = b.offsetHeight + 'px'; };
+    makeRoom();
+    window.addEventListener('resize', makeRoom);
   } catch (e) {}
 }
 document.addEventListener('DOMContentLoaded', warnIfSessionLapsed);
@@ -292,7 +309,17 @@ const sb = {
       headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token || SUPA_KEY}`, 'Content-Type': mime, 'x-upsert': 'true' },
       body: blob
     });
-    if (!res.ok) { console.error('Photo upload failed', await res.text()); return null; }
+    if (!res.ok) {
+      /* Returning null here meant the reason died in the console: a missing
+         audit-photos bucket and a storage policy refusing the write looked
+         identical to the caller. Keep returning null so existing callers
+         behave, but record why so the toast can say it. */
+      const body = await res.text();
+      console.error('Photo upload failed', res.status, body);
+      sb.lastPhotoError = 'Photo upload failed ' + res.status + ': ' + body.slice(0, 120);
+      return null;
+    }
+    sb.lastPhotoError = null;
     return `${SUPA_URL}/storage/v1/object/public/${bucket}/${path}`;
   }
 };

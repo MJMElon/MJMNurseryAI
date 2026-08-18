@@ -1,3 +1,4 @@
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table
@@ -66,9 +67,9 @@ function getTriClass(v){if(['Good','Correct'].includes(v))return'sel-ok';if(v===
 function nextAuditID(){return'PTA-'+pad(audits.length+1);}
 
 /* --- UI HELPERS --- */
-function showToast(msg){ window._pageShowToast=showToast;
+function showToast(msg, ms){ window._pageShowToast=showToast;
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms || 2600);
 }
 function setLoading(on){
   const o=document.getElementById('loading-overlay');
@@ -97,6 +98,11 @@ function selectNursery(nursery, el){
   el.classList.add('active');
   document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
   renderAuditList();
+  /* The three counters are per-nursery, but only loadAll() ever refreshed
+     them — so switching tabs re-rendered the list and left the previous
+     nursery's numbers sitting above it. Landing on PN (empty) and tapping
+     BNN gave "Total 0 / Pending 0" over a list with a plot in it. */
+  updateStats();
 }
 
 /* --- STATS --- */
@@ -108,13 +114,33 @@ function updateStats(){
   document.getElementById('stat-pending').textContent=pending;
   document.getElementById('stat-pass').textContent=passed;
   // Badge on audit tab — total pending across ALL nurseries
-  const allPending=getLatestBatchPerPlot().filter(b=>!getAuditForBatch(b.uid)).length;
+  const latestAll=getLatestBatchPerPlot();
+  const allPending=latestAll.filter(b=>!getAuditForBatch(b.uid)).length;
   const auditTab=document.querySelector('[data-t="audit"]');
   let badge=auditTab?auditTab.querySelector('.tab-badge'):null;
   if(allPending>0&&auditTab){
     if(!badge){badge=document.createElement('span');badge.className='tab-badge';auditTab.appendChild(badge);}
     badge.textContent=allPending;
   } else if(badge) badge.remove();
+
+  /* Same count, split per nursery, on the nursery tabs themselves.
+     The total at the bottom says work exists somewhere; this says where,
+     so a pending plot on BNN is visible while standing on PN instead of
+     needing a tap through all four tabs to find it. */
+  document.querySelectorAll('.nursery-filter-btn').forEach(btn=>{
+    const n=btn.dataset.n;
+    if(!n) return;
+    const count=latestAll.filter(b=>b.nursery===n&&!getAuditForBatch(b.uid)).length;
+    let dot=btn.querySelector('.nursery-badge');
+    if(count>0){
+      if(!dot){dot=document.createElement('span');dot.className='nursery-badge';btn.appendChild(dot);}
+      dot.textContent=count;
+      btn.setAttribute('aria-label',NURSERY_LABELS[n]+' — '+count+' pending');
+    } else {
+      if(dot) dot.remove();
+      btn.removeAttribute('aria-label');
+    }
+  });
 }
 
 /* ================================================================
@@ -239,7 +265,17 @@ function renderAuditList(){
 
   document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'');
 
-  function makeCard(b, showActions){
+  /* opts.canView  — may open the read-only detail of a finished audit
+     opts.canAudit — may start or redo an audit
+
+     These used to be one flag, so the completion list passed isAdmin() for
+     both and a non-admin got no buttons at all — not even View, which the
+     line above it says everyone should have. Viewing a finished audit and
+     rewriting one are different rights; they are two flags now. */
+  function makeCard(b, opts){
+    const o = (opts===true)  ? {canView:true,  canAudit:true}
+            : (opts===false) ? {canView:false, canAudit:false}
+            : (opts || {});
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const chips=audit?`<div class="audit-checks">
@@ -247,14 +283,14 @@ function renderAuditList(){
       <span class="check-chip ${chipClass(audit.infoCorrect)}">Info: ${audit.infoCorrect}</span>
       <span class="check-chip ${chipClass(audit.condition)}">Height: ${audit.condition}</span>
     </div>`:'';
-    const actions=showActions?(audit
-      ?`<div class="audit-item-actions">
-          <button class="btn-view-audit" onclick="openDetail('${audit.uid}')">View</button>
-          <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',true,'${audit.uid}')">Re-audit</button>
-        </div>`
-      :`<div class="audit-item-actions">
-          <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>
-        </div>`):'';
+    const btns=[];
+    if(audit && o.canView)
+      btns.push(`<button class="btn-view-audit" onclick="openDetail('${audit.uid}')">View</button>`);
+    if(audit && o.canAudit)
+      btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',true,'${audit.uid}')">Re-audit</button>`);
+    if(!audit && o.canAudit)
+      btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>`);
+    const actions=btns.length?`<div class="audit-item-actions">${btns.join('')}</div>`:'';
     return `<div class="audit-item status-${status}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
@@ -269,7 +305,8 @@ function renderAuditList(){
 
   // Plots to audit (pending only)
   if(pending.length){
-    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,true)).join('');
+    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot))
+      .map(b=>makeCard(b,{canView:true,canAudit:true})).join('');
   } else {
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
@@ -279,7 +316,8 @@ function renderAuditList(){
     if(compSection)compSection.style.display='block';
     document.getElementById('completion-count').textContent=audited.length+' audited';
     const admin=isAdmin();
-    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,admin)).join('');
+    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot))
+      .map(b=>makeCard(b,{canView:true,canAudit:admin})).join('');
   } else {
     if(compSection)compSection.style.display='none';
   }
@@ -449,7 +487,7 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   // no remarks field
 
   // Photo
-  renderPapanPhotoSlot(formState.photo||null);
+  renderPapanPhoto(formState.photo||null);
   setView('audit-form');
 }
 
@@ -476,34 +514,59 @@ function triggerPapanPhoto(){
 }
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
-  const compressed=await compressPhoto(input.files[0]);
-  formState.photo=compressed;
-  renderPapanPhotoSlot(compressed);
+  const file=input.files[0];
+  /* compressPhoto resolves null when FileReader fails, and the result went
+     straight into formState — so an unreadable file cleared the photo and
+     drew nothing, which is indistinguishable from the picker never having
+     opened. Say something either way. */
+  let compressed=null;
+  try{
+    compressed=await compressPhoto(file);
+  }catch(e){
+    console.error('[Papan] compressPhoto threw', e);
+  }
   input.value='';
+  if(!compressed){
+    showToast('Could not read that image ('+(file.type||'unknown type')+'). Try Kamera, or pick a JPG.', 5000);
+    return;                       // keep whatever photo was already there
+  }
+  formState.photo=compressed;
+  renderPapanPhoto(compressed);
 }
-function renderPapanPhotoSlot(src){
-  const slot=document.getElementById('papan-photo-slot');
-  if(!slot)return;
-  while(slot.firstChild)slot.removeChild(slot.firstChild);
+/* Show or hide the picked photo.
+
+   This used to write into #papan-photo-slot and bail at `if(!slot)return`
+   when it was missing — and it is missing: this page's markup is a drop
+   zone plus a hidden preview (#papan-photo-drop / #papan-photo-preview /
+   #papan-photo-img), from a redesign the script never caught up with. So
+   picking a photo stored it in formState, compressed and ready, and drew
+   nothing. The box stayed on "Tambah Gambar" and the whole thing looked
+   like a failed upload when nothing had actually failed yet.
+
+   Named for what it renders now, so the next markup change breaks loudly
+   instead of silently. */
+function renderPapanPhoto(src){
+  const drop = document.getElementById('papan-photo-drop');
+  const wrap = document.getElementById('papan-photo-preview');
+  const img  = document.getElementById('papan-photo-img');
+  if(!wrap || !img){
+    console.warn('[Papan] photo preview elements missing — check the markup');
+    return;
+  }
   if(src){
-    slot.classList.add('has-photo');
-    const img=document.createElement('img');img.src=src;img.alt='photo';slot.appendChild(img);
-    const btn=document.createElement('button');btn.className='photo-slot-clear';btn.textContent='×';
-    btn.onclick=e=>{e.stopPropagation();formState.photo=null;renderPapanPhotoSlot(null);};
-    slot.appendChild(btn);
+    img.src = src;
+    wrap.style.display = 'block';
+    if(drop) drop.style.display = 'none';
   }else{
-    slot.classList.remove('has-photo');
-    const num=document.createElement('div');num.className='photo-slot-num';num.textContent='1';
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');
-    svg.innerHTML='<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/>';
-    const lbl=document.createElement('span');lbl.className='photo-slot-label';lbl.textContent='Papan';
-    slot.appendChild(num);slot.appendChild(svg);slot.appendChild(lbl);
+    img.removeAttribute('src');
+    wrap.style.display = 'none';
+    if(drop) drop.style.display = '';
   }
 }
 function clearPhoto(e){
   if(e)e.stopPropagation();
   formState.photo=null;
-  renderPapanPhotoSlot(null);
+  renderPapanPhoto(null);
   document.getElementById('papan-photo-input').value='';
 }
 

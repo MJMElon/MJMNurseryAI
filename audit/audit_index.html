@@ -566,9 +566,24 @@
   const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
   const _supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-  // Already logged in — go straight to home (works offline too)
+  /* Where a sign-in lands. Admins get the back end (report + user access,
+     with the way through to the audit portal); everyone else goes straight
+     to the auditor view. Kept here rather than imported because this page
+     deliberately does not load audit_supabase.js. */
+  function auditLanding(){
+    try{
+      const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+      const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
+      const role = (u.audit_role || u.role || '').toLowerCase();
+      if (mod === 'admin' || role === 'admin' || role === 'administrator')
+        return 'audit_admin.html';
+    }catch(e){}
+    return 'audit_home.html';
+  }
+
+  // Already logged in — go straight in (works offline too)
   if (localStorage.getItem('mjm_user')) {
-    window.location.href = 'audit_home.html';
+    window.location.href = auditLanding();
   }
 
   // Show offline banner
@@ -626,7 +641,7 @@
           const creds = JSON.parse(cached);
           if (creds.email === email && creds.password === password) {
             // Restore cached session
-            window.location.href = 'audit_home.html';
+            window.location.href = auditLanding();
             return;
           }
         } catch(e) {}
@@ -674,7 +689,7 @@
       localStorage.setItem('mjm_user', JSON.stringify(userObj));
       localStorage.setItem('mjm_cached_creds', JSON.stringify({ email, password }));
 
-      window.location.href = 'audit_home.html';
+      window.location.href = auditLanding();
 
     } catch (e) {
       btn.classList.remove('loading');

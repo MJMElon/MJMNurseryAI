@@ -33,12 +33,13 @@ MJMModuleAccess.init({
            <br><br>
            <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
              <strong>Plot Status</strong> and <strong>Maintenance</strong> are also limited by nursery — switch
-             <em>All nurseries</em> off for someone and tick only the ones they should see. Scanning and
-             Issue Collection DO are open to everyone in the portal and are not controlled here.
+             <em>All nurseries</em> off for someone and tick only the ones they should see.
+             <br><br>
+             Scanning and Issue Collection DO are open to everyone who can reach the portal and are not
+             controlled here. To take the whole Scan Portal away from someone, set their <strong>Scan</strong>
+             module to <em>None</em> on the main portal's User Access.
            </span>`,
   pages: [
-    { key:'portal', label:'FC Scan Portal', desc:'Scanning and the records it produces',
-      actions:[] },
     { key:'plot_status', label:'Plot Status', desc:'Daily plot stage reporting',
       actions:[
         { key:'report', label:'Report a plot stage', desc:'Submit today\u2019s stage for a plot' }

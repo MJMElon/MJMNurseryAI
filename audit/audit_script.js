@@ -33,9 +33,9 @@ function fmtDT(iso){
 function nextID(nursery){return 'AUD-'+nursery+'-'+pad(records.filter(r=>r.nursery===nursery).length+1);}
 function chipClass(v){return v==='Banyak'?'mc-b':v==='Sedikit'?'mc-s':'mc-t';}
 
-function showToast(msg){ window._pageShowToast=showToast;
+function showToast(msg, ms){ window._pageShowToast=showToast;
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms || 2600);
 }
 function setLoading(on){
   const o=document.getElementById('loading-overlay');

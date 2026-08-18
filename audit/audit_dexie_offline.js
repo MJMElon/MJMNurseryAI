@@ -1,3 +1,4 @@
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY AUDIT — OFFLINE STORAGE v5
    dexie_offline.js
@@ -69,14 +70,43 @@ async function enqueue(table, method, payload, editId){
   refreshBadge();
   return id;
 }
+/* Queued and still worth retrying. Blocked rows are excluded so a
+   permanently-refused record does not make every sync report a failure
+   forever — but it stays in the table, and stays in the badge. */
 async function getPending(){
   const db = await getDB();
-  return db.queue.where({synced:0}).sortBy('created_at');
+  const rows = await db.queue.where({synced:0}).sortBy('created_at');
+  return rows.filter(r => !r.blocked);
 }
 async function countPending(){
-  const db = await getDB();
-  return db.queue.where({synced:0}).count();
+  return (await getPending()).length;
 }
+
+/* Parked: the server refused these and will keep refusing until
+   something is fixed on its side. */
+async function getBlocked(){
+  const db = await getDB();
+  const rows = await db.queue.where({synced:0}).sortBy('created_at');
+  return rows.filter(r => r.blocked);
+}
+async function countBlocked(){
+  return (await getBlocked()).length;
+}
+
+/* Un-park everything and try again — what to call once the RLS policy
+   or the missing profile has been sorted out. */
+async function retryBlocked(){
+  const db = await getDB();
+  const rows = await getBlocked();
+  for(const r of rows){
+    await db.queue.update(r.id, {blocked:0, retries:0, last_error:null});
+  }
+  console.log('[Sync] Un-parked', rows.length, 'record(s)');
+  refreshBadge();
+  if(rows.length && navigator.onLine) await syncNow();
+  return rows.length;
+}
+window.retryBlocked = retryBlocked;
 async function setDone(id){
   const db = await getDB();
   await db.queue.update(id, {synced:1});
@@ -98,6 +128,74 @@ function withTimeout(p, ms){
 }
 
 /* ================================================================
+   ERROR READING
+
+   sb throws `Supabase error 403: {"code":"42501","details":null,...}`.
+   The toast used to print the first 110 characters of that, which on a
+   phone is the status and the opening brace — the table name and the
+   reason are past the cut. A whole afternoon can go by looking at
+   "1 failed to sync: 403: {"code":"42501","details":null,"hint":null".
+
+   So: pull the code out of the JSON and say what it means in words.
+   The raw body still goes to the console for anyone who wants it.
+================================================================ */
+function parseSbError(e){
+  const raw = (e && e.message ? e.message : String(e));
+  const m   = raw.match(/^Supabase error (\d+):\s*([\s\S]*)$/);
+  const out = { status: m ? Number(m[1]) : 0, code:'', message:'', raw };
+  if(!m) return out;
+  try{
+    const body = JSON.parse(m[2]);
+    out.code    = body.code    || '';
+    out.message = body.message || '';
+    out.hint    = body.hint    || '';
+  }catch(err){
+    out.message = m[2].slice(0, 200);
+  }
+  return out;
+}
+
+/* True when retrying is pointless — the server has made a decision that
+   another attempt will not change. These must never be discarded: the
+   record is still good, it is the permission or the linked row that is
+   wrong, and both are fixable without the auditor re-keying anything. */
+function isPermanentError(p){
+  return p.code === '42501'        // RLS refused the row
+      || p.code === '23503'        // referenced row missing
+      || p.status === 401
+      || p.status === 403;
+}
+
+/* Plain-language reason, short enough to survive a toast. */
+function describeSbError(e){
+  const p = parseSbError(e);
+
+  if(p.code === '42501' || p.status === 403){
+    // Recover the table name the truncated toast used to hide.
+    const t = (p.message.match(/table "([^"]+)"/) || [])[1];
+    return 'Not allowed to save' + (t ? ' to ' + t : '') +
+           '. Your login lacks database permission (RLS) — ask an admin; '
+         + 'the record is kept on this phone.';
+  }
+  if(p.status === 401 || /JWT|token/i.test(p.message)){
+    return 'Login expired. Sign in again — the record is kept on this phone.';
+  }
+  if(/photo upload rejected/i.test(p.raw)){
+    // sb records the storage reason; without it this is just "failed".
+    const why = (typeof sb !== 'undefined' && sb.lastPhotoError) || '';
+    return 'Photo did not upload'
+         + (/not found|404/i.test(why) ? ' — the audit-photos bucket is missing' : '')
+         + (/403|row-level|policy/i.test(why) ? ' — storage permission refused it' : '')
+         + '. The record and photo are kept on this phone.';
+  }
+  if(p.code === '23505') return 'Already saved (duplicate record).';
+  if(p.code === '23503') return 'A linked record (batch or task) is missing.';
+  if(/timeout/i.test(p.raw)) return 'Server did not answer in time — will retry.';
+
+  return (p.message || p.raw).slice(0, 140);
+}
+
+/* ================================================================
    SMART SAVE
 ================================================================ */
 async function smartSave(table, method, payload, editId=null){
@@ -111,10 +209,16 @@ async function smartSave(table, method, payload, editId=null){
       for(const f of Object.keys(clean)){
         const v = clean[f];
         if(v && typeof v==='string' && v.startsWith('data:')){
+          /* A failed upload used to become clean[f] = null and the record
+             saved anyway — photo-less, silently, on a form that marks the
+             photo required. Fail the online save instead: the catch below
+             queues it, the photo is kept in IndexedDB, and the sync retries
+             it. Slower, but the photo survives. */
           photoUploads.push(
-            uploadPhoto(table, f, v)
-              .then(url => { clean[f] = url; })
-              .catch(() => { clean[f] = null; }) // don't block save on photo fail
+            uploadPhoto(table, f, v).then(url => {
+              if(!url) throw new Error('photo upload rejected for '+f);
+              clean[f] = url;
+            })
           );
         }
       }
@@ -192,14 +296,21 @@ async function syncNow(){
           const [,rKey,rField] = v.split(':');
           const data = await loadPhoto(rKey, rField);
           if(data){
-            try{
-              p[f] = await uploadPhoto(item.table, rField, data);
-              await removePhotos(rKey);
-            }catch(e){ p[f]=null; }
+            /* removePhotos() used to run whether or not the upload worked,
+               because uploadPhoto returns null on failure rather than
+               throwing — so a rejected upload deleted the only copy of the
+               photo. Delete the local one only once it is safely uploaded,
+               and let a failure abort the item so it retries with the photo
+               still in hand. */
+            const url = await uploadPhoto(item.table, rField, data);
+            if(!url) throw new Error('photo upload rejected for '+rField);
+            p[f] = url;
+            await removePhotos(rKey);
           } else { p[f]=null; }
         } else if(v.startsWith('data:')){
-          try{ p[f] = await uploadPhoto(item.table, f, v); }
-          catch(e){ p[f]=null; }
+          const url = await uploadPhoto(item.table, f, v);
+          if(!url) throw new Error('photo upload rejected for '+f);
+          p[f] = url;
         }
       }
 
@@ -212,15 +323,45 @@ async function syncNow(){
       console.log('[Sync] ✅ Done:', item.table, item.id);
 
     }catch(e){
+      const p = parseSbError(e);
+
+      /* A duplicate key means the row reached the table on an earlier
+         attempt and only the acknowledgement was lost. It is saved.
+         Counting that as a failure leaves a record in the queue that can
+         never succeed, so retire it quietly. */
+      if(p.code === '23505'){
+        await setDone(item.id);
+        ok++;
+        console.log('[Sync] ✅ Already present:', item.table, item.id);
+        continue;
+      }
+
       fail++;
-      lastErr = (e && e.message ? e.message : String(e))
-        .replace(/^Supabase error /,'').slice(0,110);
+      lastErr  = describeSbError(e);
       const retries = (item.retries||0)+1;
-      console.error('[Sync] ❌', item.id, item.table, e.message, 'try:', retries);
+      console.error('[Sync] ❌', item.id, item.table, 'try:', retries, p.raw);
       const db = await getDB();
-      if(retries >= 5){
-        await setDone(item.id); // give up
-        console.warn('[Sync] Gave up:', item.id);
+
+      /* "Gave up" used to mean setDone(), and setDone() is followed by
+         clearDone(), which DELETES. So a record the server kept
+         refusing was erased after five tries — with auto-sync at 30s,
+         about two and a half minutes from the first failure, silently.
+         A permanently-refused record is exactly the one worth keeping:
+         fix the permission and it still needs to go up.
+
+         Park it instead. Blocked rows stop being retried, stay in the
+         queue, and show in the badge until they sync or are dropped
+         on purpose. */
+      if(isPermanentError(p)){
+        await db.queue.update(item.id, {
+          retries, blocked: 1, last_error: lastErr, blocked_at: Date.now()
+        });
+        console.warn('[Sync] Parked (needs a fix server-side):', item.id, item.table);
+      } else if(retries >= 5){
+        await db.queue.update(item.id, {
+          retries, blocked: 1, last_error: lastErr, blocked_at: Date.now()
+        });
+        console.warn('[Sync] Parked after 5 tries:', item.id, item.table);
       } else {
         await db.queue.update(item.id, {retries});
       }
@@ -239,7 +380,7 @@ async function syncNow(){
   /* Show why, not just that. The reason is almost always a rejection from
      Supabase (duplicate id, missing batch/task, RLS), not the network — and
      tapping again will never fix it, so the reason has to reach the phone. */
-  if(fail>0) showToast('⚠ '+fail+' failed to sync: '+(lastErr||'unknown error'));
+  if(fail>0) showToast('⚠ '+fail+' failed to sync — '+(lastErr||'unknown error'), 7000);
 }
 
 /* ================================================================
@@ -247,20 +388,35 @@ async function syncNow(){
 ================================================================ */
 async function refreshBadge(){
   try{
-    const n = await countPending();
+    const n       = await countPending();
+    const blocked = await countBlocked();
     let b = document.getElementById('_offl_badge');
-    if(n>0){
+    if(n>0 || blocked>0){
       if(!b){
         b = document.createElement('div');
         b.id = '_offl_badge';
-        b.onclick = ()=>{ if(navigator.onLine) syncNow(); };
+        b.onclick = async ()=>{
+          if(!navigator.onLine) return;
+          // Tapping a parked record is a deliberate "try that again".
+          if(await countBlocked()) await retryBlocked();
+          else await syncNow();
+        };
         b.style.cssText = 'position:fixed;top:0;left:0;right:0;margin:0 auto;width:fit-content;max-width:480px;padding:5px 18px;border-radius:0 0 12px 12px;font-size:11px;font-weight:700;z-index:99999;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center';
         document.body.appendChild(b);
       }
-      b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
-      b.textContent = navigator.onLine
-        ? '🔄 '+n+' pending — tap to sync now'
-        : '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally';
+      if(blocked>0 && n===0){
+        // Nothing is going to happen on its own — say so, and say the reason.
+        const why = (await getBlocked())[0];
+        b.style.background = '#b91c1c';
+        b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — '
+                      + (why && why.last_error ? why.last_error : 'tap to retry');
+      } else {
+        b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
+        b.textContent = navigator.onLine
+          ? '🔄 '+n+' pending — tap to sync now'
+            + (blocked ? ' ('+blocked+' stuck)' : '')
+          : '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally';
+      }
     } else {
       if(b) b.remove();
     }
@@ -271,11 +427,15 @@ function showOfflineBadge(){ refreshBadge(); }
 /* ================================================================
    TOAST
 ================================================================ */
-function showToast(msg){
+/* ms is generous for failures: a reason worth printing is a reason worth
+   leaving on screen long enough to read, and these run two lines now. */
+function showToast(msg, ms){
   // Use page's showToast if available
-  if(window._pageShowToast) { window._pageShowToast(msg); return; }
+  if(window._pageShowToast) { window._pageShowToast(msg, ms); return; }
   const t = document.getElementById('toast');
-  if(t){ t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+  if(t){ t.textContent=msg; t.classList.add('show');
+         clearTimeout(t._hide);
+         t._hide = setTimeout(()=>t.classList.remove('show'), ms || 2800); }
 }
 
 /* ================================================================

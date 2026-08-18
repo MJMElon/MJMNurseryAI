@@ -1,3 +1,4 @@
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY — SEEDLING HEIGHT SYSTEM
    height_script.js — Supabase connected
@@ -36,10 +37,10 @@ function calcAvg(s1,s2,s3){
 function nextID(nursery){return 'HGT-'+nursery+'-'+pad(records.filter(r=>r.nursery===nursery).length+1);}
 
 /* --- UI --- */
-function showToast(msg){ window._pageShowToast=showToast;
+function showToast(msg, ms){ window._pageShowToast=showToast;
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms || 2600);
 }
 function setLoading(on){
   const o=document.getElementById('loading-overlay');

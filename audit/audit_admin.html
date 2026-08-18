@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Audit Back End — MJM Nursery</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+
+  <!-- Admin only, decided in the head so the page never renders for anyone
+       else. Not signed in goes to the one MJM AI login. -->
+  <script src="audit_login_guard.js"></script>
+  <script>MJMAuditLogin.requireAdmin();</script>
+  <style>body{opacity:0;transition:opacity .2s ease}</style>
+
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f1f5f9; --card:#fff; --line:#e6ecf2;
+      --ink:#16323f; --ink2:#5b7280; --ink3:#94a7b4;
+      --green:#22a34a;
+    }
+    html,body{min-height:100%;font-family:'DM Sans',sans-serif;font-size:16px;
+              background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+    #app{min-height:100vh;background:var(--bg)}
+
+    /* ── HEADER ── */
+    .header{background:var(--card);border-bottom:1px solid var(--line);padding:0 20px 16px}
+    .header-top{height:60px;display:flex;align-items:center;gap:6px;
+                max-width:1100px;margin:0 auto;width:100%}
+    .header-logo{display:flex;align-items:center;gap:10px}
+    .header-logo-icon{width:34px;height:34px;border-radius:9px;background:#eaf6ea;flex-shrink:0;
+                      display:flex;align-items:center;justify-content:center}
+    .header-logo-icon svg{width:18px;height:18px;stroke:#2d7a2d;fill:none;stroke-width:1.8;
+                          stroke-linecap:round;stroke-linejoin:round}
+    .header-logo-text{font-size:16px;font-weight:800;color:var(--ink)}
+    .header-logo-sub{font-size:9px;font-weight:800;color:var(--green);
+                     text-transform:uppercase;letter-spacing:1.1px;margin-top:1px}
+    .hbtn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+          border:1px solid var(--line);color:var(--ink2);font-size:12px;font-weight:700;
+          cursor:pointer;font-family:inherit;text-decoration:none;
+          display:flex;align-items:center;gap:5px}
+    .hbtn:hover{background:#eaeff5}
+    .hbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;
+              stroke-linecap:round;stroke-linejoin:round}
+    .user-chip{display:flex;align-items:center;gap:8px;background:#f4f7fa;
+               border:1px solid var(--line);border-radius:24px;padding:5px 12px 5px 6px;
+               cursor:pointer}
+    .user-chip:hover{background:#eaeff5}
+    .avatar{width:28px;height:28px;border-radius:50%;background:#2d7a2d;color:#fff;
+            display:flex;align-items:center;justify-content:center;
+            font-size:12px;font-weight:700;flex-shrink:0}
+    .uname{font-size:12px;font-weight:700;color:var(--ink)}
+
+    .welcome{max-width:1100px;margin:0 auto;width:100%;padding-top:10px}
+    .w-hi{font-size:12px;color:var(--ink3)}
+    .w-name{font-family:'DM Serif Display',serif;font-size:24px;color:var(--ink);
+            line-height:1.2;margin:4px 0 6px}
+    .w-date{font-size:11px;color:var(--ink3)}
+
+    /* ── CONTENT ── */
+    .content{max-width:1100px;margin:0 auto;padding:22px 32px 3rem}
+    .section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+                  color:var(--ink3);margin-bottom:10px;padding-left:2px}
+
+    /* ── ENTER THE PORTAL ──
+       Sits under the name, the way the store button does on the portal:
+       a solid block, icon in front, arrow marking that it leads away. */
+    .portal-btn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;
+                padding:11px 17px;border-radius:9px;text-decoration:none;
+                background:#2d7a2d;color:#fff;
+                font-size:12px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+                box-shadow:0 3px 10px rgba(45,122,45,.28);
+                transition:background .15s,transform .12s,box-shadow .15s}
+    .portal-btn:hover{background:#256725;box-shadow:0 5px 14px rgba(45,122,45,.34)}
+    .portal-btn:active{transform:translateY(1px)}
+    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.1;
+                    stroke-linecap:round;stroke-linejoin:round}
+    .portal-btn .pb-home{width:16px;height:16px}
+    .portal-btn .pb-out{width:13px;height:13px;opacity:.85}
+
+    /* ── ADMIN CARDS: same language as the auditor view ── */
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .fc-card{display:flex;align-items:center;gap:13px;background:var(--card);
+             border:1.5px solid var(--line);border-radius:14px;padding:16px 16px;
+             text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s}
+    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 6px 18px rgba(20,50,30,.07);
+                   transform:translateY(-1px)}
+    .fc-ico{width:44px;height:44px;border-radius:12px;flex-shrink:0;
+            display:flex;align-items:center;justify-content:center}
+    .fc-ico svg{width:22px;height:22px;fill:none;stroke-width:1.9;
+                stroke-linecap:round;stroke-linejoin:round}
+    .fc-body{flex:1;min-width:0}
+    .fc-ttl{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:.2px}
+    .fc-sub{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:9.5px;
+            font-weight:800;letter-spacing:.8px;color:var(--ink3)}
+    .fc-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+    .fc-desc{font-size:11px;color:var(--ink2);margin-top:5px;line-height:1.35}
+    .fc-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
+             stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+    .note{margin-top:22px;font-size:11px;color:var(--ink3);line-height:1.5;padding-left:2px}
+
+    @media (max-width:640px){
+      .header{padding:0 14px 14px}
+      .content{padding:16px 14px 3rem}
+      .cards{grid-template-columns:1fr}
+      .w-name{font-size:21px}
+      .uname{display:none}
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">
+        <div class="header-logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/></svg>
+        </div>
+        <div>
+          <div class="header-logo-text">MJM Nursery</div>
+          <div class="header-logo-sub">Audit Back End</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+        <a href="../index.html" class="hbtn">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back to Portal</span>
+        </a>
+        <div class="user-chip" onclick="signOut()">
+          <div class="avatar" id="avatar">A</div>
+          <span class="uname" id="uname">Admin</span>
+        </div>
+      </div>
+    </div>
+    <div class="welcome">
+      <div class="w-hi" id="w-hi">Good morning,</div>
+      <div class="w-name" id="w-name">Admin <span style="color:#3d9c3d">👋</span></div>
+      <div class="w-date" id="w-date"></div>
+      <!-- The way through to the auditor view. -->
+      <a class="portal-btn" href="audit_home.html">
+        <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
+        <span>Visit Auditor Portal</span>
+        <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="section-head">Administration</div>
+    <div class="cards">
+
+      <a class="fc-card" href="audit_report.html">
+        <div class="fc-ico" style="background:#e9f7e9">
+          <svg viewBox="0 0 24 24" style="stroke:#1a5c1a"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="fc-body">
+          <div class="fc-ttl">Audit Report</div>
+          <div class="fc-sub"><span class="fc-dot"></span>MONTHLY REPORT</div>
+          <div class="fc-desc">Monthly summary by nursery, printable PDF</div>
+        </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+
+      <!-- Revealed only for a portal user who may change other people's
+           access — the same rule the auditor home used. Being an audit admin
+           is not on its own enough to hand out user management. -->
+      <a class="fc-card" id="card-user-access" href="audit_user_access.html" style="display:none">
+        <div class="fc-ico" style="background:#fdeaea">
+          <svg viewBox="0 0 24 24" style="stroke:#991b1b"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
+        </div>
+        <div class="fc-body">
+          <div class="fc-ttl">User Access</div>
+          <div class="fc-sub"><span class="fc-dot"></span>ADMINISTRATION</div>
+          <div class="fc-desc">Set which audits each user may open and record</div>
+        </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+
+    </div>
+
+    <div class="note">Auditors go straight to the auditor portal — the report and user access are not shown to them.</div>
+  </div>
+</div>
+
+<script src="audit_supabase.js"></script>
+
+<!-- The portal permission layer, for the User Access card only. An admin who
+     signed in through the audit login has no portal session, so the card
+     stays hidden — it fails closed. -->
+<script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+
+<script>
+/* The guard already ran in the head; this only reveals the page it let
+   through. */
+document.body.style.opacity = '1';
+
+const user = JSON.parse(localStorage.getItem('mjm_user') || '{"name":"Admin"}');
+
+const h = new Date().getHours();
+document.getElementById('w-hi').textContent =
+  h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
+document.getElementById('w-name').innerHTML =
+  user.name + ' <span style="color:#3d9c3d">👋</span>';
+document.getElementById('w-date').textContent =
+  new Date().toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('avatar').textContent =
+  user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+document.getElementById('uname').textContent = user.name.split(' ')[0];
+
+function signOut(){
+  if(!confirm('Sign out of the audit system?')) return;
+  localStorage.removeItem('mjm_user');
+  window.location.href = MJMAuditLogin.url();
+}
+
+/* User Access needs the portal's own permission, not just audit admin. */
+(async () => {
+  try {
+    const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+    await MJMAccess.load(supa);
+    if (MJMAccess.user() && MJMAccess.canManageUsers()) {
+      document.getElementById('card-user-access').style.display = 'flex';
+    }
+  } catch (e) { /* no portal session — card stays hidden */ }
+})();
+</script>
+</body>
+</html>

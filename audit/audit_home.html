@@ -22,7 +22,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
   <!-- Anti-flicker auth guard -->
-  <script>if(!localStorage.getItem('mjm_user')){window.location.replace('audit_index.html');}</script>
+  <script src="audit_login_guard.js"></script>
+  <script>MJMAuditLogin.requireSignIn();</script>
   <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
 
   <style>
@@ -238,6 +239,110 @@
       .header { padding: 0 32px !important; padding-bottom: 40px !important; }
     }
   </style>
+
+  <!-- ================================================================
+       FC PORTAL SKIN
+
+       The audit home was a dark green hero with six full-width gradient
+       tiles: one module per screenful, so finding a module meant
+       scrolling and reading paragraphs. This re-skins it to match the FC
+       Portal — white surface, one compact row per module, the name doing
+       the work instead of the colour. Same links, same permissions, same
+       to-do list; only the surface changed.
+  ================================================================ -->
+  <style>
+    :root{
+      --fc-bg:#f1f5f9; --fc-card:#fff; --fc-line:#e6ecf2;
+      --fc-ink:#16323f; --fc-ink2:#5b7280; --fc-ink3:#94a7b4;
+      --fc-green:#22a34a;
+    }
+    html,body{background:var(--fc-bg)}
+    #app{background:var(--fc-bg)}
+
+    /* ── HEADER: white bar, not a dark hero ── */
+    .header{background:var(--fc-card);border-bottom:1px solid var(--fc-line);
+            padding:0 20px 16px}
+    .header::before,.header::after{display:none}   /* the decorative blobs */
+    .header-logo-icon{background:#eaf6ea}
+    .header-logo-icon svg{stroke:#2d7a2d}
+    .header-logo-text{color:var(--fc-ink);font-weight:800;font-size:16px}
+    .header-logo-sub{color:var(--fc-green);font-size:9px;font-weight:800;
+                     text-transform:uppercase;letter-spacing:1.1px}
+
+    .back-to-portal{background:#f4f7fa!important;border:1px solid var(--fc-line)!important;
+                    color:var(--fc-ink2)!important;border-radius:20px;height:32px;
+                    display:flex;align-items:center;gap:5px;padding:0 12px;
+                    font-size:12px;font-weight:700;text-decoration:none}
+    .back-to-portal svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.5}
+    .lang-toggle-btn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+                     border:1px solid var(--fc-line);color:var(--fc-ink2);font-size:12px;
+                     font-weight:800;cursor:pointer;font-family:inherit}
+    .header-user-btn{background:#f4f7fa;border:1px solid var(--fc-line)}
+    .header-user-btn:hover{background:#eaeff5}
+    .user-name{color:var(--fc-ink)}
+    .notif-dot{border-color:#fff}
+
+    .header-welcome{padding-top:10px;padding-bottom:0}
+    .welcome-greeting{color:var(--fc-ink3);font-size:12px}
+    .welcome-name{color:var(--fc-ink);font-size:24px}
+    .welcome-date{color:var(--fc-ink3);font-size:11px}
+
+    /* ── CONTENT: no negative overlap, the hero is gone ── */
+    .content{margin-top:0;padding:20px 16px 2.5rem}
+    .section-head{color:var(--fc-ink3);font-size:10px;letter-spacing:1px;margin-bottom:10px}
+
+    /* ── MODULE CARDS: one scannable row each ── */
+    .audit-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+                 gap:12px;margin-bottom:22px}
+    .fc-card{display:flex;align-items:center;gap:13px;background:var(--fc-card);
+             border:1.5px solid var(--fc-line);border-radius:14px;padding:14px 15px;
+             text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s;
+             -webkit-tap-highlight-color:transparent}
+    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 6px 18px rgba(20,50,30,.07);
+                   transform:translateY(-1px)}
+    .fc-card:active{transform:scale(.99)}
+    .fc-ico{width:44px;height:44px;border-radius:12px;flex-shrink:0;
+            display:flex;align-items:center;justify-content:center}
+    .fc-ico svg{width:22px;height:22px;fill:none;stroke-width:1.9;
+                stroke-linecap:round;stroke-linejoin:round}
+    .fc-body{flex:1;min-width:0}
+    .fc-ttl{font-size:13px;font-weight:800;color:var(--fc-ink);line-height:1.25;
+            letter-spacing:.2px}
+    .fc-sub{display:flex;align-items:center;gap:5px;margin-top:3px;
+            font-size:9.5px;font-weight:800;letter-spacing:.8px;color:var(--fc-ink3)}
+    .fc-dot{width:6px;height:6px;border-radius:50%;background:var(--fc-green);flex-shrink:0}
+    .fc-desc{font-size:11px;color:var(--fc-ink2);margin-top:5px;line-height:1.35}
+    .fc-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
+             stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+    /* ── TO-DO rows: same card language as the modules ── */
+    .todo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+    .todo-card{background:var(--fc-card);border:1.5px solid var(--fc-line)!important;
+               border-radius:14px!important;transition:border-color .15s}
+    .todo-card:hover{border-color:#a8d5a8}
+
+    /* The desktop rules above this skin letterbox the page in dark green
+       and pad the header for a hero that no longer exists. Same breakpoint,
+       same !important, so the light surface wins. */
+    @media (min-width:768px){
+      body{background:var(--fc-bg)!important}
+      #app{background:var(--fc-bg)}
+      .header{padding-bottom:18px!important}
+      .content{padding:24px 32px!important}
+      .audit-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    }
+    @media (min-width:768px) and (max-width:1199px){
+      .audit-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    }
+
+    /* One column on a phone — two 13px titles side by side is unreadable. */
+    @media (max-width:640px){
+      .audit-cards{grid-template-columns:1fr}
+      .header{padding:0 14px 14px}
+      .content{padding:16px 12px 2.5rem}
+      .welcome-name{font-size:21px}
+    }
+  </style>
 </head>
 <body>
 <div id="app">
@@ -260,7 +365,13 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
-        <button class="lang-toggle-btn" onclick="toggleLang()" style="height:32px;padding:0 12px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer">BM</button>
+        <!-- Portal button removed here — the standardised ribbon above already
+             provides it; keeping two would double up the same navigation. -->
+        <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back End</span>
+        </a>
+        <button class="lang-toggle-btn" onclick="toggleLang()">BM</button>
       </div>
       <div class="header-user-btn" onclick="showLogout()" style="margin-left:8px">
         <div class="notif-dot" id="notif-dot"></div>
@@ -287,121 +398,50 @@
     <!-- AUDIT MODULES -->
     <div class="section-head fade-in"><span data-t="home_modules_title">Audit Modules</span></div>
     <div class="audit-cards">
-
-      <!-- Module 1: Plot Condition -->
-      <a class="audit-card card-audit fade-in" href="audit_plot_audit.html">
-        <div class="audit-card-blob"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label">Module 1</div>
-          <div class="card-title" data-t="home_plot">Plot Condition Audit</div>
-          <div class="card-desc">Record pest levels, rat activity, leaf disease, and leaf colour per plot across all nursery sites.</div>
-          <div class="card-tags">
-            <span class="card-tag">Pest Infestation</span>
-            <span class="card-tag">Animal Infestation</span>
-            <span class="card-tag">Disease Infestation</span>
-            <span class="card-tag">Leaf Condition</span>
-          </div>
+      <a class="fc-card fade-in" href="audit_plot_audit.html">
+        <div class="fc-ico" style="background:#e8f5e9">
+          <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
-      </a>
-
-      <!-- Module 2: Seedling Height -->
-      <a class="audit-card card-height fade-in" href="audit_height_index.html">
-        <div class="audit-card-blob"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label">Module 2</div>
-          <div class="card-title" data-t="home_height">Seedling Height Audit</div>
-          <div class="card-desc">Measure and record seedling heights with 3 samples per plot. Auto-calculates average. Requires 3 photos per record.</div>
-          <div class="card-tags">
-            <span class="card-tag">Seedling Height</span>
-          </div>
+        <div class="fc-body">
+          <div class="fc-ttl" data-t="home_plot">Plot Condition Audit</div>
+          <div class="fc-sub"><span class="fc-dot"></span>MODULE 1</div>
+          <div class="fc-desc">Pest, rat, disease &amp; leaf colour per plot</div>
         </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
-
-      <!-- Module 3: Papan Tanda -->
-      <a class="audit-card card-papan fade-in" href="audit_papan_index.html">
-        <div class="audit-card-blob"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label">Module 3</div>
-          <div class="card-title" data-t="home_papan">Papan Tanda Audit</div>
-          <div class="card-desc">Audit the condition of every papan tanda across all transplant plots.</div>
-          <div class="card-tags">
-            <span class="card-tag">Height 1.5M</span>
-            <span class="card-tag">Data Correct</span>
-            <span class="card-tag">Clear &amp; Visible</span>
-          </div>
+      <a class="fc-card fade-in" href="audit_height_index.html">
+        <div class="fc-ico" style="background:#e0f2fe">
+          <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
         </div>
-      </a>
-
-      <!-- Module 4: Maintenance Audit -->
-      <a class="audit-card fade-in" href="audit_maintenance_index.html" style="background:linear-gradient(135deg,#1e3a5f 0%,#2d5986 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
-        <div class="audit-card-blob" style="background:#4a90d9"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label" style="color:#bfdbfe">Module 4</div>
-          <div class="card-title" data-t="home_maintenance">Maintenance Audit</div>
-          <div class="card-desc">Audit completed maintenance tasks from workers. Verify work quality on-site with photo evidence.</div>
-          <div class="card-tags">
-            <span class="card-tag">Manuring</span>
-            <span class="card-tag">Weeding</span>
-            <span class="card-tag">Racun</span>
-            <span class="card-tag">Interrow Spray</span>
-          </div>
+        <div class="fc-body">
+          <div class="fc-ttl" data-t="home_height">Seedling Height Audit</div>
+          <div class="fc-sub"><span class="fc-dot"></span>MODULE 2</div>
+          <div class="fc-desc">3 samples per plot, auto-average</div>
         </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
-
-      <!-- Report -->
-      <a class="audit-card fade-in" href="audit_report.html" style="background:linear-gradient(135deg,#1a3a1a 0%,#2d5a2d 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
-        <div class="audit-card-blob" style="background:#3d8c3d"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label" style="color:#b5dfb5">Monthly Report</div>
-          <div class="card-title">Audit Report</div>
-          <div class="card-desc">Generate monthly audit summary by nursery and module. Printable PDF format.</div>
-          <div class="card-tags">
-            <span class="card-tag">PN</span>
-            <span class="card-tag">Main Nursery</span>
-            <span class="card-tag">Print PDF</span>
-          </div>
+      <a class="fc-card fade-in" href="audit_papan_index.html">
+        <div class="fc-ico" style="background:#fff1e6">
+          <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
         </div>
-      </a>
-
-      <!-- User Access — revealed only for users with the Manage Users flag -->
-      <a class="audit-card fade-in" id="audit-user-access" href="audit_user_access.html" style="display:none;background:linear-gradient(135deg,#3f1d1d 0%,#7f2a2a 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
-        <div class="audit-card-blob" style="background:#c2410c"></div>
-        <div class="audit-card-body">
-          <div class="card-icon-row">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg></div>
-            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-          </div>
-          <div class="card-label" style="color:#fecdd3">Administration</div>
-          <div class="card-title">User Access</div>
-          <div class="card-desc">For users opened to this module: set which audits they can open, record, edit and verify.</div>
-          <div class="card-tags">
-            <span class="card-tag">Pages</span>
-            <span class="card-tag">Functions</span>
-            <span class="card-tag">User Roles</span>
-          </div>
+        <div class="fc-body">
+          <div class="fc-ttl" data-t="home_papan">Papan Tanda Audit</div>
+          <div class="fc-sub"><span class="fc-dot"></span>MODULE 3</div>
+          <div class="fc-desc">Condition of every papan tanda</div>
         </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
-
+      <a class="fc-card fade-in" href="audit_maintenance_index.html">
+        <div class="fc-ico" style="background:#e8eefc">
+          <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="fc-body">
+          <div class="fc-ttl" data-t="home_maintenance">Maintenance Audit</div>
+          <div class="fc-sub"><span class="fc-dot"></span>MODULE 4</div>
+          <div class="fc-desc">Verify completed worker tasks on-site</div>
+        </div>
+        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
     </div><!-- /audit-cards -->
 
     <!-- INFO STRIP -->
@@ -456,32 +496,29 @@
 
 <script src="audit_lang.js"></script>
 <script src="audit_supabase.js"></script>
-<!-- The portal's permission helper, for the User Access card only. Audit has
-     its own sign-in, so skip the helper's whole-system gate: it must never
-     redirect an auditor who reached this page through the audit login. -->
-<script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../shared/shared_supabase.js"></script>
-<script src="../shared/shared_access.js"></script>
+<!-- The portal permission layer used to load here for the User Access card.
+     That card lives on the back end now and nothing on the auditor view
+     reads MJMAccess, so the three scripts came out: an auditor on nursery
+     signal no longer waits on a CDN and two shared files to see the page. -->
 <script>
-/* Reveal User Access only for a portal-signed-in user who may change other
-   people's access. Somebody who came through the audit login has no portal
-   session, so the card stays hidden — it fails closed. */
-(async () => {
-  try {
-    const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
-    await MJMAccess.load(supa);
-    if (MJMAccess.user() && MJMAccess.canManageUsers()) {
-      const c = document.getElementById('audit-user-access');
-      if (c) c.style.display = 'block';
-    }
-  } catch (e) { /* no portal session — card stays hidden */ }
-})();
+/* The report and user access moved to the back end (audit_admin.html), so
+   this page is now purely the auditor view. An admin gets here by entering
+   the portal from the back end — show them the way back, or the only route
+   out is signing in again. */
+function syncBackendLink(){
+  const b = document.getElementById('backend-btn');
+  if (b && typeof isAuditAdmin === 'function')
+    b.style.display = isAuditAdmin() ? 'flex' : 'none';
+}
+syncBackendLink();
+/* Again once the server's answer arrives — a role granted in User Access
+   would otherwise not appear until the load after next. */
+document.addEventListener('mjm-audit-access-ready', syncBackendLink);
 </script>
 <script>
 /* ── Auth ── */
 const userRaw = localStorage.getItem('mjm_user');
-if (!userRaw) { window.location.replace('audit_index.html'); }
+if (!userRaw) { MJMAuditLogin.requireSignIn(); }
 else { document.body.style.opacity = '1'; }
 const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
 
@@ -510,7 +547,7 @@ async function doLogout(){
       const s=window._supaClient;if(s)await s.auth.signOut();
     }
   }catch(e){}
-  window.location.href='audit_index.html';
+  window.location.href = MJMAuditLogin.url();
 }
 
 /* ── ALERT SYSTEM ── */

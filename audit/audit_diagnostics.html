@@ -77,22 +77,38 @@ async function run() {
 
   /* ── 1. Is the deployed audit_supabase.js the new one, and is the service
          worker handing over a stale copy of it? ───────────────────────── */
-  let newCodeOnNetwork = false, newCodeServed = false;
-  try {
-    // A unique query string cannot match anything in the SW cache, so this
-    // one always comes from the network — it shows what is deployed.
-    const net = await fetch('audit_supabase.js?cachebust=' + Date.now(), { cache: 'no-store' });
-    newCodeOnNetwork = (await net.text()).includes('async function accessToken');
-    // This one goes through the service worker, which serves JS cache-first —
-    // it shows what the app is actually running.
-    const served = await fetch('audit_supabase.js');
-    newCodeServed = (await served.text()).includes('async function accessToken');
-  } catch (e) { row('g-build', 'fetch failed', e.message, 'bad'); }
+  /* Testing for one function name only ever proved ONE past fix had landed;
+     every deploy after it still read "NEW ✓". Each core file now carries a
+     `BUILD:` stamp, so this compares the stamp on the server against the
+     stamp the app is actually running, per file, and keeps working without
+     being edited every release. */
+  const FILES = ['audit_supabase.js', 'audit_dexie_offline.js',
+                 'audit_papan_script.js', 'audit_height_script.js'];
+  const stampOf = txt => (txt.match(/BUILD:\s*([\w.\-]+)/) || [])[1] || '(no stamp — old build)';
+  let newCodeOnNetwork = true, newCodeServed = true;
 
-  row('g-build', 'deployed on the server', newCodeOnNetwork ? 'NEW ✓' : 'OLD ✗',
-      newCodeOnNetwork ? 'ok' : 'bad');
-  row('g-build', 'what this phone runs', newCodeServed ? 'NEW ✓' : 'OLD (cached) ✗',
-      newCodeServed ? 'ok' : 'bad');
+  for (const f of FILES) {
+    let net = '(fetch failed)', served = '(fetch failed)';
+    try {
+      // A unique query string cannot match anything in the SW cache, so this
+      // one always comes from the network — it shows what is deployed.
+      net = stampOf(await (await fetch(f + '?cachebust=' + Date.now(), { cache: 'no-store' })).text());
+      // This one goes through the service worker — it shows what runs.
+      served = stampOf(await (await fetch(f)).text());
+    } catch (e) { /* reported as fetch failed below */ }
+
+    const match = net === served;
+    if (!match) newCodeServed = false;
+    if (net.startsWith('(')) newCodeOnNetwork = false;
+    row('g-build', f, match ? served + ' ✓' : 'server ' + net + '  ·  phone ' + served + ' ✗',
+        match ? 'ok' : 'bad');
+  }
+
+  row('g-build', 'verdict',
+      !newCodeOnNetwork ? 'cannot reach the server'
+      : newCodeServed   ? 'this phone matches the server ✓'
+                        : 'this phone is running OLD cached code ✗',
+      newCodeOnNetwork && newCodeServed ? 'ok' : 'bad');
   if (!newCodeOnNetwork) findings.push('NOT_DEPLOYED');
   else if (!newCodeServed) findings.push('STALE_CACHE');
 
@@ -254,7 +270,7 @@ function reLogin() {
   localStorage.removeItem('mjm_cached_creds');
   localStorage.removeItem(AUTH_KEY);
   sessionStorage.clear();
-  location.href = 'audit_index.html';
+  location.href = (window.MJMAuditLogin ? MJMAuditLogin.url() : '../index.html');
 }
 
 run();
