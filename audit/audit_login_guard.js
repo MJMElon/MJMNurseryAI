@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-18b */
+/* BUILD: 2026-08-18c */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -60,10 +60,58 @@
     return false;
   }
 
+  /* Best-effort revoke of the refresh token, so signing out on a shared or
+     lost phone ends the session server-side too and not just in this
+     browser. keepalive, because the page is navigating away as it fires.
+     The project ref is taken from the storage key rather than hardcoded. */
+  function revokeSession() {
+    try {
+      var key = null;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && /^sb-.+-auth-token$/.test(k)) { key = k; break; }
+      }
+      if (!key || typeof SUPA_KEY === 'undefined') return;
+      var sess = JSON.parse(localStorage.getItem(key) || 'null');
+      if (!sess || !sess.access_token) return;
+      var ref = key.slice(3, key.length - '-auth-token'.length);
+      fetch('https://' + ref + '.supabase.co/auth/v1/logout', {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + sess.access_token }
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  /* ── SIGNING OUT ──
+     This used to remove mjm_user and stop there. It also tried
+     sb._client.auth.signOut() and window._supaClient — neither of which
+     exists, so the whole block was dead and the Supabase session simply
+     stayed alive. Sign out of audit and you landed on the portal, which
+     found a live session and showed the module hub: signed out of one
+     module, still signed in to everything.
+
+     Three things have to go, or the next page just lets you back in:
+     the audit user, the Supabase session, and the portal's
+     mjm_session_active flag — index.html skips its own session gate while
+     that flag is set. */
+  function signOut() {
+    revokeSession();
+    try {
+      localStorage.removeItem('mjm_user');
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf('sb-') === 0) localStorage.removeItem(k);
+      });
+      sessionStorage.removeItem('mjm_session_active');
+    } catch (e) {}
+    global.location.replace(loginUrl());
+  }
+
   global.MJMAuditLogin = {
     url: loginUrl,
     requireSignIn: requireSignIn,
     requireAdmin: requireAdmin,
-    isAdmin: isAdmin
+    isAdmin: isAdmin,
+    signOut: signOut
   };
 })(window);

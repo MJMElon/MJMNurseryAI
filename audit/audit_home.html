@@ -536,18 +536,8 @@ document.getElementById('user-name').textContent   = user.name.split(' ')[0];
 function showLogout(){document.getElementById('logout-modal').classList.add('show');}
 function hideLogout(e){if(e.target===document.getElementById('logout-modal'))hideLogoutDirect();}
 function hideLogoutDirect(){document.getElementById('logout-modal').classList.remove('show');}
-async function doLogout(){
-  localStorage.removeItem('mjm_user');
-  // Also sign out from Supabase Auth if available
-  try{
-    if(typeof sb !== 'undefined' && sb._client){
-      await sb._client.auth.signOut();
-    } else {
-      // Fallback: use supabase-js directly
-      const s=window._supaClient;if(s)await s.auth.signOut();
-    }
-  }catch(e){}
-  window.location.href = MJMAuditLogin.url();
+function doLogout(){
+  MJMAuditLogin.signOut();
 }
 
 /* ── ALERT SYSTEM ── */

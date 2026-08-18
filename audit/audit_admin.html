@@ -218,8 +218,7 @@ document.getElementById('uname').textContent = user.name.split(' ')[0];
 
 function signOut(){
   if(!confirm('Sign out of the audit system?')) return;
-  localStorage.removeItem('mjm_user');
-  window.location.href = MJMAuditLogin.url();
+  MJMAuditLogin.signOut();
 }
 
 /* User Access needs the portal's own permission, not just audit admin. */
