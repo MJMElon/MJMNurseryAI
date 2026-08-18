@@ -22,7 +22,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
   <!-- Anti-flicker auth guard -->
-  <script>if(!localStorage.getItem('mjm_user')){window.location.replace('audit_index.html');}</script>
+  <script src="audit_login_guard.js"></script>
+  <script>MJMAuditLogin.requireSignIn();</script>
   <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
 
   <style>
@@ -514,7 +515,7 @@ document.addEventListener('mjm-audit-access-ready', syncBackendLink);
 <script>
 /* ── Auth ── */
 const userRaw = localStorage.getItem('mjm_user');
-if (!userRaw) { window.location.replace('audit_index.html'); }
+if (!userRaw) { MJMAuditLogin.requireSignIn(); }
 else { document.body.style.opacity = '1'; }
 const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
 
@@ -543,7 +544,7 @@ async function doLogout(){
       const s=window._supaClient;if(s)await s.auth.signOut();
     }
   }catch(e){}
-  window.location.href='audit_index.html';
+  window.location.href = MJMAuditLogin.url();
 }
 
 /* ── ALERT SYSTEM ── */

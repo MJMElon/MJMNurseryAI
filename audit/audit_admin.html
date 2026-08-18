@@ -9,8 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
-  <!-- Anti-flicker auth guard: not signed in at all, never render. -->
-  <script>if(!localStorage.getItem('mjm_user')){window.location.replace('audit_index.html');}</script>
+  <!-- Admin only, decided in the head so the page never renders for anyone
+       else. Not signed in goes to the one MJM AI login. -->
+  <script src="audit_login_guard.js"></script>
+  <script>MJMAuditLogin.requireAdmin();</script>
   <style>body{opacity:0;transition:opacity .2s ease}</style>
 
   <style>
@@ -197,11 +199,9 @@
 <script src="../shared/shared_access.js"></script>
 
 <script>
-/* ── Guard: this is the admin back end. An auditor who reaches it by URL,
-      by a stale bookmark, or by the browser restoring a tab goes to the
-      view they are entitled to rather than seeing an error. ── */
-if (!isAuditAdmin()) { window.location.replace('audit_home.html'); }
-else { document.body.style.opacity = '1'; }
+/* The guard already ran in the head; this only reveals the page it let
+   through. */
+document.body.style.opacity = '1';
 
 const user = JSON.parse(localStorage.getItem('mjm_user') || '{"name":"Admin"}');
 
@@ -219,7 +219,7 @@ document.getElementById('uname').textContent = user.name.split(' ')[0];
 function signOut(){
   if(!confirm('Sign out of the audit system?')) return;
   localStorage.removeItem('mjm_user');
-  window.location.href = 'audit_index.html';
+  window.location.href = MJMAuditLogin.url();
 }
 
 /* User Access needs the portal's own permission, not just audit admin. */

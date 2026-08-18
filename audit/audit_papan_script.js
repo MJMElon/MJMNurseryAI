@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-18a */
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table

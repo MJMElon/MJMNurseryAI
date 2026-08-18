@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-18a */
+/* BUILD: 2026-08-18b */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -211,7 +211,9 @@ async function warnIfSessionLapsed() {
     b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;padding:9px 14px;' +
       'background:#b45309;color:#fff;font-size:12px;font-weight:700;text-align:center;cursor:pointer';
     b.textContent = '⚠ Session expired — tap to sign in again, or records will not load';
-    b.onclick = () => { window.location.href = 'audit_index.html'; };
+    b.onclick = () => {
+      window.location.href = window.MJMAuditLogin ? MJMAuditLogin.url() : '../index.html';
+    };
     document.body.appendChild(b);
 
     /* It is position:fixed with nothing making room for it, so it sat on top

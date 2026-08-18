@@ -578,7 +578,7 @@
       try {
         const resp = await _supabase
           .from('shared_profiles')
-          .select('user_type, role, permissions')
+          .select('*')
           .eq('id', session.user.id)
           .maybeSingle();
         profile = resp && resp.data;
@@ -598,11 +598,27 @@
 
       welcomeText.innerText = session.user.user_metadata?.full_name || session.user.email;
       sessionStorage.setItem('mjm_session_active', '1');
+      /* The profile just read, written out whole.
+         This used to store only the email and a hardcoded role of 'staff',
+         throwing away the id, the real role and the permissions blob. Every
+         module that reads mjm_user therefore saw a nobody: the audit pages
+         could not tell an admin from an auditor, and refreshAuditPermissions
+         gave up immediately because there was no id to look the profile up
+         by. Same shape the audit login writes, so both doors leave the app
+         in the same state. */
+      const _fullName = profile?.full_name ||
+                        session.user.user_metadata?.full_name ||
+                        session.user.email;
       localStorage.setItem('mjm_user', JSON.stringify({
-        email: session.user.email,
-        full_name: session.user.user_metadata?.full_name || session.user.email,
-        name: session.user.user_metadata?.full_name || session.user.email,
-        role: 'staff'
+        id:          session.user.id,
+        email:       session.user.email,
+        full_name:   _fullName,
+        name:        _fullName,
+        role:        profile?.role || 'staff',
+        audit_role:  profile?.audit_role || null,
+        phone:       profile?.phone || '',
+        user_type:   profile?.user_type || null,
+        permissions: profile?.permissions || null
       }));
       applyModuleVisibility(profile);
       showHub();
