@@ -63,27 +63,21 @@
     .section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
                   color:var(--ink3);margin-bottom:10px;padding-left:2px}
 
-    /* ── ENTER THE PORTAL: the way through to the auditor view ── */
-    .enter{display:flex;align-items:center;gap:16px;text-decoration:none;
-           background:linear-gradient(135deg,#1a4d1a 0%,#2d7a2d 100%);
-           border-radius:16px;padding:20px 22px;margin-bottom:26px;
-           box-shadow:0 8px 24px rgba(26,77,26,.18);
-           transition:transform .15s,box-shadow .15s}
-    .enter:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(26,77,26,.24)}
-    .enter:active{transform:scale(.995)}
-    .enter-ico{width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.15);
-               display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .enter-ico svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;
-                   stroke-linecap:round;stroke-linejoin:round}
-    .enter-body{flex:1;min-width:0}
-    .enter-lbl{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-               color:#a5d6a7}
-    .enter-ttl{font-size:20px;font-weight:700;color:#fff;margin-top:3px}
-    .enter-sub{font-size:12.5px;color:rgba(255,255,255,.72);margin-top:4px;line-height:1.4}
-    .enter-arrow{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.15);
-                 display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .enter-arrow svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;
-                     stroke-linecap:round;stroke-linejoin:round}
+    /* ── ENTER THE PORTAL ──
+       Sits under the name, the way the store button does on the portal:
+       a solid block, icon in front, arrow marking that it leads away. */
+    .portal-btn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;
+                padding:11px 17px;border-radius:9px;text-decoration:none;
+                background:#2d7a2d;color:#fff;
+                font-size:12px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+                box-shadow:0 3px 10px rgba(45,122,45,.28);
+                transition:background .15s,transform .12s,box-shadow .15s}
+    .portal-btn:hover{background:#256725;box-shadow:0 5px 14px rgba(45,122,45,.34)}
+    .portal-btn:active{transform:translateY(1px)}
+    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.1;
+                    stroke-linecap:round;stroke-linejoin:round}
+    .portal-btn .pb-home{width:16px;height:16px}
+    .portal-btn .pb-out{width:13px;height:13px;opacity:.85}
 
     /* ── ADMIN CARDS: same language as the auditor view ── */
     .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -112,8 +106,6 @@
       .content{padding:16px 14px 3rem}
       .cards{grid-template-columns:1fr}
       .w-name{font-size:21px}
-      .enter{padding:18px}
-      .enter-ttl{font-size:18px}
       .uname{display:none}
     }
   </style>
@@ -147,26 +139,16 @@
       <div class="w-hi" id="w-hi">Good morning,</div>
       <div class="w-name" id="w-name">Admin <span style="color:#3d9c3d">👋</span></div>
       <div class="w-date" id="w-date"></div>
+      <!-- The way through to the auditor view. -->
+      <a class="portal-btn" href="audit_home.html">
+        <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
+        <span>Visit Auditor Portal</span>
+        <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+      </a>
     </div>
   </div>
 
   <div class="content">
-
-    <!-- The way through to the auditor view. First thing on the page: an
-         admin opening the back end most often just wants the audits. -->
-    <a class="enter" href="audit_home.html">
-      <div class="enter-ico">
-        <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
-      </div>
-      <div class="enter-body">
-        <div class="enter-lbl">Auditor View</div>
-        <div class="enter-ttl">Enter Audit Portal</div>
-        <div class="enter-sub">Plot Condition, Seedling Height, Papan Tanda and Maintenance</div>
-      </div>
-      <div class="enter-arrow">
-        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </a>
 
     <div class="section-head">Administration</div>
     <div class="cards">
@@ -200,7 +182,7 @@
 
     </div>
 
-    <div class="note">Auditors go straight to the audit portal — the report and user access are not shown to them.</div>
+    <div class="note">Auditors go straight to the auditor portal — the report and user access are not shown to them.</div>
   </div>
 </div>
 
