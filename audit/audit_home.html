@@ -242,7 +242,12 @@
 <body>
 <div id="app">
 
-  <!-- HEADER -->
+  <!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
+  <div id="mjm-ribbon"></div>
+  <script src="../shared/shared_ribbon.js"></script>
+
+  <!-- HEADER — audit-specific band kept below the ribbon; the user chip
+       still opens the sign-out modal, and the language toggle stays. -->
   <div class="header">
     <div class="header-top">
       <div class="header-logo">
@@ -255,10 +260,6 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
-        <a href="../index.html" class="back-to-portal" id="portal-btn">
-          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span data-t="back_portal">Back to Portal</span>
-        </a>
         <button class="lang-toggle-btn" onclick="toggleLang()" style="height:32px;padding:0 12px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer">BM</button>
       </div>
       <div class="header-user-btn" onclick="showLogout()" style="margin-left:8px">
