@@ -540,133 +540,10 @@ function doLogout(){
   MJMAuditLogin.signOut();
 }
 
-/* ── ALERT SYSTEM ── */
-const ALERT_KEY = 'mjm_last_alerts';
-
-function toggleAlert(card){card.classList.toggle('open');}
-
-async function loadAlerts(){
-  const section = document.getElementById('alert-section');
-  if(!section) return; // section removed, skip
-  try {
-    // Fetch plot_audits and papan_audits in parallel
-    const [plotRows, papanRows] = await Promise.all([
-      sb.select('audit_plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at'),
-      sb.select('audit_papan_audits','select=plot,nursery,presence,info_correct,condition,created_at')
-    ]);
-
-    // Plot audit — latest per plot
-    const latestPerPlot = {};
-    plotRows.forEach(r => {
-      const key = r.nursery + '_' + r.plot;
-      if (!latestPerPlot[key] || r.created_at > latestPerPlot[key].created_at) latestPerPlot[key] = r;
-    });
-    const latest = Object.values(latestPerPlot);
-
-    const ratPlots    = latest.filter(r => r.tikus === 'Banyak' || r.tikus === 'Sedikit');
-    const pestPlots   = latest.filter(r => r.pest  === 'Banyak');
-    const yellowPlots = latest.filter(r => r.warna_daun === '5');
-
-    // Papan audit — latest per plot
-    const latestPapan = {};
-    papanRows.forEach(r => {
-      const key = r.nursery + '_' + r.plot;
-      if (!latestPapan[key] || r.created_at > latestPapan[key].created_at) latestPapan[key] = r;
-    });
-    const latestPapanList = Object.values(latestPapan);
-    const papanBadPlots    = latestPapanList.filter(r => r.presence==='Bad'    || r.info_correct==='Wrong'   || r.condition==='Wrong');
-    const papanEmptyPlots  = latestPapanList.filter(r => r.presence==='Empty'  || r.info_correct==='Empty'   || r.condition==='Empty');
-
-    const totalAlerts = ratPlots.length + pestPlots.length + yellowPlots.length + papanBadPlots.length + papanEmptyPlots.length;
-
-    // Notify if alerts changed
-    const prevAlerts = localStorage.getItem(ALERT_KEY);
-    const currAlerts = JSON.stringify({
-      rat: ratPlots.map(r=>r.plot).sort(),
-      pest: pestPlots.map(r=>r.plot).sort(),
-      yellow: yellowPlots.map(r=>r.plot).sort(),
-      papanBad: papanBadPlots.map(r=>r.plot).sort(),
-      papanEmpty: papanEmptyPlots.map(r=>r.plot).sort()
-    });
-    if (prevAlerts && prevAlerts !== currAlerts && totalAlerts > 0) {
-      sendNotification(ratPlots, pestPlots, yellowPlots, papanBadPlots, papanEmptyPlots);
-    }
-    localStorage.setItem(ALERT_KEY, currAlerts);
-
-    if (totalAlerts > 0) document.getElementById('notif-dot').classList.add('active');
-    else document.getElementById('notif-dot').classList.remove('active');
-
-    if (totalAlerts === 0) {
-      section.innerHTML = `
-        <div class="all-clear">
-          <div class="all-clear-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-          <div>
-            <div class="all-clear-text">All Clear</div>
-            <div class="all-clear-sub">No alerts from the latest audit data</div>
-          </div>
-        </div>`;
-      return;
-    }
-
-    function plotPills(plots){
-      return plots.map(r=>`<span class="plot-pill">${r.nursery} · ${r.plot}</span>`).join('');
-    }
-    function alertCard(icon, iconClass, title, sub, count, badgeClass, plots){
-      return `<div class="alert-card" onclick="toggleAlert(this)">
-        <div class="alert-card-header">
-          <div class="alert-icon ${iconClass}">${icon}</div>
-          <div class="alert-card-info">
-            <div class="alert-card-title">${title}</div>
-            <div class="alert-card-sub">${sub}</div>
-          </div>
-          <span class="alert-count-badge ${badgeClass}">${count}</span>
-          <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-        <div class="alert-plots">${plotPills(plots)}</div>
-      </div>`;
-    }
-
-    let html = '';
-    if (ratPlots.length)       html += alertCard('🐀','alert-icon-rat','Rat Detection',`${ratPlots.length} plot${ratPlots.length>1?'s':''} — Sedikit & Banyak`,ratPlots.length,'badge-red',ratPlots);
-    if (pestPlots.length)      html += alertCard('🐛','alert-icon-pest','Pest Infection',`${pestPlots.length} plot${pestPlots.length>1?'s':''} — Banyak only`,pestPlots.length,'badge-amber',pestPlots);
-    if (yellowPlots.length)    html += alertCard('🍂','alert-icon-leaf','Yellow Leaves',`${yellowPlots.length} plot${yellowPlots.length>1?'s':''} — Warna Daun 5`,yellowPlots.length,'badge-yellow',yellowPlots);
-    if (papanBadPlots.length)  html += alertCard('🪧','alert-icon-rat','Papan Tanda — Bad / Wrong',`${papanBadPlots.length} plot${papanBadPlots.length>1?'s':''} with issues`,papanBadPlots.length,'badge-red',papanBadPlots);
-    if (papanEmptyPlots.length)html += alertCard('🪧','alert-icon-pest','Papan Tanda — Empty',`${papanEmptyPlots.length} plot${papanEmptyPlots.length>1?'s':''} with empty papan`,papanEmptyPlots.length,'badge-amber',papanEmptyPlots);
-
-    section.innerHTML = html;
-
-  } catch(e) {
-    console.error('Alert load failed:', e);
-    section.innerHTML = '<div class="alert-loading">⚠ Failed to load alert data</div>';
-  }
-}
-
-/* ── BROWSER NOTIFICATION ── */
-function sendNotification(rat, pest, yellow, papanBad=[], papanEmpty=[]){
-  if (!('Notification' in window)) return;
-  const parts = [];
-  if (rat.length)        parts.push(`🐀 Rat: ${rat.map(r=>r.plot).join(', ')}`);
-  if (pest.length)       parts.push(`🐛 Pest: ${pest.map(r=>r.plot).join(', ')}`);
-  if (yellow.length)     parts.push(`🍂 Yellow: ${yellow.map(r=>r.plot).join(', ')}`);
-  if (papanBad.length)   parts.push(`🪧 Papan Bad: ${papanBad.map(r=>r.plot).join(', ')}`);
-  if (papanEmpty.length) parts.push(`🪧 Papan Empty: ${papanEmpty.map(r=>r.plot).join(', ')}`);
-  const body = parts.join(' | ');
-
-  if (Notification.permission === 'granted') {
-    new Notification('⚠ MJM Nursery Alert', { body, icon: '' });
-  } else if (Notification.permission !== 'denied') {
-    Notification.requestPermission().then(p => {
-      if (p === 'granted') new Notification('⚠ MJM Nursery Alert', { body, icon: '' });
-    });
-  }
-}
-
+/* Alerts live on the back end now (audit_admin.html). The code that used
+   to sit here rendered into an #alert-section this page no longer has, so
+   it had been running to a dead end; the back-end copy is the live one. */
 /* ── Request notification permission on load ── */
-function requestNotifPermission(){
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
-}
 
 
 /* --- INSTALL BANNER --- */
@@ -719,10 +596,9 @@ if(isIOS() && !isInStandaloneMode()){
 // Android without prompt (already installable via browser)
 setTimeout(()=>{if(!deferredPrompt&&!isIOS()&&!isInStandaloneMode())showInstallBanner();}, 3000);
 
-/* ── Auto-refresh alerts every 5 minutes ── */
-loadAlerts();
-requestNotifPermission();
-setInterval(loadAlerts, 5 * 60 * 1000);
+/* The alert refresh, and the notification permission prompt that went with
+   it, moved to the back end. Nothing on this page notifies now, so asking
+   an auditor to allow notifications would be asking for nothing. */
 
 /* ── AUDIT SCHEDULE TO-DO ── */
 function loadAuditTodo(){

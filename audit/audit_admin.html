@@ -101,6 +101,40 @@
     .fc-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
              stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 
+    /* ── ALERTS ──
+       Moved off the plot audit page, where only the auditor recording that
+       nursery ever saw them, and only for the tab they had open. */
+    .alert-wrap{margin-bottom:26px}
+    .alert-group{margin-bottom:14px}
+    .alert-group-head{font-size:10px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:1px;color:var(--ink3);margin-bottom:8px;padding-left:2px}
+    .alert-card{background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+                margin-bottom:7px;overflow:hidden}
+    .alert-head{display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer;
+                -webkit-tap-highlight-color:transparent}
+    .alert-emoji{font-size:17px;line-height:1;flex-shrink:0}
+    .alert-body{flex:1;min-width:0}
+    .alert-ttl{font-size:13px;font-weight:800;color:var(--ink)}
+    .alert-sub{font-size:11px;color:var(--ink2);margin-top:2px}
+    .alert-count{font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;flex-shrink:0}
+    .alert-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
+                stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .2s}
+    .alert-card.open .alert-chev{transform:rotate(90deg)}
+    .alert-plots{display:none;padding:0 14px 11px;flex-wrap:wrap;gap:5px}
+    .alert-card.open .alert-plots{display:flex}
+    .plot-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+               background:#f4f7fa;border:1px solid var(--line);color:var(--ink2)}
+    .all-clear{display:flex;align-items:center;gap:11px;background:#f0f9f0;
+               border:1.5px solid #cbe8cb;border-radius:12px;padding:14px 16px}
+    .all-clear-ico{width:34px;height:34px;border-radius:50%;background:#dcf0dc;flex-shrink:0;
+                   display:flex;align-items:center;justify-content:center}
+    .all-clear-ico svg{width:17px;height:17px;stroke:#2d7a2d;fill:none;stroke-width:2.2;
+                       stroke-linecap:round;stroke-linejoin:round}
+    .all-clear-ttl{font-size:13px;font-weight:800;color:#1f5f1f}
+    .all-clear-sub{font-size:11px;color:var(--ink2);margin-top:2px}
+    .alert-loading{background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+                   padding:18px;text-align:center;font-size:12px;color:var(--ink3)}
+
     .note{margin-top:22px;font-size:11px;color:var(--ink3);line-height:1.5;padding-left:2px}
 
     @media (max-width:640px){
@@ -151,6 +185,14 @@
   </div>
 
   <div class="content">
+
+    <!-- No section heading here: every group already announces itself as
+         "Alerts — <nursery>", and stacking the two just repeated the word. -->
+    <div class="alert-wrap">
+      <div id="alert-section">
+        <div class="alert-loading">Checking the latest audit data…</div>
+      </div>
+    </div>
 
     <div class="section-head">Administration</div>
     <div class="cards">
@@ -220,6 +262,150 @@ function signOut(){
   if(!confirm('Sign out of the audit system?')) return;
   MJMAuditLogin.signOut();
 }
+
+/* ── ALERTS ──────────────────────────────────────────────────────────
+   These used to live on the plot audit page, inside the auditor portal,
+   filtered to whichever nursery tab was open — so the one person who
+   could act on them across every nursery was the one person who never
+   saw them together. They are grouped by nursery here and cover every
+   nursery at once.
+
+   Papan tanda alerts are included: the logic was already written on the
+   auditor home page against an element that had been removed, so it had
+   been running to a dead end for a while. Nothing else reads it now.
+   ─────────────────────────────────────────────────────────────────── */
+const NURSERY_LABELS = { PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2' };
+const ALERT_KEY = 'mjm_last_alerts';
+
+function toggleAlert(card){ card.classList.toggle('open'); }
+
+function latestPerPlot(rows){
+  const seen = {};
+  rows.forEach(r => {
+    const key = r.nursery + '_' + r.plot;
+    if (!seen[key] || r.created_at > seen[key].created_at) seen[key] = r;
+  });
+  return Object.values(seen);
+}
+
+async function loadAlerts(){
+  const section = document.getElementById('alert-section');
+  if (!section) return;
+  try {
+    const [plotRows, papanRows] = await Promise.all([
+      sb.select('audit_plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at'),
+      sb.select('audit_papan_audits','select=plot,nursery,presence,info_correct,condition,created_at')
+    ]);
+
+    const plots = latestPerPlot(plotRows || []);
+    const papan = latestPerPlot(papanRows || []);
+
+    const kinds = [
+      { emoji:'🐀', title:'Animal Infestation', note:'Sedikit & Banyak',
+        bg:'#fff1f1', fg:'#b91c1c',
+        match: plots.filter(r => r.tikus === 'Banyak' || r.tikus === 'Sedikit') },
+      { emoji:'🐛', title:'Pest Infestation', note:'Banyak only',
+        bg:'#fff7ed', fg:'#c2410c',
+        match: plots.filter(r => r.pest === 'Banyak') },
+      { emoji:'🍂', title:'Yellow Leaves', note:'Warna Daun 5',
+        bg:'#fefce8', fg:'#854d0e',
+        match: plots.filter(r => r.warna_daun === '5') },
+      { emoji:'🪧', title:'Papan Tanda — Bad / Wrong', note:'sign damaged or incorrect',
+        bg:'#fff1f1', fg:'#b91c1c',
+        match: papan.filter(r => r.presence==='Bad' || r.info_correct==='Wrong' || r.condition==='Wrong') },
+      { emoji:'🪧', title:'Papan Tanda — Empty', note:'no sign on the plot',
+        bg:'#fff7ed', fg:'#c2410c',
+        match: papan.filter(r => r.presence==='Empty' || r.info_correct==='Empty' || r.condition==='Empty') }
+    ];
+
+    const total = kinds.reduce((n,k) => n + k.match.length, 0);
+
+    /* Tell the admin when something new appears, but only on a change —
+       a notification on every page load is one nobody reads. */
+    const fingerprint = JSON.stringify(
+      kinds.map(k => k.match.map(r => r.nursery + '/' + r.plot).sort()));
+    const previous = localStorage.getItem(ALERT_KEY);
+    if (previous && previous !== fingerprint && total > 0) notifyAlerts(kinds);
+    localStorage.setItem(ALERT_KEY, fingerprint);
+
+    if (total === 0) {
+      section.innerHTML =
+        '<div class="all-clear">' +
+          '<div class="all-clear-ico"><svg viewBox="0 0 24 24">' +
+            '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>' +
+            '<polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
+          '<div><div class="all-clear-ttl">All Clear</div>' +
+          '<div class="all-clear-sub">Nothing flagged in the latest audit for any nursery</div>' +
+        '</div></div>';
+      return;
+    }
+
+    /* Grouped by nursery, because that is how the work gets assigned.
+       Any nursery not in the label list still gets a group under its own
+       code rather than being dropped. */
+    const order = Object.keys(NURSERY_LABELS);
+    const seenNurseries = [];
+    kinds.forEach(k => k.match.forEach(r => {
+      if (r.nursery && seenNurseries.indexOf(r.nursery) === -1) seenNurseries.push(r.nursery);
+    }));
+    seenNurseries.sort((a,b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    section.innerHTML = seenNurseries.map(n => {
+      const cards = kinds.map(k => {
+        const hits = k.match.filter(r => r.nursery === n);
+        if (!hits.length) return '';
+        return '<div class="alert-card" onclick="toggleAlert(this)">' +
+          '<div class="alert-head">' +
+            '<span class="alert-emoji">' + k.emoji + '</span>' +
+            '<div class="alert-body">' +
+              '<div class="alert-ttl">' + k.title + '</div>' +
+              '<div class="alert-sub">' + hits.length + ' plot' + (hits.length > 1 ? 's' : '') +
+              ' affected · ' + k.note + '</div>' +
+            '</div>' +
+            '<span class="alert-count" style="background:' + k.bg + ';color:' + k.fg + '">' +
+              hits.length + '</span>' +
+            '<svg class="alert-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>' +
+          '</div>' +
+          '<div class="alert-plots">' +
+            hits.map(r => '<span class="plot-pill">' + r.plot + '</span>').join('') +
+          '</div></div>';
+      }).join('');
+      return '<div class="alert-group">' +
+        '<div class="alert-group-head">⚠ Alerts — ' + (NURSERY_LABELS[n] || n) + '</div>' +
+        cards + '</div>';
+    }).join('');
+
+  } catch (e) {
+    console.error('Alert load failed:', e);
+    section.innerHTML = '<div class="alert-loading">⚠ Could not load the alert data</div>';
+  }
+}
+
+function notifyAlerts(kinds){
+  if (!('Notification' in window)) return;
+  const body = kinds.filter(k => k.match.length)
+    .map(k => k.emoji + ' ' + k.title + ': ' +
+              k.match.map(r => (NURSERY_LABELS[r.nursery] || r.nursery) + '/' + r.plot).join(', '))
+    .join(' | ');
+  if (!body) return;
+  try {
+    if (Notification.permission === 'granted') {
+      new Notification('⚠ MJM Nursery Alert', { body: body });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(function (p) {
+        if (p === 'granted') new Notification('⚠ MJM Nursery Alert', { body: body });
+      });
+    }
+  } catch (e) {}
+}
+
+loadAlerts();
+/* Long shifts leave this page open; five minutes keeps it honest without
+   hammering the table. */
+setInterval(loadAlerts, 5 * 60 * 1000);
 
 /* User Access needs the portal's own permission, not just audit admin. */
 (async () => {
