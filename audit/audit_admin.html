@@ -81,38 +81,68 @@
     .portal-btn .pb-home{width:16px;height:16px}
     .portal-btn .pb-out{width:13px;height:13px;opacity:.85}
 
-    /* ── ADMIN CARDS: same language as the auditor view ── */
-    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .fc-card{display:flex;align-items:center;gap:13px;background:var(--card);
-             border:1.5px solid var(--line);border-radius:14px;padding:16px 16px;
-             text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s}
-    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 6px 18px rgba(20,50,30,.07);
-                   transform:translateY(-1px)}
-    .fc-ico{width:44px;height:44px;border-radius:12px;flex-shrink:0;
+    /* ── ADMIN CARDS ──
+       Scaled up to match the module cards on the other dashboards: room to
+       say what the thing does, and an explicit way in rather than a chevron
+       you have to know is a link. */
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .fc-card{display:flex;flex-direction:column;background:var(--card);
+             border:1px solid var(--line);border-radius:18px;padding:24px 24px 22px;
+             text-decoration:none;box-shadow:0 1px 3px rgba(16,40,60,.05);
+             transition:box-shadow .18s,transform .18s;min-height:210px}
+    .fc-card:hover{box-shadow:0 10px 26px rgba(16,40,60,.10);transform:translateY(-2px)}
+    .fc-ico{width:52px;height:52px;border-radius:14px;flex-shrink:0;margin-bottom:18px;
             display:flex;align-items:center;justify-content:center}
-    .fc-ico svg{width:22px;height:22px;fill:none;stroke-width:1.9;
+    .fc-ico svg{width:25px;height:25px;fill:none;stroke-width:1.9;
                 stroke-linecap:round;stroke-linejoin:round}
-    .fc-body{flex:1;min-width:0}
-    .fc-ttl{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:.2px}
-    .fc-sub{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:9.5px;
-            font-weight:800;letter-spacing:.8px;color:var(--ink3)}
-    .fc-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
-    .fc-desc{font-size:11px;color:var(--ink2);margin-top:5px;line-height:1.35}
-    .fc-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
-             stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .fc-ttl{font-size:21px;font-weight:800;letter-spacing:.3px;line-height:1.15;
+            text-transform:uppercase}
+    .fc-desc{font-size:13px;font-weight:600;color:#64748b;margin-top:12px;line-height:1.5;flex:1}
+    .fc-enter{display:inline-flex;align-items:center;gap:7px;margin-top:18px;
+              font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase}
+    .fc-enter svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+                  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
+    .fc-card:hover .fc-enter svg{transform:translateX(4px)}
 
     /* ── ALERTS ──
        Moved off the plot audit page, where only the auditor recording that
-       nursery ever saw them, and only for the tab they had open. */
-    .alert-wrap{margin-bottom:26px}
-    .alert-group{margin-bottom:14px}
-    .alert-group-head{font-size:10px;font-weight:700;text-transform:uppercase;
-                      letter-spacing:1px;color:var(--ink3);margin-bottom:8px;padding-left:2px}
-    .alert-card{background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+       nursery ever saw them, and only for the tab they had open.
+
+       The header is deliberately loud. A pale grey caption reading
+       "Alerts — PN" looked like a section label; rats in a nursery are not
+       a section label. Solid red, and it is the control that collapses the
+       group, so the whole bar is the hit target. */
+    .alert-wrap{margin-bottom:28px}
+    .alert-month{font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:12px;
+                 padding-left:2px;letter-spacing:.3px}
+    .alert-group{margin-bottom:14px;border-radius:14px;overflow:hidden;
+                 border:1px solid #f3d4d4;box-shadow:0 1px 3px rgba(120,20,20,.06)}
+    .alert-group-head{display:flex;align-items:center;gap:10px;padding:13px 16px;
+                      background:#dc2626;cursor:pointer;user-select:none;
+                      -webkit-tap-highlight-color:transparent}
+    .alert-group-head:hover{background:#c81e1e}
+    .alert-warn{width:19px;height:19px;flex-shrink:0;stroke:#fff;fill:none;stroke-width:2.2;
+                stroke-linecap:round;stroke-linejoin:round;animation:pulse 1.9s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+    @media (prefers-reduced-motion:reduce){.alert-warn{animation:none}}
+    .alert-group-ttl{flex:1;min-width:0;font-size:13.5px;font-weight:800;color:#fff;
+                     letter-spacing:1px;text-transform:uppercase}
+    .alert-group-count{font-size:11px;font-weight:800;padding:3px 11px;border-radius:20px;
+                       background:rgba(255,255,255,.22);color:#fff;flex-shrink:0;
+                       white-space:nowrap}
+    .alert-group-chev{width:17px;height:17px;flex-shrink:0;stroke:#fff;fill:none;
+                      stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+                      transition:transform .2s}
+    .alert-group.collapsed .alert-group-chev{transform:rotate(-90deg)}
+    .alert-group-body{background:#fff5f5;padding:10px}
+    .alert-group.collapsed .alert-group-body{display:none}
+
+    .alert-card{background:var(--card);border:1px solid #f0dcdc;border-radius:11px;
                 margin-bottom:7px;overflow:hidden}
+    .alert-card:last-child{margin-bottom:0}
     .alert-head{display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer;
                 -webkit-tap-highlight-color:transparent}
-    .alert-emoji{font-size:17px;line-height:1;flex-shrink:0}
+    .alert-emoji{font-size:18px;line-height:1;flex-shrink:0}
     .alert-body{flex:1;min-width:0}
     .alert-ttl{font-size:13px;font-weight:800;color:var(--ink)}
     .alert-sub{font-size:11px;color:var(--ink2);margin-top:2px}
@@ -189,6 +219,7 @@
     <!-- No section heading here: every group already announces itself as
          "Alerts — <nursery>", and stacking the two just repeated the word. -->
     <div class="alert-wrap">
+      <div class="alert-month" id="alert-month">Checking this month's audits…</div>
       <div id="alert-section">
         <div class="alert-loading">Checking the latest audit data…</div>
       </div>
@@ -198,15 +229,15 @@
     <div class="cards">
 
       <a class="fc-card" href="audit_report.html">
-        <div class="fc-ico" style="background:#e9f7e9">
+        <div class="fc-ico" style="background:#e7f6e7">
           <svg viewBox="0 0 24 24" style="stroke:#1a5c1a"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         </div>
-        <div class="fc-body">
-          <div class="fc-ttl">Audit Report</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MONTHLY REPORT</div>
-          <div class="fc-desc">Monthly summary by nursery, printable PDF</div>
+        <div class="fc-ttl" style="color:#1a5c1a">Audit Report</div>
+        <div class="fc-desc">Monthly summary for every nursery — plot condition, seedling height, papan tanda and maintenance, ready to print as a PDF.</div>
+        <div class="fc-enter" style="color:#1a5c1a">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
 
       <!-- Revealed only for a portal user who may change other people's
@@ -214,16 +245,15 @@
            is not on its own enough to hand out user management. -->
       <a class="fc-card" id="card-user-access" href="audit_user_access.html" style="display:none">
         <div class="fc-ico" style="background:#fdeaea">
-          <svg viewBox="0 0 24 24" style="stroke:#991b1b"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
+          <svg viewBox="0 0 24 24" style="stroke:#b91c4a"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
         </div>
-        <div class="fc-body">
-          <div class="fc-ttl">User Access</div>
-          <div class="fc-sub"><span class="fc-dot"></span>ADMINISTRATION</div>
-          <div class="fc-desc">Set which audits each user may open and record</div>
+        <div class="fc-ttl" style="color:#b91c4a">User Access</div>
+        <div class="fc-desc">Set which audits each person may open and record, per nursery and per module.</div>
+        <div class="fc-enter" style="color:#b91c4a">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
-
     </div>
 
     <div class="note">Auditors go straight to the auditor portal — the report and user access are not shown to them.</div>
@@ -275,9 +305,46 @@ function signOut(){
    been running to a dead end for a while. Nothing else reads it now.
    ─────────────────────────────────────────────────────────────────── */
 const NURSERY_LABELS = { PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2' };
-const ALERT_KEY = 'mjm_last_alerts';
+const ALERT_KEY     = 'mjm_last_alerts';
+const COLLAPSED_KEY = 'mjm_alert_collapsed';
 
 function toggleAlert(card){ card.classList.toggle('open'); }
+
+/* Which nursery groups the admin has folded away. Remembered, because a
+   group you collapse should stay collapsed through the five-minute
+   refresh — otherwise it springs back open while you are reading. */
+function collapsedGroups(){
+  try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function toggleGroup(head){
+  const group = head.parentElement;
+  group.classList.toggle('collapsed');
+  const n = group.dataset.nursery;
+  const list = collapsedGroups().filter(x => x !== n);
+  if (group.classList.contains('collapsed')) list.push(n);
+  try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+/* The month the alerts cover. Only this calendar month counts: a rat found
+   in July is either dealt with or it shows up again in this month's audit,
+   and either way last month's list is not today's work queue.
+
+   Filtered on `date` — the day the audit was carried out — rather than
+   created_at, which is when the row reached the server and can be days
+   later for anything recorded offline. Same column the monthly report
+   uses, so the two agree. */
+function currentMonthRange(){
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const pad   = String(month).padStart(2, '0');
+  return {
+    start: year + '-' + pad + '-01',
+    end:   year + '-' + pad + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0'),
+    label: now.toLocaleDateString('en-MY', { month: 'long', year: 'numeric' })
+  };
+}
 
 function latestPerPlot(rows){
   const seen = {};
@@ -292,10 +359,18 @@ async function loadAlerts(){
   const section = document.getElementById('alert-section');
   if (!section) return;
   try {
+    const { start, end, label } = currentMonthRange();
+    const within = 'date=gte.' + start + '&date=lte.' + end;
+
     const [plotRows, papanRows] = await Promise.all([
-      sb.select('audit_plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at'),
-      sb.select('audit_papan_audits','select=plot,nursery,presence,info_correct,condition,created_at')
+      sb.select('audit_plot_audits',
+        'select=plot,nursery,pest,tikus,warna_daun,date,created_at&' + within),
+      sb.select('audit_papan_audits',
+        'select=plot,nursery,presence,info_correct,condition,date,created_at&' + within)
     ]);
+
+    const monthEl = document.getElementById('alert-month');
+    if (monthEl) monthEl.textContent = 'Showing ' + label + ' only';
 
     const plots = latestPerPlot(plotRows || []);
     const papan = latestPerPlot(papanRows || []);
@@ -335,7 +410,7 @@ async function loadAlerts(){
             '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>' +
             '<polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
           '<div><div class="all-clear-ttl">All Clear</div>' +
-          '<div class="all-clear-sub">Nothing flagged in the latest audit for any nursery</div>' +
+          '<div class="all-clear-sub">Nothing flagged in any nursery for ' + label + '</div>' +
         '</div></div>';
       return;
     }
@@ -373,9 +448,18 @@ async function loadAlerts(){
             hits.map(r => '<span class="plot-pill">' + r.plot + '</span>').join('') +
           '</div></div>';
       }).join('');
-      return '<div class="alert-group">' +
-        '<div class="alert-group-head">⚠ Alerts — ' + (NURSERY_LABELS[n] || n) + '</div>' +
-        cards + '</div>';
+      const count = kinds.reduce((t,k) => t + k.match.filter(r => r.nursery === n).length, 0);
+      const shut  = collapsedGroups().indexOf(n) !== -1 ? ' collapsed' : '';
+      return '<div class="alert-group' + shut + '" data-nursery="' + n + '">' +
+        '<div class="alert-group-head" onclick="toggleGroup(this)">' +
+          '<svg class="alert-warn" viewBox="0 0 24 24">' +
+            '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>' +
+            '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '<span class="alert-group-ttl">Alerts — ' + (NURSERY_LABELS[n] || n) + '</span>' +
+          '<span class="alert-group-count">' + count + ' issue' + (count > 1 ? 's' : '') + '</span>' +
+          '<svg class="alert-group-chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</div>' +
+        '<div class="alert-group-body">' + cards + '</div></div>';
     }).join('');
 
   } catch (e) {
