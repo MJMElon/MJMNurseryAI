@@ -130,6 +130,7 @@
                             <tr id="ledger-head-row">
                                 <th>Batch</th>
                                 <th>Breed</th>
+                                <th>Age</th>
                                 <th>Planted Date</th>
                                 <th>Planted Qty</th>
                                 <th style="min-width: 180px;">Current Stage</th>
@@ -140,7 +141,7 @@
                         </thead>
                         <tbody id="ledger-body">
                             <tr>
-                                <td colspan="8" class="text-center p-16 text-[#8a7a68] font-bold animate-pulse uppercase tracking-widest text-xs">Loading seedling list...</td>
+                                <td colspan="9" class="text-center p-16 text-[#8a7a68] font-bold animate-pulse uppercase tracking-widest text-xs">Loading seedling list...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -474,7 +475,7 @@
 
             } catch(e) {
                 console.error("Data load error:", e);
-                document.getElementById('ledger-body').innerHTML = `<tr><td colspan="8" class="text-center p-10 text-red-600 font-bold">Error connecting to database. Verify Supabase policies.</td></tr>`;
+                document.getElementById('ledger-body').innerHTML = `<tr><td colspan="9" class="text-center p-10 text-red-600 font-bold">Error connecting to database. Verify Supabase policies.</td></tr>`;
             }
         }
 
@@ -552,6 +553,23 @@
             renderLedgerTable();
         }
 
+        /* How old a batch is, in whole months since it was planted. The nursery
+           talks in months, so six weeks is "1 month" rather than 1.5 — the month
+           only counts once the same day of the month has come round again. A
+           batch planted this month reads "0 months", not a dash, which would
+           look like a missing planting date. */
+        function batchAgeInMonths(plantedSource) {
+            if (!plantedSource) return '—';
+            const planted = new Date(plantedSource);
+            if (isNaN(planted.getTime())) return '—';
+            const now = new Date();
+            let months = (now.getFullYear() - planted.getFullYear()) * 12
+                       + (now.getMonth()    - planted.getMonth());
+            if (now.getDate() < planted.getDate()) months--;
+            if (months < 0) months = 0;   // a planting date keyed in ahead of today
+            return months + (months === 1 ? ' month' : ' months');
+        }
+
         function renderLedgerTable() {
             const body = document.getElementById('ledger-body');
             body.innerHTML = '';
@@ -616,7 +634,7 @@
                     ? `No batches matching "${query}".`
                     : (currentListTab === 'amendment' ? "No batches need amendment — nothing has been rejected by HQ."
                     :  currentListTab === 'active'    ? "No active batches in the nursery." : "No completed batches yet.");
-                body.innerHTML = `<tr><td colspan="8" class="text-center p-16 text-[#8a7a68] font-bold">${emptyMsg}</td></tr>`;
+                body.innerHTML = `<tr><td colspan="9" class="text-center p-16 text-[#8a7a68] font-bold">${emptyMsg}</td></tr>`;
                 return;
             }
 
@@ -636,6 +654,7 @@
                 // Planted Qty = actual planted (totalPlanted − empty holes), summed across the batch's Planted log rows.
                 const plantedQtyNum = b.actualPlanted || 0;
                 const plantedQty = plantedQtyNum > 0 ? plantedQtyNum.toLocaleString() : '—';
+                const age = batchAgeInMonths(plantedSource);
 
                 const survPct = Math.max(0, 100 - b.cullRate);
                 const survRate = survPct.toFixed(2) + '%';
@@ -646,6 +665,7 @@
                     <tr class="hover:bg-[#f8f4ec] transition-colors batch-row">
                         <td class="text-[#3d2610] font-black tracking-wider text-base batch-id-cell">${b.batch_name}</td>
                         <td class="breed-cell">${b.breed_name || '—'}</td>
+                        <td class="text-[#8a7a68] text-xs whitespace-nowrap">${age}</td>
                         <td class="text-[#8a7a68] text-xs">${datePlanted}</td>
                         <td class="font-black text-[#1a150d]">${plantedQty}</td>
                         <td>
