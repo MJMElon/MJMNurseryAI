@@ -580,6 +580,8 @@
                     <div class="flex items-center gap-3 text-[9px] font-bold text-slate-500 mb-1">
                         <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500"></span>Order</span>
                         <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Collection</span>
+                        <!-- Calibration chip appears only when at least one month has calibration data (see renderMonthDashChart). -->
+                        <span id="mon-dash-cal-legend" style="display:none" class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-violet-500"></span>Calibration</span>
                     </div>
                     <div id="mon-dash-month-bars" class="grid grid-cols-12 gap-1 h-28 items-end"></div>
                     <div class="text-[9px] font-bold text-slate-400 mt-2 text-center">Click a bar to see the rows behind that month.</div>

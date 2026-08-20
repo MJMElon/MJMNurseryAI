@@ -1174,6 +1174,15 @@
     function _monAddDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
     function _monDateKey(d)    { return d.toISOString().slice(0, 10); }
     function _monFmt(n)        { return (Number(n) || 0).toLocaleString(); }
+    // A calibration DO is any shared_do_records row whose do_number starts
+    // with the `CAL-` prefix — the convention used for bulk stock
+    // corrections that are not real customer collections (e.g. BNN/UNN1
+    // sales calibrations). The chart shows them in their own Calibration
+    // bar so they never inflate the Collection figure, and the current-
+    // month Collection card excludes them for the same reason.
+    function _isCalibrationDo(d) {
+        return /^CAL-/i.test(String((d && d.do_number) || ''));
+    }
 
     function renderMonitoringDashboard() {
         const cardsEl = document.getElementById('mon-dash-cards');
@@ -1215,8 +1224,13 @@
         // Order & Collection chart uses — sum of total_qty on every
         // non-cancelled DO delivered in the current month. Keeps the
         // card in lock-step with the chart's current-month bar.
+        //
+        // Excludes calibration DOs (`CAL-…`) so a bulk stock calibration
+        // never inflates the month's real collection figure. Those DOs
+        // land in the chart's separate Calibration bar instead.
         monthCollected = (allDoRecords || []).reduce((s, d) => {
             if (!d.delivery_date) return s;
+            if (_isCalibrationDo(d)) return s;
             return String(d.delivery_date).slice(0, 7) === monthKeyNow
                 ? s + Number(d.total_qty || 0)
                 : s;
@@ -1270,14 +1284,25 @@
         renderMonthDashChart();
     }
 
-    // ── Order vs Collection chart — full 12-month view of the live year.
-    // Ordered qty buckets by orderDate month; Collected qty buckets by
-    // shared_do_records.delivery_date month (every non-cancelled DO is a
-    // collection event). The visible bar for "now" is highlighted.
+    // ── Order vs Collection vs Calibration chart — full 12-month view of
+    // the live year. Ordered qty buckets by the AL's order_date month;
+    // Collected qty buckets by shared_do_records.delivery_date month for
+    // every non-cancelled DO whose number does NOT start with `CAL-`;
+    // Calibration qty buckets those `CAL-…` DOs (bulk stock corrections
+    // that should not read as customer collections). The visible bar for
+    // "now" is highlighted.
+    //
+    // Calibration is rendered per-month only when that month has any
+    // calibration data — months without still show two bars (Order +
+    // Collection) so a stock calibration in one month does not add a
+    // zero-height column to every other month. The legend chip and the
+    // header total's "· Calibrated N" segment appear only when the year
+    // has calibration data at all.
     function renderMonthDashChart() {
         const bars     = document.getElementById('mon-dash-month-bars');
         const yearLbl  = document.getElementById('mon-dash-year');
         const totLabel = document.getElementById('mon-dash-year-total');
+        const calLeg   = document.getElementById('mon-dash-cal-legend');
         if (!bars) return;
 
         const now  = new Date();
@@ -1288,8 +1313,9 @@
         // to created_at when order_date isn't populated. (Previously this
         // pulled from allCustomerOrders, which is the salesweb-orders
         // table — not the same population as the AL list the user sees.)
-        const orderByMonth      = {};
-        const collectionByMonth = {};
+        const orderByMonth       = {};
+        const collectionByMonth  = {};
+        const calibrationByMonth = {};
         (allAls || []).forEach(a => {
             const ds = a.order_date || a.created_at;
             if (!ds) return;
@@ -1298,8 +1324,13 @@
         });
         (allDoRecords || []).forEach(d => {
             if (!d.delivery_date) return;
-            const k = String(d.delivery_date).slice(0, 7);
-            collectionByMonth[k] = (collectionByMonth[k] || 0) + Number(d.total_qty || 0);
+            const k   = String(d.delivery_date).slice(0, 7);
+            const qty = Number(d.total_qty || 0);
+            if (_isCalibrationDo(d)) {
+                calibrationByMonth[k] = (calibrationByMonth[k] || 0) + qty;
+            } else {
+                collectionByMonth[k] = (collectionByMonth[k] || 0) + qty;
+            }
         });
 
         const months = [];
@@ -1309,38 +1340,60 @@
                 key: k,
                 idx: m,
                 label: new Date(year, m, 1).toLocaleString('en-MY', { month: 'short' }),
-                order:      Number(orderByMonth[k]      || 0),
-                collection: Number(collectionByMonth[k] || 0)
+                order:       Number(orderByMonth[k]       || 0),
+                collection:  Number(collectionByMonth[k]  || 0),
+                calibration: Number(calibrationByMonth[k] || 0)
             });
         }
-        const maxQ     = Math.max(1, ...months.flatMap(m => [m.order, m.collection]));
+        const maxQ     = Math.max(1, ...months.flatMap(m => [m.order, m.collection, m.calibration]));
         const nowMonth = now.getMonth();
 
         bars.innerHTML = months.map(m => {
-            const ho = Math.max(2, Math.round((m.order      / maxQ) * 80));
-            const hc = Math.max(2, Math.round((m.collection / maxQ) * 80));
+            const hasCal    = m.calibration > 0;
             const isCurrent = m.idx === nowMonth && year === now.getFullYear();
             const labelCls  = isCurrent ? 'text-blue-700 font-black' : 'text-slate-500 font-bold';
+            // 3 columns when the month has calibration, 2 otherwise, so
+            // an inactive month still reads the same as before this change.
+            const colCls    = hasCal ? 'w-1/3' : 'w-1/2';
+            const ho = Math.max(2, Math.round((m.order       / maxQ) * 80));
+            const hc = Math.max(2, Math.round((m.collection  / maxQ) * 80));
+            const hk = Math.max(2, Math.round((m.calibration / maxQ) * 80));
+            const orderCol = `
+                  <div class="flex flex-col items-center justify-end gap-0.5 ${colCls}">
+                    <div class="text-[8px] font-black text-blue-700 leading-none">${m.order ? _monFmt(m.order) : '·'}</div>
+                    <div class="w-full rounded-t-md bg-blue-500 hover:bg-blue-600 cursor-pointer transition-colors" style="height:${ho}px" title="${m.label} ${year} — Order: ${_monFmt(m.order)} qty (click for details)" data-month-key="${m.key}" data-bar-type="order"></div>
+                  </div>`;
+            const collCol = `
+                  <div class="flex flex-col items-center justify-end gap-0.5 ${colCls}">
+                    <div class="text-[8px] font-black text-emerald-700 leading-none">${m.collection ? _monFmt(m.collection) : '·'}</div>
+                    <div class="w-full rounded-t-md bg-emerald-500 hover:bg-emerald-600 cursor-pointer transition-colors" style="height:${hc}px" title="${m.label} ${year} — Collection: ${_monFmt(m.collection)} qty (click for details)" data-month-key="${m.key}" data-bar-type="collection"></div>
+                  </div>`;
+            const calCol = hasCal ? `
+                  <div class="flex flex-col items-center justify-end gap-0.5 ${colCls}">
+                    <div class="text-[8px] font-black text-violet-700 leading-none">${_monFmt(m.calibration)}</div>
+                    <div class="w-full rounded-t-md bg-violet-500 hover:bg-violet-600 cursor-pointer transition-colors" style="height:${hk}px" title="${m.label} ${year} — Calibration: ${_monFmt(m.calibration)} qty (click for details)" data-month-key="${m.key}" data-bar-type="calibration"></div>
+                  </div>` : '';
             return `
               <div class="flex flex-col items-stretch gap-1 h-full">
                 <div class="flex items-end justify-center gap-0.5 flex-1">
-                  <div class="flex flex-col items-center justify-end gap-0.5 w-1/2">
-                    <div class="text-[8px] font-black text-blue-700 leading-none">${m.order ? _monFmt(m.order) : '·'}</div>
-                    <div class="w-full rounded-t-md bg-blue-500 hover:bg-blue-600 cursor-pointer transition-colors" style="height:${ho}px" title="${m.label} ${year} — Order: ${_monFmt(m.order)} qty (click for details)" data-month-key="${m.key}" data-bar-type="order"></div>
-                  </div>
-                  <div class="flex flex-col items-center justify-end gap-0.5 w-1/2">
-                    <div class="text-[8px] font-black text-emerald-700 leading-none">${m.collection ? _monFmt(m.collection) : '·'}</div>
-                    <div class="w-full rounded-t-md bg-emerald-500 hover:bg-emerald-600 cursor-pointer transition-colors" style="height:${hc}px" title="${m.label} ${year} — Collection: ${_monFmt(m.collection)} qty (click for details)" data-month-key="${m.key}" data-bar-type="collection"></div>
-                  </div>
+                  ${orderCol}${collCol}${calCol}
                 </div>
                 <div class="text-[10px] ${labelCls} leading-tight text-center">${m.label}</div>
               </div>`;
         }).join('');
 
-        const totOrder = months.reduce((s, m) => s + m.order, 0);
-        const totColl  = months.reduce((s, m) => s + m.collection, 0);
+        const totOrder = months.reduce((s, m) => s + m.order,       0);
+        const totColl  = months.reduce((s, m) => s + m.collection,  0);
+        const totCal   = months.reduce((s, m) => s + m.calibration, 0);
         if (yearLbl)  yearLbl.textContent  = String(year);
-        if (totLabel) totLabel.textContent = `Order ${_monFmt(totOrder)} · Collected ${_monFmt(totColl)}`;
+        if (totLabel) {
+            // "· Calibrated N" only when there is calibration data this year,
+            // matching the per-month rule so the totals line stays clean.
+            let text = `Order ${_monFmt(totOrder)} · Collected ${_monFmt(totColl)}`;
+            if (totCal > 0) text += ` · Calibrated ${_monFmt(totCal)}`;
+            totLabel.textContent = text;
+        }
+        if (calLeg) calLeg.style.display = totCal > 0 ? '' : 'none';
 
         // Wire bar clicks once. Delegation handles every month/type pair.
         if (!bars._wiredDrill) {
@@ -1395,12 +1448,37 @@
                     ]
                 });
             });
+        } else if (barType === 'calibration') {
+            // Same shape as the Collection drilldown, but filtered to the
+            // `CAL-…` DOs that the chart split off into its own bar.
+            eyebrow.textContent = '⚙️ Calibration qty · click-through';
+            titleEl.textContent = `${monthLabel} · Calibration DOs`;
+            columns = ['Delivery date', 'DO #', 'Note', 'Qty'];
+            (allDoRecords || []).forEach(d => {
+                if (!d.delivery_date) return;
+                if (!_isCalibrationDo(d)) return;
+                if (String(d.delivery_date).slice(0, 7) !== monthKey) return;
+                const qty = Number(d.total_qty || 0);
+                total += qty;
+                rows.push({
+                    sort: String(d.delivery_date).slice(0, 10),
+                    cells: [
+                        `<td class="py-2 pr-3 font-bold text-slate-600">${String(d.delivery_date).slice(0, 10)}</td>`,
+                        `<td class="py-2 pr-3 font-black text-violet-700">${d.do_number || '—'}</td>`,
+                        `<td class="py-2 pr-3 truncate" style="max-width:320px">${d.remark || ''}</td>`,
+                        `<td class="py-2 pr-3 font-black text-violet-700">${_monFmt(qty)}</td>`
+                    ]
+                });
+            });
         } else {
             eyebrow.textContent = '🚚 Collection qty · click-through';
             titleEl.textContent = `${monthLabel} · Delivery Orders`;
             columns = ['Delivery date', 'AL #', 'DO #', 'Customer', 'Qty'];
             (allDoRecords || []).forEach(d => {
                 if (!d.delivery_date) return;
+                // Skip calibration DOs — they show under their own bar and
+                // must not double-count here.
+                if (_isCalibrationDo(d)) return;
                 if (String(d.delivery_date).slice(0, 7) !== monthKey) return;
                 const qty = Number(d.total_qty || 0);
                 total += qty;
