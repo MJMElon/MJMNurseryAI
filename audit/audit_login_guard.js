@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21e */
+/* BUILD: 2026-08-21f */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -137,23 +137,20 @@
     try { localStorage.removeItem(scopeKey()); } catch (e) {}
   }
 
-  /* Which nurseries this account may audit.
+  /* Which nurseries this account may audit: both, for everybody.
 
-     A role that names one — "Auditor PN", "MN Auditor" — is held to it.
-     Everyone else, including a plain "Auditor" and any admin, is offered
-     both and picks on the way in. The old rule quietly handed a plain
-     auditor the main nursery and nothing else, so most of the team was
-     never asked a question they should have been answering every morning.
+     This used to be inferred from the role string — "Auditor PN" was held
+     to the pre nursery — which meant the chooser silently offered one card
+     to anyone whose role happened to name a nursery, and a plain "Auditor"
+     was given the main nursery and nothing else. Guessing access from free
+     text was the problem; both nurseries are offered now and the choice is
+     the auditor's.
 
-     audit_home builds its rows from this same answer, so the chooser can
-     never offer a nursery the list would then refuse to show. */
+     If per-person limits are wanted later they belong in User Access,
+     alongside the other permissions, not in a substring match on a job
+     title. audit_home builds its rows from this same answer, so the two
+     cannot disagree. */
   function allowedScopes() {
-    var u = {};
-    try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
-    var role = ((u.audit_role || '') || (u.role || '')).toLowerCase();
-    var namesPN = role.indexOf('pn') !== -1;
-    var namesMN = role.indexOf('mn') !== -1;
-    if (namesPN !== namesMN) return namesPN ? ['PN'] : ['MN'];
     return ['PN', 'MN'];
   }
 
