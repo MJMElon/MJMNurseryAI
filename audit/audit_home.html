@@ -223,7 +223,7 @@
       }
       .audit-cards {
         display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
         gap: 16px !important;
       }
       .alert-section {
@@ -234,7 +234,7 @@
       .section-head { max-width: 100%; }
     }
     @media (min-width: 768px) and (max-width: 1199px) {
-      .audit-cards { grid-template-columns: repeat(2, 1fr) !important; }
+      .audit-cards { grid-template-columns: repeat(4, 1fr) !important; }
       .alert-section { grid-template-columns: repeat(2, 1fr) !important; }
       .header { padding: 0 32px !important; padding-bottom: 40px !important; }
     }
@@ -291,29 +291,31 @@
     .content{margin-top:0;padding:20px 16px 2.5rem}
     .section-head{color:var(--fc-ink3);font-size:10px;letter-spacing:1px;margin-bottom:10px}
 
-    /* ── MODULE CARDS: one scannable row each ── */
-    .audit-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    /* ── MODULE TILES ──
+       Four across, icon first. They were two columns of horizontal rows, so
+       the fourth wrapped onto a line of its own and the set stopped reading
+       as one group of four. The icon is the thing being aimed at on a phone,
+       so it gets the space the chevron and the blurb were using. */
+    .audit-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
                  gap:12px;margin-bottom:22px}
-    .fc-card{display:flex;align-items:center;gap:13px;background:var(--fc-card);
-             border:1.5px solid var(--fc-line);border-radius:14px;padding:14px 15px;
+    .fc-card{display:flex;flex-direction:column;align-items:center;text-align:center;
+             gap:0;background:var(--fc-card);
+             border:1.5px solid var(--fc-line);border-radius:16px;padding:20px 12px 16px;
              text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s;
              -webkit-tap-highlight-color:transparent}
-    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 6px 18px rgba(20,50,30,.07);
-                   transform:translateY(-1px)}
+    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 8px 22px rgba(20,50,30,.09);
+                   transform:translateY(-2px)}
     .fc-card:active{transform:scale(.99)}
-    .fc-ico{width:44px;height:44px;border-radius:12px;flex-shrink:0;
+    .fc-ico{width:64px;height:64px;border-radius:19px;flex-shrink:0;margin-bottom:13px;
             display:flex;align-items:center;justify-content:center}
-    .fc-ico svg{width:22px;height:22px;fill:none;stroke-width:1.9;
+    .fc-ico svg{width:32px;height:32px;fill:none;stroke-width:1.8;
                 stroke-linecap:round;stroke-linejoin:round}
-    .fc-body{flex:1;min-width:0}
-    .fc-ttl{font-size:13px;font-weight:800;color:var(--fc-ink);line-height:1.25;
+    .fc-body{min-width:0;width:100%}
+    .fc-ttl{font-size:14px;font-weight:800;color:var(--fc-ink);line-height:1.3;
             letter-spacing:.2px}
-    .fc-sub{display:flex;align-items:center;gap:5px;margin-top:3px;
+    .fc-sub{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px;
             font-size:9.5px;font-weight:800;letter-spacing:.8px;color:var(--fc-ink3)}
     .fc-dot{width:6px;height:6px;border-radius:50%;background:var(--fc-green);flex-shrink:0}
-    .fc-desc{font-size:11px;color:var(--fc-ink2);margin-top:5px;line-height:1.35}
-    .fc-chev{width:15px;height:15px;stroke:#c3ced6;fill:none;stroke-width:2.5;
-             stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 
     /* ── TO-DO rows: same card language as the modules ── */
     .todo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
@@ -352,18 +354,26 @@
                font-family:inherit}
     .cal-today:hover{background:#e9eff5}
 
-    .cal-days{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;
-              scrollbar-width:thin;-webkit-overflow-scrolling:touch}
-    .cal-days::-webkit-scrollbar{height:5px}
-    .cal-days::-webkit-scrollbar-thumb{background:#d5dee6;border-radius:3px}
-    .day{flex:0 0 auto;width:44px;padding:7px 0 6px;border-radius:12px;cursor:pointer;
+    .cal-strip{display:flex;align-items:stretch;gap:8px;padding:2px 2px 12px}
+    .cal-step{width:30px;flex:0 0 auto;border-radius:11px;border:1px solid var(--fc-line);
+              background:#f4f7fa;cursor:pointer;display:flex;align-items:center;
+              justify-content:center;padding:0;font-family:inherit}
+    .cal-step:hover{background:#e9eff5}
+    .cal-step svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.6;
+                  stroke-linecap:round;stroke-linejoin:round}
+    /* Five days, sized to the row rather than scrolled. Thirty-one cells on a
+       phone meant dragging a hairline scrollbar to find a date; five fill the
+       width and each is a thumb wide. */
+    .cal-days{display:flex;gap:8px;flex:1;min-width:0}
+    .day{flex:1 1 0;min-width:0;padding:9px 0 8px;border-radius:13px;cursor:pointer;
          background:#f4f7fa;border:1.5px solid transparent;text-align:center;
-         -webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s}
+         -webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s;
+         font-family:inherit}
     .day:hover{background:#e9eff5}
-    .day-w{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--fc-ink3);
+    .day-w{font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--fc-ink3);
            text-transform:uppercase}
-    .day-n{font-size:15px;font-weight:800;color:var(--fc-ink);margin-top:2px;line-height:1}
-    .day-dot{width:5px;height:5px;border-radius:50%;background:#c3ced6;margin:4px auto 0}
+    .day-n{font-size:18px;font-weight:800;color:var(--fc-ink);margin-top:3px;line-height:1}
+    .day-dot{width:5px;height:5px;border-radius:50%;background:#c3ced6;margin:5px auto 0}
     .day.has .day-dot{background:#2d7a2d}
     .day.today{border-color:#2d7a2d}
     .day.today .day-n{color:#2d7a2d}
@@ -407,7 +417,6 @@
     .tl-body{flex:1;min-width:0}
     .tl-ttl{font-size:13.5px;font-weight:800;color:var(--fc-ink);display:flex;
             align-items:center;gap:7px;flex-wrap:wrap}
-    .tl-sub{font-size:11px;color:var(--fc-ink2);margin-top:3px}
     .tl-when{flex-shrink:0;text-align:right}
     .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
     .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
@@ -437,15 +446,21 @@
       #app{background:var(--fc-bg)}
       .header{padding-bottom:18px!important}
       .content{padding:24px 32px!important}
-      .audit-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important}
     }
     @media (min-width:768px) and (max-width:1199px){
-      .audit-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important}
     }
 
-    /* One column on a phone — two 13px titles side by side is unreadable. */
+    /* Still four across on a phone — the tiles are an icon and a short
+       title, so they shrink rather than stack. */
     @media (max-width:640px){
-      .audit-cards{grid-template-columns:1fr}
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px}
+      .fc-card{padding:14px 6px 12px;border-radius:14px}
+      .fc-ico{width:46px;height:46px;border-radius:14px;margin-bottom:9px}
+      .fc-ico svg{width:24px;height:24px}
+      .fc-ttl{font-size:11px;line-height:1.25}
+      .fc-sub{font-size:8.5px;margin-top:4px}
       .header{padding:0 14px 14px}
       .content{padding:16px 12px 2.5rem}
       .welcome-name{font-size:21px}
@@ -528,7 +543,15 @@
           </button>
           <button class="cal-today" id="cal-today">Today</button>
         </div>
-        <div class="cal-days" id="cal-days"></div>
+        <div class="cal-strip">
+          <button class="cal-step" id="day-prev" aria-label="Earlier days">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="cal-days" id="cal-days"></div>
+          <button class="cal-step" id="day-next" aria-label="Later days">
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="chips" id="chips"></div>
@@ -548,9 +571,7 @@
         <div class="fc-body">
           <div class="fc-ttl" data-t="home_plot">Plot Condition Audit</div>
           <div class="fc-sub"><span class="fc-dot"></span>MODULE 1</div>
-          <div class="fc-desc">Pest, rat, disease &amp; leaf colour per plot</div>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="fc-card fade-in" href="audit_height_index.html">
         <div class="fc-ico" style="background:#e0f2fe">
@@ -559,9 +580,7 @@
         <div class="fc-body">
           <div class="fc-ttl" data-t="home_height">Seedling Height Audit</div>
           <div class="fc-sub"><span class="fc-dot"></span>MODULE 2</div>
-          <div class="fc-desc">3 samples per plot, auto-average</div>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="fc-card fade-in" href="audit_papan_index.html">
         <div class="fc-ico" style="background:#fff1e6">
@@ -570,9 +589,7 @@
         <div class="fc-body">
           <div class="fc-ttl" data-t="home_papan">Papan Tanda Audit</div>
           <div class="fc-sub"><span class="fc-dot"></span>MODULE 3</div>
-          <div class="fc-desc">Condition of every papan tanda</div>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="fc-card fade-in" href="audit_maintenance_index.html">
         <div class="fc-ico" style="background:#e8eefc">
@@ -581,9 +598,7 @@
         <div class="fc-body">
           <div class="fc-ttl" data-t="home_maintenance">Maintenance Audit</div>
           <div class="fc-sub"><span class="fc-dot"></span>MODULE 4</div>
-          <div class="fc-desc">Verify completed worker tasks on-site</div>
         </div>
-        <svg class="fc-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
     </div><!-- /audit-cards -->
 
@@ -794,6 +809,10 @@ function loadAuditTodo(){
 
   /* ── The month being looked at. Starts on this one. ── */
   let viewY = year, viewM = month, selDay = null;
+  /* First of the five days on screen. Kept inside the viewed month so the
+     strip, the count line and the timeline all describe the same month. */
+  let winStart = 1;
+  const WIN = 5;
   const active = new Set();          // status filters; empty means show all
 
   const MONTHS_FULL = ['January','February','March','April','May','June','July',
@@ -805,24 +824,23 @@ function loadAuditTodo(){
      nursery chosen on the way in. */
   const MN_SET = [
     {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
-     windows:[[10,10],[20,20],[30,30]], note:'Every 10th, 20th & 30th'},
+     windows:[[10,10],[20,20],[30,30]]},
     {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
-     windows:[[1,5],[15,20]],           note:'1st–5th & 15th–20th'},
+     windows:[[1,5],[15,20]]},
     {mod:'papan',  title:'Papan Tanda',     href:'audit_papan_index.html',
-     windows:[[15,20]],                 note:'15th–20th each month'}
+     windows:[[15,20]]}
   ];
   const PN_SET = [
     {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
-     windows:[[20,25]], note:'20th–25th each month'},
+     windows:[[20,25]]},
     {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
-     windows:[[20,25]], note:'20th–25th each month'}
+     windows:[[20,25]]}
   ];
   /* No window at all — these are triggered by events, not by the calendar. */
   const ANYTIME = [];
   if (showPN) ANYTIME.push({mod:'papan', title:'Papan Tanda',
-                            href:'audit_papan_index.html', note:'When case available'});
-  ANYTIME.push({mod:'maint', title:'Maintenance Audit', href:'audit_maintenance_index.html',
-                note:'Audit when worker submits completed task', badge:'maint'});
+                            href:'audit_papan_index.html'});
+  ANYTIME.push({mod:'maint', title:'Maintenance Audit', href:'audit_maintenance_index.html', badge:'maint'});
 
   const SET = showMN ? MN_SET : showPN ? PN_SET : [];
 
@@ -879,6 +897,14 @@ function loadAuditTodo(){
   }
 
   /* ── Month strip ── */
+  const clampWin = (y,m,d) => Math.max(1, Math.min(d, Math.max(1, daysIn(y,m) - WIN + 1)));
+
+  /* Today sits in the middle of the five on the current month; other months
+     open at the 1st. */
+  function windowFor(y,m){
+    return (y === year && m === month) ? clampWin(y, m, day - 2) : 1;
+  }
+
   function renderCalendar(){
     document.getElementById('cal-month').textContent = MONTHS_FULL[viewM] + ' ' + viewY;
 
@@ -887,8 +913,9 @@ function loadAuditTodo(){
     occ.forEach(o => { for (let d = o.start; d <= o.end; d++) busy.add(d); });
 
     const last = daysIn(viewY, viewM);
+    winStart = clampWin(viewY, viewM, winStart);
     let html = '';
-    for (let d = 1; d <= last; d++){
+    for (let d = winStart; d <= Math.min(winStart + WIN - 1, last); d++){
       const isToday = (viewY === year && viewM === month && d === day);
       const cls = ['day'];
       if (busy.has(d))  cls.push('has');
@@ -909,11 +936,28 @@ function loadAuditTodo(){
         renderAll();
       };
     });
+  }
 
-    /* Bring the interesting part of the month into view rather than always
-       starting at the 1st. */
-    const focus = strip.querySelector('.day.sel') || strip.querySelector('.day.today');
-    if (focus) strip.scrollLeft = Math.max(0, focus.offsetLeft - strip.clientWidth / 2 + 22);
+  /* Paging rolls into the neighbouring month rather than stopping dead at
+     the 1st or the 31st. */
+  function stepDays(dir){
+    const last = daysIn(viewY, viewM);
+    const maxStart = Math.max(1, last - WIN + 1);
+    let next = winStart + dir * WIN;
+    if (next < 1){
+      viewM--; if (viewM < 0){ viewM = 11; viewY--; }
+      next = Math.max(1, daysIn(viewY, viewM) - WIN + 1);   // land on the final five
+    } else if (next > maxStart){
+      if (winStart >= maxStart){                             // already on the last five
+        viewM++; if (viewM > 11){ viewM = 0; viewY++; }
+        next = 1;
+      } else {
+        next = maxStart;
+      }
+    }
+    winStart = next;
+    selDay = null;
+    renderAll();
   }
 
   /* ── Status filters ── */
@@ -954,7 +998,6 @@ function loadAuditTodo(){
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
             <div class="tl-ttl">${o.title}</div>
-            <div class="tl-sub">${o.note}</div>
           </div>
           <div class="tl-when">
             <div class="tl-date">${dateLabel(o, viewM)}</div>
@@ -985,7 +1028,6 @@ function loadAuditTodo(){
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${o.title}</div>
-              <div class="tl-sub">${o.note}</div>
             </div>
             <div class="tl-when">${
               o.badge === 'maint'
@@ -1043,15 +1085,21 @@ function loadAuditTodo(){
   }
 
   document.getElementById('cal-prev').onclick = () => {
-    viewM--; if (viewM < 0){ viewM = 11; viewY--; } selDay = null; renderAll();
+    viewM--; if (viewM < 0){ viewM = 11; viewY--; }
+    winStart = windowFor(viewY, viewM); selDay = null; renderAll();
   };
   document.getElementById('cal-next').onclick = () => {
-    viewM++; if (viewM > 11){ viewM = 0; viewY++; } selDay = null; renderAll();
+    viewM++; if (viewM > 11){ viewM = 0; viewY++; }
+    winStart = windowFor(viewY, viewM); selDay = null; renderAll();
   };
   document.getElementById('cal-today').onclick = () => {
-    viewY = year; viewM = month; selDay = null; active.clear(); renderAll();
+    viewY = year; viewM = month; winStart = windowFor(year, month);
+    selDay = null; active.clear(); renderAll();
   };
+  document.getElementById('day-prev').onclick = () => stepDays(-1);
+  document.getElementById('day-next').onclick = () => stepDays(1);
 
+  winStart = windowFor(viewY, viewM);
   renderAll();
 
 
