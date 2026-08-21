@@ -77,6 +77,19 @@
                                        text-overflow:ellipsis}
     .header-actions{flex-shrink:0}
 
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
     @media (max-width:640px){
       .header-top{height:54px;gap:8px}
       .header-actions{gap:5px}

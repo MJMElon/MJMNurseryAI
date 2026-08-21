@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
+  <script src="audit_lang.js"></script>
   <script src="audit_login_guard.js"></script>
   <script>MJMAuditLogin.requireSignIn();</script>
   <style>body{opacity:0;transition:opacity .2s ease}</style>
@@ -44,6 +45,10 @@
     .hbtn:hover{background:#eaeff5}
     .hbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;
               stroke-linecap:round;stroke-linejoin:round}
+    .lang-toggle-btn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+                     border:1px solid var(--line);color:var(--ink2);font-size:12px;
+                     font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
+    .lang-toggle-btn:hover{background:#eaeff5}
     .user-chip{display:flex;align-items:center;gap:8px;background:#f4f7fa;
                border:1px solid var(--line);border-radius:24px;padding:5px 12px 5px 6px}
     .avatar{width:28px;height:28px;border-radius:50%;background:#2d7a2d;color:#fff;
@@ -66,6 +71,19 @@
                                        text-overflow:ellipsis}
     .header-actions{flex-shrink:0}
 
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
     @media (max-width:640px){
       .header-top{height:54px;gap:8px}
       .header-actions{gap:5px}
@@ -154,11 +172,12 @@
       <div class="header-actions" style="display:flex;align-items:center;gap:6px;margin-left:auto">
         <a href="#" class="hbtn" id="backend-btn" style="display:none">
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>Main Page</span>
+          <span data-t="main_page">Main Page</span>
         </a>
+        <button class="lang-toggle-btn" onclick="toggleLang()">BM</button>
         <button class="hbtn" onclick="MJMAuditLogin.signOut()">
           <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span>Sign Out</span>
+          <span data-t="signout">Sign Out</span>
         </button>
         <div class="user-chip">
           <div class="avatar" id="avatar">A</div>
@@ -174,7 +193,7 @@
   </div>
 
   <div class="content">
-    <div class="ask">Which nursery are you auditing today?</div>
+    <div class="ask" data-t="ask_nursery">Which nursery are you auditing today?</div>
 
     <div class="picks">
 
@@ -189,10 +208,10 @@
             <path d="M29.3 34.4h-8.2c-1.1 0-2.2-.4-3-1.2l-2.5-2.5c-.8-.8-1.9-1.2-3-1.2H8.5"/>
           </svg>
         </div>
-        <div class="pick-ttl">Pre Nursery</div>
+        <div class="pick-ttl" data-t="pre_nursery">Pre Nursery</div>
         <div class="pick-code">PN</div>
         <div class="pick-go" style="color:var(--accent)">
-          <span>Enter</span>
+          <span data-t="enter">Enter</span>
           <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
         </div>
       </button>
@@ -212,17 +231,17 @@
             <path d="M5 42h38"/>
           </svg>
         </div>
-        <div class="pick-ttl">Main Nursery</div>
+        <div class="pick-ttl" data-t="main_nursery">Main Nursery</div>
         <div class="pick-code">MN · BNN · UNN 1 · UNN 2</div>
         <div class="pick-go" style="color:var(--accent)">
-          <span>Enter</span>
+          <span data-t="enter">Enter</span>
           <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
         </div>
       </button>
 
     </div>
 
-    <div class="note" id="note">You can switch nursery at any time from the audit menu.</div>
+    <div class="note" id="note" data-t="switch_note">You can switch nursery at any time from the audit menu.</div>
   </div>
 </div>
 
@@ -248,9 +267,14 @@ function choose(scope){
   if (MJMAuditLogin.scope() !== scope) {
     const n = document.getElementById('note');
     if (n) {
-      n.textContent = 'This browser is not letting the app save your choice, ' +
-                      'so it cannot open the audit list. Turn off private ' +
-                      'browsing, or allow site data, and try again.';
+      n.removeAttribute('data-t');       // stop applyTranslations overwriting it
+      n.textContent = currentLang === 'ms'
+        ? 'Pelayar ini tidak membenarkan pilihan anda disimpan, jadi senarai ' +
+          'audit tidak dapat dibuka. Matikan pelayaran peribadi, atau benarkan ' +
+          'data laman, dan cuba lagi.'
+        : 'This browser is not letting the app save your choice, so it cannot ' +
+          'open the audit list. Turn off private browsing, or allow site data, ' +
+          'and try again.';
       n.style.color = '#b91c1c';
       n.style.fontWeight = '700';
     }
@@ -270,13 +294,18 @@ if (allowed.indexOf('PN') === -1) document.getElementById('pick-pn').style.displ
 if (allowed.indexOf('MN') === -1) document.getElementById('pick-mn').style.display = 'none';
 
 /* Greeting */
-const h = new Date().getHours();
-document.getElementById('w-hi').textContent =
-  h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
+function paintGreeting(){
+  const h = new Date().getHours();
+  document.getElementById('w-hi').textContent =
+    t(h < 12 ? 'good_morning' : h < 17 ? 'good_afternoon' : 'good_evening');
+  document.getElementById('w-date').textContent =
+    new Date().toLocaleDateString(currentLang === 'ms' ? 'ms-MY' : 'en-MY',
+      {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+paintGreeting();
+document.addEventListener('mjm-lang-changed', paintGreeting);
 document.getElementById('w-name').innerHTML =
   user.name + ' <span style="color:#3d9c3d">👋</span>';
-document.getElementById('w-date').textContent =
-  new Date().toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 document.getElementById('avatar').textContent =
   (user.name || 'A').split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
 document.getElementById('uname').textContent = (user.name || 'Auditor').split(' ')[0];

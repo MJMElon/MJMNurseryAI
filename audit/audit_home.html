@@ -346,6 +346,19 @@
                                        text-overflow:ellipsis}
     .header-actions{flex-shrink:0}
 
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
     @media (max-width:640px){
       .header-top{height:54px;gap:8px}
       .header-actions{gap:5px}
@@ -886,17 +899,19 @@ function loadAuditTodo(){
 
   /* Name the nursery on the screen itself, and offer the way to the other
      one — without which the choice made on the way in is a one-way door. */
-  (function paintRibbon(){
+  function paintRibbon(){
     const ttl = document.getElementById('ribbon-ttl');
     const rib = document.getElementById('ribbon');
     const sw  = document.getElementById('scope-switch');
     if (!ttl || !scope) return;
     const isPN = scope === 'PN';
-    ttl.textContent = isPN ? 'Pre Nursery' : 'Main Nursery';
+    ttl.textContent = t(isPN ? 'pre_nursery' : 'main_nursery');
     rib.style.setProperty('--rib', isPN ? '#1f7a3d' : '#1558a8');
     /* Only worth offering when there is somewhere else to go. */
     if (sw && allowed.length < 2) sw.style.visibility = 'hidden';
-  })();
+  }
+  paintRibbon();
+  document.addEventListener('mjm-lang-changed', paintRibbon);
 
   /* ── The month being looked at. Starts on this one. ── */
   /* Today is selected from the start: the question this screen answers is
@@ -909,8 +924,13 @@ function loadAuditTodo(){
   const WIN = 5;
   const active = new Set();          // status filters; empty means show all
 
-  const MONTHS_FULL = ['January','February','March','April','May','June','July',
-                       'August','September','October','November','December'];
+  /* Built from the browser's own month names so they follow the language
+     rather than needing twelve more dictionary keys kept in step. */
+  const monthNames = (style) => Array.from({length:12}, (_, i) =>
+    new Date(2020, i, 1).toLocaleDateString(
+      (typeof currentLang !== 'undefined' && currentLang === 'ms') ? 'ms-MY' : 'en-MY',
+      {month: style}));
+  let MONTHS_FULL = monthNames('long');
   const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   /* ── Schedules ──
@@ -950,12 +970,15 @@ function loadAuditTodo(){
     papan:  {tone:'#e65100', tint:'#fef1e3'},
     maint:  {tone:'#880e4f', tint:'#fdeaf1'}
   };
+  /* Labels are looked up when a row is drawn rather than fixed here, so a
+     language change redraws into the new one. */
   const STATUS = {
-    overdue:  {lbl:'Overdue',  emoji:'⚠️', bg:'#fee2e2', fg:'#7f1d1d'},
-    due:      {lbl:'Due Now',  emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
-    soon:     {lbl:'Soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
-    upcoming: {lbl:'Upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'}
+    overdue:  {key:'st_overdue',  emoji:'⚠️', bg:'#fee2e2', fg:'#7f1d1d'},
+    due:      {key:'st_due',      emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
+    soon:     {key:'st_soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
+    upcoming: {key:'st_upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'}
   };
+  const stLbl = k => (typeof t === 'function' ? t(STATUS[k].key) : STATUS[k].key);
 
   /* ── HAS THIS WINDOW BEEN DONE? ────────────────────────────────────
      A window is a task, not just a date range: it shows every day of the
@@ -1182,7 +1205,7 @@ function loadAuditTodo(){
       const off = active.size > 0 && !on;
       return `<button class="chip ${on?'on':''} ${off?'off':''}" data-k="${k}">
         <span class="chip-dot" style="background:${st.bg}">${st.emoji}</span>
-        <span class="chip-lbl">${st.lbl}</span>
+        <span class="chip-lbl">${stLbl(k)}</span>
         <span class="chip-n">${counts[k]}</span>
       </button>`;
     }).join('');
@@ -1229,7 +1252,7 @@ function loadAuditTodo(){
           </div>
           <div class="tl-when">
             <div class="tl-date">${dateLabel(o, om)}</div>
-            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${st.lbl}</span>
+            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
           </div>
         </a>
       </div>`;
@@ -1238,19 +1261,19 @@ function loadAuditTodo(){
     if (!list.length){
       html = `<div class="tl-empty">${
         selDay !== null
-          ? `Nothing outstanding on ${selDay} ${MONTHS_FULL[viewM]}.`
+          ? `${t('nothing_on')} ${selDay} ${MONTHS_FULL[viewM]}.`
           : active.size
-            ? 'Nothing outstanding matches that filter.'
+            ? t('nothing_matches')
             : occ.length
-              ? '✅ Every audit for this month is done.'
-              : 'No scheduled audits this month.'
+              ? '✅ ' + t('all_month_done')
+              : t('none_scheduled')
       }</div>`;
     }
 
     /* Event-driven work has no date, so it is listed apart rather than given
        a day it does not have — and hidden when a single day is in focus. */
     if ((selDay === null || showingToday) && !active.size && ANYTIME.length){
-      html += '<div class="tl-head">Anytime</div>';
+      html += `<div class="tl-head">${t('anytime')}</div>`;
       html += ANYTIME.map(o => {
         const c = TONE[o.mod];
         return `<div class="tl-item" style="--tone:${c.tone}">
@@ -1262,7 +1285,7 @@ function loadAuditTodo(){
             <div class="tl-when">${
               o.badge === 'maint'
                 ? '<div id="maint-pending-badge"><span class="tl-badge" style="background:#e9edf1;color:#5b7280">…</span></div>'
-                : '<span class="tl-badge" style="background:#e9edf1;color:#5b7280">On Demand</span>'
+                : `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">${t('on_demand')}</span>`
             }</div>
           </a>
         </div>`;
@@ -1274,6 +1297,7 @@ function loadAuditTodo(){
   }
 
   function renderAll(){
+    MONTHS_FULL = monthNames('long');
     const thisMonth = (viewY === year && viewM === month);
     const monthOcc  = occurrences(viewY, viewM);
     /* Anything still owed from earlier months rides along with the current
@@ -1299,20 +1323,20 @@ function loadAuditTodo(){
     const todayN  = actionable.length;
 
     const doneNote = finished
-      ? ` <span class="count-note">· ${finished} done this month</span>` : '';
+      ? ` <span class="count-note">· ${finished} ${t('n_done_month')}</span>` : '';
     const overNote = carried
-      ? ` <span class="count-note over">· ${carried} overdue</span>` : '';
+      ? ` <span class="count-note over">· ${carried} ${t('n_overdue')}</span>` : '';
 
     document.getElementById('sched-count').innerHTML = thisMonth
       ? (beforeStart(viewY, viewM)
-          ? `<span class="count-big">No audit</span> tasks yet — the schedule ` +
-            `starts in ${MONTHS_FULL[START_M]} ${START_Y}`
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('sched_starts')} ` +
+            `${MONTHS_FULL[START_M]} ${START_Y}`
         : todayN === 0
-          ? `<span class="count-big">No audit</span> tasks today ✅${doneNote}`
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅${doneNote}`
           /* "2 audit" stays singular inside the big text — pluralising both
              halves read "2 audits tasks". Only "task" takes the s. */
-          : `You have <span class="count-big">${todayN} audit</span> ` +
-            `task${todayN>1?'s':''} today 👍${overNote}${doneNote}`)
+          : `${t('you_have')} <span class="count-big">${todayN} ${t('audit_word')}</span> ` +
+            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')} 👍${overNote}${doneNote}`)
       : (monthOcc.length === 0
           ? (beforeStart(viewY, viewM)
               ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
@@ -1337,8 +1361,8 @@ function loadAuditTodo(){
       el.innerHTML = n === null
         ? `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">—</span>`
         : n === 0
-          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ All done</span>`
-          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} waiting</span>`;
+          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`
+          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} ${t('waiting')}</span>`;
     };
     if (maintCache !== null) { paint(maintCache); return; }
     try{
@@ -1366,6 +1390,8 @@ function loadAuditTodo(){
   };
   document.getElementById('day-prev').onclick = () => stepDays(-1);
   document.getElementById('day-next').onclick = () => stepDays(1);
+
+  document.addEventListener('mjm-lang-changed', renderAll);
 
   winStart = windowFor(viewY, viewM);
   renderAll();                                   // draw at once, from the schedule
