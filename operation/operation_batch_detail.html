@@ -1470,6 +1470,27 @@
                                 </div>
                             </div>
 
+                            <!-- Drone map vs 3rd culled qty — the plots that do not tally.
+                                 The report saves either way; an unexplained plot keeps the
+                                 batch in HQ's Amendment Needed list until a reason is
+                                 written here, so the work is never blocked but never
+                                 quietly forgotten either. -->
+                            <!-- The gap sits on the panel, not on the save row, so
+                                 nothing shifts on the tabs where the panel is hidden. -->
+                            <div id="t6-mismatch-panel" class="hidden mb-6 bg-white rounded-3xl border-2 border-[#f0b429] shadow-lg overflow-hidden">
+                                <div class="px-6 py-4 bg-[#fffbeb] border-b-2 border-[#f0b429] flex items-center justify-between gap-3 flex-wrap">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-10 h-10 rounded-xl bg-[#fef3c7] border border-[#f0b429] flex items-center justify-center text-xl shrink-0">⚠️</span>
+                                        <div>
+                                            <div class="text-sm font-black text-[#7a4a10] uppercase tracking-widest">Drone Map Doesn’t Tally</div>
+                                            <div class="text-[11px] font-bold text-[#8a7a68]">Explain each one below. The report still saves — but the batch stays in <strong>Amendment Needed</strong> until every plot here has a reason.</div>
+                                        </div>
+                                    </div>
+                                    <span class="text-[11px] font-black text-[#7a4a10] uppercase tracking-widest bg-[#fef3c7] border border-[#f0b429] rounded-lg px-3 py-1.5 whitespace-nowrap" id="t6-mismatch-count">0 plots</span>
+                                </div>
+                                <div id="t6-mismatch-rows" class="p-4 sm:p-6 space-y-3"></div>
+                            </div>
+
                             <!-- Save button -->
                             <div class="flex justify-end">
                                 <button type="button" id="save-t6-btn" class="btn-earth !bg-gradient-to-r !from-[#6d28d9] !to-[#4c1d95] !shadow-[0_8px_20px_-4px_rgba(109,40,217,0.4)] px-12" onclick="saveTab6()">Save 3rd Culling Report (0% Complete)</button>
@@ -6595,12 +6616,19 @@ Thank you.`;
                     let docName = '';
                     if (nameMatch) { try { docName = decodeURIComponent(nameMatch[1]); } catch(_) { docName = nameMatch[1]; } }
                     const mapQtyMatch = log.remark ? log.remark.match(/MapQty:\s*(\d+)/) : null;
+                    // Why the drone map and the culled qty disagree, written by
+                    // whoever reconciled them. Kept so the mismatch panel comes
+                    // back filled in rather than asking again every reload.
+                    const mmMatch = log.remark ? log.remark.match(/MismatchNote:(\S+)/) : null;
+                    let mismatchNote = '';
+                    if (mmMatch) { try { mismatchNote = decodeURIComponent(mmMatch[1]); } catch(_) { mismatchNote = mmMatch[1]; } }
                     const entry = {
                         culled:  log.quantity_change,
                         balance: balMatch  ? parseInt(balMatch[1]) : null,
                         docUrl:  docMatch  ? docMatch[1]           : null,
                         docName: docName || null,
-                        mapQty:  mapQtyMatch ? parseInt(mapQtyMatch[1]) : null
+                        mapQty:  mapQtyMatch ? parseInt(mapQtyMatch[1]) : null,
+                        mismatchNote: mismatchNote || null
                     };
                     if (destMatch) {
                         savedCull3Map[`${log.plot_name}|${destMatch[1]}`] = entry;
@@ -6750,7 +6778,8 @@ Thank you.`;
                         savedCulled:   saved.culled  ?? null,
                         savedDocUrl:   saved.docUrl  ?? null,
                         savedDocName:  saved.docName ?? null,
-                        savedMapQty:   saved.mapQty  ?? null
+                        savedMapQty:   saved.mapQty  ?? null,
+                        savedMismatchNote: saved.mismatchNote ?? null
                     });
                 });
 
@@ -6805,6 +6834,7 @@ Thank you.`;
                         // DestType keys + legacy queue) — merged rows carry the
                         // summed culled qty and the first doc/map values found.
                         let culled = null, balance = null, docUrl = null, docName = null, mapQty = null;
+                        let mismatchNote = null;
                         ['main', 'doubletone'].forEach(d => {   // premium excluded from this report
                             const e = savedCull3Map[`${v.plot}|${d}`];
                             if (!e) return;
@@ -6812,6 +6842,7 @@ Thank you.`;
                             if (balance == null) balance = e.balance;
                             if (!docUrl)         { docUrl = e.docUrl; docName = e.docName; }
                             if (mapQty == null)  mapQty = e.mapQty ?? null;
+                            if (!mismatchNote)   mismatchNote = e.mismatchNote || null;
                         });
                         const q = legacyCull3Queue[v.plot];
                         while (q && q.length) {
@@ -6819,6 +6850,7 @@ Thank you.`;
                             culled = (culled || 0) + (e.culled || 0);
                             if (balance == null) balance = e.balance;
                             if (!docUrl)         { docUrl = e.docUrl; docName = e.docName; }
+                            if (!mismatchNote)   mismatchNote = e.mismatchNote || null;
                         }
                         t6_plotData.push({
                             plot:         v.plot,
@@ -6831,7 +6863,8 @@ Thank you.`;
                             savedCulled:  culled,
                             savedDocUrl:  docUrl,
                             savedDocName: docName,
-                            savedMapQty:  mapQty
+                            savedMapQty:  mapQty,
+                            savedMismatchNote: mismatchNote
                         });
                     });
                     injectTransfers();
@@ -7256,6 +7289,103 @@ Thank you.`;
             if (caret) caret.innerText = collapsed ? '▸' : '▾';
         }
 
+        /* Every plot whose drone map qty is keyed in and disagrees with the
+           3rd culled qty. A blank map qty is "not counted yet", not a
+           disagreement — only a number that is actually there can differ. */
+        function t6Mismatches() {
+            const out = [];
+            document.querySelectorAll('.t6-plot-row').forEach((row, i) => {
+                const p = t6_plotData[i];
+                if (!p) return;
+                const mapRaw = (row.querySelector('.t6-map-qty')?.value ?? '').trim();
+                const cullRaw = row.querySelector('.t6-culled-input')?.value ?? '';
+                if (mapRaw === '' || cullRaw === '') return;
+                const mapQty = parseInt(mapRaw) || 0;
+                const culled = parseInt(cullRaw) || 0;
+                if (mapQty === culled) return;
+                out.push({ idx: i, rowId: `t6-row-${i}`, plot: p.plot, culled, mapQty });
+            });
+            return out;
+        }
+
+        /* The reason written for a plot, whether typed just now or loaded from
+           the last save. Trimmed, because a box of spaces explains nothing. */
+        function t6MismatchNote(idx) {
+            const el = document.getElementById(`t6-mm-note-${idx}`);
+            if (el) return (el.value || '').trim();
+            return String((t6_plotData[idx] && t6_plotData[idx].savedMismatchNote) || '').trim();
+        }
+
+        /* Redraw the panel under the totals. Called from calcT6, so it follows
+           every keystroke — which means it must not throw away a half-typed
+           reason, hence reading the boxes back before rebuilding them. */
+        function syncT6Mismatch() {
+            const panel = document.getElementById('t6-mismatch-panel');
+            const host  = document.getElementById('t6-mismatch-rows');
+            const count = document.getElementById('t6-mismatch-count');
+            if (!panel || !host) return [];
+
+            const list = t6Mismatches();
+            if (!list.length) { panel.classList.add('hidden'); host.innerHTML = ''; return list; }
+
+            const typed = {};
+            host.querySelectorAll('.t6-mm-note').forEach(el => { typed[el.dataset.idx] = el.value; });
+
+            panel.classList.remove('hidden');
+            if (count) count.innerText = `${list.length} plot${list.length === 1 ? '' : 's'}`;
+            host.innerHTML = list.map(m => {
+                const diff = m.mapQty - m.culled;
+                const note = typed[m.idx] !== undefined
+                    ? typed[m.idx]
+                    : String((t6_plotData[m.idx] && t6_plotData[m.idx].savedMismatchNote) || '');
+                return `
+                    <div class="border border-[#e8dcc8] rounded-2xl p-4 bg-[#fdfaf4]">
+                        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+                            <div>
+                                <div class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest">Plot</div>
+                                <div class="text-base font-black text-[#3d2610]">${m.plot}</div>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest">3rd Culled Qty</div>
+                                <div class="text-base font-black text-[#a83020]">${m.culled.toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest">Drone Map Qty</div>
+                                <div class="text-base font-black text-[#c07820]">${m.mapQty.toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest">Difference</div>
+                                <div class="text-base font-black ${diff > 0 ? 'text-[#c07820]' : 'text-[#a83020]'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <label class="label-style !text-[#7a4a10]">Reason &amp; how to avoid it in future</label>
+                        <textarea rows="2" data-idx="${m.idx}" id="t6-mm-note-${m.idx}"
+                            class="input-style t6-mm-note w-full !text-sm"
+                            oninput="syncT6MismatchState()"
+                            placeholder="e.g. drone flew before the last batch was moved out — recount after transfers close">${_escAttr(note)}</textarea>
+                    </div>`;
+            }).join('');
+            syncT6MismatchState();
+            return list;
+        }
+
+        /* Colour the panel by whether anything is still unexplained, so the
+           admin can see at a glance what the save will leave behind. */
+        function syncT6MismatchState() {
+            const panel = document.getElementById('t6-mismatch-panel');
+            if (!panel || panel.classList.contains('hidden')) return;
+            const open = t6Mismatches().filter(m => !t6MismatchNote(m.idx)).length;
+            const count = document.getElementById('t6-mismatch-count');
+            if (count) {
+                count.innerText = open
+                    ? `${open} unexplained`
+                    : 'All explained';
+                count.className = open
+                    ? 'text-[11px] font-black text-[#7a4a10] uppercase tracking-widest bg-[#fef3c7] border border-[#f0b429] rounded-lg px-3 py-1.5 whitespace-nowrap'
+                    : 'text-[11px] font-black text-[#4a7a2e] uppercase tracking-widest bg-[#f0f8ec] border border-[#c3e6cb] rounded-lg px-3 py-1.5 whitespace-nowrap';
+            }
+        }
+
         function calcT6() {
             let totTransplanted = 0, totBalance = 0, totCulled = 0;
             let rowsDone = 0, totalRows = 0;
@@ -7300,6 +7430,10 @@ Thank you.`;
             setT('t6-tot-culled-m',       totCulled > 0 ? totCulled.toLocaleString() : '—');
             setT('t6-tot-cull-rate',   avgStr);
             setT('t6-tot-cull-rate-m', avgStr);
+
+            // The plots whose drone map disagrees with the culled qty, listed
+            // under the totals for a reason to be written against each.
+            syncT6Mismatch();
 
             // Done counter
             document.getElementById('t6-done-count').innerText = rowsDone;
@@ -7487,6 +7621,10 @@ Thank you.`;
                 let logsToInsert = [];
                 let transferLogs = [];
                 let uploadFailures = 0;
+                // Plots whose drone map does not tally, and how many of those
+                // still have nobody's explanation against them.
+                let mismatchPlots = [];
+                let unexplained = 0;
                 const t6Rows = Array.from(document.querySelectorAll('.t6-plot-row'));
                 for (let i = 0; i < t6Rows.length; i++) {
                     const row = t6Rows[i];
@@ -7527,19 +7665,20 @@ Thank you.`;
                     if (isNaN(balance) || balVal === '') continue;
                     const cullPct = transplanted > 0 ? ((culled / transplanted) * 100).toFixed(2) : '0';
 
-                    // Drone map qty must tally with the 3rd culled qty — when it
-                    // doesn't, the admin must explain the discrepancy and how to
-                    // avoid it in future; the note is stored with the record.
+                    // Drone map qty and the 3rd culled qty should tally. When they
+                    // don't, the save is NOT blocked — the plot is listed in the
+                    // panel under the totals with a box for the reason, and the
+                    // batch stays in HQ's Amendment Needed list until one is
+                    // written. Blocking the save used to mean a day's counting
+                    // sat unsaved because of a figure nobody could resolve yet.
                     const mapQtyRaw = (row.querySelector('.t6-map-qty')?.value ?? '').trim();
                     const mapQty    = mapQtyRaw !== '' ? (parseInt(mapQtyRaw) || 0) : null;
                     let mismatchNote = '';
                     if (mapQty !== null && mapQty !== culled) {
-                        const note = prompt(
-                            `Plot ${plotName}: 3rd culled qty (${culled.toLocaleString()}) and drone map qty (${mapQty.toLocaleString()}) do not tally.\n\nPlease explain the issue and how to avoid this in future:`);
-                        if (note === null || !note.trim()) {
-                            throw new Error(`Save cancelled — plot ${plotName}'s drone map qty doesn't tally with the 3rd culled qty and needs a remark.`);
-                        }
-                        mismatchNote = ` MismatchNote:${encodeURIComponent(note.trim())}`;
+                        const note = t6MismatchNote(i);
+                        if (note) mismatchNote = ` MismatchNote:${encodeURIComponent(note)}`;
+                        unexplained += note ? 0 : 1;
+                        mismatchPlots.push({ plot: plotName, culled, mapQty, note });
                     }
                     const dead2Part = `, 2ndCulled: ${t6_plotData[i]?.dead2 || 0}, Sales: ${t6_plotData[i]?.sales || 0}`;
                     const mapQtyPart = mapQty !== null ? ` MapQty: ${mapQty}` : '';
@@ -7586,11 +7725,54 @@ Thank you.`;
                 // removes it from the DB too.
                 const { error: trErr } = await safeReplaceLogs(batchId, ['Cull3_Transfer'], transferLogs);
                 if (trErr) throw trErr;
+
+                // A plot whose drone map still has nobody's explanation against
+                // it keeps this batch on HQ's Amendment Needed list; explaining
+                // them all clears it. This is the same row the office-sheet
+                // import writes, so the two supersede each other rather than
+                // stacking two amendments on one batch. Written after the
+                // report itself, and never allowed to fail the save: the
+                // counting is already stored by this point.
+                try {
+                    const { data: oldFlags } = await _supabase.from('shared_inventory_logs')
+                        .select('id')
+                        .eq('batch_name', batchId)
+                        .eq('transaction_type', 'Review_Rejection')
+                        .eq('plot_name', 'cull_3')
+                        .like('remark', '3rd Culling map qty%');
+                    if (unexplained > 0) {
+                        const lines = mismatchPlots.filter(m => !m.note).map(m => {
+                            const d = m.mapQty - m.culled;
+                            return `${m.plot}: 3rd culled ${m.culled}, drone map ${m.mapQty} (${d > 0 ? '+' : ''}${d})`;
+                        });
+                        const { error: rjErr } = await safeInsertLogs([withEditMeta({
+                            transaction_type: 'Review_Rejection',
+                            batch_name:       batchId,
+                            plot_name:        'cull_3',
+                            quantity_change:  0,
+                            remark: `3rd Culling map qty does not tally — ${lines.length} plot(s) to explain. ${lines.join(' | ')}`
+                        })]);
+                        if (rjErr) throw rjErr;
+                    }
+                    // Insert first, then clear the old one, so the batch is never
+                    // briefly missing from the Amendment Needed list.
+                    const flagIds = (oldFlags || []).map(r => r.id).filter(v => v != null);
+                    if (flagIds.length) await _supabase.from('shared_inventory_logs').delete().in('id', flagIds);
+                } catch (flagErr) {
+                    console.warn('[saveTab6] amendment flag not updated:', flagErr);
+                    showToast('Report saved, but the Amendment Needed flag could not be updated. Save again to retry.', 'error');
+                }
+
                 setEditMetaUI(6, new Date().toISOString(), window.currentUserEmail);
                 if (uploadFailures > 0) {
                     showToast(`⚠️ ${uploadFailures} doc(s) failed to upload: ${window._mjmLastUploadError || 'storage error'}. Rows saved without doc. Fix bucket and re-save.`, 'error');
                 }
-                showToast(`3rd Culling report saved — ${logsToInsert.length} plot record(s)${transferLogs.length ? `, ${transferLogs.length} transfer(s)` : ''} logged.`, 'success');
+                const savedMsg = `3rd Culling report saved — ${logsToInsert.length} plot record(s)${transferLogs.length ? `, ${transferLogs.length} transfer(s)` : ''} logged.`;
+                if (unexplained > 0) {
+                    showToast(`${savedMsg} ${unexplained} plot(s) still need a drone map reason — this batch stays in Amendment Needed until they have one.`, 'error');
+                } else {
+                    showToast(savedMsg, 'success');
+                }
                 btn.innerText = originalText; btn.disabled = false;
                 // Re-sync so newly-transferred plots appear as their own rows.
                 await syncTab6();

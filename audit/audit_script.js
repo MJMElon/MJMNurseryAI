@@ -53,7 +53,6 @@ function selectTab(nursery){
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.n===nursery));
   document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
   renderList();
-  renderAlertStrip();
   setView('list');
 }
 
@@ -69,42 +68,8 @@ async function loadRecords(){
       date:r.date,createdAt:r.created_at
     }));
     renderList();
-    renderAlertStrip();
   }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
-}
-
-/* --- ALERT STRIP --- */
-function renderAlertStrip(){
-  const strip=document.getElementById('alert-strip');if(!strip)return;
-  const recs=records.filter(r=>r.nursery===activeTab);
-  const latestPerPlot={};
-  recs.forEach(r=>{
-    if(!latestPerPlot[r.plot]||r.createdAt>latestPerPlot[r.plot].createdAt)
-      latestPerPlot[r.plot]=r;
-  });
-  const latest=Object.values(latestPerPlot);
-  const ratPlots   =latest.filter(r=>r.tikus==='Banyak'||r.tikus==='Sedikit');
-  const pestPlots  =latest.filter(r=>r.ulat==='Banyak');
-  const yellowPlots=latest.filter(r=>r.warna==='5');
-  if(!ratPlots.length&&!pestPlots.length&&!yellowPlots.length){strip.innerHTML='';return;}
-  let html='<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b8a6b;margin-bottom:8px">⚠ Alerts — '+NURSERY_LABELS[activeTab]+'</div>';
-  function alertRow(icon,label,plots,bg,color){
-    return `<div style="background:#fff;border:1px solid #dde8dd;border-radius:12px;margin-bottom:6px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='flex'?'none':'flex'">
-        <span style="font-size:16px">${icon}</span>
-        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#182018">${label}</div><div style="font-size:11px;color:#6b8a6b">${plots.length} plot${plots.length>1?'s':''} affected</div></div>
-        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${bg};color:${color}">${plots.length}</span>
-      </div>
-      <div style="display:none;padding:0 12px 10px;flex-wrap:wrap;gap:5px">
-        ${plots.map(r=>`<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f4f6f4;border:1px solid #dde8dd;color:#3d5c3d">${r.plot}</span>`).join('')}
-      </div></div>`;
-  }
-  if(ratPlots.length)    html+=alertRow('🐀',t('alert_rat'),ratPlots,'#fff1f1','#b91c1c');
-  if(pestPlots.length)   html+=alertRow('🐛',t('alert_pest'),pestPlots,'#fff7ed','#c2410c');
-  if(yellowPlots.length) html+=alertRow('🍂',t('alert_yellow'),yellowPlots,'#fefce8','#854d0e');
-  html+='</div>';
-  strip.innerHTML=html;
 }
 
 /* --- RENDER LIST --- */

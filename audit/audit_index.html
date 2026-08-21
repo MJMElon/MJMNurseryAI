@@ -640,7 +640,17 @@
         try {
           const creds = JSON.parse(cached);
           if (creds.email === email && creds.password === password) {
-            // Restore cached session
+            /* Restore the cached user. Without this the redirect landed on a
+               page whose guard found no mjm_user and sent it straight back
+               here — offline login looked like it did nothing. */
+            const cachedUser = localStorage.getItem('mjm_cached_user');
+            if (!cachedUser) {
+              btn.classList.remove('loading');
+              errEl.textContent = '📴 Offline — no cached profile. Sign in online once first.';
+              errEl.classList.add('show');
+              return;
+            }
+            localStorage.setItem('mjm_user', cachedUser);
             window.location.href = auditLanding();
             return;
           }
@@ -685,8 +695,12 @@
                         user_type: profile?.user_type || null,
                         permissions: profile?.permissions || null };
 
-      // Save session + cache credentials for offline login
+      // Save session + cache credentials for offline login. The user object
+      // is cached alongside them because signing out clears mjm_user, and
+      // the offline path below has nothing to sign anyone back in with
+      // otherwise.
       localStorage.setItem('mjm_user', JSON.stringify(userObj));
+      localStorage.setItem('mjm_cached_user', JSON.stringify(userObj));
       localStorage.setItem('mjm_cached_creds', JSON.stringify({ email, password }));
 
       window.location.href = auditLanding();

@@ -417,12 +417,23 @@
     // fetched yet (a real admin hitting the page cold still works).
     const auditCard = document.querySelector('.module-card[data-module="audit"]');
     if (auditCard) {
+      /* Route by the EXPLICIT audit module level, matching how the audit
+         guards decide admin (isAuditAdmin / requireAdmin were fixed to
+         ignore the profile-level role fallback whenever modules.audit is
+         set — otherwise a Normal auditor who is admin of another module
+         gets misrouted here and then bounced right back).
+
+         The destination for a non-admin points at the nursery chooser so
+         they don't take a second page load through audit_home.html just
+         to reach the screen they were always going to see. With no
+         permissions fetched yet, fall back to the back end — its own
+         guard will redirect if that guess turns out wrong. */
       const auditLvl = mods ? String(mods.audit || '').toLowerCase() : null;
       auditCard.setAttribute(
         'href',
         auditLvl === 'admin' || !perms
           ? 'audit/audit_admin.html'
-          : 'audit/audit_home.html'
+          : 'audit/audit_nursery_select.html'
       );
     }
     const ua = document.getElementById('hub-user-access');

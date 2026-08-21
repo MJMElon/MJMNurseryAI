@@ -1525,6 +1525,40 @@ function monthLabelToInput(lbl) {
   return idx >= 0 ? `${m[2]}-${String(idx + 1).padStart(2, '0')}` : '';
 }
 const getMonth   = () => monthInputToLabel(document.getElementById('global-month').value);
+
+/* ── COLUMN HEADERS AS DATES ──
+   The month is worked in blocks of seven days, and the field reads them as
+   dates rather than as an ordinal they have to count back from: 1st - 7th,
+   8th - 14th, 15th - 21st, 22nd - 28th. A block added by hand beyond the
+   fourth runs to the end of the month, so February never reads "29th - 35th".
+   Takes the month label ("Apr 2026") the table is being drawn for; the PDF
+   draws a different month from the screen, so it passes its own. */
+function daysInMonthLabel(lbl) {
+  const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec((lbl || '').trim());
+  if (!m) return 31;                       // unknown month — assume the longest
+  const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === m[1].toLowerCase());
+  if (idx < 0) return 31;
+  return new Date(parseInt(m[2], 10), idx + 1, 0).getDate();  // day 0 of next
+}
+function ordinalDay(d) {
+  const v = d % 100, sfx = ['th', 'st', 'nd', 'rd'];
+  return d + (sfx[(v - 20) % 10] || sfx[v] || sfx[0]);
+}
+function periodLabel(n, monthLabel) {
+  const lbl = monthLabel !== undefined
+    ? monthLabel
+    : (document.getElementById('global-month') ? getMonth() : '');
+  const days = daysInMonthLabel(lbl);
+  const from = (n - 1) * 7 + 1;
+  // A block with no days left in the month — a 5th round in a 28-day
+  // February. There is no date to name, so it keeps its number rather than
+  // inventing a 29th of February.
+  if (from > days) return `${t('hdr.round')} ${n}`;
+  const to = Math.min(from + 6, days);
+  return from === to ? ordinalDay(from) : `${ordinalDay(from)} - ${ordinalDay(to)}`;
+}
+
+
 const getNursery = () => document.getElementById('global-nursery').value;
 
 /* ── MONTH/YEAR WHEEL PICKER (Android-style spinner) ──
@@ -1661,6 +1695,110 @@ function renderAll() {
   if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   WHAT THE FIELD RECORDED
+   The FC Scan Portal's Maintenance module saves one row per job done into
+   nops_maint_field_records — the date the work actually happened and the
+   batches that were standing in the plot. Those are the two columns this
+   page otherwise chases by phone, so they are read back here and written
+   onto the matching work-record row.
+
+   A field record finds its row by job + plot + the round the schedule asked
+   for it in ("Round 2: ..." in the racun column is the second seven-day
+   block of the month, which is the week the field recorded against).
+
+   Nothing keyed in by hand is ever overwritten: a cell is filled only while
+   it is still blank, or while it holds a value this sync put there itself.
+   A row an admin has Checked is left alone entirely.
+══════════════════════════════════════════════════════════════ */
+let fieldRecords = [];
+
+const _FIELD_JENIS = {
+  pd:       'Penyemburan racun kulat dan serangga',
+  manuring: 'Membaja',
+  weeding:  'Merumput',
+  interrow: 'Meracun rumput secara selingan'
+};
+
+async function loadFieldRecords() {
+  if (!_supabase) return;
+  try {
+    let res = await _supabase.from('nops_maint_field_records')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month');
+    // batch_name / week_no / schedule_month come from
+    // shared/add_maint_field_batch.sql. Until that has been run the field is
+    // still recording the work itself, so fall back to reading what is there.
+    if (res.error) {
+      res = await _supabase.from('nops_maint_field_records')
+        .select('id, work_date, plot_name, work_type, jenis');
+    }
+    if (res.error) { console.warn('[maint] field records unavailable:', res.error.message); return; }
+    fieldRecords = res.data || [];
+  } catch (e) { console.warn('[maint] field records unavailable:', e); }
+}
+
+/* "Round 2: Daconil 50gm" → 2 */
+function _recRound(racun) {
+  const m = /^\s*Round\s+(\d+)\s*:/i.exec(String(racun || ''));
+  return m ? parseInt(m[1], 10) : 0;
+}
+/* Which seven-day block of the month a date falls in — the 29th on is the 4th,
+   the same way the schedule's last round runs to the end of the month. */
+function _weekOfDate(iso) {
+  const day = parseInt(String(iso || '').slice(8, 10), 10);
+  return day ? Math.min(4, Math.ceil(day / 7)) : 0;
+}
+function _isoMonthLabel(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+  return m ? `${_MONTHS_SHORT[parseInt(m[2], 10) - 1]} ${m[1]}` : '';
+}
+const _fieldKey = (jenis, plot, week) => `${jenis}||${_mvPlotKey(plot)}||${week}`;
+
+/* The field's answer for each (job, plot, round) of one month. Where the same
+   job was saved twice the later one wins — the second save is a correction. */
+function fieldRecordIndex(monthLbl) {
+  const idx = {};
+  fieldRecords.forEach(f => {
+    const jenis = f.jenis || _FIELD_JENIS[f.work_type];
+    if (!jenis) return;
+    if ((f.schedule_month || _isoMonthLabel(f.work_date)) !== monthLbl) return;
+    const week = f.week_no || _weekOfDate(f.work_date);
+    if (!week) return;
+    const k = _fieldKey(jenis, f.plot_name, week), cur = idx[k];
+    const newer = !cur
+      || String(f.work_date || '') > String(cur.work_date || '')
+      || (String(f.work_date || '') === String(cur.work_date || '') && (f.id || 0) > (cur.id || 0));
+    if (newer) idx[k] = f;
+  });
+  return idx;
+}
+
+function applyFieldRecords(nursery, monthLbl) {
+  const idx = fieldRecordIndex(monthLbl);
+  const plots = NURSERY_PLOTS[nursery] || [];
+  records.forEach(r => {
+    if (!plots.includes(r.plot) || r.checked) return;
+    const week = _recRound(r.racun);
+    const f = week ? idx[_fieldKey(r.jenis, r.plot, week)] : null;
+    if (!f) {
+      // A cell this sync filled before whose field record has gone — deleted,
+      // or the month on screen has moved on. Put it back the way it was found
+      // rather than leaving another month's answer sitting in it.
+      if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
+      if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
+      return;
+    }
+    if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
+      r.tarikh = f.work_date || '-';
+      r._fromFieldDate = 1;
+    }
+    if (f.batch_name && (!r.batch || r._fromFieldBatch)) {
+      r.batch = f.batch_name;
+      r._fromFieldBatch = 1;
+    }
+  });
+}
+
 /* Auto-sync: silently regenerate records from current schedule (no confirm, no alert) */
 function autoSyncRecords() {
   const n=getNursery(), m=getMonth(), s=getState(n,m), cfg=s.pdConfig;
@@ -1720,6 +1858,8 @@ function autoSyncRecords() {
   const otherNurseryRecs = records.filter(r => !NURSERY_PLOTS[n].includes(r.plot));
   const merged = newRecs.map(r => existingMap[existingKey(r)] || r);
   records = [...otherNurseryRecs, ...merged];
+  // Fill the date and batch of anything the field has already reported.
+  try { applyFieldRecords(n, m); } catch (e) { console.warn('[maint] field sync failed:', e); }
   renderRecords();
   persistRecords();
 }
@@ -2058,7 +2198,7 @@ function renderPD() {
   const W=['W1','W2','W3','W4'];
   let h='<thead>';
   h+=`<tr><th rowspan="4" class="plot-col-hdr">${t('col.plot')}</th>`;
-  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${t('hdr.week')} ${w[1]}</th>`);
+  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${periodLabel(+w[1], m)}</th>`);
   h+='</tr><tr>';
   W.forEach(()=>h+=`<th class="p-th">${t('hdr.pSerangga')}</th><th class="d-th">${t('hdr.dKulat')}</th>`);
   h+='</tr><tr>';
@@ -2258,7 +2398,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${t('hdr.round')} ${ri+1}</span>
+        <span class="th-title">${periodLabel(ri+1, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addManuringCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeManuringCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2293,7 +2433,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.manuring[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${t('hdr.round')} ${ri+1}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -2388,7 +2528,7 @@ function renderWeeding() {
   h+=`<th rowspan="2" class="plot-col-hdr">${t('col.plot')}</th>`;
   h+=`<th colspan="2" class="wk-th">${t('hdr.weeding')}</th>`;
   h+='</tr><tr>';
-  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${t('hdr.round')} ${r[1]}</th>`);
+  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${periodLabel(+r[1], m)}</th>`);
   h+='</tr></thead><tbody>';
 
   // Select-all row
@@ -2527,7 +2667,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${t('hdr.round')} ${ri+1}</span>
+        <span class="th-title">${periodLabel(ri+1, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addInterrowCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeInterrowCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2566,7 +2706,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.interrow[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${t('hdr.round')} ${ri+1}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -3362,7 +3502,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*4, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     W.forEach((w, wi) => {
       const x = startX + plotColW + wi*colW*2;
-      cell(x, y, colW*2, rowH, `${t('hdr.week')} ${w[1]}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW*2, rowH, periodLabel(+w[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
 
@@ -3474,7 +3614,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     cfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, `${t('hdr.round')} ${ri+1}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3574,7 +3714,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*2, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     rounds.forEach((r, i) => {
       const x = startX + plotColW + i*colW;
-      cell(x, y, colW, rowH, `${t('hdr.round')} ${r[1]}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW, rowH, periodLabel(+r[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
     rounds.forEach((r, i) => {
@@ -3618,7 +3758,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     icfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, `${t('hdr.round')} ${ri+1}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3915,7 +4055,10 @@ async function initDb() {
       // The register the worker names really come from — see loadLinkedWorkers.
       _supabase.from('mjmnpayroll_workers').select('*').then(r => r, e => ({ error: e })),
       _supabase.from('nops_maint_payroll').select('nursery, month, work_type, data').then(r => r, () => ({ data: [] })),
-      _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] }))
+      _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] })),
+      // What the Field Conductors have already recorded — read alongside the
+      // rest so the first paint of Work Record already carries their dates.
+      loadFieldRecords()
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
