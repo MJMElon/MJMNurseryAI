@@ -323,8 +323,12 @@
        Month strip, status filters, and a timeline of the windows that fall
        in the month you are looking at. ── */
     .sched{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
-           padding:16px 16px 8px;margin-bottom:22px}
-    .sched-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+           padding:18px 16px 8px;margin-bottom:22px}
+    /* The count and the calendar are one thing: what is owed, and when. They
+       read as two stacked boxes when the count sat above with its own space,
+       so the rule below joins them instead of separating them. */
+    .sched-top{display:flex;align-items:flex-start;gap:12px;padding-bottom:14px;
+               margin-bottom:14px;border-bottom:1px solid var(--fc-line)}
     .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
                   letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
     /* ── HEADER ON A NARROW SCREEN ──
@@ -485,6 +489,18 @@
     .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
     .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
               padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
+    /* One chip per nursery the task covers, so a main-nursery row says which
+       of the three are done rather than hiding two behind the first. */
+    .tl-nurs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+    .nchip{font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 8px;
+           border-radius:20px;background:#fff;border:1.5px solid #d8e2ea;
+           color:var(--fc-ink3);white-space:nowrap}
+    .nchip.on{background:#dcfce7;border-color:#a7e0b5;color:#166534}
+
+    .count-big{font-size:26px;font-weight:800;color:#2d7a2d;letter-spacing:-.3px}
+    .count-note{font-size:12px;font-weight:700;color:var(--fc-ink3)}
+    .count-note.over{color:#b91c1c}
+
     .tl-from{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
              padding:2px 7px;border-radius:20px;background:#fee2e2;color:#7f1d1d}
     .tl-item.overdue .tl-card{border-left-width:6px}
@@ -883,7 +899,10 @@ function loadAuditTodo(){
   })();
 
   /* ── The month being looked at. Starts on this one. ── */
-  let viewY = year, viewM = month, selDay = null;
+  /* Today is selected from the start: the question this screen answers is
+     "what am I doing today", and an unselected strip answered "what happens
+     this month" instead. Paging to another month clears it. */
+  let viewY = year, viewM = month, selDay = day;
   /* First of the five days on screen. Kept inside the viewed month so the
      strip, the count line and the timeline all describe the same month. */
   let winStart = 1;
@@ -956,19 +975,46 @@ function loadAuditTodo(){
      too much rather than hiding work somebody still owes. Audits recorded
      offline and still queued are not visible to this either, for the same
      reason: they count once they sync. */
+  /* ── WHERE THE SCHEDULE BEGINS ──
+     The audit schedule runs from September 2026. Months before it are not
+     part of it: they show no tasks, count for nothing, and never turn
+     overdue — the records from that period were kept differently and
+     dragging them in would open the list on a backlog nobody owes.
+
+     Month is zero-based, so 8 is September. Move this and everything —
+     the board, the counts, the carry-over — moves with it. */
+  let START_Y = 2026, START_M = 8;
+  /* Overridable as "YYYY-MM" so the behaviour around a live window — due
+     today, closing unfinished, carrying over — can be exercised without
+     waiting for the calendar to reach it. Also the lever to pull if the
+     schedule is ever backdated, rather than editing this file. */
+  try {
+    const o = /^(\d{4})-(\d{2})$/.exec(localStorage.getItem('mjm_schedule_start') || '');
+    if (o) { START_Y = +o[1]; START_M = +o[2] - 1; }
+  } catch (e) {}
+  const beforeStart = (y, m) => (y < START_Y) || (y === START_Y && m < START_M);
+
   const LOOKBACK_MONTHS = 3;
   const SCOPE_NURSERIES = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  /* How each nursery code is written on screen. Same spellings the plot audit
+     tabs and the monthly report use, so one place does not say "UNN1" while
+     another says "UNN 1". */
+  const NURSERY_LABELS = { PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2' };
   const DONE_TABLE = {
     plot:   'audit_plot_audits',
     height: 'audit_height_records',
     papan:  'audit_papan_audits'
   };
-  let done = null;          // {plot:Set('YYYY-MM-DD'), …}; null until loaded
+  /* Keyed by module → 'nursery|YYYY-MM-DD'. Tracking the nursery as well as
+     the day is what lets a main-nursery task say which of BNN, UNN 1 and
+     UNN 2 are done: recording one used to close the window for all three. */
+  let done = null;
 
   const iso = (y,m,d) => y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
 
   async function loadCompletions(){
-    const from = new Date(year, month - LOOKBACK_MONTHS, 1);
+    let from = new Date(year, month - LOOKBACK_MONTHS, 1);
+    if (beforeStart(from.getFullYear(), from.getMonth())) from = new Date(START_Y, START_M, 1);
     const since = iso(from.getFullYear(), from.getMonth(), 1);
     const next = { plot:new Set(), height:new Set(), papan:new Set() };
     try {
@@ -977,7 +1023,7 @@ function loadAuditTodo(){
           'select=date,nursery&date=gte.' + since);
         (rows || []).forEach(r => {
           if (r && r.date && SCOPE_NURSERIES.indexOf(r.nursery) !== -1)
-            next[mod].add(String(r.date).slice(0,10));
+            next[mod].add(r.nursery + '|' + String(r.date).slice(0,10));
         });
       }));
       done = next;
@@ -987,11 +1033,21 @@ function loadAuditTodo(){
     }
   }
 
+  /* Which nurseries have been audited inside this window. */
+  function nurseryState(o, y, m){
+    return SCOPE_NURSERIES.map(n => {
+      let ok = false;
+      if (done && done[o.mod])
+        for (let d = o.start; d <= o.end && !ok; d++)
+          if (done[o.mod].has(n + '|' + iso(y, m, d))) ok = true;
+      return {nursery:n, done:ok};
+    });
+  }
+
+  /* A task is finished when every nursery it covers has been audited — not
+     when the first one has. */
   function isDone(o, y, m){
-    if (!done || !done[o.mod]) return false;
-    for (let d = o.start; d <= o.end; d++)
-      if (done[o.mod].has(iso(y, m, d))) return true;
-    return false;
+    return nurseryState(o, y, m).every(x => x.done);
   }
 
   const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
@@ -1000,6 +1056,7 @@ function loadAuditTodo(){
      A window is clamped to the last day of the month, so "the 30th" still
      lands in February instead of vanishing or reading as 30 February. */
   function occurrences(y, m){
+    if (beforeStart(y, m)) return [];
     const last = daysIn(y, m);
     const out = [];
     SET.forEach(sc => sc.windows.forEach(w => {
@@ -1032,6 +1089,7 @@ function loadAuditTodo(){
     for (let back = LOOKBACK_MONTHS; back >= 1; back--){
       const d = new Date(year, month - back, 1);
       const y = d.getFullYear(), m = d.getMonth();
+      if (beforeStart(y, m)) continue;
       occurrences(y, m).forEach(o => {
         if (occStatus(o, y, m) === 'overdue')
           out.push(Object.assign({}, o, {fromY:y, fromM:m}));
@@ -1140,8 +1198,15 @@ function loadAuditTodo(){
   /* ── Timeline ── */
   function renderTimeline(occ){
     let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
-    if (selDay !== null) list = list.filter(o => o.fromY === undefined &&
-                                                 selDay >= o.start && selDay <= o.end);
+    /* Today's view answers "what do I owe", so overdue belongs in it —
+       leaving it out let the page say "nothing outstanding" while the
+       Overdue chip beside it counted five. Picking a different day asks a
+       narrower question, "what falls on that date", and gets a literal
+       answer. */
+    const showingToday = (viewY === year && viewM === month && selDay === day);
+    if (selDay !== null) list = list.filter(o =>
+      (showingToday && occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue') ||
+      (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
     if (active.size)     list = list.filter(o =>
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
@@ -1156,6 +1221,11 @@ function loadAuditTodo(){
             <div class="tl-ttl">${o.title}${
               o.fromY !== undefined
                 ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
+            <div class="tl-nurs">${
+              nurseryState(o, oy, om).map(x =>
+                `<span class="nchip${x.done ? ' on' : ''}">${
+                   x.done ? '✓ ' : ''}${NURSERY_LABELS[x.nursery] || x.nursery}</span>`
+              ).join('')}</div>
           </div>
           <div class="tl-when">
             <div class="tl-date">${dateLabel(o, om)}</div>
@@ -1179,7 +1249,7 @@ function loadAuditTodo(){
 
     /* Event-driven work has no date, so it is listed apart rather than given
        a day it does not have — and hidden when a single day is in focus. */
-    if (selDay === null && !active.size && ANYTIME.length){
+    if ((selDay === null || showingToday) && !active.size && ANYTIME.length){
       html += '<div class="tl-head">Anytime</div>';
       html += ANYTIME.map(o => {
         const c = TONE[o.mod];
@@ -1200,7 +1270,7 @@ function loadAuditTodo(){
     }
 
     document.getElementById('todo-section').innerHTML = html;
-    if (selDay === null && !active.size) countMaintenance();
+    if ((selDay === null || showingToday) && !active.size) countMaintenance();
   }
 
   function renderAll(){
@@ -1216,16 +1286,39 @@ function loadAuditTodo(){
     const finished = monthOcc.length - monthOcc.filter(o =>
       occStatus(o, viewY, viewM) !== 'done').length;
 
-    const where = thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM] + ' ' + viewY;
+    /* What is actually owed today: the windows open on today's date that are
+       not finished, plus anything still carried from an earlier month. The
+       month total told you how busy August was; this tells you what to do
+       before going home. */
+    const actionable = thisMonth ? occ.filter(o => {
+      const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      return k === 'overdue' || k === 'due';   // 'due' already means today is inside it
+    }) : [];
+    const carried = actionable.filter(o =>
+      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue').length;
+    const todayN  = actionable.length;
+
     const doneNote = finished
-      ? ` <span style="font-size:12px;font-weight:700;color:var(--fc-ink3)">· ${finished} done</span>`
-      : '';
-    document.getElementById('sched-count').innerHTML =
-      monthOcc.length === 0
-        ? `No scheduled audits ${where} 🌱`
-        : outstanding === 0
-          ? `All caught up ${where} ✅${doneNote}`
-          : `You have <b>${outstanding}</b> audit${outstanding>1?'s':''} to do ${where} 👍${doneNote}`;
+      ? ` <span class="count-note">· ${finished} done this month</span>` : '';
+    const overNote = carried
+      ? ` <span class="count-note over">· ${carried} overdue</span>` : '';
+
+    document.getElementById('sched-count').innerHTML = thisMonth
+      ? (beforeStart(viewY, viewM)
+          ? `<span class="count-big">No audit</span> tasks yet — the schedule ` +
+            `starts in ${MONTHS_FULL[START_M]} ${START_Y}`
+        : todayN === 0
+          ? `<span class="count-big">No audit</span> tasks today ✅${doneNote}`
+          /* "2 audit" stays singular inside the big text — pluralising both
+             halves read "2 audits tasks". Only "task" takes the s. */
+          : `You have <span class="count-big">${todayN} audit</span> ` +
+            `task${todayN>1?'s':''} today 👍${overNote}${doneNote}`)
+      : (monthOcc.length === 0
+          ? (beforeStart(viewY, viewM)
+              ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
+              : `No scheduled audits in ${MONTHS_FULL[viewM]} ${viewY} 🌱`)
+          : `<span class="count-big">${outstanding}</span> to do in ` +
+            `${MONTHS_FULL[viewM]} ${viewY}${doneNote}`);
 
     renderCalendar();
     renderChips(occ);
@@ -1269,7 +1362,7 @@ function loadAuditTodo(){
   };
   document.getElementById('cal-today').onclick = () => {
     viewY = year; viewM = month; winStart = windowFor(year, month);
-    selDay = null; active.clear(); renderAll();
+    selDay = day; active.clear(); renderAll();
   };
   document.getElementById('day-prev').onclick = () => stepDays(-1);
   document.getElementById('day-next').onclick = () => stepDays(1);
