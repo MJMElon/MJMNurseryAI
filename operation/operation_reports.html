@@ -798,6 +798,28 @@ function _emptyMv() {
 }
 function _netOfMv(b) { return b.seeds + b.planted + b.trans + b.premium + b.dtone + b.trIn - b.damaged - b.cull1 - b.cull2 - b.cull3 - b.sold - b.trOut; }
 
+/* A delivery order's plot and batch are typed by hand: "225.", " 225",
+   "U15 (UPB PREMIER HYBRID)". Read them the way the batch report reads them,
+   so a D/O line lands on the row the batch report already has rather than
+   inventing one of its own. */
+function _mvPlotKey(v) {
+  return String(v == null ? '' : v).trim().toUpperCase()
+    .replace(/^PLOT\s*:?\s*/, '')
+    .split(/[\s(,\[]/)[0]
+    .replace(/[^0-9A-Z\-]/g, '');
+}
+/* A batch is identified by its trailing digits, exactly as the batch report
+   identifies it — "MJM-225", "225." and " 225 " are all batch 225. Something
+   with no trailing digits at all ("24D") identifies no batch and returns '',
+   so it can never be matched to one. */
+function _mvBatchKey(v) {
+  // Trailing punctuation first — "225." is still batch 225 — then the digits
+  // it ends with.
+  const cleaned = String(v == null ? '' : v).trim().replace(/[^0-9A-Za-z]+$/, '');
+  const m = /(\d+)$/.exec(cleaned);
+  return m ? String(parseInt(m[1], 10)) : '';
+}
+
 function _categorise(b, t, q) {
   switch (t) {
     case 'Seeds_Received':           b.seeds   += q; break;
@@ -897,6 +919,24 @@ async function runSummaryMovement() {
       qty:   Number(l.quantity_change || 0)
     });
   });
+  // Which (plot · batch) rows actually exist, straight from the batch report:
+  // a plot only appears because the batch was transplanted (or planted) into
+  // it, and everything else — culls, transfers, sales — hangs off that row.
+  // Keyed loosely so a D/O's "225." finds the batch report's "MJM-225".
+  const realRows = new Map();   // plotKey → Map(batchKey → { plot, batch })
+  events.forEach(ev => {
+    const pk = _mvPlotKey(ev.plot), bk = _mvBatchKey(ev.batch);
+    if (!pk || !bk) return;
+    if (!realRows.has(pk)) realRows.set(pk, new Map());
+    if (!realRows.get(pk).has(bk)) realRows.get(pk).set(bk, { plot: ev.plot, batch: ev.batch });
+  });
+
+  // D/O lines are SALES AGAINST those rows, never rows of their own. The batch
+  // and plot on a delivery order are free text — a mistyped "24D" used to open
+  // its own line in this report showing a batch that does not exist. Anything
+  // that cannot be matched is counted aside and reported under the table
+  // rather than dropped without a word.
+  const unmatchedSales = [];
   (dosRes.data || []).forEach(d => {
     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
     for (let i = 1; i <= 5; i++) {
@@ -904,10 +944,17 @@ async function runSummaryMovement() {
       if (!qty) continue;
       const plot = d[`plot_${i}`];
       if (!passLoc(plot)) continue;
+      const hit = (realRows.get(_mvPlotKey(plot)) || new Map()).get(_mvBatchKey(d[`batch_${i}`]));
+      if (!hit) {
+        unmatchedSales.push({ plot: plot || '—', batch: d[`batch_${i}`] || '—', qty });
+        continue;
+      }
       events.push({
         date:  d.delivery_date || null,
-        plot:  plot  || '—',
-        batch: d[`batch_${i}`] || '—',
+        // The batch report's own spelling, so the sale lands on its row
+        // instead of sitting beside it under a slightly different name.
+        plot:  hit.plot,
+        batch: hit.batch,
         type:  'Sold',
         qty
       });
@@ -974,7 +1021,9 @@ async function runSummaryMovement() {
   loading.classList.add('hidden');
   out.classList.remove('hidden');
   if (!rows.length) {
-    out.innerHTML = `<div class="glass-panel p-6 rounded-[2rem] text-[#8a7a68] text-sm">No movement found in this period.</div>`;
+    out.innerHTML = `<div class="glass-panel p-6 rounded-[2rem] text-[#8a7a68] text-sm">No movement found in this period.${
+      unmatchedSales.length ? ` <strong class="text-[#7a4a10]">${unmatchedSales.length} delivery order line(s) name a plot or batch no batch report has — they are not counted.</strong>` : ''
+    }</div>`;
     return;
   }
 
@@ -1060,6 +1109,25 @@ async function runSummaryMovement() {
     : `<th>${isDateMode ? 'Date' : 'Batch'}</th>`;
   const grandLeft = isPlotMode ? `<td class="font-black text-[#3d2610]">GRAND TOTAL</td><td></td>` : `<td class="font-black text-[#3d2610]">GRAND TOTAL</td>`;
 
+  // Sales that name a plot or batch the batch report has never heard of. They
+  // are kept out of the table — a mistyped batch is not a row — but shown here
+  // so the quantity is not simply lost and the D/O can be corrected.
+  const unmatchedHtml = unmatchedSales.length ? `
+      <div class="mt-4 rounded-2xl border border-[#f0b429] bg-[#fffbeb] p-4">
+        <div class="text-[11px] font-black text-[#7a4a10] uppercase tracking-widest mb-2">
+          ${unmatchedSales.length} delivery order line${unmatchedSales.length === 1 ? '' : 's'} not matched to a batch report
+        </div>
+        <div class="text-[10px] font-bold text-[#8a7a68] mb-2">
+          These are left out of the table above. The plot or batch on the delivery order does not
+          exist in any batch report, so there is no row for the sale to belong to — correct the D/O
+          or the batch report, then run this again.
+        </div>
+        <div class="flex flex-wrap gap-2">
+          ${unmatchedSales.map(u => `<span class="inline-block bg-white border border-[#e8dcc8] rounded-lg px-2.5 py-1 text-[11px] font-bold text-[#3d2610]">
+             ${u.plot} · batch ${u.batch} · ${fmtNum(u.qty)}</span>`).join('')}
+        </div>
+      </div>` : '';
+
   const rangeLabel = `${fromStr ? fmtDate(fromStr) : '—'} → ${toStr ? fmtDate(toStr) : '—'}`;
   out.innerHTML = `
     <div class="glass-panel p-6 rounded-[2rem]">
@@ -1110,13 +1178,18 @@ async function runSummaryMovement() {
         </table>
       </div>
 
+      ${unmatchedHtml}
+
       <div class="text-[10px] font-bold text-[#8a7a68] mt-4 leading-relaxed">
         <strong class="text-[#3d2610]">Notes —</strong>
         Which batch sits in which plot comes from the <strong>batch report</strong>: the transplanting record's
         destination plot, quantity and keyed date create the (Plot · Batch) row, and every other column
         (seeds, planted, damaged, 1st / 2nd / 3rd cull) is read from that same batch's report.
         <em>Sold</em> is the only column sourced elsewhere — it comes from the <strong>Customer DO system</strong>
-        (<code>plot_n / batch_n / qty_n</code> on delivery orders); cancelled DOs are excluded.
+        (<code>plot_n / batch_n / qty_n</code> on delivery orders); cancelled DOs are excluded. A delivery
+        order can only ever <em>subtract</em> from a row the batch report already has: it never creates one,
+        so a plot or batch mistyped on a D/O cannot appear here as a batch that does not exist.
+        Its batch is matched on the trailing digits, so "225.", " 225" and "MJM-225" are all batch 225.
         Dates are the ones keyed into the batch report; where a stage was saved without one
         (3rd culling), the record's save date is used.
         <em>Transfer</em> is the 3rd culling's plot transfers, netted: what moved into this plot less what
