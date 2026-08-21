@@ -327,6 +327,48 @@
     .sched-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
     .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
                   letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
+    /* ── HEADER ON A NARROW SCREEN ──
+       On a phone this band broke: "MJM Nursery" wrapped onto three lines,
+       "Audit System" onto two, and the user chip was pushed off the right
+       edge. The title was allowed to wrap while the buttons were allowed to
+       grow, so the row solved its overflow in the worst available way.
+
+       Same discipline as the shared ribbon: the title is the only thing that
+       gives, truncating rather than wrapping; the buttons keep their size;
+       and labels step aside before anything leaves the screen. */
+    .header-logo{min-width:0}
+    .header-logo>div{min-width:0}
+    .header-logo-text,.header-logo-sub{white-space:nowrap;overflow:hidden;
+                                       text-overflow:ellipsis}
+    .header-actions{flex-shrink:0}
+
+    @media (max-width:640px){
+      .header-top{height:54px;gap:8px}
+      .header-actions{gap:5px}
+      .header-logo{gap:8px}
+      .header-logo-icon{width:30px;height:30px;border-radius:8px}
+      .header-logo-icon svg{width:16px;height:16px}
+      .header-logo-text{font-size:13.5px}
+      .header-logo-sub{font-size:8px;letter-spacing:.8px}
+      /* Icon-only, the way the ribbon shows a bare back arrow. */
+      .hbtn{height:30px;padding:0 9px;font-size:11px}
+      .hbtn span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
+      .avatar{width:26px;height:26px;font-size:11px}
+      .user-chip{padding:4px}
+      .uname{display:none}
+      /* This page's buttons carry their own classes rather than .hbtn, and
+         the user chip is a third child of the row instead of sitting inside
+         the action group — so the rules above missed all of them and the
+         logo was crushed to 23px to make room. */
+      .back-to-portal{padding:0 9px!important;height:30px!important}
+      .back-to-portal span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 10px;font-size:11px}
+      .header-user-btn{margin-left:4px!important;padding:4px!important;flex-shrink:0}
+      .header-user-btn .user-name{display:none}
+      .header-user-btn .user-avatar{width:26px;height:26px;font-size:11px}
+    }
+
     /* ── NURSERY RIBBON ──
        A banner rather than a chip. Pre and main nursery run different
        schedules, so which one you are looking at is the single most
@@ -509,7 +551,7 @@
           <div class="header-logo-sub">Audit System</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+      <div class="header-actions" style="display:flex;align-items:center;gap:6px;margin-left:auto">
         <!-- Portal button removed here — the standardised ribbon above already
              provides it; keeping two would double up the same navigation. -->
         <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
