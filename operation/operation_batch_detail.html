@@ -1475,7 +1475,9 @@
                                  batch in HQ's Amendment Needed list until a reason is
                                  written here, so the work is never blocked but never
                                  quietly forgotten either. -->
-                            <div id="t6-mismatch-panel" class="hidden bg-white rounded-3xl border-2 border-[#f0b429] shadow-lg overflow-hidden">
+                            <!-- The gap sits on the panel, not on the save row, so
+                                 nothing shifts on the tabs where the panel is hidden. -->
+                            <div id="t6-mismatch-panel" class="hidden mb-6 bg-white rounded-3xl border-2 border-[#f0b429] shadow-lg overflow-hidden">
                                 <div class="px-6 py-4 bg-[#fffbeb] border-b-2 border-[#f0b429] flex items-center justify-between gap-3 flex-wrap">
                                     <div class="flex items-center gap-3">
                                         <span class="w-10 h-10 rounded-xl bg-[#fef3c7] border border-[#f0b429] flex items-center justify-center text-xl shrink-0">⚠️</span>
