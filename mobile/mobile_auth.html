@@ -339,16 +339,19 @@ async function handlePostLogin(session) {
 }
 
 var _STAFF_LEVELS = ['admin','normal','view','edit','manage','read','write','full','staff'];
+// Gate for the MOBILE app specifically — the tiles on mobile_landing.html
+// (Issue Collection DO, Customer Consent, Booking) are all mobile-module
+// pages. Accepting any staff-grade module here (as this predicate used
+// to) let an Audit-only auditor into the whole mobile dashboard even
+// though their Mobile module is None; mobile_landing then bounced them
+// back here, which happily re-accepted them → loop. Gate on `mobile`
+// so the pending-access notice appears once and stays.
 function hasOpsAccessMobile(profile) {
   if (!profile) return false;
   var p = profile.permissions || {};
-  if (p.manage_users || p.can_verify_operation) return true;
-  if (p.modules && typeof p.modules === 'object') {
-    for (var k in p.modules) {
-      if (p.modules[k] && _STAFF_LEVELS.indexOf(String(p.modules[k]).toLowerCase()) !== -1) return true;
-    }
-  }
-  return false;
+  if (p.manage_users) return true;
+  var lvl = p.modules && p.modules.mobile;
+  return !!lvl && _STAFF_LEVELS.indexOf(String(lvl).toLowerCase()) !== -1;
 }
 
 // Inline pending-access UI: hides the login card and shows a friendly
