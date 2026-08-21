@@ -105,6 +105,59 @@
     return out;
   }
 
+  // ── Profile-fetch cache ─────────────────────────────────────────
+  //   Two layers, both aimed at stopping the same shared_profiles row
+  //   being pulled over and over during Supabase blips (a 522 storm
+  //   we saw on 21 Aug turned four MJMAccess.load() calls in the same
+  //   second into four identical failed round-trips):
+  //
+  //   1. `_inflight` (in-memory, per page): if load() is already in
+  //      flight for a user id, subsequent calls await the SAME promise
+  //      rather than firing another HTTP call.
+  //   2. sessionStorage TTL: a successful profile stays fresh for 30 s.
+  //      Follow-up loads within the same tab hydrate from that cache and
+  //      skip the network entirely. sessionStorage (not localStorage) so
+  //      a permission change picked up in one tab does not silence the
+  //      next tab's refresh — the next tab still fetches on its own.
+  //
+  //   The cache is BYPASSED whenever the auth session is missing —
+  //   never gate a fresh sign-in decision on a stale permissions blob.
+  const PROFILE_TTL_MS = 30_000;
+  const _inflight = {};    // uid → Promise<{ data, error }>
+
+  function _profileCacheKey(uid) { return 'mjm_profile_cache__' + uid; }
+
+  function _readProfileCache(uid) {
+    try {
+      const raw = sessionStorage.getItem(_profileCacheKey(uid));
+      if (!raw) return null;
+      const rec = JSON.parse(raw);
+      if (!rec || typeof rec !== 'object') return null;
+      if (Date.now() - Number(rec.ts || 0) > PROFILE_TTL_MS) return null;
+      return rec.data || null;
+    } catch (_) { return null; }
+  }
+
+  function _writeProfileCache(uid, data) {
+    try {
+      sessionStorage.setItem(_profileCacheKey(uid),
+        JSON.stringify({ ts: Date.now(), data: data }));
+    } catch (_) { /* private mode / quota — silent */ }
+  }
+
+  async function _fetchProfile(supa, uid) {
+    if (_inflight[uid]) return _inflight[uid];
+    const p = supa
+      .from('shared_profiles')
+      .select('full_name, email, permissions')
+      .eq('id', uid)
+      .single()
+      .then(function (r) { return r; })
+      .finally(function () { delete _inflight[uid]; });
+    _inflight[uid] = p;
+    return p;
+  }
+
   async function load(supa) {
     if (!supa) throw new Error('MJMAccess.load(supabase) — supabase client required');
     const { data: { session } } = await supa.auth.getSession();
@@ -121,11 +174,17 @@
     };
     let fetchOk = false;
     try {
-      const { data, error } = await supa
-        .from('shared_profiles')
-        .select('full_name, email, permissions')
-        .eq('id', u.id)
-        .single();
+      // Try the short-lived per-tab cache first — a repeat MJMAccess.load
+      // inside the TTL is a no-op on the network, which cuts the dogpile
+      // on shared_profiles during outages and normal navigation alike.
+      let data = _readProfileCache(u.id);
+      let error = null;
+      if (!data) {
+        const res = await _fetchProfile(supa, u.id);
+        data = res.data;
+        error = res.error;
+        if (!error && data) _writeProfileCache(u.id, data);
+      }
       if (error) throw error;
       if (data) {
         if (data.full_name) state.user.full_name = data.full_name;
