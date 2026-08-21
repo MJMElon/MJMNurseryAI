@@ -1723,14 +1723,19 @@ const _FIELD_JENIS = {
 async function loadFieldRecords() {
   if (!_supabase) return;
   try {
-    let res = await _supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month');
+    // Paged: the field writes roughly one row per plot per job per week, so
+    // this table passes Supabase's 1000-row cap within a couple of months —
+    // and a short read does not fail, it just quietly loses the newest work.
+    let res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month')
+      .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
     // still recording the work itself, so fall back to reading what is there.
     if (res.error) {
-      res = await _supabase.from('nops_maint_field_records')
-        .select('id, work_date, plot_name, work_type, jenis');
+      res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
+        .select('id, work_date, plot_name, work_type, jenis')
+        .order('id', { ascending: true }));
     }
     if (res.error) { console.warn('[maint] field records unavailable:', res.error.message); return; }
     fieldRecords = res.data || [];
