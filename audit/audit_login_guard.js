@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-18e */
+/* BUILD: 2026-08-18f */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -101,6 +101,7 @@
      that flag is set. */
   function signOut() {
     revokeSession();
+    clearScope();
     try {
       localStorage.removeItem('mjm_user');
       Object.keys(localStorage).forEach(function (k) {
@@ -111,11 +112,53 @@
     global.location.replace(loginUrl());
   }
 
+  /* ── WHICH NURSERY THIS SESSION IS FOR ──
+     Keyed by account rather than stored flat: the nursery office phone is
+     shared, and a flat key would hand the next person to sign in the last
+     person's choice. Cleared on sign-out for the same reason. */
+  function scopeKey() {
+    var u = {};
+    try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
+    return 'mjm_nursery_scope:' + (u.id || u.email || 'anon');
+  }
+  function scope() {
+    try { return localStorage.getItem(scopeKey()); } catch (e) { return null; }
+  }
+  function setScope(v) {
+    try { localStorage.setItem(scopeKey(), v); } catch (e) {}
+  }
+  function clearScope() {
+    try { localStorage.removeItem(scopeKey()); } catch (e) {}
+  }
+
+  /* Which nurseries this account may audit at all. audit_home builds its
+     rows from the same answer, so the chooser can never offer a nursery
+     the list would then refuse to show. */
+  function allowedScopes() {
+    var u = {};
+    try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
+    var auditRole = (u.audit_role || '').toLowerCase();
+    var mainRole  = (u.role || '').toLowerCase();
+    var role      = auditRole || mainRole;
+    var isAdmin   = role.indexOf('admin') !== -1 || mainRole.indexOf('admin') !== -1;
+    var out = [];
+    if (isAdmin || role.indexOf('pn') !== -1) out.push('PN');
+    if (isAdmin || role.indexOf('mn') !== -1 ||
+        (role.indexOf('pn') === -1 && !isAdmin && role.indexOf('auditor') !== -1)) out.push('MN');
+    /* A role string matching neither — an account made before roles were
+       tightened — is offered both rather than shut out of the module. */
+    return out.length ? out : ['PN', 'MN'];
+  }
+
   global.MJMAuditLogin = {
     url: loginUrl,
     requireSignIn: requireSignIn,
     requireAdmin: requireAdmin,
     isAdmin: isAdmin,
-    signOut: signOut
+    signOut: signOut,
+    scope: scope,
+    setScope: setScope,
+    clearScope: clearScope,
+    allowedScopes: allowedScopes
   };
 })(window);

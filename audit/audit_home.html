@@ -390,7 +390,16 @@
   <div class="content">
 
     <!-- AUDIT TO-DO -->
-    <div class="section-head fade-in">📋 Audit To-Do</div>
+    <div class="section-head fade-in" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span>📋 Audit To-Do</span>
+      <!-- Which nursery this list is for, and the way to the other one.
+           Without it the choice made on the way in would be a one-way door. -->
+      <span id="scope-badge" style="display:none;font-size:9.5px;font-weight:800;
+            padding:3px 9px;border-radius:20px;letter-spacing:.7px"></span>
+      <a href="audit_nursery_select.html" id="scope-switch"
+         style="display:none;margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.6px;
+                color:#2d7a2d;text-decoration:none;text-transform:uppercase">Switch ⇄</a>
+    </div>
     <div class="todo-list fade-in" id="todo-section">
       <!-- Populated by JS -->
     </div>
@@ -616,8 +625,38 @@ function loadAuditTodo(){
   const role = auditRole || mainRole;
   // Admin and Administrator see everything
   const isAdmin = role.includes('admin') || mainRole.includes('admin');
-  const showPN = isAdmin || role.includes('pn');
-  const showMN = isAdmin || role.includes('mn') || (!role.includes('pn') && !isAdmin && role.includes('auditor'));
+
+  /* What this account is allowed to audit … */
+  const mayPN = isAdmin || role.includes('pn');
+  const mayMN = isAdmin || role.includes('mn') ||
+                (!role.includes('pn') && !isAdmin && role.includes('auditor'));
+
+  /* … and which half of it they chose on the way in. The list used to carry
+     both nurseries at once, so an auditor walking the pre nursery read past
+     three main-nursery rows to reach theirs. Chosen once on
+     audit_nursery_select.html; anyone arriving without a choice is sent
+     there rather than shown the wrong nursery's schedule. */
+  const scope = MJMAuditLogin.scope();
+  if (!scope) { window.location.replace('audit_nursery_select.html'); }
+
+  const showPN = mayPN && scope === 'PN';
+  const showMN = mayMN && scope === 'MN';
+
+  /* Name the nursery on the list itself. Two nurseries run different
+     schedules, so a list with no label is a list you can act on wrongly. */
+  (function labelScope(){
+    const badge  = document.getElementById('scope-badge');
+    const switcher = document.getElementById('scope-switch');
+    if (!badge || !scope) return;
+    const isPN = scope === 'PN';
+    badge.textContent = isPN ? 'PRE NURSERY' : 'MAIN NURSERY';
+    badge.style.background = isPN ? '#dcfce7' : '#dbeafe';
+    badge.style.color      = isPN ? '#166534' : '#1e40af';
+    badge.style.display    = 'inline-block';
+    /* Only worth offering when there is somewhere else to go. */
+    if (switcher && MJMAuditLogin.allowedScopes().length > 1)
+      switcher.style.display = 'inline-block';
+  })();
 
   /* ── Date helpers ── */
   function daysUntil(targetDay){
