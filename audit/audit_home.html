@@ -317,6 +317,114 @@
 
     /* ── TO-DO rows: same card language as the modules ── */
     .todo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+    /* ── AUDIT SCHEDULE BOARD ────────────────────────────────────────
+       Month strip, status filters, and a timeline of the windows that fall
+       in the month you are looking at. ── */
+    .sched{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
+           padding:16px 16px 8px;margin-bottom:22px}
+    .sched-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+    .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
+                  letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
+    #scope-badge{font-size:9px;font-weight:800;padding:3px 9px;border-radius:20px;
+                 letter-spacing:.7px}
+    .sched-count{font-size:17px;font-weight:700;color:var(--fc-ink);margin-top:6px;
+                 line-height:1.3}
+    .sched-count b{color:#2d7a2d}
+    .sched-switch{margin-left:auto;flex-shrink:0;font-size:10px;font-weight:800;
+                  letter-spacing:.6px;color:#2d7a2d;text-decoration:none;
+                  text-transform:uppercase;padding:6px 11px;border-radius:20px;
+                  background:#eef7ee;white-space:nowrap}
+    .sched-switch:hover{background:#e2f1e2}
+
+    /* ── Month strip ── */
+    .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+    .cal-nav{width:28px;height:28px;border-radius:9px;border:1px solid var(--fc-line);
+             background:#f4f7fa;cursor:pointer;display:flex;align-items:center;
+             justify-content:center;flex-shrink:0;padding:0}
+    .cal-nav:hover{background:#e9eff5}
+    .cal-nav svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.6;
+                 stroke-linecap:round;stroke-linejoin:round}
+    .cal-month{font-size:14px;font-weight:800;color:var(--fc-ink);min-width:130px;
+               text-align:center}
+    .cal-today{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.6px;
+               text-transform:uppercase;padding:6px 12px;border-radius:20px;cursor:pointer;
+               border:1px solid var(--fc-line);background:#f4f7fa;color:var(--fc-ink2);
+               font-family:inherit}
+    .cal-today:hover{background:#e9eff5}
+
+    .cal-days{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;
+              scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+    .cal-days::-webkit-scrollbar{height:5px}
+    .cal-days::-webkit-scrollbar-thumb{background:#d5dee6;border-radius:3px}
+    .day{flex:0 0 auto;width:44px;padding:7px 0 6px;border-radius:12px;cursor:pointer;
+         background:#f4f7fa;border:1.5px solid transparent;text-align:center;
+         -webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s}
+    .day:hover{background:#e9eff5}
+    .day-w{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--fc-ink3);
+           text-transform:uppercase}
+    .day-n{font-size:15px;font-weight:800;color:var(--fc-ink);margin-top:2px;line-height:1}
+    .day-dot{width:5px;height:5px;border-radius:50%;background:#c3ced6;margin:4px auto 0}
+    .day.has .day-dot{background:#2d7a2d}
+    .day.today{border-color:#2d7a2d}
+    .day.today .day-n{color:#2d7a2d}
+    .day.sel{background:#1a4d1a;border-color:#1a4d1a}
+    .day.sel .day-w,.day.sel .day-n{color:#fff}
+    .day.sel .day-dot{background:rgba(255,255,255,.8)}
+
+    /* ── Status filters ── */
+    .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none}
+    .chips::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:7px 13px 7px 7px;
+          border-radius:22px;background:#f4f7fa;border:1.5px solid transparent;cursor:pointer;
+          font-family:inherit;-webkit-tap-highlight-color:transparent;transition:border-color .12s}
+    .chip:hover{background:#e9eff5}
+    .chip-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+              justify-content:center;font-size:11px;flex-shrink:0}
+    .chip-lbl{font-size:11px;font-weight:800;color:var(--fc-ink2);letter-spacing:.3px}
+    .chip-n{font-size:11px;font-weight:800;color:var(--fc-ink3)}
+    .chip.on{border-color:var(--fc-ink);background:#fff}
+    .chip.on .chip-lbl{color:var(--fc-ink)}
+    .chip.off{opacity:.4}
+
+    /* ── Timeline ──
+       The rail is what turns a list into a schedule: the eye follows it down
+       the month instead of reading four unrelated boxes. */
+    .tl{position:relative;padding:2px 0 6px 26px}
+    .tl::before{content:'';position:absolute;left:8px;top:6px;bottom:16px;width:2px;
+                background:linear-gradient(#e3ebf2,#eef3f7)}
+    .tl-item{position:relative;margin-bottom:9px}
+    .tl-item::before{content:'';position:absolute;left:-23px;top:17px;width:11px;height:11px;
+                     border-radius:50%;background:#fff;border:2.5px solid var(--tone,#c3ced6)}
+    .tl-card{display:flex;align-items:center;gap:12px;text-decoration:none;border-radius:13px;
+             padding:12px 14px;background:var(--tint,#f4f7fa);
+             border-left:4px solid var(--tone,#c3ced6);
+             transition:transform .14s,box-shadow .14s}
+    .tl-card:hover{transform:translateX(2px);box-shadow:0 4px 14px rgba(16,40,60,.08)}
+    .tl-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.75);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .tl-ico svg{width:17px;height:17px;fill:none;stroke-width:2;
+                stroke-linecap:round;stroke-linejoin:round}
+    .tl-body{flex:1;min-width:0}
+    .tl-ttl{font-size:13.5px;font-weight:800;color:var(--fc-ink);display:flex;
+            align-items:center;gap:7px;flex-wrap:wrap}
+    .tl-sub{font-size:11px;color:var(--fc-ink2);margin-top:3px}
+    .tl-when{flex-shrink:0;text-align:right}
+    .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
+    .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
+              padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
+    .tl-item.passed .tl-card{opacity:.55}
+    .tl-head{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+             color:var(--fc-ink3);margin:14px 0 8px}
+    .tl-empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--fc-ink3)}
+
+    @media (max-width:640px){
+      .sched{padding:14px 12px 6px;border-radius:16px}
+      .sched-count{font-size:15px}
+      .cal-month{min-width:104px;font-size:13px}
+      .tl-when{display:none}
+      .day{width:40px}
+    }
+
     .todo-card{background:var(--fc-card);border:1.5px solid var(--fc-line)!important;
                border-radius:14px!important;transition:border-color .15s}
     .todo-card:hover{border-color:#a8d5a8}
@@ -390,18 +498,44 @@
   <div class="content">
 
     <!-- AUDIT TO-DO -->
-    <div class="section-head fade-in" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span>📋 Audit To-Do</span>
-      <!-- Which nursery this list is for, and the way to the other one.
-           Without it the choice made on the way in would be a one-way door. -->
-      <span id="scope-badge" style="display:none;font-size:9.5px;font-weight:800;
-            padding:3px 9px;border-radius:20px;letter-spacing:.7px"></span>
-      <a href="audit_nursery_select.html" id="scope-switch"
-         style="display:none;margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.6px;
-                color:#2d7a2d;text-decoration:none;text-transform:uppercase">Switch ⇄</a>
-    </div>
-    <div class="todo-list fade-in" id="todo-section">
-      <!-- Populated by JS -->
+    <!-- ── THE AUDIT SCHEDULE BOARD ──
+         A flat list of four rows could not say when anything was due beyond
+         a line of text, and every month looked identical. The month, the
+         days that carry a window, and what falls on the day you tap are the
+         whole point of this screen. -->
+    <div class="sched fade-in">
+
+      <div class="sched-top">
+        <div style="min-width:0">
+          <div class="sched-kicker">
+            <span>📋 Audit To-Do</span>
+            <span id="scope-badge" style="display:none"></span>
+          </div>
+          <div class="sched-count" id="sched-count">&nbsp;</div>
+        </div>
+        <a href="audit_nursery_select.html" id="scope-switch" class="sched-switch"
+           style="display:none">Switch ⇄</a>
+      </div>
+
+      <div class="cal">
+        <div class="cal-head">
+          <button class="cal-nav" id="cal-prev" aria-label="Previous month">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="cal-month" id="cal-month">—</div>
+          <button class="cal-nav" id="cal-next" aria-label="Next month">
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <button class="cal-today" id="cal-today">Today</button>
+        </div>
+        <div class="cal-days" id="cal-days"></div>
+      </div>
+
+      <div class="chips" id="chips"></div>
+
+      <div class="tl" id="todo-section">
+        <!-- Populated by JS -->
+      </div>
     </div>
 
     <!-- AUDIT MODULES -->
@@ -658,152 +792,269 @@ function loadAuditTodo(){
       switcher.style.display = 'inline-block';
   })();
 
-  /* ── Date helpers ── */
-  function daysUntil(targetDay){
-    const today = new Date(year, month, day);
-    const thisM = new Date(year, month, targetDay);
-    if(thisM >= today) return Math.round((thisM-today)/(864e5));
-    return Math.round((new Date(year,month+1,targetDay)-today)/(864e5));
-  }
-  function inWindow(w){ return w.some(([s,e])=>day>=s&&day<=e); }
-  function nearWindow(w,a=3){ return w.some(([s])=>{const d=daysUntil(s);return d>=0&&d<=a;}); }
-  function nextLabel(w){
-    if(inWindow(w)) return '📌 Audit period now';
-    let best=null;
-    w.forEach(([s,e])=>{const d=daysUntil(s);if(!best||d<best.d)best={d,s,e};});
-    if(!best) return '';
-    const nm = best.d > (new Date(year,month+1,0).getDate()-day) ? MONTHS[month+1>11?0:month+1] : MONTHS[month];
-    if(best.d===0) return '📌 Starts today';
-    if(best.d===1) return '⏰ Starts tomorrow';
-    return `📅 Next: ${best.s}–${best.e} ${nm}`;
-  }
-  function status(w){
-    if(inWindow(w)) return 'today';
-    if(nearWindow(w,3)) return 'due';
-    return 'ok';
-  }
+  /* ── The month being looked at. Starts on this one. ── */
+  let viewY = year, viewM = month, selDay = null;
+  const active = new Set();          // status filters; empty means show all
 
-  /* ── Schedules ── */
-  const MN_PLOT   = [[10,10],[20,20],[30,30]];
-  const MN_HEIGHT = [[1,5],[15,20]];
-  const MN_PAPAN  = [[15,20]];
-  const PN_PLOT   = [[20,25]];
-  const PN_HEIGHT = [[20,25]];
+  const MONTHS_FULL = ['January','February','March','April','May','June','July',
+                       'August','September','October','November','December'];
+  const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-  /* ── Badge ── */
-  const B = {
-    today:`<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fee2e2;color:#991b1b;white-space:nowrap">🔴 Due Now</span>`,
-    due:  `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fef9c3;color:#854d0e;white-space:nowrap">🟡 Soon</span>`,
-    ok:   `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#dcfce7;color:#166534;white-space:nowrap">✅ On Track</span>`,
-  };
+  /* ── Schedules ──
+     Windows are day-of-month ranges. Which set applies is settled by the
+     nursery chosen on the way in. */
+  const MN_SET = [
+    {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
+     windows:[[10,10],[20,20],[30,30]], note:'Every 10th, 20th & 30th'},
+    {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
+     windows:[[1,5],[15,20]],           note:'1st–5th & 15th–20th'},
+    {mod:'papan',  title:'Papan Tanda',     href:'audit_papan_index.html',
+     windows:[[15,20]],                 note:'15th–20th each month'}
+  ];
+  const PN_SET = [
+    {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
+     windows:[[20,25]], note:'20th–25th each month'},
+    {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
+     windows:[[20,25]], note:'20th–25th each month'}
+  ];
+  /* No window at all — these are triggered by events, not by the calendar. */
+  const ANYTIME = [];
+  if (showPN) ANYTIME.push({mod:'papan', title:'Papan Tanda',
+                            href:'audit_papan_index.html', note:'When case available'});
+  ANYTIME.push({mod:'maint', title:'Maintenance Audit', href:'audit_maintenance_index.html',
+                note:'Audit when worker submits completed task', badge:'maint'});
 
-  /* ── Nursery pill ── */
-  function pill(label){
-    const style = label==='PN'
-      ? 'background:#dcfce7;color:#166534'
-      : 'background:#dbeafe;color:#1e40af';
-    return `<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;${style}">${label}</span>`;
-  }
+  const SET = showMN ? MN_SET : showPN ? PN_SET : [];
 
-  /* ── Card builder ── */
   const ICONS = {
     plot:   '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/>',
     height: '<line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/>',
     papan:  '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>',
-    maint:  '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>',
+    maint:  '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'
   };
-  const COLORS = {
-    plot:   {accent:'#1a4d1a',bg:'#e8f5e9',stroke:'#1a4d1a'},
-    height: {accent:'#1565c0',bg:'#e3f2fd',stroke:'#1565c0'},
-    papan:  {accent:'#e65100',bg:'#fff3e0',stroke:'#e65100'},
-    maint:  {accent:'#880e4f',bg:'#fce4ec',stroke:'#880e4f'},
+  const TONE = {
+    plot:   {tone:'#1a4d1a', tint:'#e9f5ea'},
+    height: {tone:'#1565c0', tint:'#e5f0fb'},
+    papan:  {tone:'#e65100', tint:'#fef1e3'},
+    maint:  {tone:'#880e4f', tint:'#fdeaf1'}
+  };
+  const STATUS = {
+    due:      {lbl:'Due Now',  emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
+    soon:     {lbl:'Soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
+    upcoming: {lbl:'Upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'},
+    passed:   {lbl:'Passed',   emoji:'✅', bg:'#e9edf1', fg:'#5b7280'}
   };
 
-  function mkCard(mod, title, schedule, nextStr, badge, href, nurseryLabel, onDemand=false){
-    const c = COLORS[mod];
-    const pillHtml = nurseryLabel ? pill(nurseryLabel) : '';
-    const subline = onDemand ? schedule : `${schedule}${nextStr ? ' · '+nextStr : ''}`;
-    const isDue  = badge.includes('Due Now');
-    const isSoon = badge.includes('Soon');
-    const isOk   = !isDue && !isSoon;
-    const rightEl = isDue
-      ? `<div style="width:32px;height:32px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:16px">🔴</div>`
-      : isSoon
-      ? `<div style="width:32px;height:32px;border-radius:50%;background:#fef9c3;display:flex;align-items:center;justify-content:center;font-size:16px">🟡</div>`
-      : `<div style="width:32px;height:32px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:16px">✅</div>`;
-    return `
-    <a class="todo-card" href="${href}" style="text-decoration:none;border-radius:14px;padding:12px 14px;display:flex;flex-direction:row;align-items:center;gap:0">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <div style="width:36px;height:36px;border-radius:10px;background:${c.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:${c.stroke};fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round">${ICONS[mod]}</svg>
+  const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
+
+  /* Every window that falls in the month on screen.
+     A window is clamped to the last day of the month, so "the 30th" still
+     lands in February instead of vanishing or reading as 30 February. */
+  function occurrences(y, m){
+    const last = daysIn(y, m);
+    const out = [];
+    SET.forEach(sc => sc.windows.forEach(w => {
+      out.push(Object.assign({}, sc, {
+        start: Math.min(w[0], last),
+        end:   Math.min(w[1], last)
+      }));
+    }));
+    return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
+  }
+
+  /* Where a window sits relative to today — which is only interesting in the
+     current month; past months are closed and future ones are all ahead. */
+  function occStatus(o, y, m){
+    const t0 = new Date(year, month, day);
+    const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
+    if (t0 > e0) return 'passed';
+    if (t0 >= s0) return 'due';
+    const away = Math.round((s0 - t0) / 864e5);
+    return away <= 3 ? 'soon' : 'upcoming';
+  }
+
+  function dateLabel(o, m){
+    const mn = MONTHS[m];
+    return o.start === o.end ? `${o.start} ${mn}` : `${o.start}–${o.end} ${mn}`;
+  }
+
+  /* ── Month strip ── */
+  function renderCalendar(){
+    document.getElementById('cal-month').textContent = MONTHS_FULL[viewM] + ' ' + viewY;
+
+    const occ  = occurrences(viewY, viewM);
+    const busy = new Set();
+    occ.forEach(o => { for (let d = o.start; d <= o.end; d++) busy.add(d); });
+
+    const last = daysIn(viewY, viewM);
+    let html = '';
+    for (let d = 1; d <= last; d++){
+      const isToday = (viewY === year && viewM === month && d === day);
+      const cls = ['day'];
+      if (busy.has(d))  cls.push('has');
+      if (isToday)      cls.push('today');
+      if (selDay === d) cls.push('sel');
+      html += `<button class="${cls.join(' ')}" data-day="${d}">
+        <div class="day-w">${WD[new Date(viewY, viewM, d).getDay()]}</div>
+        <div class="day-n">${d}</div>
+        <div class="day-dot"></div>
+      </button>`;
+    }
+    const strip = document.getElementById('cal-days');
+    strip.innerHTML = html;
+    strip.querySelectorAll('.day').forEach(el => {
+      el.onclick = () => {
+        const d = parseInt(el.dataset.day, 10);
+        selDay = (selDay === d) ? null : d;   // tapping the chosen day clears it
+        renderAll();
+      };
+    });
+
+    /* Bring the interesting part of the month into view rather than always
+       starting at the 1st. */
+    const focus = strip.querySelector('.day.sel') || strip.querySelector('.day.today');
+    if (focus) strip.scrollLeft = Math.max(0, focus.offsetLeft - strip.clientWidth / 2 + 22);
+  }
+
+  /* ── Status filters ── */
+  function renderChips(occ){
+    const counts = {due:0, soon:0, upcoming:0, passed:0};
+    occ.forEach(o => counts[occStatus(o, viewY, viewM)]++);
+    const box = document.getElementById('chips');
+    box.innerHTML = Object.keys(STATUS).map(k => {
+      const st = STATUS[k];
+      const on  = active.has(k);
+      const off = active.size > 0 && !on;
+      return `<button class="chip ${on?'on':''} ${off?'off':''}" data-k="${k}">
+        <span class="chip-dot" style="background:${st.bg}">${st.emoji}</span>
+        <span class="chip-lbl">${st.lbl}</span>
+        <span class="chip-n">${counts[k]}</span>
+      </button>`;
+    }).join('');
+    box.querySelectorAll('.chip').forEach(el => {
+      el.onclick = () => {
+        const k = el.dataset.k;
+        if (active.has(k)) active.delete(k); else active.add(k);
+        renderAll();
+      };
+    });
+  }
+
+  /* ── Timeline ── */
+  function renderTimeline(occ){
+    let list = occ;
+    if (selDay !== null) list = list.filter(o => selDay >= o.start && selDay <= o.end);
+    if (active.size)     list = list.filter(o => active.has(occStatus(o, viewY, viewM)));
+
+    let html = list.map(o => {
+      const k  = occStatus(o, viewY, viewM);
+      const st = STATUS[k], c = TONE[o.mod];
+      return `<div class="tl-item ${k==='passed'?'passed':''}" style="--tone:${c.tone}">
+        <a class="tl-card" href="${o.href}" style="--tint:${c.tint};--tone:${c.tone}">
+          <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
+          <div class="tl-body">
+            <div class="tl-ttl">${o.title}</div>
+            <div class="tl-sub">${o.note}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;color:var(--text1)">${title}</span>
-            ${pillHtml}
+          <div class="tl-when">
+            <div class="tl-date">${dateLabel(o, viewM)}</div>
+            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${st.lbl}</span>
           </div>
-        </div>
-        <div style="font-size:11px;color:var(--text3);padding-left:44px;line-height:1.4">${subline}</div>
-      </div>
-      <div style="flex-shrink:0;margin-left:14px;align-self:center">${rightEl}</div>
-    </a>`;
+        </a>
+      </div>`;
+    }).join('');
+
+    if (!list.length){
+      html = `<div class="tl-empty">${
+        selDay !== null
+          ? `Nothing scheduled on ${selDay} ${MONTHS_FULL[viewM]}.`
+          : active.size
+            ? 'Nothing in this month matches that filter.'
+            : 'No scheduled audits this month.'
+      }</div>`;
+    }
+
+    /* Event-driven work has no date, so it is listed apart rather than given
+       a day it does not have — and hidden when a single day is in focus. */
+    if (selDay === null && !active.size && ANYTIME.length){
+      html += '<div class="tl-head">Anytime</div>';
+      html += ANYTIME.map(o => {
+        const c = TONE[o.mod];
+        return `<div class="tl-item" style="--tone:${c.tone}">
+          <a class="tl-card" href="${o.href}" style="--tint:${c.tint};--tone:${c.tone}">
+            <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
+            <div class="tl-body">
+              <div class="tl-ttl">${o.title}</div>
+              <div class="tl-sub">${o.note}</div>
+            </div>
+            <div class="tl-when">${
+              o.badge === 'maint'
+                ? '<div id="maint-pending-badge"><span class="tl-badge" style="background:#e9edf1;color:#5b7280">…</span></div>'
+                : '<span class="tl-badge" style="background:#e9edf1;color:#5b7280">On Demand</span>'
+            }</div>
+          </a>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('todo-section').innerHTML = html;
+    if (selDay === null && !active.size) countMaintenance();
   }
 
-  const section = document.getElementById('todo-section');
-  section.className = 'todo-list fade-in';
-  let html = '';
-
-  /* ── MN cards ── */
-  if(showMN){
-    html += mkCard('plot',  'Plot Condition',   'Every 10th, 20th & 30th', nextLabel(MN_PLOT),   B[status(MN_PLOT)],   'audit_plot_audit.html',   'MN');
-    html += mkCard('height','Seedling Height',  '1st–5th & 15th–20th',     nextLabel(MN_HEIGHT), B[status(MN_HEIGHT)], 'audit_height_index.html', 'MN');
-    html += mkCard('papan', 'Papan Tanda',      '15th–20th each month',    nextLabel(MN_PAPAN),  B[status(MN_PAPAN)],  'audit_papan_index.html',  'MN');
+  function renderAll(){
+    const occ = occurrences(viewY, viewM);
+    const n = occ.length;
+    const thisMonth = (viewY === year && viewM === month);
+    document.getElementById('sched-count').innerHTML =
+      n === 0
+        ? `No scheduled audits ${thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM]} 🌱`
+        : `You have <b>${n}</b> audit${n>1?'s':''} ${
+            thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM] + ' ' + viewY} 👍`;
+    renderCalendar();
+    renderChips(occ);
+    renderTimeline(occ);
   }
 
-  /* ── PN cards ── */
-  if(showPN){
-    html += mkCard('plot',  'Plot Condition',   '20th–25th each month',  nextLabel(PN_PLOT),   B[status(PN_PLOT)],   'audit_plot_audit.html',   'PN');
-    html += mkCard('height','Seedling Height',  '20th–25th each month',  nextLabel(PN_HEIGHT), B[status(PN_HEIGHT)], 'audit_height_index.html', 'PN');
-    html += mkCard('papan', 'Papan Tanda',      'When case available',   '', `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#6b7280;white-space:nowrap">On Demand</span>`, 'audit_papan_index.html', 'PN', true);
-  }
-
-  /* ── Maintenance ── */
-  html += `
-  <a class="todo-card" href="audit_maintenance_index.html" style="text-decoration:none;border-radius:14px;padding:12px 14px;display:flex;flex-direction:row;align-items:center;gap:0">
-    <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <div style="width:36px;height:36px;border-radius:10px;background:#fce4ec;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#880e4f;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round">${ICONS.maint}</svg>
-        </div>
-        <span style="font-size:13px;font-weight:700;color:var(--text1)">Maintenance Audit</span>
-      </div>
-      <div style="font-size:11px;color:var(--text3);padding-left:44px">Audit when worker submits completed task</div>
-    </div>
-    <div style="flex-shrink:0;margin-left:14px;align-self:center" id="maint-pending-badge">
-      <div style="width:32px;height:32px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af">...</div>
-    </div>
-  </a>`;
-
-  section.innerHTML = html;
-
-  /* ── Maintenance count ── */
-  (async()=>{
+  /* ── Outstanding maintenance ──
+     Re-read whenever the timeline redraws that row, since switching month
+     or filter rebuilds the element this writes into. The result is cached
+     so flicking between months does not re-query every time. */
+  let maintCache = null;
+  async function countMaintenance(){
     const el = document.getElementById('maint-pending-badge');
-    if(!el) return;
+    if (!el) return;
+    const paint = n => {
+      el.innerHTML = n === null
+        ? `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">—</span>`
+        : n === 0
+          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ All done</span>`
+          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} waiting</span>`;
+    };
+    if (maintCache !== null) { paint(maintCache); return; }
     try{
       const [tasks, audits] = await Promise.all([
         sb.select('audit_maintenance_tasks','select=id'),
         sb.select('audit_maintenance_audits','select=task_id')
       ]);
-      const done = new Set(audits.map(a=>String(a.task_id)));
-      const n = tasks.filter(t=>!done.has(String(t.id))).length;
-      el.innerHTML = n===0
-        ? `<div style="width:32px;height:32px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:16px">✅</div>`
-        : `<div style="min-width:32px;height:32px;border-radius:50%;background:#ef4444;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px">${n}</div>`;
-    }catch(e){
-      el.innerHTML = `<div style="width:32px;height:32px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;color:#9ca3af">—</div>`;
-    }
-  })();
+      const done = new Set(audits.map(a => String(a.task_id)));
+      maintCache = tasks.filter(t => !done.has(String(t.id))).length;
+      paint(maintCache);
+    }catch(e){ paint(null); }
+  }
+
+  document.getElementById('cal-prev').onclick = () => {
+    viewM--; if (viewM < 0){ viewM = 11; viewY--; } selDay = null; renderAll();
+  };
+  document.getElementById('cal-next').onclick = () => {
+    viewM++; if (viewM > 11){ viewM = 0; viewY++; } selDay = null; renderAll();
+  };
+  document.getElementById('cal-today').onclick = () => {
+    viewY = year; viewM = month; selDay = null; active.clear(); renderAll();
+  };
+
+  renderAll();
+
+
 }
 
 loadAuditTodo();
