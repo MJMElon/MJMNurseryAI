@@ -46,6 +46,10 @@
       var u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
       var mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
       if (mod === 'admin') return true;
+      // Explicit non-admin level → the legacy fallback below MUST NOT
+      // promote a normal auditor whose profile role happens to be 'admin'
+      // for another module. Only fall through when audit is unset entirely.
+      if (mod !== undefined && mod !== null && mod !== '') return false;
       var role = (u.audit_role || u.role || '').toLowerCase();
       return role === 'admin' || role === 'administrator';
     } catch (e) { return false; }
