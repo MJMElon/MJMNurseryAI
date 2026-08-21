@@ -485,7 +485,9 @@
     .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
     .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
               padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
-    .tl-item.passed .tl-card{opacity:.55}
+    .tl-from{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+             padding:2px 7px;border-radius:20px;background:#fee2e2;color:#7f1d1d}
+    .tl-item.overdue .tl-card{border-left-width:6px}
     .tl-head{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
              color:var(--fc-ink3);margin:14px 0 8px}
     .tl-empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--fc-ink3)}
@@ -930,11 +932,67 @@ function loadAuditTodo(){
     maint:  {tone:'#880e4f', tint:'#fdeaf1'}
   };
   const STATUS = {
+    overdue:  {lbl:'Overdue',  emoji:'⚠️', bg:'#fee2e2', fg:'#7f1d1d'},
     due:      {lbl:'Due Now',  emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
     soon:     {lbl:'Soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
-    upcoming: {lbl:'Upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'},
-    passed:   {lbl:'Passed',   emoji:'✅', bg:'#e9edf1', fg:'#5b7280'}
+    upcoming: {lbl:'Upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'}
   };
+
+  /* ── HAS THIS WINDOW BEEN DONE? ────────────────────────────────────
+     A window is a task, not just a date range: it shows every day of the
+     window until somebody records the audit, disappears once they do, and
+     if the window closes with nothing recorded it does not quietly pass —
+     it turns overdue and keeps showing, into the following months, until
+     the work is done.
+
+     Which nurseries count towards it follows the nursery chosen on the way
+     in. Any one record inside the window marks it done; the main nursery is
+     not tracked per-plot here, so recording BNN closes the main-nursery
+     window for that month. Say if it should need all three.
+
+     Records are read once for a short lookback rather than per row, and
+     only the two columns this needs. If the read fails — offline, or the
+     session lapsed — everything is treated as not done, so the list shows
+     too much rather than hiding work somebody still owes. Audits recorded
+     offline and still queued are not visible to this either, for the same
+     reason: they count once they sync. */
+  const LOOKBACK_MONTHS = 3;
+  const SCOPE_NURSERIES = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  const DONE_TABLE = {
+    plot:   'audit_plot_audits',
+    height: 'audit_height_records',
+    papan:  'audit_papan_audits'
+  };
+  let done = null;          // {plot:Set('YYYY-MM-DD'), …}; null until loaded
+
+  const iso = (y,m,d) => y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+  async function loadCompletions(){
+    const from = new Date(year, month - LOOKBACK_MONTHS, 1);
+    const since = iso(from.getFullYear(), from.getMonth(), 1);
+    const next = { plot:new Set(), height:new Set(), papan:new Set() };
+    try {
+      await Promise.all(Object.keys(DONE_TABLE).map(async mod => {
+        const rows = await sb.select(DONE_TABLE[mod],
+          'select=date,nursery&date=gte.' + since);
+        (rows || []).forEach(r => {
+          if (r && r.date && SCOPE_NURSERIES.indexOf(r.nursery) !== -1)
+            next[mod].add(String(r.date).slice(0,10));
+        });
+      }));
+      done = next;
+    } catch (e) {
+      console.warn('Could not read what has been audited:', e);
+      done = null;                      // show everything rather than hide it
+    }
+  }
+
+  function isDone(o, y, m){
+    if (!done || !done[o.mod]) return false;
+    for (let d = o.start; d <= o.end; d++)
+      if (done[o.mod].has(iso(y, m, d))) return true;
+    return false;
+  }
 
   const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
 
@@ -953,15 +1011,33 @@ function loadAuditTodo(){
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
   }
 
-  /* Where a window sits relative to today — which is only interesting in the
-     current month; past months are closed and future ones are all ahead. */
+  /* Where a window stands. 'done' is returned so callers can drop it from
+     the list; a closed window with nothing recorded is overdue, not passed. */
   function occStatus(o, y, m){
+    if (isDone(o, y, m)) return 'done';
     const t0 = new Date(year, month, day);
     const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
-    if (t0 > e0) return 'passed';
+    if (t0 > e0) return 'overdue';
     if (t0 >= s0) return 'due';
     const away = Math.round((s0 - t0) / 864e5);
     return away <= 3 ? 'soon' : 'upcoming';
+  }
+
+  /* Windows from earlier months that were never completed. They belong on
+     the current month's list — that is the whole point of overdue — and are
+     stamped with the month they were owed so nobody reads "20–25" as this
+     month's. Bounded by the same lookback as the records read. */
+  function carriedOverdue(){
+    const out = [];
+    for (let back = LOOKBACK_MONTHS; back >= 1; back--){
+      const d = new Date(year, month - back, 1);
+      const y = d.getFullYear(), m = d.getMonth();
+      occurrences(y, m).forEach(o => {
+        if (occStatus(o, y, m) === 'overdue')
+          out.push(Object.assign({}, o, {fromY:y, fromM:m}));
+      });
+    }
+    return out;
   }
 
   function dateLabel(o, m){
@@ -981,7 +1057,8 @@ function loadAuditTodo(){
   function renderCalendar(){
     document.getElementById('cal-month').textContent = MONTHS_FULL[viewM] + ' ' + viewY;
 
-    const occ  = occurrences(viewY, viewM);
+    const occ  = occurrences(viewY, viewM)
+      .filter(o => occStatus(o, viewY, viewM) !== 'done');   // done days stop nagging
     const busy = new Set();
     occ.forEach(o => { for (let d = o.start; d <= o.end; d++) busy.add(d); });
 
@@ -1035,8 +1112,11 @@ function loadAuditTodo(){
 
   /* ── Status filters ── */
   function renderChips(occ){
-    const counts = {due:0, soon:0, upcoming:0, passed:0};
-    occ.forEach(o => counts[occStatus(o, viewY, viewM)]++);
+    const counts = {overdue:0, due:0, soon:0, upcoming:0};
+    occ.forEach(o => {
+      const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      if (k in counts) counts[k]++;          // 'done' is not a filter, it is gone
+    });
     const box = document.getElementById('chips');
     box.innerHTML = Object.keys(STATUS).map(k => {
       const st = STATUS[k];
@@ -1059,21 +1139,26 @@ function loadAuditTodo(){
 
   /* ── Timeline ── */
   function renderTimeline(occ){
-    let list = occ;
-    if (selDay !== null) list = list.filter(o => selDay >= o.start && selDay <= o.end);
-    if (active.size)     list = list.filter(o => active.has(occStatus(o, viewY, viewM)));
+    let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
+    if (selDay !== null) list = list.filter(o => o.fromY === undefined &&
+                                                 selDay >= o.start && selDay <= o.end);
+    if (active.size)     list = list.filter(o =>
+                           active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
     let html = list.map(o => {
-      const k  = occStatus(o, viewY, viewM);
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
-      return `<div class="tl-item ${k==='passed'?'passed':''}" style="--tone:${c.tone}">
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" style="--tone:${c.tone}">
         <a class="tl-card" href="${o.href}" style="--tint:${c.tint};--tone:${c.tone}">
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
-            <div class="tl-ttl">${o.title}</div>
+            <div class="tl-ttl">${o.title}${
+              o.fromY !== undefined
+                ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
           </div>
           <div class="tl-when">
-            <div class="tl-date">${dateLabel(o, viewM)}</div>
+            <div class="tl-date">${dateLabel(o, om)}</div>
             <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${st.lbl}</span>
           </div>
         </a>
@@ -1083,10 +1168,12 @@ function loadAuditTodo(){
     if (!list.length){
       html = `<div class="tl-empty">${
         selDay !== null
-          ? `Nothing scheduled on ${selDay} ${MONTHS_FULL[viewM]}.`
+          ? `Nothing outstanding on ${selDay} ${MONTHS_FULL[viewM]}.`
           : active.size
-            ? 'Nothing in this month matches that filter.'
-            : 'No scheduled audits this month.'
+            ? 'Nothing outstanding matches that filter.'
+            : occ.length
+              ? '✅ Every audit for this month is done.'
+              : 'No scheduled audits this month.'
       }</div>`;
     }
 
@@ -1117,14 +1204,29 @@ function loadAuditTodo(){
   }
 
   function renderAll(){
-    const occ = occurrences(viewY, viewM);
-    const n = occ.length;
     const thisMonth = (viewY === year && viewM === month);
+    const monthOcc  = occurrences(viewY, viewM);
+    /* Anything still owed from earlier months rides along with the current
+       month, and only there — paging back to July should show July, not
+       July plus a copy of June. */
+    const occ = thisMonth ? carriedOverdue().concat(monthOcc) : monthOcc;
+
+    const outstanding = occ.filter(o =>
+      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done').length;
+    const finished = monthOcc.length - monthOcc.filter(o =>
+      occStatus(o, viewY, viewM) !== 'done').length;
+
+    const where = thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM] + ' ' + viewY;
+    const doneNote = finished
+      ? ` <span style="font-size:12px;font-weight:700;color:var(--fc-ink3)">· ${finished} done</span>`
+      : '';
     document.getElementById('sched-count').innerHTML =
-      n === 0
-        ? `No scheduled audits ${thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM]} 🌱`
-        : `You have <b>${n}</b> audit${n>1?'s':''} ${
-            thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM] + ' ' + viewY} 👍`;
+      monthOcc.length === 0
+        ? `No scheduled audits ${where} 🌱`
+        : outstanding === 0
+          ? `All caught up ${where} ✅${doneNote}`
+          : `You have <b>${outstanding}</b> audit${outstanding>1?'s':''} to do ${where} 👍${doneNote}`;
+
     renderCalendar();
     renderChips(occ);
     renderTimeline(occ);
@@ -1173,7 +1275,8 @@ function loadAuditTodo(){
   document.getElementById('day-next').onclick = () => stepDays(1);
 
   winStart = windowFor(viewY, viewM);
-  renderAll();
+  renderAll();                                   // draw at once, from the schedule
+  loadCompletions().then(renderAll);             // then again, minus what is done
 
 
 }

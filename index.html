@@ -429,9 +429,17 @@
          permissions fetched yet, fall back to the back end — its own
          guard will redirect if that guess turns out wrong. */
       const auditLvl = mods ? String(mods.audit || '').toLowerCase() : null;
+      /* Read admin the way isAuditAdmin() does — module level OR role. On the
+         module level alone an administrator by role was aimed at the auditor
+         view here while every audit page treated them as an admin, so the
+         back end was only reachable by typing the URL. */
+      const roleStr = String((profile && (profile.audit_role || profile.role)) || '')
+                        .toLowerCase();
+      const isAuditAdmin = auditLvl === 'admin' ||
+                           roleStr === 'admin' || roleStr === 'administrator';
       auditCard.setAttribute(
         'href',
-        auditLvl === 'admin' || !perms
+        isAuditAdmin || !perms
           ? 'audit/audit_admin.html'
           : 'audit/audit_nursery_select.html'
       );
