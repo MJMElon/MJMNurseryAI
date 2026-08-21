@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21b */
+/* BUILD: 2026-08-21c */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -131,23 +131,24 @@
     try { localStorage.removeItem(scopeKey()); } catch (e) {}
   }
 
-  /* Which nurseries this account may audit at all. audit_home builds its
-     rows from the same answer, so the chooser can never offer a nursery
-     the list would then refuse to show. */
+  /* Which nurseries this account may audit.
+
+     A role that names one — "Auditor PN", "MN Auditor" — is held to it.
+     Everyone else, including a plain "Auditor" and any admin, is offered
+     both and picks on the way in. The old rule quietly handed a plain
+     auditor the main nursery and nothing else, so most of the team was
+     never asked a question they should have been answering every morning.
+
+     audit_home builds its rows from this same answer, so the chooser can
+     never offer a nursery the list would then refuse to show. */
   function allowedScopes() {
     var u = {};
     try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
-    var auditRole = (u.audit_role || '').toLowerCase();
-    var mainRole  = (u.role || '').toLowerCase();
-    var role      = auditRole || mainRole;
-    var isAdmin   = role.indexOf('admin') !== -1 || mainRole.indexOf('admin') !== -1;
-    var out = [];
-    if (isAdmin || role.indexOf('pn') !== -1) out.push('PN');
-    if (isAdmin || role.indexOf('mn') !== -1 ||
-        (role.indexOf('pn') === -1 && !isAdmin && role.indexOf('auditor') !== -1)) out.push('MN');
-    /* A role string matching neither — an account made before roles were
-       tightened — is offered both rather than shut out of the module. */
-    return out.length ? out : ['PN', 'MN'];
+    var role = ((u.audit_role || '') || (u.role || '')).toLowerCase();
+    var namesPN = role.indexOf('pn') !== -1;
+    var namesMN = role.indexOf('mn') !== -1;
+    if (namesPN !== namesMN) return namesPN ? ['PN'] : ['MN'];
+    return ['PN', 'MN'];
   }
 
   global.MJMAuditLogin = {

@@ -327,16 +327,38 @@
     .sched-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
     .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
                   letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
-    #scope-badge{font-size:9px;font-weight:800;padding:3px 9px;border-radius:20px;
-                 letter-spacing:.7px}
+    /* ── NURSERY RIBBON ──
+       A banner rather than a chip. Pre and main nursery run different
+       schedules, so which one you are looking at is the single most
+       important fact on the screen. */
+    .ribbon{display:flex;align-items:center;gap:12px;background:var(--fc-card);
+            border:1.5px solid var(--fc-line);border-left:6px solid var(--rib,#2d7a2d);
+            border-radius:16px;padding:14px 16px;margin-bottom:16px;
+            box-shadow:0 1px 3px rgba(16,40,60,.05)}
+    .ribbon-btn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+                padding:8px 14px;border-radius:22px;background:#f4f7fa;
+                border:1px solid var(--fc-line);text-decoration:none;
+                font-size:10.5px;font-weight:800;letter-spacing:.7px;
+                text-transform:uppercase;color:var(--fc-ink2);white-space:nowrap}
+    .ribbon-btn:hover{background:#e9eff5}
+    .ribbon-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;
+                    stroke-linecap:round;stroke-linejoin:round}
+    .ribbon-ttl{flex:1;min-width:0;text-align:center;font-size:22px;font-weight:800;
+                letter-spacing:2px;text-transform:uppercase;color:var(--rib,#2d7a2d);
+                line-height:1.15}
+    /* Balances the button so the title sits centred on the ribbon, not
+       shunted right by it. */
+    .ribbon-spacer{flex:0 0 auto;width:92px}
+    @media (max-width:640px){
+      .ribbon{padding:12px;gap:8px;border-radius:14px}
+      .ribbon-ttl{font-size:15px;letter-spacing:1px}
+      .ribbon-btn{padding:7px 10px;font-size:9.5px}
+      .ribbon-btn span{display:none}
+      .ribbon-spacer{width:34px}
+    }
     .sched-count{font-size:17px;font-weight:700;color:var(--fc-ink);margin-top:6px;
                  line-height:1.3}
     .sched-count b{color:#2d7a2d}
-    .sched-switch{margin-left:auto;flex-shrink:0;font-size:10px;font-weight:800;
-                  letter-spacing:.6px;color:#2d7a2d;text-decoration:none;
-                  text-transform:uppercase;padding:6px 11px;border-radius:20px;
-                  background:#eef7ee;white-space:nowrap}
-    .sched-switch:hover{background:#e2f1e2}
 
     /* ── Month strip ── */
     .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
@@ -492,7 +514,7 @@
              provides it; keeping two would double up the same navigation. -->
         <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>Back End</span>
+          <span>Main Page</span>
         </a>
         <button class="lang-toggle-btn" onclick="toggleLang()">BM</button>
       </div>
@@ -513,6 +535,18 @@
   <div class="content">
 
     <!-- AUDIT TO-DO -->
+    <!-- Names the nursery this whole screen is about. The small badge that
+         used to sit beside "Audit To-Do" was easy to miss, and reading the
+         wrong nursery's schedule is the one mistake this page can cause. -->
+    <div class="ribbon fade-in" id="ribbon">
+      <a href="audit_nursery_select.html" class="ribbon-btn" id="scope-switch">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>Switch</span>
+      </a>
+      <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
+      <div class="ribbon-spacer"></div>
+    </div>
+
     <!-- ── THE AUDIT SCHEDULE BOARD ──
          A flat list of four rows could not say when anything was due beyond
          a line of text, and every month looked identical. The month, the
@@ -522,14 +556,9 @@
 
       <div class="sched-top">
         <div style="min-width:0">
-          <div class="sched-kicker">
-            <span>📋 Audit To-Do</span>
-            <span id="scope-badge" style="display:none"></span>
-          </div>
+          <div class="sched-kicker"><span>📋 Audit To-Do</span></div>
           <div class="sched-count" id="sched-count">&nbsp;</div>
         </div>
-        <a href="audit_nursery_select.html" id="scope-switch" class="sched-switch"
-           style="display:none">Switch ⇄</a>
       </div>
 
       <div class="cal">
@@ -775,10 +804,11 @@ function loadAuditTodo(){
   // Admin and Administrator see everything
   const isAdmin = role.includes('admin') || mainRole.includes('admin');
 
-  /* What this account is allowed to audit … */
-  const mayPN = isAdmin || role.includes('pn');
-  const mayMN = isAdmin || role.includes('mn') ||
-                (!role.includes('pn') && !isAdmin && role.includes('auditor'));
+  /* What this account is allowed to audit — asked of the shared guard, so
+     this and the chooser can never disagree about it. */
+  const allowed = MJMAuditLogin.allowedScopes();
+  const mayPN = allowed.indexOf('PN') !== -1;
+  const mayMN = allowed.indexOf('MN') !== -1;
 
   /* … and which half of it they chose on the way in. The list used to carry
      both nurseries at once, so an auditor walking the pre nursery read past
@@ -791,20 +821,18 @@ function loadAuditTodo(){
   const showPN = mayPN && scope === 'PN';
   const showMN = mayMN && scope === 'MN';
 
-  /* Name the nursery on the list itself. Two nurseries run different
-     schedules, so a list with no label is a list you can act on wrongly. */
-  (function labelScope(){
-    const badge  = document.getElementById('scope-badge');
-    const switcher = document.getElementById('scope-switch');
-    if (!badge || !scope) return;
+  /* Name the nursery on the screen itself, and offer the way to the other
+     one — without which the choice made on the way in is a one-way door. */
+  (function paintRibbon(){
+    const ttl = document.getElementById('ribbon-ttl');
+    const rib = document.getElementById('ribbon');
+    const sw  = document.getElementById('scope-switch');
+    if (!ttl || !scope) return;
     const isPN = scope === 'PN';
-    badge.textContent = isPN ? 'PRE NURSERY' : 'MAIN NURSERY';
-    badge.style.background = isPN ? '#dcfce7' : '#dbeafe';
-    badge.style.color      = isPN ? '#166534' : '#1e40af';
-    badge.style.display    = 'inline-block';
+    ttl.textContent = isPN ? 'Pre Nursery' : 'Main Nursery';
+    rib.style.setProperty('--rib', isPN ? '#1f7a3d' : '#1558a8');
     /* Only worth offering when there is somewhere else to go. */
-    if (switcher && MJMAuditLogin.allowedScopes().length > 1)
-      switcher.style.display = 'inline-block';
+    if (sw && allowed.length < 2) sw.style.visibility = 'hidden';
   })();
 
   /* ── The month being looked at. Starts on this one. ── */

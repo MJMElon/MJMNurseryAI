@@ -122,7 +122,7 @@
       <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
         <a href="#" class="hbtn" id="backend-btn" style="display:none">
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>Back End</span>
+          <span>Main Page</span>
         </a>
         <button class="hbtn" onclick="MJMAuditLogin.signOut()">
           <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -213,13 +213,10 @@ function choose(scope){
 
 const allowed = MJMAuditLogin.allowedScopes();
 
-/* One choice is not a choice. An auditor who may only ever record the pre
-   nursery should not be asked a question with one answer every morning. */
-if (allowed.length === 1) {
-  choose(allowed[0]);
-} else {
-  document.body.style.opacity = '1';
-}
+/* Always ask. This is the first screen of the day for a normal account, and
+   it is where they say which nursery they are walking — not something to be
+   decided for them behind a redirect. */
+document.body.style.opacity = '1';
 
 if (allowed.indexOf('PN') === -1) document.getElementById('pick-pn').style.display = 'none';
 if (allowed.indexOf('MN') === -1) document.getElementById('pick-mn').style.display = 'none';
