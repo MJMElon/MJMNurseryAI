@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21d */
+/* BUILD: 2026-08-21e */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
