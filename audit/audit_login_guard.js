@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21c */
+/* BUILD: 2026-08-21d */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -56,11 +56,17 @@
   }
 
   /* Admin-only page. Not signed in goes to the login; signed in but not an
-     admin goes to the view they are entitled to. */
-  function requireAdmin() {
+     admin goes wherever the caller says they belong.
+
+     The default is the auditor view, which is right when someone is being
+     turned away from a page (the report). audit_admin.html passes the
+     nursery chooser instead, because that page is what the portal's Nursery
+     Audit tile opens: a normal account tapping the tile should arrive at
+     the chooser, not bounce through the auditor view to reach it. */
+  function requireAdmin(fallback) {
     if (!requireSignIn()) return false;
     if (isAdmin()) return true;
-    global.location.replace('audit_home.html');
+    global.location.replace(fallback || 'audit_home.html');
     return false;
   }
 
