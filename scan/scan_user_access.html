@@ -28,18 +28,22 @@ MJMModuleAccess.init({
   // "back" to it would otherwise mean leaving this one behind.
   portal: { href: 'https://scan.mjmnursery.com', label: 'Back to Portal' },
   note:   `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
-           For each of them, tick exactly what they can do in the Scan Portal — and whether they can
-           <strong>change other users' roles</strong>.
+           For each of them, tick which of the five modules they can open and exactly what they can do
+           inside each — and whether they can <strong>change other users' roles</strong>.
            <br><br>
            <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
-             <strong>Plot Status</strong> and <strong>Maintenance</strong> are also limited by nursery — switch
-             <em>All nurseries</em> off for someone and tick only the ones they should see.
+             <strong>Nurseries</strong> are set separately, below the modules. Switch <em>All nurseries</em>
+             off for someone and tick only the ones they should see — that one setting governs
+             <strong>Plot Status</strong>, <strong>Maintenance</strong> and <strong>PALMS</strong> together,
+             so a BNN-only Field Conductor sees BNN on every screen.
              <br><br>
-             Scanning and Issue Collection DO are open to everyone who can reach the portal and are not
-             controlled here. To take the whole Scan Portal away from someone, set their <strong>Scan</strong>
+             A module with nothing ticked here stays open, so nobody loses access by never having been
+             set up. To take the whole Scan Portal away from someone, set their <strong>Scan</strong>
              module to <em>None</em> on the main portal's User Access.
            </span>`,
   pages: [
+    { key:'barcode', label:'Scan Barcode Counter', desc:'Counting seedlings by scanning barcodes' },
+    { key:'do', label:'Issue Collection DO', desc:'Raising and managing collection delivery orders' },
     { key:'plot_status', label:'Plot Status', desc:'Daily plot stage reporting',
       actions:[
         { key:'report', label:'Report a plot stage', desc:'Submit today\u2019s stage for a plot' }
@@ -49,13 +53,17 @@ MJMModuleAccess.init({
         { key:'record', label:'Record maintenance work', desc:'Scan and submit a maintenance record' },
         { key:'edit',   label:'Edit & delete records',   desc:'Change or remove a maintenance record already submitted' },
         { key:'export', label:'Download records',        desc:'Export the maintenance records' }
+      ]},
+    { key:'palms', label:'PALMS', desc:'Plot Activity Log Monitoring System',
+      actions:[
+        { key:'settings', label:'Open Settings', desc:'The cog in the bar \u2014 sets up PALMS for everyone, not just this user' }
       ]}
   ],
   scopes: [
     {
       key:      'plot_status_nurseries',
       label:    'Nurseries',
-      desc:     'Which nurseries this person sees in Plot Status and Maintenance',
+      desc:     'Which nurseries this person sees in Plot Status, Maintenance and PALMS',
       allLabel: 'All nurseries',
       emptyText:'No nurseries found in shared_plots yet.',
       // Read from the plots themselves, so a nursery added later shows up here
