@@ -215,16 +215,19 @@ function showDash(session) {
 
 // ── Auth state listener ───────────────────────────────────
 var _MJM_STAFF_LEVELS = ['admin','normal','view','edit','manage','read','write','full','staff'];
-function _mjmHasOpsAccess(profile) {
+// This is the MOBILE app entry — the tiles below are all mobile-module
+// pages (Issue Collection DO, Customer Consent, Booking). A user whose
+// only staff access is to a different module (Audit, Payroll, …) must
+// NOT land here — the previous predicate accepted any staff-grade
+// module, so an Audit-only auditor saw the whole mobile dashboard.
+// Gate specifically on the `mobile` module now.
+function _mjmHasMobileAccess(profile) {
   if (!profile) return false;
   var p = profile.permissions || {};
-  if (p.manage_users || p.can_verify_operation) return true;
-  if (p.modules && typeof p.modules === 'object') {
-    for (var k in p.modules) {
-      if (p.modules[k] && _MJM_STAFF_LEVELS.indexOf(String(p.modules[k]).toLowerCase()) !== -1) return true;
-    }
-  }
-  return false;
+  // Portal super-users (Manage Users) still get in, matching the hub.
+  if (p.manage_users) return true;
+  var lvl = p.modules && p.modules.mobile;
+  return !!lvl && _MJM_STAFF_LEVELS.indexOf(String(lvl).toLowerCase()) !== -1;
 }
 
 _supabase.auth.onAuthStateChange(async (event, session) => {
@@ -241,11 +244,11 @@ _supabase.auth.onAuthStateChange(async (event, session) => {
     sessionStorage.setItem('mjm_user_email', session.user.email);
     sessionStorage.setItem('mjm_user_name', session.user.user_metadata?.full_name || session.user.email);
 
-    // Ops-access gate — same predicate as the hub and audit. If the
-    // signed-in user has no staff-grade module access, bounce them to
-    // mobile_auth.html where the inline Pending Access notice is
-    // shown. Fail-open on profile-read errors so a brief Supabase
-    // hiccup doesn't lock real admins out.
+    // Mobile-module gate. The signed-in user must have the mobile
+    // module set to a staff-grade level (or Manage Users). Without
+    // that they're bounced to mobile_auth.html where the inline
+    // Pending Access notice is shown. Fail-open on profile-read
+    // errors so a brief Supabase hiccup doesn't lock real admins out.
     var hasAccess = true;
     try {
       var resp = await _supabase
@@ -253,7 +256,7 @@ _supabase.auth.onAuthStateChange(async (event, session) => {
         .select('role, user_type, permissions')
         .eq('id', session.user.id)
         .maybeSingle();
-      if (resp && !resp.error) hasAccess = _mjmHasOpsAccess(resp.data);
+      if (resp && !resp.error) hasAccess = _mjmHasMobileAccess(resp.data);
       console.log('[mobile-gate]', { canEnter: hasAccess, profile: resp && resp.data });
     } catch (e) { console.warn('[mobile-gate] profile read failed (allowing through):', e); }
     if (!hasAccess) {

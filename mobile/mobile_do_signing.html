@@ -517,11 +517,36 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ════════════════════════════════════════════════════════
 let currentSession = null;
 
-_supabase.auth.getSession().then(({ data: { session } }) => {
+// Same mobile-module gate mobile_landing.html uses — a user without
+// staff-grade `modules.mobile` (or `manage_users`) bookmarking this
+// URL directly must not slip past. Bounce them to mobile_landing.html
+// where the gate there sends them to mobile_auth.html's Pending
+// Access notice.
+const _MOBILE_STAFF_LEVELS = ['admin','normal','view','edit','manage','read','write','full','staff'];
+function _mjmHasMobileAccess(profile) {
+  if (!profile) return false;
+  const p = profile.permissions || {};
+  if (p.manage_users) return true;
+  const lvl = p.modules && p.modules.mobile;
+  return !!lvl && _MOBILE_STAFF_LEVELS.indexOf(String(lvl).toLowerCase()) !== -1;
+}
+
+_supabase.auth.getSession().then(async ({ data: { session } }) => {
   if (!session) {
     window.location.href = 'mobile_landing.html';
     return;
   }
+  try {
+    const { data: profile } = await _supabase
+      .from('shared_profiles')
+      .select('permissions')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    if (profile && !_mjmHasMobileAccess(profile)) {
+      window.location.replace('mobile_landing.html');
+      return;
+    }
+  } catch (_) { /* fail open on transient errors, matching mobile_landing */ }
   currentSession = session;
   const name = session.user.user_metadata?.full_name || session.user.email;
   document.getElementById('user-label').innerText = name;
