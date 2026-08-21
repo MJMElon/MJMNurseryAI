@@ -790,9 +790,13 @@ async function fetchAllRows(buildQuery, pageSize = 1000) {
 }
 
 function _emptyMv() {
-  return { seeds:0, planted:0, trans:0, premium:0, dtone:0, damaged:0, cull1:0, cull2:0, cull3:0, sold:0 };
+  // trIn / trOut are the batch report's 3rd-culling transfers: seedlings that
+  // left one plot for another without being culled or sold. Without them a
+  // plot that has moved everything on still shows the old quantity sitting
+  // there, and its closing balance never reaches zero.
+  return { seeds:0, planted:0, trans:0, premium:0, dtone:0, damaged:0, cull1:0, cull2:0, cull3:0, sold:0, trIn:0, trOut:0 };
 }
-function _netOfMv(b) { return b.seeds + b.planted + b.trans + b.premium + b.dtone - b.damaged - b.cull1 - b.cull2 - b.cull3 - b.sold; }
+function _netOfMv(b) { return b.seeds + b.planted + b.trans + b.premium + b.dtone + b.trIn - b.damaged - b.cull1 - b.cull2 - b.cull3 - b.sold - b.trOut; }
 
 function _categorise(b, t, q) {
   switch (t) {
@@ -806,6 +810,10 @@ function _categorise(b, t, q) {
     case '2nd_Culling':              b.cull2   += Math.abs(q); break;
     case '3rd_Culling':              b.cull3   += Math.abs(q); break;
     case 'Sold':                     b.sold    += q; break;
+    // Split by the synthetic type the event builder gives each side of a
+    // transfer, so one log can add to the target and subtract from the source.
+    case 'Cull3_Transfer_In':        b.trIn    += Math.abs(q); break;
+    case 'Cull3_Transfer_Out':       b.trOut   += Math.abs(q); break;
   }
 }
 
@@ -834,7 +842,7 @@ async function runSummaryMovement() {
       // table (photos, audit notes, calibration) just burned DB CPU.
       .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
           'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
-          '1st_Culling', '2nd_Culling', '3rd_Culling'])
+          '1st_Culling', '2nd_Culling', '3rd_Culling', 'Cull3_Transfer'])
       .order('id', { ascending: true })),
     fetchAllRows(() => _supabase.from('shared_do_records')
       .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
@@ -862,6 +870,24 @@ async function runSummaryMovement() {
   const events = [];
   (logsRes.data || []).forEach(l => {
     if (SUMMARY_SKIP_TYPES.has(l.transaction_type)) return;
+    // A 3rd-culling transfer is one log describing two sides: plot_name is
+    // where the seedlings landed, and the remark says where they left. Each
+    // side is its own event so the source's balance falls and the target's
+    // rises, exactly as the batch report shows them.
+    if (l.transaction_type === 'Cull3_Transfer') {
+      const from = (l.remark || '').match(/From:\s*\[([^\]|]+)\|/);
+      const qty  = Math.abs(Number(l.quantity_change || 0));
+      const date = _logDate(l);
+      if (passLoc(l.plot_name)) {
+        events.push({ date, plot: l.plot_name || '—', batch: l.batch_name || '—',
+                      type: 'Cull3_Transfer_In', qty });
+      }
+      if (from && passLoc(from[1])) {
+        events.push({ date, plot: from[1], batch: l.batch_name || '—',
+                      type: 'Cull3_Transfer_Out', qty });
+      }
+      return;
+    }
     if (!passLoc(l.plot_name)) return;
     events.push({
       date:  _logDate(l),
@@ -920,11 +946,15 @@ async function runSummaryMovement() {
   for (const k of allKeys) {
     const b = buc[k] || _emptyMv();
     const opening = openingOf(k);
-    const inflow  = b.seeds + b.planted + b.trans + b.premium + b.dtone;
-    const outflow = b.damaged + b.cull1 + b.cull2 + b.cull3 + b.sold;
+    const inflow  = b.seeds + b.planted + b.trans + b.premium + b.dtone + b.trIn;
+    const outflow = b.damaged + b.cull1 + b.cull2 + b.cull3 + b.sold + b.trOut;
     const closing = opening + inflow - outflow;
     // Hide rows that are entirely empty for the chosen period AND have zero opening
     if (opening === 0 && inflow === 0 && outflow === 0) continue;
+    // Nothing of this batch is left in this plot — everything was culled, sold
+    // or moved on — so the row has nothing to say. A NEGATIVE closing is kept:
+    // that is a figure that needs looking at, not one to hide.
+    if (closing === 0) continue;
     let plot = '', batch = '', date = '';
     if (groupBy === 'plot')  { [plot, batch] = k.split('\u0001'); }
     else if (groupBy === 'batch') { batch = k; }
@@ -949,6 +979,14 @@ async function runSummaryMovement() {
   }
 
   const fmtCell = (n, cls) => `<td class="text-right ${cls || ''}">${n ? fmtNum(n) : '0'}</td>`;
+  // Transfers in and out share one column: what the plot gained, less what it
+  // sent on. Signed, so "−397" reads as seedlings that left for another plot.
+  const fmtTransfer = (r) => {
+    const net = (r.trIn || 0) - (r.trOut || 0);
+    if (!net) return `<td class="text-right">0</td>`;
+    return `<td class="text-right ${net > 0 ? 'text-[#3a7ab4]' : 'text-[#c07820]'}">`
+         + `${net > 0 ? '+' : '\u2212'}${fmtNum(Math.abs(net))}</td>`;
+  };
   const isPlotMode  = groupBy === 'plot';
   const isBatchMode = groupBy === 'batch';
   const isDateMode  = groupBy === 'date';
@@ -970,6 +1008,7 @@ async function runSummaryMovement() {
           ${fmtCell(r.cull2,   'text-[#a83020]')}
           ${fmtCell(r.cull3,   'text-[#a83020]')}
           ${fmtCell(r.sold,    'text-[#a83020]')}
+          ${fmtTransfer(r)}
           ${fmtCell(r.closing, 'text-[#4a7a2e] font-black')}
         </tr>`).join('');
     }
@@ -1001,6 +1040,7 @@ async function runSummaryMovement() {
             ${fmtCell(r.cull2,   'text-[#a83020]')}
             ${fmtCell(r.cull3,   'text-[#a83020]')}
             ${fmtCell(r.sold,    'text-[#a83020]')}
+            ${fmtTransfer(r)}
             ${fmtCell(r.closing, 'text-[#4a7a2e] font-black')}
           </tr>`);
       });
@@ -1044,6 +1084,7 @@ async function runSummaryMovement() {
               <th class="text-right">2nd Cull</th>
               <th class="text-right">3rd Cull</th>
               <th class="text-right">Sold</th>
+              <th class="text-right">Transfer</th>
               <th class="text-right">Closing</th>
             </tr>
           </thead>
@@ -1062,6 +1103,7 @@ async function runSummaryMovement() {
               ${fmtCell(grand.cull2,   'text-[#a83020] font-black')}
               ${fmtCell(grand.cull3,   'text-[#a83020] font-black')}
               ${fmtCell(grand.sold,    'text-[#a83020] font-black')}
+              ${fmtTransfer(grand)}
               ${fmtCell(grand.closing, 'text-[#4a7a2e] font-black')}
             </tr>
           </tbody>
@@ -1077,7 +1119,11 @@ async function runSummaryMovement() {
         (<code>plot_n / batch_n / qty_n</code> on delivery orders); cancelled DOs are excluded.
         Dates are the ones keyed into the batch report; where a stage was saved without one
         (3rd culling), the record's save date is used.
+        <em>Transfer</em> is the 3rd culling's plot transfers, netted: what moved into this plot less what
+        it sent on, so a plot that has passed its seedlings elsewhere no longer appears to be holding them.
         <em>B/F</em> is the cumulative net of all transactions <strong>before</strong> the From date for the same key.
+        A (Plot · Batch) whose <em>Closing</em> works out to zero is left off — everything has been culled,
+        sold or moved on. A negative closing is still shown, because that is a figure to look into.
         Audit, photo, and stock-calibration entries are not counted as movements.
         Pre-nursery plots populate <em>Planted</em> / <em>1st Cull</em>; main-nursery plots populate <em>Transplanted</em> / <em>Double Tone</em> / <em>2nd Cull</em>. Empty cells are zero.
       </div>
