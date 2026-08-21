@@ -1525,6 +1525,40 @@ function monthLabelToInput(lbl) {
   return idx >= 0 ? `${m[2]}-${String(idx + 1).padStart(2, '0')}` : '';
 }
 const getMonth   = () => monthInputToLabel(document.getElementById('global-month').value);
+
+/* ── COLUMN HEADERS AS DATES ──
+   The month is worked in blocks of seven days, and the field reads them as
+   dates rather than as an ordinal they have to count back from: 1st - 7th,
+   8th - 14th, 15th - 21st, 22nd - 28th. A block added by hand beyond the
+   fourth runs to the end of the month, so February never reads "29th - 35th".
+   Takes the month label ("Apr 2026") the table is being drawn for; the PDF
+   draws a different month from the screen, so it passes its own. */
+function daysInMonthLabel(lbl) {
+  const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec((lbl || '').trim());
+  if (!m) return 31;                       // unknown month — assume the longest
+  const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === m[1].toLowerCase());
+  if (idx < 0) return 31;
+  return new Date(parseInt(m[2], 10), idx + 1, 0).getDate();  // day 0 of next
+}
+function ordinalDay(d) {
+  const v = d % 100, sfx = ['th', 'st', 'nd', 'rd'];
+  return d + (sfx[(v - 20) % 10] || sfx[v] || sfx[0]);
+}
+function periodLabel(n, monthLabel) {
+  const lbl = monthLabel !== undefined
+    ? monthLabel
+    : (document.getElementById('global-month') ? getMonth() : '');
+  const days = daysInMonthLabel(lbl);
+  const from = (n - 1) * 7 + 1;
+  // A block with no days left in the month — a 5th round in a 28-day
+  // February. There is no date to name, so it keeps its number rather than
+  // inventing a 29th of February.
+  if (from > days) return `${t('hdr.round')} ${n}`;
+  const to = Math.min(from + 6, days);
+  return from === to ? ordinalDay(from) : `${ordinalDay(from)} - ${ordinalDay(to)}`;
+}
+
+
 const getNursery = () => document.getElementById('global-nursery').value;
 
 /* ── MONTH/YEAR WHEEL PICKER (Android-style spinner) ──
@@ -2058,7 +2092,7 @@ function renderPD() {
   const W=['W1','W2','W3','W4'];
   let h='<thead>';
   h+=`<tr><th rowspan="4" class="plot-col-hdr">${t('col.plot')}</th>`;
-  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${t('hdr.week')} ${w[1]}</th>`);
+  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${periodLabel(+w[1], m)}</th>`);
   h+='</tr><tr>';
   W.forEach(()=>h+=`<th class="p-th">${t('hdr.pSerangga')}</th><th class="d-th">${t('hdr.dKulat')}</th>`);
   h+='</tr><tr>';
@@ -2258,7 +2292,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${t('hdr.round')} ${ri+1}</span>
+        <span class="th-title">${periodLabel(ri+1, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addManuringCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeManuringCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2293,7 +2327,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.manuring[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${t('hdr.round')} ${ri+1}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -2388,7 +2422,7 @@ function renderWeeding() {
   h+=`<th rowspan="2" class="plot-col-hdr">${t('col.plot')}</th>`;
   h+=`<th colspan="2" class="wk-th">${t('hdr.weeding')}</th>`;
   h+='</tr><tr>';
-  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${t('hdr.round')} ${r[1]}</th>`);
+  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${periodLabel(+r[1], m)}</th>`);
   h+='</tr></thead><tbody>';
 
   // Select-all row
@@ -2527,7 +2561,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${t('hdr.round')} ${ri+1}</span>
+        <span class="th-title">${periodLabel(ri+1, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addInterrowCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeInterrowCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2566,7 +2600,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.interrow[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${t('hdr.round')} ${ri+1}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -3362,7 +3396,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*4, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     W.forEach((w, wi) => {
       const x = startX + plotColW + wi*colW*2;
-      cell(x, y, colW*2, rowH, `${t('hdr.week')} ${w[1]}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW*2, rowH, periodLabel(+w[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
 
@@ -3474,7 +3508,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     cfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, `${t('hdr.round')} ${ri+1}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3574,7 +3608,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*2, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     rounds.forEach((r, i) => {
       const x = startX + plotColW + i*colW;
-      cell(x, y, colW, rowH, `${t('hdr.round')} ${r[1]}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW, rowH, periodLabel(+r[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
     rounds.forEach((r, i) => {
@@ -3618,7 +3652,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     icfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, `${t('hdr.round')} ${ri+1}`, {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
