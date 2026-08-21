@@ -816,7 +816,10 @@ function loadAuditTodo(){
      audit_nursery_select.html; anyone arriving without a choice is sent
      there rather than shown the wrong nursery's schedule. */
   const scope = MJMAuditLogin.scope();
-  if (!scope) { window.location.replace('audit_nursery_select.html'); }
+  /* Stop here rather than carrying on. Without the return this went on to
+     build the board and fire its queries while the browser was already
+     navigating away — work and REST calls thrown away on every visit. */
+  if (!scope) { window.location.replace('audit_nursery_select.html'); return; }
 
   const showPN = mayPN && scope === 'PN';
   const showMN = mayMN && scope === 'MN';

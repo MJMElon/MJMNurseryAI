@@ -491,9 +491,12 @@ function notifyAlerts(kinds){
 }
 
 loadAlerts();
-/* Long shifts leave this page open; five minutes keeps it honest without
-   hammering the table. */
-setInterval(loadAlerts, 5 * 60 * 1000);
+/* Long shifts leave this page open, so it refreshes — but only while
+   somebody is actually looking at it. A tab left open on a back-office
+   machine for a week would otherwise keep querying all week for nobody. */
+setInterval(function(){
+  if (document.visibilityState === 'visible') loadAlerts();
+}, 5 * 60 * 1000);
 
 /* User Access needs the portal's own permission, not just audit admin. */
 (async () => {

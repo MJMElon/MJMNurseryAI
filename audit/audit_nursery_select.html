@@ -208,6 +208,22 @@ const user = JSON.parse(localStorage.getItem('mjm_user') || '{"name":"Auditor"}'
 
 function choose(scope){
   MJMAuditLogin.setScope(scope);
+  /* Only leave if the choice actually stuck. setScope swallows storage
+     failures — blocked or full localStorage, private browsing — and
+     audit_home sends anyone without a choice straight back here, so
+     navigating on a failed write would put the two pages in a redirect
+     loop, hammering the API on every pass. Say so instead. */
+  if (MJMAuditLogin.scope() !== scope) {
+    const n = document.getElementById('note');
+    if (n) {
+      n.textContent = 'This browser is not letting the app save your choice, ' +
+                      'so it cannot open the audit list. Turn off private ' +
+                      'browsing, or allow site data, and try again.';
+      n.style.color = '#b91c1c';
+      n.style.fontWeight = '700';
+    }
+    return;
+  }
   window.location.href = 'audit_home.html';
 }
 
