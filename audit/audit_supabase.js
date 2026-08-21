@@ -240,6 +240,12 @@ function isAuditAdmin() {
     const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
     if (mod === 'admin') return true;
 
+    // If the audit module has an explicit level (normal, none, …) that answer
+    // is authoritative — a Normal auditor whose PROFILE role happens to be
+    // 'admin' for another module must NOT be promoted to audit admin by the
+    // legacy fallback below. Only fall through when nothing is set at all.
+    if (mod !== undefined && mod !== null && mod !== '') return false;
+
     // Fallback for accounts that predate permissions: audit_role wins over
     // role, matching how audit_home.html picks a role.
     const role = (u.audit_role || u.role || '').toLowerCase();
