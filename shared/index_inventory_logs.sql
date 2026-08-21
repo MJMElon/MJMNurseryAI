@@ -39,6 +39,13 @@ CREATE INDEX IF NOT EXISTS shared_inventory_logs_type_id_idx
 -- Tell the planner about it straight away rather than waiting for autovacuum.
 ANALYZE shared_inventory_logs;
 
+/* ── TO UNDO ──
+   An index holds no data of its own, so dropping it loses nothing and takes
+   an instant. Everything goes back to reading the way it does today.
+
+       DROP INDEX IF EXISTS shared_inventory_logs_type_id_idx;
+*/
+
 /* Check it is being used: run the movement report once, then re-run
    section 4 of check_db_health.sql. idx_scan should be climbing and
    seq_scan should have stopped. */
