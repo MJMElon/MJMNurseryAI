@@ -408,6 +408,23 @@
       const visible = !perms ? true : (!!lvl && lvl !== 'none');
       card.style.display = visible ? '' : 'none';
     });
+    // Audit tile is split: an admin lands on the back-end page (report,
+    // user access, and a button through to the auditor portal); everyone
+    // else goes straight to the auditor portal. audit_admin.html already
+    // bounces non-admins over there via requireAdmin(), but rewriting the
+    // href here saves the extra hop — Normal auditors never flash the
+    // admin page. Falls back to the admin landing when perms haven't been
+    // fetched yet (a real admin hitting the page cold still works).
+    const auditCard = document.querySelector('.module-card[data-module="audit"]');
+    if (auditCard) {
+      const auditLvl = mods ? String(mods.audit || '').toLowerCase() : null;
+      auditCard.setAttribute(
+        'href',
+        auditLvl === 'admin' || !perms
+          ? 'audit/audit_admin.html'
+          : 'audit/audit_home.html'
+      );
+    }
     const ua = document.getElementById('hub-user-access');
     if (ua) ua.style.display = (perms && perms.manage_users) ? '' : 'none';
   }
