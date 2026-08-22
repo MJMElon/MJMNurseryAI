@@ -259,21 +259,21 @@ function isBatchAudited(plot, batch){
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   const plots=NURSERY_PLOTS[activeTab]||[];
-  // A plot is "done" when every REQUIRED batch on it has an audit.
-  // Batches the operation ledger says are out (balance ≤ 0) are
-  // Not-Required and don't block the plot's done state — same rule
-  // that hides their row in the plot detail. If a plot has NO
-  // required batches at all (all sold out already), it doesn't count
-  // toward "done" (we can't credit an audit that never had to happen).
-  const donePlots = plots.filter(p => {
-    const bs = batchesOnPlot(p);
-    if (!bs.length) return false;                    // no data → never "done"
-    const required = bs.filter(b => !isBatchNotRequired(p, b.batch));
-    if (!required.length) return false;              // all out — nothing to audit
-    return required.every(b => isBatchAudited(p, b.batch));
-  }).length;
+  // Count BATCHES to audit, not plots — the ratio in the header now
+  // tells the auditor how many actual audit tasks are left. A plot
+  // with 6 required batches counts 6, a plot with 0 required
+  // (everything sold out / Not-Required) counts 0. Batches the
+  // operation ledger says are out are excluded from both sides of
+  // the fraction so a plot that has no work never inflates the total.
+  let totalRequired = 0;
+  let totalAudited  = 0;
+  plots.forEach(p => {
+    const required = batchesOnPlot(p).filter(b => !isBatchNotRequired(p, b.batch));
+    totalRequired += required.length;
+    totalAudited  += required.filter(b => isBatchAudited(p, b.batch)).length;
+  });
   document.getElementById('list-count').textContent =
-    donePlots + ' / ' + plots.length + ' done';
+    totalAudited + ' / ' + totalRequired + ' audited';
   document.getElementById('list-heading').textContent =
     t('plot_title') + ' — ' + NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
@@ -729,6 +729,36 @@ function declineAudit(){
   showToast('Marked "No Audit Required". Tap Save to close this batch.');
 }
 window.declineAudit = declineAudit;
+
+/* Undo the decline — for when the auditor tapped NO AUDIT REQUIRED by
+   mistake. Clears the sentinel out of formState, re-enables every
+   field (tri-buttons, warna swatches, photo slots), hides the
+   confirmation panel and shows the NO AUDIT REQUIRED button again.
+   Photo-slot rendering is untouched — the sample colour buttons keep
+   whatever they were on before the mis-tap so a two-tap mistake
+   ('decline' → 'undo') doesn't clear a half-filled real audit. */
+function undoDeclineAudit(){
+  formState.ulat   = null;
+  formState.tikus  = null;
+  formState.bintik = null;
+  formState.warna  = null;
+  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
+  document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
+    b.disabled = false;
+    b.style.opacity = '';
+    b.style.pointerEvents = '';
+    b.classList.remove('sel-b','sel-s','sel-t','sel-ok','sel-warn','sel-bad','active');
+  });
+  document.querySelectorAll('.photo-slot').forEach(s => {
+    s.style.opacity = '';
+    s.style.pointerEvents = '';
+  });
+  const photoReq = document.getElementById('photo-req-note');
+  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = t('photo_req'); }
+  showToast('Undone. Fill in the audit or tap No Audit Required again.');
+}
+window.undoDeclineAudit = undoDeclineAudit;
 
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
