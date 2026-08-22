@@ -408,13 +408,24 @@ function openPlotDetail(plot){
       : notReq
         ? '<span style="color:#94a3b8;font-weight:600">✕ Not Required</span> · balance ≤ 0 in operation ledger'
         : 'Pending';
-    const chipsHtml = done ? `
-      <div class="record-chips">
-        <span class="mini-chip ${chipClass(audit.ulat)}">Pest:${audit.ulat}</span>
-        <span class="mini-chip ${chipClass(audit.tikus)}">Animal:${audit.tikus}</span>
-        <span class="mini-chip ${chipClass(audit.bintik)}">Disease:${audit.bintik}</span>
-        <span class="mc-w mini-chip" style="background:${WARNA_BG[audit.warna]||'#888'}">Leaf ${audit.warna}</span>
-      </div>` : '';
+    // "No Audit Required" records get one compact pill instead of the
+    // four measurement chips — the four fields carry the sentinel
+    // string, not real measurements, so rendering them as chips would
+    // be misleading. Shows who declined for accountability.
+    const chipsHtml = done
+      ? (isNoAuditRequired(audit)
+          ? `<div class="record-chips">
+               <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0;padding:3px 10px">
+                 ✕ No Audit Required · by ${audit.auditor_name || 'Auditor'}
+               </span>
+             </div>`
+          : `<div class="record-chips">
+               <span class="mini-chip ${chipClass(audit.ulat)}">Pest:${audit.ulat}</span>
+               <span class="mini-chip ${chipClass(audit.tikus)}">Animal:${audit.tikus}</span>
+               <span class="mini-chip ${chipClass(audit.bintik)}">Disease:${audit.bintik}</span>
+               <span class="mc-w mini-chip" style="background:${WARNA_BG[audit.warna]||'#888'}">Leaf ${audit.warna}</span>
+             </div>`)
+      : '';
     // Actions on the right:
     //   audited → edit + (admin) delete icon buttons
     //   pending → nothing on the right; the row itself is the tap target
@@ -523,12 +534,30 @@ function _unlockPlotBatchInputs(){
   if (bf){ bf.readOnly=false; bf.removeAttribute('aria-readonly'); bf.title=''; bf.style.background=''; bf.style.color=''; bf.style.cursor=''; }
 }
 
+/* Reset the "No Audit Required" UI so a new form doesn't start with
+   the previous decline still greyed-out or its confirmation panel
+   still showing. Called at the top of openAddForm / openEdit. */
+function _resetDeclineUI(){
+  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
+  document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
+    b.disabled = false;
+    b.style.opacity = '';
+    b.style.pointerEvents = '';
+  });
+  document.querySelectorAll('.photo-slot').forEach(s => {
+    s.style.opacity = '';
+    s.style.pointerEvents = '';
+  });
+}
+
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
   formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
   populateForm();setView('form');
   _unlockPlotBatchInputs();
+  _resetDeclineUI();
   document.getElementById('form-view-title').textContent=t('new_audit')+' — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
@@ -536,6 +565,23 @@ function openEdit(uid){
   editMode=true;editId=uid;
   formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,photo1:r.photo||null,photo2:r.photo2||null};
   populateForm(r);setView('form');
+  _resetDeclineUI();
+  // If this record was closed with "No Audit Required", replay the same
+  // greyed-out state so the auditor can see (or re-decline / re-open).
+  if (isNoAuditRequired(r)) {
+    const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+    const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+    const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = r.auditor_name || 'Auditor';
+    const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = fmtDT(r.createdAt);
+    document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
+      b.disabled = true; b.style.opacity = '.4'; b.style.pointerEvents = 'none';
+    });
+    document.querySelectorAll('.photo-slot').forEach(s => {
+      s.style.opacity = '.4'; s.style.pointerEvents = 'none';
+    });
+    const photoReq = document.getElementById('photo-req-note');
+    if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch was closed with No Audit Required.'; }
+  }
   // Editing an existing audit: plot and batch are what identify the
   // record; changing them would silently rewrite a different plot's
   // audit. Lock them the same way _openFormForPlot does.
@@ -629,19 +675,83 @@ function renderPlotSlot(n,src){
 function cancelForm(){setView('list');}
 
 /* --- SAVE --- */
+/* NO_AUDIT_SENTINEL — the string we stamp into pest / tikus / disease /
+   warna_daun when an auditor closes a batch out without checking it.
+   Detection uses `isNoAuditRequired(r)` below, and the plot detail /
+   detail modal render swap the chip row for a compact "No audit
+   required — by X · date" pill. Kept as a distinctive constant string
+   rather than a Boolean column so nothing has to change in the DB. */
+const NO_AUDIT_SENTINEL = 'No Audit Required';
+function isNoAuditRequired(r){
+  return !!r && r.ulat === NO_AUDIT_SENTINEL && r.warna === NO_AUDIT_SENTINEL;
+}
+window.isNoAuditRequired = isNoAuditRequired;
+
+/* Decline flow — one tap on the form's NO AUDIT REQUIRED button:
+   fills formState with the sentinel values, shows the "who + when"
+   confirmation panel, disables every other field, and lets the auditor
+   press Save to write the record. The user's own name is captured from
+   localStorage.mjm_user (the same field auditor_name uses elsewhere). */
+function declineAudit(){
+  const u = (function(){ try { return JSON.parse(localStorage.getItem('mjm_user')||'{}'); } catch(e){ return {}; } })();
+  const who = u.name || u.email || 'Auditor';
+  formState.ulat   = NO_AUDIT_SENTINEL;
+  formState.tikus  = NO_AUDIT_SENTINEL;
+  formState.bintik = NO_AUDIT_SENTINEL;
+  formState.warna  = NO_AUDIT_SENTINEL;
+  formState.photo1 = null;
+  formState.photo2 = null;
+
+  // Reveal the confirmation panel + hide the decline button so it can't
+  // be tapped again. Stamp the "by <name> · <when>" line at the same time.
+  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+  const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+  const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = who;
+  const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+
+  // Disable every condition control below so it visually reads as
+  // 'you don't need to fill this'. The controls stay in the DOM so
+  // save-time serialisation still works; they just can't be interacted
+  // with. Includes tri-buttons, warna colour swatches, and the two
+  // photo slots.
+  document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '.4';
+    b.style.pointerEvents = 'none';
+  });
+  document.querySelectorAll('.photo-slot').forEach(s => {
+    s.style.opacity = '.4';
+    s.style.pointerEvents = 'none';
+  });
+  const photoReq = document.getElementById('photo-req-note');
+  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch is being closed with No Audit Required.'; }
+
+  showToast('Marked "No Audit Required". Tap Save to close this batch.');
+}
+window.declineAudit = declineAudit;
+
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot)           {showToast(t('err_select_plot'));return;}
   if(!batch)          {showToast(t('err_batch'));return;}
-  if(!formState.ulat) {showToast(t('err_pest'));return;}
-  if(!formState.tikus){showToast(t('err_animal'));return;}
-  if(!formState.bintik){showToast(t('err_disease'));return;}
-  if(!formState.warna){showToast(t('err_leaf'));return;}
-  if(!formState.photo1||!formState.photo2){
-    const note=document.getElementById('photo-req-note');
-    if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
-    showToast(t('photo_both_req'));return;
+  // "No Audit Required" bypasses the four measurement + two-photo
+  // requirements — the whole point is that the auditor is closing out
+  // a batch without checking it. All four fields carry NO_AUDIT_SENTINEL,
+  // set by declineAudit(). Everything else on the payload (audit_id,
+  // date, auditor_name) is captured the same way as a normal save.
+  const declined = formState.ulat === NO_AUDIT_SENTINEL
+                && formState.warna === NO_AUDIT_SENTINEL;
+  if (!declined) {
+    if(!formState.ulat) {showToast(t('err_pest'));return;}
+    if(!formState.tikus){showToast(t('err_animal'));return;}
+    if(!formState.bintik){showToast(t('err_disease'));return;}
+    if(!formState.warna){showToast(t('err_leaf'));return;}
+    if(!formState.photo1||!formState.photo2){
+      const note=document.getElementById('photo-req-note');
+      if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
+      showToast(t('photo_both_req'));return;
+    }
   }
   setLoading(true);
   try{
