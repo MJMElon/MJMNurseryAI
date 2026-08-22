@@ -10,7 +10,7 @@
    THAT phone, the office cannot see a plot's activity at all, and a lost
    or wiped phone takes its year of records with it.
 
-   These are the tables that fix it. Prefix palms_, the same way the
+   These are the tables that fix it. Prefix fcportal_palms_, the same way the
    maintenance module uses nops_maint_.
 
    ── READ THIS BEFORE RUNNING ──
@@ -31,7 +31,7 @@
 
    client_uid is minted on the phone before the row is sent, so a record
    made with no signal and sent later cannot be saved twice. */
-CREATE TABLE IF NOT EXISTS palms_plot_logs (
+CREATE TABLE IF NOT EXISTS fcportal_palms_plot_logs (
   id           BIGSERIAL PRIMARY KEY,
   client_uid   TEXT UNIQUE,                    -- the phone's own id for this entry
   nursery_name TEXT,                           -- BNN / UNN1 / UNN2
@@ -45,16 +45,16 @@ CREATE TABLE IF NOT EXISTS palms_plot_logs (
   created_at   TIMESTAMPTZ DEFAULT now(),
   updated_at   TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS palms_plot_logs_plot_idx ON palms_plot_logs (plot_name, start_date DESC);
+CREATE INDEX IF NOT EXISTS fcportal_palms_plot_logs_plot_idx ON fcportal_palms_plot_logs (plot_name, start_date DESC);
 -- "what is running right now" is the question every screen opens with.
-CREATE INDEX IF NOT EXISTS palms_plot_logs_open_idx ON palms_plot_logs (plot_name) WHERE end_date IS NULL;
+CREATE INDEX IF NOT EXISTS fcportal_palms_plot_logs_open_idx ON fcportal_palms_plot_logs (plot_name) WHERE end_date IS NULL;
 
 
 /* ── 2. THE DAILY REPORT ────────────────────────────────────────────────
    What was keyed in on a given day, so "show me 3 August" is an exact
    answer rather than one reconstructed from the log. One row per unit per
    day: saving a nursery twice is a correction, not a second report. */
-CREATE TABLE IF NOT EXISTS palms_history (
+CREATE TABLE IF NOT EXISTS fcportal_palms_history (
   id          BIGSERIAL PRIMARY KEY,
   unit_key    TEXT        NOT NULL,            -- the plot or unit the row is about
   at_date     DATE        NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS palms_history (
   updated_at  TIMESTAMPTZ DEFAULT now(),
   UNIQUE (unit_key, at_date)
 );
-CREATE INDEX IF NOT EXISTS palms_history_date_idx ON palms_history (at_date DESC);
+CREATE INDEX IF NOT EXISTS fcportal_palms_history_date_idx ON fcportal_palms_history (at_date DESC);
 
 
 /* ── 3. REQUESTS FOR THE AUDITOR ────────────────────────────────────────
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS palms_history_date_idx ON palms_history (at_date DESC
 
    One per plot per destination per day, matching the rule the app already
    enforces so a double tap does not queue the auditor up twice. */
-CREATE TABLE IF NOT EXISTS palms_requests (
+CREATE TABLE IF NOT EXISTS fcportal_palms_requests (
   id           BIGSERIAL PRIMARY KEY,
   client_uid   TEXT UNIQUE,
   plot_name    TEXT        NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS palms_requests (
   created_at   TIMESTAMPTZ DEFAULT now(),
   UNIQUE (plot_name, send_to, at_date)
 );
-CREATE INDEX IF NOT EXISTS palms_requests_open_idx ON palms_requests (send_to, status, at_date DESC);
+CREATE INDEX IF NOT EXISTS fcportal_palms_requests_open_idx ON fcportal_palms_requests (send_to, status, at_date DESC);
 
 
 /* ── 4. THE CULLING CALCULATOR ──────────────────────────────────────────
@@ -98,7 +98,7 @@ CREATE INDEX IF NOT EXISTS palms_requests_open_idx ON palms_requests (send_to, s
    before anything is raised from them. Kept as its own payload per
    nursery, which is how the office already keeps its schedules
    (nops_maint_state.payload). */
-CREATE TABLE IF NOT EXISTS palms_culling (
+CREATE TABLE IF NOT EXISTS fcportal_palms_culling (
   id           BIGSERIAL PRIMARY KEY,
   nursery_name TEXT        NOT NULL,
   session_date DATE        NOT NULL,
@@ -113,12 +113,12 @@ CREATE TABLE IF NOT EXISTS palms_culling (
    Plot layout, attention thresholds and incentive rules. One row: these
    are the nursery's rules, not a person's preference, and everybody should
    be reading the same ones. */
-CREATE TABLE IF NOT EXISTS palms_settings (
+CREATE TABLE IF NOT EXISTS fcportal_palms_settings (
   id         SMALLINT PRIMARY KEY DEFAULT 1,
   payload    JSONB    NOT NULL DEFAULT '{}',
   updated_by TEXT,
   updated_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT palms_settings_one_row CHECK (id = 1)
+  CONSTRAINT fcportal_palms_settings_one_row CHECK (id = 1)
 );
 
 
@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS palms_settings (
 DO $$
 DECLARE tbl TEXT;
 BEGIN
-  FOREACH tbl IN ARRAY ARRAY['palms_plot_logs','palms_history','palms_requests',
-                             'palms_culling','palms_settings']
+  FOREACH tbl IN ARRAY ARRAY['fcportal_palms_plot_logs','fcportal_palms_history','fcportal_palms_requests',
+                             'fcportal_palms_culling','fcportal_palms_settings']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
     IF NOT EXISTS (SELECT 1 FROM pg_policies
@@ -157,13 +157,13 @@ SELECT c.relname AS table_name,
         WHERE p.schemaname = 'public' AND p.tablename = c.relname) AS policies
 FROM   pg_class c
 JOIN   pg_namespace n ON n.oid = c.relnamespace
-WHERE  n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'palms\_%'
+WHERE  n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'fcportal\_palms\_%'
 ORDER  BY c.relname;
 
 
 /* ── TO UNDO ──
    These are new tables holding nothing until the app writes to them.
 
-       DROP TABLE IF EXISTS palms_plot_logs, palms_history, palms_requests,
-                            palms_culling, palms_settings;
+       DROP TABLE IF EXISTS fcportal_palms_plot_logs, fcportal_palms_history, fcportal_palms_requests,
+                            fcportal_palms_culling, fcportal_palms_settings;
 */
