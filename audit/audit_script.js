@@ -22,6 +22,11 @@ let records=[], activeTab='PN', activeView='list';
 // gets one placeholder dot so the icon is not blank on a plot that has
 // not been keyed in yet.
 let plotBatches=[];
+// Per-(plot,batch) current balance from shared_plot_batch_balance — the
+// same figure the Operation Movement Report shows. Populated in
+// loadRecords, keyed 'PLOT|BATCH'. Missing key OR value ≤ 0 means the
+// batch is out (culled, sold or moved on) and audit is Not Required.
+let balanceByPB = {};
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formState={nursery:'PN',ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
 let toastTimer=null;
@@ -89,7 +94,7 @@ async function loadRecords(){
     // locked for auditor accounts; audit_batches is the Nursery-AI-sync
     // snapshot that every auditor can already read. We merge both so the
     // grid populates from whichever answers.
-    const [aRows, tRows, abRows, bMetaRows] = await Promise.all([
+    const [aRows, tRows, abRows, bMetaRows, balRows] = await Promise.all([
       sb.select('audit_plot_audits', 'select=*'),
       sb.select('shared_inventory_logs',
                 'select=batch_name,plot_name,transaction_type,breed_name'
@@ -98,7 +103,13 @@ async function loadRecords(){
       sb.select('audit_batches', 'select=nursery,plot,batch_no,breed')
         .catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; }),
       sb.select('operation_batches', 'select=name,breed_name')
-        .catch(e => { console.warn('[plot-audit] operation_batches load failed:', e); return []; })
+        .catch(e => { console.warn('[plot-audit] operation_batches load failed:', e); return []; }),
+      // Current plot·batch standing balance — same figure the movement
+      // report shows. Missing key OR value ≤ 0 → batch is out, audit is
+      // Not Required. Fail-open on any error so the grid keeps working;
+      // without balance data every batch is treated as still standing.
+      sb.select('shared_plot_batch_balance', 'select=plot_name,batch_name,qty')
+        .catch(e => { console.warn('[plot-audit] shared_plot_batch_balance load failed:', e); return []; })
     ]);
     records = aRows.map(r => ({
       uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
@@ -138,11 +149,24 @@ async function loadRecords(){
       const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
       addBatch(nursery, plot, batch, r.breed);
     });
+    // Build the balance lookup. Plot / batch keys are upper-cased, since
+    // the view keeps them in their original spelling and audit_batches
+    // and logs both cased. The 'not required' rule fires on missing key
+    // OR value ≤ 0 (see batchesOnPlot()).
+    balanceByPB = {};
+    (balRows || []).forEach(r => {
+      const plot  = String(r.plot_name || '').trim().toUpperCase();
+      const batch = String(r.batch_name || '').trim();
+      if (!plot || !batch) return;
+      balanceByPB[plot + '|' + batch] = Number(r.qty || 0);
+    });
+
     console.log('[plot-audit] loaded', {
       audits: records.length,
       fromLogs: (tRows || []).length,
       fromAuditBatches: (abRows || []).length,
-      totalPlotBatches: plotBatches.length
+      totalPlotBatches: plotBatches.length,
+      balanceRows: (balRows || []).length
     });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
@@ -150,6 +174,22 @@ async function loadRecords(){
 }
 
 /* --- RENDER LIST --- */
+/* Not-required = the operation ledger says nothing is standing in
+   this (plot, batch) right now. Balance ≤ 0 counts (culled, sold,
+   moved on, or over-issued); a batch not present in the balance map
+   at all also counts, since the view drops zero-balance rows.
+
+   When we don't have any balance data at all (view unreadable /
+   Supabase blip), fall CLOSED to 'required' so we never accidentally
+   mark a real batch as done — the auditor can decide by eye. */
+function isBatchNotRequired(plot, batch){
+  if (!Object.keys(balanceByPB).length) return false;   // no data → don't skip
+  const key = String(plot || '').toUpperCase() + '|' + String(batch || '').trim();
+  const qty = balanceByPB[key];
+  return qty === undefined || qty <= 0;
+}
+window.isBatchNotRequired = isBatchNotRequired;
+
 /* Batches on a specific plot in the current nursery, deduped by batch
    number (audit_batches occasionally carries two rows for the same batch
    during transplant windows). Also folds in any batches the plot has an
@@ -184,10 +224,18 @@ function isBatchAudited(plot, batch){
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   const plots=NURSERY_PLOTS[activeTab]||[];
+  // A plot is "done" when every REQUIRED batch on it has an audit.
+  // Batches the operation ledger says are out (balance ≤ 0) are
+  // Not-Required and don't block the plot's done state — same rule
+  // that hides their row in the plot detail. If a plot has NO
+  // required batches at all (all sold out already), it doesn't count
+  // toward "done" (we can't credit an audit that never had to happen).
   const donePlots = plots.filter(p => {
     const bs = batchesOnPlot(p);
     if (!bs.length) return false;                    // no data → never "done"
-    return bs.every(b => isBatchAudited(p, b.batch));
+    const required = bs.filter(b => !isBatchNotRequired(p, b.batch));
+    if (!required.length) return false;              // all out — nothing to audit
+    return required.every(b => isBatchAudited(p, b.batch));
   }).length;
   document.getElementById('list-count').textContent =
     donePlots + ' / ' + plots.length + ' done';
@@ -207,12 +255,17 @@ function renderList(){
   }
   grid.innerHTML = plots.map(p => {
     const bs = batchesOnPlot(p);
-    // No batches on file yet → one placeholder dot so the icon isn't
-    // blank; the plot can't reach "done" until a batch is registered.
-    const dotSpecs = bs.length
-      ? bs.map(b => ({ batch: b.batch, done: isBatchAudited(p, b.batch) }))
+    // Dots only appear for REQUIRED batches — the operation ledger's
+    // Not-Required rows are hidden from the icon so an amber dot never
+    // shows for a batch nobody has to audit. When a plot has no
+    // required batches at all, we still render one placeholder amber
+    // dot so the icon isn't visually blank on a plot the user might
+    // want to open (e.g. to add an ad-hoc audit).
+    const required = bs.filter(b => !isBatchNotRequired(p, b.batch));
+    const dotSpecs = required.length
+      ? required.map(b => ({ batch: b.batch, done: isBatchAudited(p, b.batch) }))
       : [{ batch: '', done: false }];
-    const allDone = bs.length && dotSpecs.every(d => d.done);
+    const allDone = required.length && dotSpecs.every(d => d.done);
     const dotsHtml = dotSpecs.map(d =>
       '<span class="plot-dot' + (d.done ? ' done' : '') + '"></span>').join('');
     return `
@@ -262,7 +315,16 @@ function openPlotDetail(plot){
     const audit = records.find(r => r.nursery === activeTab && r.plot === plot &&
                               String(r.batch || '').trim() === b.batch);
     const done = !!audit;
-    const rowStyle = done ? 'border-left:4px solid #22a34a' : 'border-left:4px solid #f4c94a';
+    // The operation ledger's Plot·Batch Balance says nothing is standing
+    // here — culled, sold or moved on. No audit needed. Skip Not-
+    // Required if an audit ALREADY exists on this batch (don't hide
+    // the auditor's work just because the batch was sold off later).
+    const notReq = !done && isBatchNotRequired(plot, b.batch);
+    const rowStyle = done
+      ? 'border-left:4px solid #22a34a'
+      : notReq
+        ? 'border-left:4px solid #cbd5e1;opacity:.72'
+        : 'border-left:4px solid #f4c94a';
     const thumbHtml = done && audit.photo
       ? `<img class="record-thumb" src="${audit.photo}" alt="Batch ${b.batch}" onclick="event.stopPropagation();openLightbox('${audit.photo}')"/>`
       : `<div class="record-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`;
@@ -271,7 +333,9 @@ function openPlotDetail(plot){
       : '';
     const metaHtml = done
       ? `${audit.id || ''}${audit.createdAt ? ' · ' + fmtDT(audit.createdAt) : ''}`
-      : 'Pending';
+      : notReq
+        ? '<span style="color:#94a3b8;font-weight:600">✕ Not Required</span> · balance ≤ 0 in operation ledger'
+        : 'Pending';
     const chipsHtml = done ? `
       <div class="record-chips">
         <span class="mini-chip ${chipClass(audit.ulat)}">Pest:${audit.ulat}</span>
@@ -289,24 +353,32 @@ function openPlotDetail(plot){
         + '</div>'
       : '';
     // Whole-row click opens the right form: pending → new audit for this
-    // batch (Audit Now button is no longer needed); audited → edit that
-    // audit. On audited rows the icon buttons live inside their own
-    // stopPropagation wrapper so tapping edit/delete doesn't double-fire.
+    // batch; audited → edit that audit. Not-Required rows are DEAD
+    // targets — no action, no keyboard activation — so a tap doesn't
+    // trigger an audit that wasn't asked for. The auditor can still
+    // manually add one via the FAB if they want.
     const rowClick = done
       ? `openEdit('${audit.uid}')`
-      : `_openFormForPlot('${plot}','${b.batch}')`;
-    const rowLabel = done ? 'Edit audit for batch ' + b.batch : 'Audit batch ' + b.batch;
-    return `<div class="record-item" role="button" tabindex="0"
-                 aria-label="${rowLabel}" style="${rowStyle}"
-                 onclick="${rowClick}"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${rowClick};}">
+      : notReq
+        ? ''
+        : `_openFormForPlot('${plot}','${b.batch}')`;
+    const rowLabel = done
+      ? 'Edit audit for batch ' + b.batch
+      : notReq
+        ? 'Batch ' + b.batch + ' — audit not required (operation ledger balance ≤ 0)'
+        : 'Audit batch ' + b.batch;
+    const rowAttrs = notReq
+      // no role=button, no tabindex, no click — the row is inert.
+      ? `aria-label="${rowLabel}" style="${rowStyle}"`
+      : `role="button" tabindex="0" aria-label="${rowLabel}" style="${rowStyle}" onclick="${rowClick}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${rowClick};}"`;
+    return `<div class="record-item" ${rowAttrs}>
       ${thumbHtml}
       <div class="record-info">
         <div class="record-plot">Batch ${b.batch}${breedHtml}</div>
         <div class="record-meta">${metaHtml}</div>
         ${chipsHtml}
       </div>
-      ${actionsHtml}
+      ${notReq ? '' : actionsHtml}
     </div>`;
   }).join('');
   setView('plot');
