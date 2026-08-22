@@ -1,7 +1,12 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-22g */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
-   papan_script.js — auto-linked from Nursery AI batches table
+   papan_script.js — auto-linked from Nursery AI batches table PLUS
+   this month's operation-ledger transplant/planted events. When the
+   operation module logs a Planted (PN) or Transplanted* (MN) event
+   for a plot, that (plot, batch) shows up in the papan list on the
+   matching nursery tab so the signage can be checked while the
+   plants are still visibly "new".
 ================================================================ */
 'use strict';
 
@@ -47,14 +52,47 @@ function fmtDate(iso){
   const s=iso.split('T')[0].split('-');
   return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
 }
+/* First day of this calendar month as YYYY-MM-01 — the window for
+   auto-detecting new transplant/planted events from the operation
+   ledger. Papan tanda gets checked on newly-placed plants, so
+   "this month" is the natural window. */
+function _startOfThisMonthISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+}
+/* Canonical plot code — the papan grid uses the padded form ('B01'),
+   the operation ledger keeps the unpadded form ('B1'). Same helper
+   the Plot Condition and Height audits use. Preserves the '-R'
+   reserve suffix. */
+function _canonicalPlot(raw){
+  const s = String(raw||'').trim().toUpperCase();
+  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  if(!m) return s;
+  return m[1] + m[2].padStart(2,'0') + (m[3]||'');
+}
+/* Reverse lookup keyed by both padded and unpadded plot codes so a raw
+   log spelling resolves without a canonicalise-then-lookup two-step. */
+const PLOT_TO_NURSERY_P = (function(){
+  const m = {};
+  Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => {
+    m[p] = n;
+    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+    if(stripped !== p) m[stripped] = n;
+  }));
+  return m;
+})();
 
-/* Get latest batch per plot based on date_transplant */
+/* Latest batch per plot. PN batches often have no date_transplant (they
+   sit in the pre-nursery until they get moved), so fall back to
+   date_planted before either — otherwise every PN plot compares '' >= ''
+   and the first-seen row wins arbitrarily. Ties still fall through to
+   whichever we iterated first, which matches the previous behaviour. */
 function getLatestBatchPerPlot(){
   const map={};
-  batches.forEach(b=>{
-    const key=b.nursery+'_'+b.plot;
-    if(!map[key]||(b.dateTransplant||'')>=(map[key].dateTransplant||''))
-      map[key]=b;
+  const dateOf = b => b.dateTransplant || b.datePlanted || '';
+  batches.forEach(b => {
+    const key = b.nursery + '_' + b.plot;
+    if(!map[key] || dateOf(b) >= dateOf(map[key])) map[key] = b;
   });
   return Object.values(map);
 }
@@ -181,18 +219,39 @@ function updateStats(){
 }
 
 /* ================================================================
-   LOAD — reads from existing Nursery AI batches table + papan_audits
+   LOAD — reads existing manual batches (audit_batches) + this month's
+   auto-detected plot·batch pairs from the operation ledger
+   (shared_inventory_logs). PN scope pulls Planted events, MN scope
+   pulls Transplanted* events. Log-derived batches carry a synthetic
+   uid ('LOG:NURSERY|PLOT|BATCH'); saveAudit() materialises a real
+   audit_batches row on first save so the audit's batch_ref FK
+   resolves. If the same (nursery, plot, batch) is already keyed in
+   manually, the audit_batches row wins — we don't duplicate.
 ================================================================ */
 async function loadAll(){
   setLoading(true);
   try{
-    const [bRows,aRows]=await Promise.all([
+    const monthStart = _startOfThisMonthISO();
+    // Filter logs server-side to this month + the four life-stage events
+    // that put a new batch onto a plot. transaction_date is the real
+    // event date when set; the created_at fallback keeps rows written
+    // before the transaction_date backfill visible.
+    const logQuery =
+        'select=plot_name,batch_name,transaction_type,breed_name,transaction_date,created_at'
+      + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)'
+      + '&or=(transaction_date.gte.' + monthStart + ',and(transaction_date.is.null,created_at.gte.' + monthStart + '))'
+      + '&order=id.desc';
+
+    const [bRows, aRows, lRows] = await Promise.all([
       sb.select('audit_batches','select=*'),
-      sb.select('audit_papan_audits','select=*')
+      sb.select('audit_papan_audits','select=*'),
+      sb.select('shared_inventory_logs', logQuery)
+        .catch(e => { console.warn('[papan] shared_inventory_logs load failed:', e); return []; })
     ]);
 
-    // Map batches from Nursery AI
-    batches=bRows.map(r=>({
+    // Map batches from Nursery AI (manual entries — the source of truth
+    // when both tables carry the same plot·batch).
+    batches = bRows.map(r => ({
       uid:           String(r.id),
       id:            r.batch_id||String(r.id),
       nursery:       r.nursery||'',
@@ -203,8 +262,47 @@ async function loadAll(){
       datePlanted:   r.date_planted||'',
       dateTransplant:r.date_transplant||'',
       dateMature:    r.date_mature||'',
-      createdAt:     r.created_at
+      createdAt:     r.created_at,
+      _source:       'manual'
     }));
+
+    // Auto-detected batches from the operation ledger. Dedupe against
+    // audit_batches on (canonical plot, batch) — a manual row for the
+    // same batch always wins. Within the log itself, the ".desc" order
+    // and this seen-set keep only the first (most recent) occurrence,
+    // so a Transplanted + Transplanted_Premium pair on one plot only
+    // produces one card.
+    const manualKeys = new Set(batches.map(b =>
+      (b.nursery||'') + '|' + _canonicalPlot(b.plot) + '|' + (b.batch||'').trim()));
+    const seenLogKeys = new Set();
+    (lRows||[]).forEach(l => {
+      const plot = _canonicalPlot(l.plot_name);
+      const batch = String(l.batch_name||'').trim();
+      const nursery = plot ? PLOT_TO_NURSERY_P[plot] : null;
+      if(!nursery || !plot || !batch) return;
+      const key = nursery + '|' + plot + '|' + batch;
+      if(manualKeys.has(key) || seenLogKeys.has(key)) return;
+      seenLogKeys.add(key);
+      // PN gets Planted → datePlanted; everything else is a Transplanted*
+      // event → dateTransplant. Only one date is ever set on a log-derived
+      // card because the log carries only one event at a time.
+      const evDate = l.transaction_date || (l.created_at ? l.created_at.split('T')[0] : '');
+      const isPlanted = l.transaction_type === 'Planted';
+      batches.push({
+        uid:           'LOG:' + key,          // synthetic — materialised on save
+        id:            'LOG-' + nursery + '-' + plot + '-' + batch,
+        nursery,
+        plot,
+        batch,
+        breed:         l.breed_name || '',
+        qtyTransplant: '',
+        datePlanted:   isPlanted ? evDate : '',
+        dateTransplant: isPlanted ? '' : evDate,
+        dateMature:    '',
+        createdAt:     l.created_at || null,
+        _source:       'log'
+      });
+    });
 
     // Map papan audits — batch_ref = batches.id
     audits=aRows.map(r=>({
@@ -287,10 +385,16 @@ function renderAuditList(){
   const latest=getLatestBatchPerPlot().filter(b=>b.nursery===activeNursery);
 
   if(!latest.length){
+    // Empty state is now scope-aware: PN watches Planted events, MN
+    // watches Transplanted*. If the operation ledger recorded nothing
+    // this month for the active nursery, that's the honest reason
+    // there's nothing to audit — say so instead of pointing at the
+    // manual Batch Info tab.
+    const evName = activeNursery === 'PN' ? 'Planted' : 'Transplanted';
     listEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
-      <h3>No plots to audit</h3>
-      <p>Add batch records in the <strong>Batch Info</strong> tab first.</p>
+      <h3>No new plots this month</h3>
+      <p>No ${evName} events recorded on ${NURSERY_LABELS[activeNursery]} this month. Newly-placed batches appear here automatically, or add one manually in <strong>Batch Info</strong>.</p>
     </div>`;
     if(compSection)compSection.style.display='none';
     return;
@@ -300,7 +404,10 @@ function renderAuditList(){
   const pending=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))==='pending');
   const audited=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))!=='pending');
 
-  document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'');
+  // Header count carries the "this month" context so it's clear which
+  // window the pending count is against; the log auto-adds anything new,
+  // so the number reflects today, not everything ever keyed.
+  document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'')+' · this month';
 
   /* opts.canView  — may open the read-only detail of a finished audit
      opts.canAudit — may start or redo an audit
@@ -328,11 +435,23 @@ function renderAuditList(){
     if(!audit && o.canAudit)
       btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>`);
     const actions=btns.length?`<div class="audit-item-actions">${btns.join('')}</div>`:'';
+    // Event date: use whichever the batch actually carries. PN batches
+    // detected from the log have a Planted date instead of a transplant
+    // date; log-detected MN batches have a transplant date. Manual
+    // entries usually carry both.
+    const evDate = b.dateTransplant || b.datePlanted || '';
+    const evLabel = b.dateTransplant ? '' : (b.datePlanted ? ' (planted)' : '');
+    // Log-detected cards get a compact chip so it's obvious the record
+    // came from the operation ledger, not a manually keyed batch.
+    const sourceChip = (b._source === 'log')
+      ? `<span class="audit-nursery-tag" style="background:#eef7f0;color:#0f5527;border:1px solid #a7d5b0" title="Auto-detected from Operation ledger">✨ Auto</span>`
+      : '';
     return `<div class="audit-item status-${status}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
+        ${sourceChip}
         <span class="audit-status-badge ${statusBadgeClass(status)}">${statusLabel(status)}</span>
-        <span class="audit-item-date">${fmtDate(b.dateTransplant)}</span>
+        <span class="audit-item-date">${fmtDate(evDate)}${evLabel}</span>
       </div>
       <div class="audit-plot">${b.plot}</div>
       <div class="audit-batch">Batch: ${b.batch}${b.breed?' · '+b.breed:''}${b.qtyTransplant?' · Qty: '+b.qtyTransplant:''}</div>
@@ -615,8 +734,31 @@ async function saveAudit(){
   const b=batches.find(x=>x.uid===auditFormBatchUid);if(!b)return;
   setLoading(true);
   try{
+    // audit_papan_audits.batch_ref is an integer FK into audit_batches.
+    // Log-detected batches don't have a row there yet — materialise one
+    // now so the FK resolves. Everything we know about the batch comes
+    // straight from the operation ledger; qty_transplant is left null
+    // (the log doesn't carry it here) and date_planted / date_transplant
+    // are set per the event that surfaced it.
+    let realBatchUid = auditFormBatchUid;
+    if (b._source === 'log' || String(b.uid).startsWith('LOG:')) {
+      const materialised = await sb.insert('audit_batches', {
+        batch_id:       'BTH-' + b.nursery + '-' + b.batch + '-' + b.plot,
+        nursery:        b.nursery,
+        plot:           b.plot,
+        batch_no:       b.batch,
+        breed:          b.breed || null,
+        qty_transplant: null,
+        date_planted:   b.datePlanted || null,
+        date_transplant:b.dateTransplant || null,
+        date_mature:    b.dateMature || null
+      });
+      const newRow = Array.isArray(materialised) ? materialised[0] : materialised;
+      if (!newRow || newRow.id == null) throw new Error('audit_batches insert returned no id');
+      realBatchUid = String(newRow.id);
+    }
     const payload={
-      batch_ref:parseInt(auditFormBatchUid),
+      batch_ref:parseInt(realBatchUid),
       nursery:b.nursery,plot:b.plot,batch_no:b.batch,
       presence:formState.presence,info_correct:formState.infoCorrect,
       condition:formState.condition,remarks:null,
