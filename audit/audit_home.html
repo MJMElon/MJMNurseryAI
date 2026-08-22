@@ -970,25 +970,29 @@ function loadAuditTodo(){
   /* ── Schedules ──
      Windows are day-of-month ranges. Which set applies is settled by the
      nursery chosen on the way in. */
+  /* titles are translation KEYS resolved at render time via t(o.title)
+     so a BM switch flips them without re-declaring the array. Same keys
+     the Audit Modules row uses so the wording stays in step across the
+     page. */
   const MN_SET = [
-    {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
+    {mod:'plot',   title:'home_plot',   href:'audit_plot_audit.html',
      windows:[[10,10],[20,20],[30,30]]},
-    {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
+    {mod:'height', title:'home_height', href:'audit_height_index.html',
      windows:[[1,5],[15,20]]},
-    {mod:'papan',  title:'Papan Tanda',     href:'audit_papan_index.html',
+    {mod:'papan',  title:'home_papan',  href:'audit_papan_index.html',
      windows:[[15,20]]}
   ];
   const PN_SET = [
-    {mod:'plot',   title:'Plot Condition',  href:'audit_plot_audit.html',
+    {mod:'plot',   title:'home_plot',   href:'audit_plot_audit.html',
      windows:[[20,25]]},
-    {mod:'height', title:'Seedling Height', href:'audit_height_index.html',
+    {mod:'height', title:'home_height', href:'audit_height_index.html',
      windows:[[20,25]]}
   ];
   /* No window at all — these are triggered by events, not by the calendar. */
   const ANYTIME = [];
-  if (showPN) ANYTIME.push({mod:'papan', title:'Papan Tanda',
+  if (showPN) ANYTIME.push({mod:'papan', title:'home_papan',
                             href:'audit_papan_index.html'});
-  ANYTIME.push({mod:'maint', title:'Maintenance Audit', href:'audit_maintenance_index.html', badge:'maint'});
+  ANYTIME.push({mod:'maint', title:'home_maintenance', href:'audit_maintenance_index.html', badge:'maint'});
 
   const SET = showMN ? MN_SET : showPN ? PN_SET : [];
 
@@ -1242,11 +1246,14 @@ function loadAuditTodo(){
        Overdue       → 'overdue'                      (window past, not done)
 
      Tapping the active tile with the SAME key clears the filter. */
+  /* Labels are translation KEYS, not strings — renderBuckets() runs
+     t(b.lbl) so the tiles update immediately on mjm-lang-changed
+     without re-declaring the array. */
   const BUCKETS = [
-    {k:'today',  lbl:"Today's Audit",  cls:'bkt-today', statuses:['due']},
-    {k:'sched',  lbl:'Scheduled',      cls:'bkt-sched', statuses:['soon','upcoming']},
-    {k:'all',    lbl:'All Audit',      cls:'bkt-all',   statuses:[]},        // empty = no filter
-    {k:'over',   lbl:'Overdue',        cls:'bkt-over',  statuses:['overdue']}
+    {k:'today',  lbl:'bucket_today',  cls:'bkt-today', statuses:['due']},
+    {k:'sched',  lbl:'bucket_sched',  cls:'bkt-sched', statuses:['soon','upcoming']},
+    {k:'all',    lbl:'bucket_all',    cls:'bkt-all',   statuses:[]},        // empty = no filter
+    {k:'over',   lbl:'bucket_over',   cls:'bkt-over',  statuses:['overdue']}
   ];
   const BUCKET_ICONS = {
     today: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
@@ -1272,7 +1279,7 @@ function loadAuditTodo(){
           <div class="bkt-ico"><svg viewBox="0 0 24 24">${BUCKET_ICONS[b.k]}</svg></div>
           <div class="bkt-n">${counts[b.k]}</div>
         </div>
-        <div class="bkt-lbl">${b.lbl}</div>
+        <div class="bkt-lbl">${t(b.lbl)}</div>
       </button>
     `).join('');
     box.querySelectorAll('.bkt').forEach(el => {
@@ -1332,7 +1339,7 @@ function loadAuditTodo(){
         <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
-            <div class="tl-ttl">${o.title}${
+            <div class="tl-ttl">${t(o.title)}${
               o.fromY !== undefined
                 ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
             <div class="tl-nurs">${
@@ -1371,7 +1378,7 @@ function loadAuditTodo(){
           <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
-              <div class="tl-ttl">${o.title}</div>
+              <div class="tl-ttl">${t(o.title)}</div>
               ${_chipsHtml(o, c.tone)}
             </div>
             <div class="tl-when">${
