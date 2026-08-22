@@ -9,10 +9,22 @@ const TASK_TYPES = ['Manuring','Weeding','Racun','Interrow Spray','Other'];
 
 let tasks=[], audits=[];
 let activeTab='audit', activeFilter='All', activeView='list';
-// The nursery filter mirrors Papan Tanda's — one of PN | BNN | UNN1 | UNN2
-// at any time. Deep-link from the auditor hub (?nursery=X) sets this too.
-let activeNursery='PN';
+// The nursery filter respects the scope chosen on audit_nursery_select:
+//   Pre Nursery scope → only PN
+//   Main Nursery scope → BNN, UNN1, UNN2
+// so a PN auditor never sees the three main-nursery tabs (and vice
+// versa). The active default is the first entry in that list.
 const NURSERY_LABELS={PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
+function _scopeNurseries(){
+  try {
+    var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
+    if (s === 'PN') return ['PN'];
+    if (s === 'MN') return ['BNN','UNN1','UNN2'];
+  } catch (e) {}
+  return ['PN','BNN','UNN1','UNN2'];        // scope unknown → show all
+}
+const SCOPE_NURSERIES = _scopeNurseries();
+let activeNursery = SCOPE_NURSERIES[0] || 'PN';
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formTaskId=null;
 let formState={result:null,remarks:'',photo:null};
@@ -423,13 +435,35 @@ function init(){
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
   selectTab('audit');setView('list');
+  // Hide the nursery buttons that fall outside the current scope
+  // (Pre Nursery = PN only; Main Nursery = BNN/UNN1/UNN2). The buttons
+  // are hard-coded so we filter the DOM in place rather than rebuilding
+  // it; the grid-template stretches the remaining ones to fill the row.
+  (function _applyScope(){
+    var row = document.querySelector('.nursery-filter-btn') && document.querySelector('.nursery-filter-btn').parentElement;
+    var kept = 0;
+    document.querySelectorAll('.nursery-filter-btn').forEach(function(b){
+      if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
+        b.style.display = 'none';
+        b.classList.remove('active');
+      } else { kept++; }
+    });
+    if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
+    // Fresh-active button that matches the scope-default activeNursery.
+    var d = document.querySelector('.nursery-filter-btn[data-n="'+activeNursery+'"]');
+    if (d) d.classList.add('active');
+    var label = document.getElementById('topbar-nursery');
+    if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
+  })();
   // Deep-link support: the auditor hub tags its nursery chips with
   // ?nursery=X&from=home. Set the active nursery BEFORE loadAll() so the
   // first render already respects the choice; &from=home swaps the
-  // top-bar back arrow into Choose-Another-Nursery.
+  // top-bar back arrow into Choose-Another-Nursery. The nursery param is
+  // ignored if it's outside the current scope (a PN auditor can't be
+  // routed to BNN by a hub tap that shouldn't have been offered).
   const _q = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
-  if (NURSERY_LABELS[_nq]) selectNursery(_nq);
+  if (NURSERY_LABELS[_nq] && SCOPE_NURSERIES.indexOf(_nq) !== -1) selectNursery(_nq);
   loadAll();
   if (_q.get('from') === 'home') {
     const back = document.querySelector('.top-bar-back');

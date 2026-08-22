@@ -314,13 +314,31 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',e=>{
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
+  // Scope-aware tab bar: hide the tabs outside the current scope so a
+  // PN auditor only sees PN and an MN auditor only sees BNN/UNN1/UNN2.
+  //   Pre Nursery scope → PN only
+  //   Main Nursery scope → BNN, UNN1, UNN2
+  const _SCOPE = (function(){
+    try {
+      var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
+      if (s === 'PN') return ['PN'];
+      if (s === 'MN') return ['BNN','UNN1','UNN2'];
+    } catch(e){}
+    return ['PN','BNN','UNN1','UNN2'];      // unknown scope → show all
+  })();
+  document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
+    if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
+  });
   // Deep-link support: ?nursery=BNN pre-selects that tab so the auditor
-  // hub can send the user straight to the right nursery. `?from=home` on
-  // top swaps the top-bar back arrow for a Choose-Another-Nursery button
-  // so they can pick another one without re-entering from the hub.
+  // hub can send the user straight to the right nursery. Falls back to
+  // the first in-scope tab if the URL param is outside the scope (a
+  // stray link the hub shouldn't have shown). `?from=home` on top swaps
+  // the top-bar back arrow for Choose-Another-Nursery.
   const _q  = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
-  const _startNursery = NURSERY_PLOTS[_nq] ? _nq : 'PN';
+  const _startNursery = (NURSERY_PLOTS[_nq] && _SCOPE.indexOf(_nq) !== -1)
+    ? _nq
+    : (_SCOPE[0] || 'PN');
   selectTab(_startNursery);
   if (_q.get('from') === 'home') {
     const back = document.querySelector('.top-bar-back');

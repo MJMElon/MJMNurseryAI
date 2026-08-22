@@ -16,7 +16,21 @@ const NURSERY_PLOTS = {
 
 
 let batches=[], audits=[];
-let activeNursery='PN';
+// The four nursery buttons are hard-coded in audit_papan_index.html but the
+// active one honours the scope chosen on audit_nursery_select.html:
+//   Pre Nursery scope → only PN
+//   Main Nursery scope → BNN, UNN1, UNN2
+// so a PN auditor never sees the three MN tabs, matching Maintenance Audit.
+function _scopeNurseriesPapan(){
+  try {
+    var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
+    if (s === 'PN') return ['PN'];
+    if (s === 'MN') return ['BNN','UNN1','UNN2'];
+  } catch (e) {}
+  return ['PN','BNN','UNN1','UNN2'];
+}
+const SCOPE_NURSERIES = _scopeNurseriesPapan();
+let activeNursery = SCOPE_NURSERIES[0] || 'PN';
 let activeTab='audit', activeView='list';
 let editMode=false, editId=null, detailId=null, deleteTarget=null, deleteType='audit';
 let auditFormBatchUid=null;
@@ -671,17 +685,35 @@ async function doDelete(){
 function init(){
   const d=document.getElementById('nav-today');if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))cancelDelete();});
-  selectTab('audit');setView('list');loadAll();
+  selectTab('audit');setView('list');
+  // Hide the nursery buttons that fall outside the current scope so a PN
+  // auditor never sees the three MN tabs (and vice versa). Runs before
+  // loadAll so the row is already sized correctly on first render.
+  (function _applyScope(){
+    var row = document.querySelector('.nursery-filter-btn') && document.querySelector('.nursery-filter-btn').parentElement;
+    var kept = 0;
+    document.querySelectorAll('.nursery-filter-btn').forEach(function(b){
+      if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
+        b.style.display = 'none';
+        b.classList.remove('active');
+      } else { kept++; }
+    });
+    if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
+    var d = document.querySelector('.nursery-filter-btn[data-n="'+activeNursery+'"]');
+    if (d) d.classList.add('active');
+    var label = document.getElementById('topbar-nursery');
+    if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
+  })();
+  loadAll();
   // Deep-link support — same contract as the other audit pages: the hub
   // sends ?nursery=X to pick the nursery filter, plus &from=home to
   // re-label the top-bar back arrow as Choose-Another-Nursery. Runs
-  // after loadAll queues so the filter button state settles first.
+  // after loadAll queues so the filter button state settles first, and
+  // ignores nurseries outside the current scope (a stray link from a
+  // hub that shouldn't have offered them).
   const _q  = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
-  if (NURSERY_PLOTS[_nq]) {
-    // The nursery buttons render inside loadAll → renderAll; wait a tick
-    // so the target element exists, then click it to reuse the same code
-    // path a manual tap uses (state + UI + counts stay in sync).
+  if (NURSERY_PLOTS[_nq] && SCOPE_NURSERIES.indexOf(_nq) !== -1) {
     setTimeout(() => {
       const btn = document.querySelector('.nursery-filter-btn[data-nursery="'+_nq+'"]')
                || document.querySelector('.nursery-filter-btn[data-n="'+_nq+'"]');
