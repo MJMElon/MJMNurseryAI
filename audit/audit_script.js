@@ -83,15 +83,20 @@ const PLOT_TO_NURSERY = (function(){
 async function loadRecords(){
   setLoading(true);
   try{
-    // Pull audit records + transplant logs + operation_batches (for breed
-    // fallback) in parallel. All three are fail-open — a Supabase blip
-    // shouldn't blank the grid.
-    const [aRows, tRows, bMetaRows] = await Promise.all([
+    // Pull audit records + two possible batch sources + operation_batches
+    // (for breed fallback) in parallel. Two sources because the operation
+    // ledger (shared_inventory_logs) is the freshest but might be RLS-
+    // locked for auditor accounts; audit_batches is the Nursery-AI-sync
+    // snapshot that every auditor can already read. We merge both so the
+    // grid populates from whichever answers.
+    const [aRows, tRows, abRows, bMetaRows] = await Promise.all([
       sb.select('audit_plot_audits', 'select=*'),
       sb.select('shared_inventory_logs',
                 'select=batch_name,plot_name,transaction_type,breed_name'
               + '&transaction_type=in.(Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
         .catch(e => { console.warn('[plot-audit] transplant logs load failed:', e); return []; }),
+      sb.select('audit_batches', 'select=nursery,plot,batch_no,breed')
+        .catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; }),
       sb.select('operation_batches', 'select=name,breed_name')
         .catch(e => { console.warn('[plot-audit] operation_batches load failed:', e); return []; })
     ]);
@@ -105,24 +110,39 @@ async function loadRecords(){
     const breedByBatch = {};
     (bMetaRows || []).forEach(b => { if (b && b.name) breedByBatch[b.name] = b.breed_name || ''; });
 
-    // Build (nursery, plot, batch) triples from every transplant log,
-    // deduped so the same batch on the same plot doesn't produce
-    // multiple dots (Transplanted + Transplanted_Premium for one plot).
+    // Build (nursery, plot, batch) triples from BOTH sources, deduped
+    // so the same batch on the same plot doesn't produce multiple dots
+    // (Transplanted + Transplanted_Premium for one plot, or the same
+    // row appearing in both sources).
     const seen = new Set();
     plotBatches = [];
-    (tRows || []).forEach(l => {
-      const plot  = l.plot_name;
-      const batch = String(l.batch_name || '').trim();
-      if (!plot || !batch) return;
-      const nursery = PLOT_TO_NURSERY[plot];
-      if (!nursery) return;                            // plot outside PN/BNN/UNN1/UNN2 → ignore
+    const addBatch = (nursery, plot, batch, breed) => {
+      if (!nursery || !plot || !batch) return;
       const key = nursery + '|' + plot + '|' + batch;
       if (seen.has(key)) return;
       seen.add(key);
-      plotBatches.push({
-        nursery, plot, batch,
-        breed: l.breed_name || breedByBatch[batch] || ''
-      });
+      plotBatches.push({ nursery, plot, batch, breed: breed || breedByBatch[batch] || '' });
+    };
+    (tRows || []).forEach(l => {
+      const plot  = l.plot_name;
+      const batch = String(l.batch_name || '').trim();
+      const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
+      addBatch(nursery, plot, batch, l.breed_name);
+    });
+    (abRows || []).forEach(r => {
+      // audit_batches carries `nursery` directly, but re-check via
+      // PLOT_TO_NURSERY so a stale nursery label can't sneak a plot
+      // into the wrong grid.
+      const plot = r.plot;
+      const batch = String(r.batch_no || '').trim();
+      const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
+      addBatch(nursery, plot, batch, r.breed);
+    });
+    console.log('[plot-audit] loaded', {
+      audits: records.length,
+      fromLogs: (tRows || []).length,
+      fromAuditBatches: (abRows || []).length,
+      totalPlotBatches: plotBatches.length
     });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
