@@ -80,9 +80,30 @@ function selectTab(nursery){
    PLOT_TO_NURSERY is a reverse lookup of NURSERY_PLOTS (plot code →
    nursery). Anything not in the four scoped lists is skipped so a stray
    plot name in the logs can't inflate the grid. */
+/* Canonical plot code — the audit's NURSERY_PLOTS uses padded form
+   ('B01', 'U09'), but the operation ledger and shared_plots store the
+   unpadded form ('B1', 'U9'). Left alone the two never matched and
+   every log was silently dropped from the grid. Preserves the '-R'
+   suffix used for reserve plots (e.g. 'B4-R'). */
+function _canonicalPlot(raw){
+  const s = String(raw || '').trim().toUpperCase();
+  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  if (!m) return s;
+  return m[1] + m[2].padStart(2, '0') + (m[3] || '');
+}
+/* PLOT_TO_NURSERY is a reverse lookup of NURSERY_PLOTS keyed by
+   BOTH the padded ('B01') and the unpadded ('B1') form, so lookups
+   from either source resolve without a canonicalise-then-lookup
+   two-step. */
 const PLOT_TO_NURSERY = (function(){
   const m = {};
-  Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => { m[p] = n; }));
+  Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => {
+    m[p] = n;
+    // Unpadded variant of the same plot (B01 → B1) also maps to the
+    // same nursery, so a raw log spelling matches without pre-work.
+    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+    if (stripped !== p) m[stripped] = n;
+  }));
   return m;
 })();
 async function loadRecords(){
@@ -112,7 +133,10 @@ async function loadRecords(){
         .catch(e => { console.warn('[plot-audit] shared_plot_batch_balance load failed:', e); return []; })
     ]);
     records = aRows.map(r => ({
-      uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
+      uid:String(r.id),id:r.audit_id,nursery:r.nursery,
+      // Canonicalise so records saved as 'B1' vs 'B01' still match the
+      // grid's padded form.
+      plot:_canonicalPlot(r.plot),
       batch:r.batch,ulat:r.pest,tikus:r.tikus,bintik:r.disease,
       warna:r.warna_daun,photo:r.photo_url,photo2:r.photo_2_url||null,
       date:r.date,createdAt:r.created_at
@@ -135,7 +159,9 @@ async function loadRecords(){
       plotBatches.push({ nursery, plot, batch, breed: breed || breedByBatch[batch] || '' });
     };
     (tRows || []).forEach(l => {
-      const plot  = l.plot_name;
+      // Canonicalise the plot as it comes off the ledger — logs use
+      // 'B1' but the audit grid iterates 'B01'.
+      const plot  = _canonicalPlot(l.plot_name);
       const batch = String(l.batch_name || '').trim();
       const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
       addBatch(nursery, plot, batch, l.breed_name);
@@ -144,7 +170,7 @@ async function loadRecords(){
       // audit_batches carries `nursery` directly, but re-check via
       // PLOT_TO_NURSERY so a stale nursery label can't sneak a plot
       // into the wrong grid.
-      const plot = r.plot;
+      const plot = _canonicalPlot(r.plot);
       const batch = String(r.batch_no || '').trim();
       const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
       addBatch(nursery, plot, batch, r.breed);
@@ -155,7 +181,9 @@ async function loadRecords(){
     // OR value ≤ 0 (see batchesOnPlot()).
     balanceByPB = {};
     (balRows || []).forEach(r => {
-      const plot  = String(r.plot_name || '').trim().toUpperCase();
+      // Same canonical form as the audit grid uses, so isBatchNotRequired
+      // matches without a second normalisation step.
+      const plot  = _canonicalPlot(r.plot_name);
       const batch = String(r.batch_name || '').trim();
       if (!plot || !batch) return;
       balanceByPB[plot + '|' + batch] = Number(r.qty || 0);
@@ -184,7 +212,7 @@ async function loadRecords(){
    mark a real batch as done — the auditor can decide by eye. */
 function isBatchNotRequired(plot, batch){
   if (!Object.keys(balanceByPB).length) return false;   // no data → don't skip
-  const key = String(plot || '').toUpperCase() + '|' + String(batch || '').trim();
+  const key = _canonicalPlot(plot) + '|' + String(batch || '').trim();
   const qty = balanceByPB[key];
   return qty === undefined || qty <= 0;
 }
