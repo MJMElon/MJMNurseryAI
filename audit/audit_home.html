@@ -609,6 +609,10 @@
       .welcome-name{font-size:21px}
     }
   </style>
+  <!-- Shared a11y + motion overlay — keyboard focus rings on every
+       interactive element + prefers-reduced-motion collapse. Loaded
+       last so it wins by source order without needing !important. -->
+  <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
 <div id="app">

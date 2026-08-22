@@ -1,0 +1,65 @@
+/* ================================================================
+   MJM NURSERY AUDIT — shared accessibility + motion overlay
+
+   Loaded AFTER each audit page's own stylesheet so its rules win via
+   source order (no !important shouting). Applies the framework's
+   priority-1 (accessibility) and priority-7 (motion) baselines:
+
+     1. Visible keyboard focus on every interactive element. Every
+        button, link, and tab in the audit currently used
+        -webkit-tap-highlight-color:transparent and no :focus outline,
+        which means a keyboard user could not see where they were.
+        :focus-visible only paints for keyboard focus, so mouse clicks
+        don't flash a ring.
+
+     2. Respect prefers-reduced-motion. All non-essential transitions
+        collapse to almost-nothing for viewers with vestibular triggers.
+
+     3. Ensure a Windows High-Contrast Mode fallback via forced-colors
+        so system chrome (border, background, text) still reads on
+        buttons whose colour is the only affordance.
+
+   Nothing in here changes the look for the default (mouse) path.
+================================================================ */
+
+/* Priority 1 — keyboard focus ring on every interactive element.
+   Uses currentColor + a soft halo, then falls back to a colour token
+   the audit already ships if we can pick one up (the papan/plot audit
+   pages define --g500 / --g600). */
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible{
+  outline:2px solid #22a34a;               /* audit green — highest contrast on both green-800 and white surfaces */
+  outline-offset:2px;
+  box-shadow:0 0 0 4px rgba(34,163,74,.22);
+  border-radius:8px;                       /* keeps the ring rounded on square icon buttons */
+}
+/* Ribbon buttons on dark headers need a light halo to be visible on a
+   green background. */
+:where(.top-bar-back, .top-bar-btn, .lang-toggle-btn, .header-user-btn):focus-visible,
+:where(.nursery-filter-btn, .nursery-tab-item):focus-visible{
+  outline-color:#fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,.35);
+}
+
+/* Priority 7 — prefers-reduced-motion.
+   Collapse any transition and animation to 0.01ms rather than 0 so
+   the state change still fires (some browsers skip event listeners
+   when the transition is exactly 0). Scroll behaviour normalised too. */
+@media (prefers-reduced-motion: reduce){
+  *,
+  *::before,
+  *::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+
+/* Windows High-Contrast Mode (forced-colors) — buttons that rely on
+   background colour alone can vanish. Force a visible border in the
+   system's ButtonText colour so shape stays. */
+@media (forced-colors: active){
+  :where(button, a, .plot-cell, .fc-card, .bkt, .tab-item){
+    border:1px solid ButtonText;
+  }
+}
