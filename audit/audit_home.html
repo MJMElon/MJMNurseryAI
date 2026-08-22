@@ -323,10 +323,69 @@
        Month strip, status filters, and a timeline of the windows that fall
        in the month you are looking at. ── */
     .sched{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
-           padding:16px 16px 8px;margin-bottom:22px}
-    .sched-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+           padding:18px 16px 8px;margin-bottom:22px}
+    /* The count and the calendar are one thing: what is owed, and when. They
+       read as two stacked boxes when the count sat above with its own space,
+       so the rule below joins them instead of separating them. */
+    .sched-top{display:flex;align-items:flex-start;gap:12px;padding-bottom:14px;
+               margin-bottom:14px;border-bottom:1px solid var(--fc-line)}
     .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
                   letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
+    /* ── HEADER ON A NARROW SCREEN ──
+       On a phone this band broke: "MJM Nursery" wrapped onto three lines,
+       "Audit System" onto two, and the user chip was pushed off the right
+       edge. The title was allowed to wrap while the buttons were allowed to
+       grow, so the row solved its overflow in the worst available way.
+
+       Same discipline as the shared ribbon: the title is the only thing that
+       gives, truncating rather than wrapping; the buttons keep their size;
+       and labels step aside before anything leaves the screen. */
+    .header-logo{min-width:0}
+    .header-logo>div{min-width:0}
+    .header-logo-text,.header-logo-sub{white-space:nowrap;overflow:hidden;
+                                       text-overflow:ellipsis}
+    .header-actions{flex-shrink:0}
+
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
+    @media (max-width:640px){
+      .header-top{height:54px;gap:8px}
+      .header-actions{gap:5px}
+      .header-logo{gap:8px}
+      .header-logo-icon{width:30px;height:30px;border-radius:8px}
+      .header-logo-icon svg{width:16px;height:16px}
+      .header-logo-text{font-size:13.5px}
+      .header-logo-sub{font-size:8px;letter-spacing:.8px}
+      /* Icon-only, the way the ribbon shows a bare back arrow. */
+      .hbtn{height:30px;padding:0 9px;font-size:11px}
+      .hbtn span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
+      .avatar{width:26px;height:26px;font-size:11px}
+      .user-chip{padding:4px}
+      .uname{display:none}
+      /* This page's buttons carry their own classes rather than .hbtn, and
+         the user chip is a third child of the row instead of sitting inside
+         the action group — so the rules above missed all of them and the
+         logo was crushed to 23px to make room. */
+      .back-to-portal{padding:0 9px!important;height:30px!important}
+      .back-to-portal span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 10px;font-size:11px}
+      .header-user-btn{margin-left:4px!important;padding:4px!important;flex-shrink:0}
+      .header-user-btn .user-name{display:none}
+      .header-user-btn .user-avatar{width:26px;height:26px;font-size:11px}
+    }
+
     /* ── NURSERY RIBBON ──
        A banner rather than a chip. Pre and main nursery run different
        schedules, so which one you are looking at is the single most
@@ -491,7 +550,21 @@
     .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
     .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
               padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
-    .tl-item.passed .tl-card{opacity:.55}
+    /* One chip per nursery the task covers, so a main-nursery row says which
+       of the three are done rather than hiding two behind the first. */
+    .tl-nurs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+    .nchip{font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 8px;
+           border-radius:20px;background:#fff;border:1.5px solid #d8e2ea;
+           color:var(--fc-ink3);white-space:nowrap}
+    .nchip.on{background:#dcfce7;border-color:#a7e0b5;color:#166534}
+
+    .count-big{font-size:26px;font-weight:800;color:#2d7a2d;letter-spacing:-.3px}
+    .count-note{font-size:12px;font-weight:700;color:var(--fc-ink3)}
+    .count-note.over{color:#b91c1c}
+
+    .tl-from{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+             padding:2px 7px;border-radius:20px;background:#fee2e2;color:#7f1d1d}
+    .tl-item.overdue .tl-card{border-left-width:6px}
     .tl-head{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
              color:var(--fc-ink3);margin:14px 0 8px}
     .tl-empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--fc-ink3)}
@@ -557,7 +630,7 @@
           <div class="header-logo-sub">Audit System</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+      <div class="header-actions" style="display:flex;align-items:center;gap:6px;margin-left:auto">
         <!-- Portal button removed here — the standardised ribbon above already
              provides it; keeping two would double up the same navigation. -->
         <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
@@ -847,35 +920,48 @@ function loadAuditTodo(){
      audit_nursery_select.html; anyone arriving without a choice is sent
      there rather than shown the wrong nursery's schedule. */
   const scope = MJMAuditLogin.scope();
-  if (!scope) { window.location.replace('audit_nursery_select.html'); }
+  /* Stop here rather than carrying on. Without the return this went on to
+     build the board and fire its queries while the browser was already
+     navigating away — work and REST calls thrown away on every visit. */
+  if (!scope) { window.location.replace('audit_nursery_select.html'); return; }
 
   const showPN = mayPN && scope === 'PN';
   const showMN = mayMN && scope === 'MN';
 
   /* Name the nursery on the screen itself, and offer the way to the other
      one — without which the choice made on the way in is a one-way door. */
-  (function paintRibbon(){
+  function paintRibbon(){
     const ttl = document.getElementById('ribbon-ttl');
     const rib = document.getElementById('ribbon');
     const sw  = document.getElementById('scope-switch');
     if (!ttl || !scope) return;
     const isPN = scope === 'PN';
-    ttl.textContent = isPN ? 'Pre Nursery' : 'Main Nursery';
+    ttl.textContent = t(isPN ? 'pre_nursery' : 'main_nursery');
     rib.style.setProperty('--rib', isPN ? '#1f7a3d' : '#1558a8');
     /* Only worth offering when there is somewhere else to go. */
     if (sw && allowed.length < 2) sw.style.visibility = 'hidden';
-  })();
+  }
+  paintRibbon();
+  document.addEventListener('mjm-lang-changed', paintRibbon);
 
   /* ── The month being looked at. Starts on this one. ── */
-  let viewY = year, viewM = month, selDay = null;
+  /* Today is selected from the start: the question this screen answers is
+     "what am I doing today", and an unselected strip answered "what happens
+     this month" instead. Paging to another month clears it. */
+  let viewY = year, viewM = month, selDay = day;
   /* First of the five days on screen. Kept inside the viewed month so the
      strip, the count line and the timeline all describe the same month. */
   let winStart = 1;
   const WIN = 5;
   const active = new Set();          // status filters; empty means show all
 
-  const MONTHS_FULL = ['January','February','March','April','May','June','July',
-                       'August','September','October','November','December'];
+  /* Built from the browser's own month names so they follow the language
+     rather than needing twelve more dictionary keys kept in step. */
+  const monthNames = (style) => Array.from({length:12}, (_, i) =>
+    new Date(2020, i, 1).toLocaleDateString(
+      (typeof currentLang !== 'undefined' && currentLang === 'ms') ? 'ms-MY' : 'en-MY',
+      {month: style}));
+  let MONTHS_FULL = monthNames('long');
   const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   /* ── Schedules ──
@@ -915,12 +1001,108 @@ function loadAuditTodo(){
     papan:  {tone:'#e65100', tint:'#fef1e3'},
     maint:  {tone:'#880e4f', tint:'#fdeaf1'}
   };
+  /* Labels are looked up when a row is drawn rather than fixed here, so a
+     language change redraws into the new one. */
   const STATUS = {
-    due:      {lbl:'Due Now',  emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
-    soon:     {lbl:'Soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
-    upcoming: {lbl:'Upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'},
-    passed:   {lbl:'Passed',   emoji:'✅', bg:'#e9edf1', fg:'#5b7280'}
+    overdue:  {key:'st_overdue',  emoji:'⚠️', bg:'#fee2e2', fg:'#7f1d1d'},
+    due:      {key:'st_due',      emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
+    soon:     {key:'st_soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
+    upcoming: {key:'st_upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'}
   };
+  const stLbl = k => (typeof t === 'function' ? t(STATUS[k].key) : STATUS[k].key);
+
+  /* ── HAS THIS WINDOW BEEN DONE? ────────────────────────────────────
+     A window is a task, not just a date range: it shows every day of the
+     window until somebody records the audit, disappears once they do, and
+     if the window closes with nothing recorded it does not quietly pass —
+     it turns overdue and keeps showing, into the following months, until
+     the work is done.
+
+     Which nurseries count towards it follows the nursery chosen on the way
+     in. Any one record inside the window marks it done; the main nursery is
+     not tracked per-plot here, so recording BNN closes the main-nursery
+     window for that month. Say if it should need all three.
+
+     Records are read once for a short lookback rather than per row, and
+     only the two columns this needs. If the read fails — offline, or the
+     session lapsed — everything is treated as not done, so the list shows
+     too much rather than hiding work somebody still owes. Audits recorded
+     offline and still queued are not visible to this either, for the same
+     reason: they count once they sync. */
+  /* ── WHERE THE SCHEDULE BEGINS ──
+     The audit schedule runs from September 2026. Months before it are not
+     part of it: they show no tasks, count for nothing, and never turn
+     overdue — the records from that period were kept differently and
+     dragging them in would open the list on a backlog nobody owes.
+
+     Month is zero-based, so 8 is September. Move this and everything —
+     the board, the counts, the carry-over — moves with it. */
+  let START_Y = 2026, START_M = 8;
+  /* Overridable as "YYYY-MM" so the behaviour around a live window — due
+     today, closing unfinished, carrying over — can be exercised without
+     waiting for the calendar to reach it. Also the lever to pull if the
+     schedule is ever backdated, rather than editing this file. */
+  try {
+    const o = /^(\d{4})-(\d{2})$/.exec(localStorage.getItem('mjm_schedule_start') || '');
+    if (o) { START_Y = +o[1]; START_M = +o[2] - 1; }
+  } catch (e) {}
+  const beforeStart = (y, m) => (y < START_Y) || (y === START_Y && m < START_M);
+
+  const LOOKBACK_MONTHS = 3;
+  const SCOPE_NURSERIES = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  /* How each nursery code is written on screen. Same spellings the plot audit
+     tabs and the monthly report use, so one place does not say "UNN1" while
+     another says "UNN 1". */
+  const NURSERY_LABELS = { PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2' };
+  const DONE_TABLE = {
+    plot:   'audit_plot_audits',
+    height: 'audit_height_records',
+    papan:  'audit_papan_audits'
+  };
+  /* Keyed by module → 'nursery|YYYY-MM-DD'. Tracking the nursery as well as
+     the day is what lets a main-nursery task say which of BNN, UNN 1 and
+     UNN 2 are done: recording one used to close the window for all three. */
+  let done = null;
+
+  const iso = (y,m,d) => y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+  async function loadCompletions(){
+    let from = new Date(year, month - LOOKBACK_MONTHS, 1);
+    if (beforeStart(from.getFullYear(), from.getMonth())) from = new Date(START_Y, START_M, 1);
+    const since = iso(from.getFullYear(), from.getMonth(), 1);
+    const next = { plot:new Set(), height:new Set(), papan:new Set() };
+    try {
+      await Promise.all(Object.keys(DONE_TABLE).map(async mod => {
+        const rows = await sb.select(DONE_TABLE[mod],
+          'select=date,nursery&date=gte.' + since);
+        (rows || []).forEach(r => {
+          if (r && r.date && SCOPE_NURSERIES.indexOf(r.nursery) !== -1)
+            next[mod].add(r.nursery + '|' + String(r.date).slice(0,10));
+        });
+      }));
+      done = next;
+    } catch (e) {
+      console.warn('Could not read what has been audited:', e);
+      done = null;                      // show everything rather than hide it
+    }
+  }
+
+  /* Which nurseries have been audited inside this window. */
+  function nurseryState(o, y, m){
+    return SCOPE_NURSERIES.map(n => {
+      let ok = false;
+      if (done && done[o.mod])
+        for (let d = o.start; d <= o.end && !ok; d++)
+          if (done[o.mod].has(n + '|' + iso(y, m, d))) ok = true;
+      return {nursery:n, done:ok};
+    });
+  }
+
+  /* A task is finished when every nursery it covers has been audited — not
+     when the first one has. */
+  function isDone(o, y, m){
+    return nurseryState(o, y, m).every(x => x.done);
+  }
 
   const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
 
@@ -928,6 +1110,7 @@ function loadAuditTodo(){
      A window is clamped to the last day of the month, so "the 30th" still
      lands in February instead of vanishing or reading as 30 February. */
   function occurrences(y, m){
+    if (beforeStart(y, m)) return [];
     const last = daysIn(y, m);
     const out = [];
     SET.forEach(sc => sc.windows.forEach(w => {
@@ -939,15 +1122,34 @@ function loadAuditTodo(){
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
   }
 
-  /* Where a window sits relative to today — which is only interesting in the
-     current month; past months are closed and future ones are all ahead. */
+  /* Where a window stands. 'done' is returned so callers can drop it from
+     the list; a closed window with nothing recorded is overdue, not passed. */
   function occStatus(o, y, m){
+    if (isDone(o, y, m)) return 'done';
     const t0 = new Date(year, month, day);
     const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
-    if (t0 > e0) return 'passed';
+    if (t0 > e0) return 'overdue';
     if (t0 >= s0) return 'due';
     const away = Math.round((s0 - t0) / 864e5);
     return away <= 3 ? 'soon' : 'upcoming';
+  }
+
+  /* Windows from earlier months that were never completed. They belong on
+     the current month's list — that is the whole point of overdue — and are
+     stamped with the month they were owed so nobody reads "20–25" as this
+     month's. Bounded by the same lookback as the records read. */
+  function carriedOverdue(){
+    const out = [];
+    for (let back = LOOKBACK_MONTHS; back >= 1; back--){
+      const d = new Date(year, month - back, 1);
+      const y = d.getFullYear(), m = d.getMonth();
+      if (beforeStart(y, m)) continue;
+      occurrences(y, m).forEach(o => {
+        if (occStatus(o, y, m) === 'overdue')
+          out.push(Object.assign({}, o, {fromY:y, fromM:m}));
+      });
+    }
+    return out;
   }
 
   function dateLabel(o, m){
@@ -972,7 +1174,8 @@ function loadAuditTodo(){
     if (!mon) return;
     mon.textContent = MONTHS_FULL[viewM] + ' ' + viewY;
 
-    const occ  = occurrences(viewY, viewM);
+    const occ  = occurrences(viewY, viewM)
+      .filter(o => occStatus(o, viewY, viewM) !== 'done');   // done days stop nagging
     const busy = new Set();
     occ.forEach(o => { for (let d = o.start; d <= o.end; d++) busy.add(d); });
 
@@ -1025,31 +1228,22 @@ function loadAuditTodo(){
     renderAll();
   }
 
-  /* ── Nurseries the current scope allows the auditor to open ──
-     PN scope → just [PN]. MN scope → [BNN, UNN1, UNN2]. Rendered inside
-     every timeline card as clickable chips, and used to build the
-     destination URL. */
-  const SCOPE_NURSERIES = showPN ? ['PN'] : ['BNN','UNN1','UNN2'];
-  const NURSERY_LBL = {PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2'};
-
   /* ── Bucket tiles ──
-     Four counters replace the old chip strip. `bucketFilter` is a Set
-     of *occ statuses* (the same values used by occStatus): a tile maps
-     to one or more statuses, and the timeline shows only those. Empty
-     Set = show all.
+     Four iOS-style buckets replace the old chip strip. Each tile maps
+     to one or more occStatus values; tapping seeds the legacy `active`
+     Set so the existing timeline filter code keeps working untouched.
 
-       Today's Audit → 'due'                (windows open on today)
-       Scheduled     → 'soon' | 'upcoming'   (still ahead of today)
+       Today's Audit → 'due'                          (windows open today)
+       Scheduled     → 'soon' | 'upcoming'            (still ahead of today)
        All Audit     → (empty set — no filter)
-       Overdue       → 'passed'              (window closed, no record)
+       Overdue       → 'overdue'                      (window past, not done)
 
-     Tapping the active tile clears the filter — same UX the chip row
-     used to have, just fewer targets and bigger. */
+     Tapping the active tile with the SAME key clears the filter. */
   const BUCKETS = [
     {k:'today',  lbl:"Today's Audit",  cls:'bkt-today', statuses:['due']},
     {k:'sched',  lbl:'Scheduled',      cls:'bkt-sched', statuses:['soon','upcoming']},
     {k:'all',    lbl:'All Audit',      cls:'bkt-all',   statuses:[]},        // empty = no filter
-    {k:'over',   lbl:'Overdue',        cls:'bkt-over',  statuses:['passed']}
+    {k:'over',   lbl:'Overdue',        cls:'bkt-over',  statuses:['overdue']}
   ];
   const BUCKET_ICONS = {
     today: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
@@ -1062,12 +1256,13 @@ function loadAuditTodo(){
   function renderBuckets(occ){
     const counts = {today:0, sched:0, over:0, all:occ.length};
     occ.forEach(o => {
-      const s = occStatus(o, viewY, viewM);
-      if (s === 'due')                          counts.today++;
+      const s = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      if (s === 'due')                           counts.today++;
       else if (s === 'soon' || s === 'upcoming') counts.sched++;
-      else if (s === 'passed')                   counts.over++;
+      else if (s === 'overdue')                  counts.over++;
     });
     const box = document.getElementById('buckets');
+    if (!box) return;
     box.innerHTML = BUCKETS.map(b => `
       <button class="bkt ${b.cls} ${activeBucket===b.k?'on':''}" data-k="${b.k}">
         <div class="bkt-top">
@@ -1101,29 +1296,51 @@ function loadAuditTodo(){
     return `<div class="tl-chips">${
       SCOPE_NURSERIES.map(n => `
         <a class="tl-chip" style="--tone:${tone}"
-           href="${o.href}?nursery=${n}&from=home">${NURSERY_LBL[n]}</a>`
+           href="${o.href}?nursery=${n}&from=home">${NURSERY_LABELS[n]}</a>`
       ).join('')
     }</div>`;
   }
 
   function renderTimeline(occ){
-    let list = occ;
-    if (selDay !== null) list = list.filter(o => selDay >= o.start && selDay <= o.end);
-    if (active.size)     list = list.filter(o => active.has(occStatus(o, viewY, viewM)));
+    let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
+    /* Today's view answers "what do I owe", so overdue belongs in it —
+       leaving it out let the page say "nothing outstanding" while the
+       Overdue chip beside it counted five. Picking a different day asks a
+       narrower question, "what falls on that date", and gets a literal
+       answer. */
+    const showingToday = (viewY === year && viewM === month && selDay === day);
+    if (selDay !== null) list = list.filter(o =>
+      (showingToday && occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue') ||
+      (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
+    if (active.size)     list = list.filter(o =>
+                           active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
     let html = list.map(o => {
-      const k  = occStatus(o, viewY, viewM);
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
-      return `<div class="tl-item ${k==='passed'?'passed':''}" style="--tone:${c.tone}">
+      /* Card is a plain div (not an <a>) because each nchip inside it is
+         its own link — one deep-link per nursery, tagged &from=home so
+         the destination re-labels its back button as
+         Choose-Another-Nursery. A ✓ prefix marks the nurseries that have
+         already recorded audits in this window, so the auditor sees at a
+         glance which nursery still needs walking. */
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" style="--tone:${c.tone}">
         <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
-            <div class="tl-ttl">${o.title}</div>
-            ${_chipsHtml(o, c.tone)}
+            <div class="tl-ttl">${o.title}${
+              o.fromY !== undefined
+                ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
+            <div class="tl-nurs">${
+              nurseryState(o, oy, om).map(x =>
+                `<a class="nchip${x.done ? ' on' : ''}" href="${o.href}?nursery=${x.nursery}&from=home">${
+                   x.done ? '✓ ' : ''}${NURSERY_LABELS[x.nursery] || x.nursery}</a>`
+              ).join('')}</div>
           </div>
           <div class="tl-when">
-            <div class="tl-date">${dateLabel(o, viewM)}</div>
-            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${st.lbl}</span>
+            <div class="tl-date">${dateLabel(o, om)}</div>
+            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
           </div>
         </div>
       </div>`;
@@ -1132,17 +1349,19 @@ function loadAuditTodo(){
     if (!list.length){
       html = `<div class="tl-empty">${
         selDay !== null
-          ? `Nothing scheduled on ${selDay} ${MONTHS_FULL[viewM]}.`
+          ? `${t('nothing_on')} ${selDay} ${MONTHS_FULL[viewM]}.`
           : active.size
-            ? 'Nothing in this month matches that filter.'
-            : 'No scheduled audits this month.'
+            ? t('nothing_matches')
+            : occ.length
+              ? '✅ ' + t('all_month_done')
+              : t('none_scheduled')
       }</div>`;
     }
 
     /* Event-driven work has no date, so it is listed apart rather than given
        a day it does not have — and hidden when a single day is in focus. */
-    if (selDay === null && !active.size && ANYTIME.length){
-      html += '<div class="tl-head">Anytime</div>';
+    if ((selDay === null || showingToday) && !active.size && ANYTIME.length){
+      html += `<div class="tl-head">${t('anytime')}</div>`;
       html += ANYTIME.map(o => {
         const c = TONE[o.mod];
         return `<div class="tl-item" style="--tone:${c.tone}">
@@ -1155,7 +1374,7 @@ function loadAuditTodo(){
             <div class="tl-when">${
               o.badge === 'maint'
                 ? '<div id="maint-pending-badge"><span class="tl-badge" style="background:#e9edf1;color:#5b7280">…</span></div>'
-                : '<span class="tl-badge" style="background:#e9edf1;color:#5b7280">On Demand</span>'
+                : `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">${t('on_demand')}</span>`
             }</div>
           </div>
         </div>`;
@@ -1163,21 +1382,62 @@ function loadAuditTodo(){
     }
 
     document.getElementById('todo-section').innerHTML = html;
-    if (selDay === null && !active.size) countMaintenance();
+    if ((selDay === null || showingToday) && !active.size) countMaintenance();
   }
 
   function renderAll(){
-    const occ = occurrences(viewY, viewM);
-    const n = occ.length;
+    MONTHS_FULL = monthNames('long');
     const thisMonth = (viewY === year && viewM === month);
-    document.getElementById('sched-count').innerHTML =
-      n === 0
-        ? `No scheduled audits ${thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM]} 🌱`
-        : `You have <b>${n}</b> audit${n>1?'s':''} ${
-            thisMonth ? 'this month' : 'in ' + MONTHS_FULL[viewM] + ' ' + viewY} 👍`;
-    // renderCalendar()/renderChips() were the removed month strip and the
-    // due/soon/upcoming/passed pills. renderBuckets() replaces both — its
-    // counts come from the same occurrences result the timeline uses.
+    const monthOcc  = occurrences(viewY, viewM);
+    /* Anything still owed from earlier months rides along with the current
+       month, and only there — paging back to July should show July, not
+       July plus a copy of June. */
+    const occ = thisMonth ? carriedOverdue().concat(monthOcc) : monthOcc;
+
+    const outstanding = occ.filter(o =>
+      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done').length;
+    const finished = monthOcc.length - monthOcc.filter(o =>
+      occStatus(o, viewY, viewM) !== 'done').length;
+
+    /* What is actually owed today: the windows open on today's date that are
+       not finished, plus anything still carried from an earlier month. The
+       month total told you how busy August was; this tells you what to do
+       before going home. */
+    const actionable = thisMonth ? occ.filter(o => {
+      const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      return k === 'overdue' || k === 'due';   // 'due' already means today is inside it
+    }) : [];
+    const carried = actionable.filter(o =>
+      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue').length;
+    const todayN  = actionable.length;
+
+    const doneNote = finished
+      ? ` <span class="count-note">· ${finished} ${t('n_done_month')}</span>` : '';
+    const overNote = carried
+      ? ` <span class="count-note over">· ${carried} ${t('n_overdue')}</span>` : '';
+
+    document.getElementById('sched-count').innerHTML = thisMonth
+      ? (beforeStart(viewY, viewM)
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('sched_starts')} ` +
+            `${MONTHS_FULL[START_M]} ${START_Y}`
+        : todayN === 0
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅${doneNote}`
+          /* "2 audit" stays singular inside the big text — pluralising both
+             halves read "2 audits tasks". Only "task" takes the s. */
+          : `${t('you_have')} <span class="count-big">${todayN} ${t('audit_word')}</span> ` +
+            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')} 👍${overNote}${doneNote}`)
+      : (monthOcc.length === 0
+          ? (beforeStart(viewY, viewM)
+              ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
+              : `No scheduled audits in ${MONTHS_FULL[viewM]} ${viewY} 🌱`)
+          : `<span class="count-big">${outstanding}</span> to do in ` +
+            `${MONTHS_FULL[viewM]} ${viewY}${doneNote}`);
+
+    // renderCalendar() and renderChips() are now no-ops for the bucket-tile
+    // layout — the month strip and due/soon/etc pills are gone; renderBuckets
+    // replaces the filter role. renderCalendar's own null guards make it safe
+    // to keep the call in case any HTML fragment brings the strip back.
+    renderCalendar();
     renderBuckets(occ);
     renderTimeline(occ);
   }
@@ -1194,8 +1454,8 @@ function loadAuditTodo(){
       el.innerHTML = n === null
         ? `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">—</span>`
         : n === 0
-          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ All done</span>`
-          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} waiting</span>`;
+          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`
+          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} ${t('waiting')}</span>`;
     };
     if (maintCache !== null) { paint(maintCache); return; }
     try{
@@ -1227,13 +1487,16 @@ function loadAuditTodo(){
   });
   _bind('cal-today', () => {
     viewY = year; viewM = month; winStart = windowFor(year, month);
-    selDay = null; active.clear(); renderAll();
+    selDay = day; active.clear(); renderAll();
   });
   _bind('day-prev', () => stepDays(-1));
   _bind('day-next', () => stepDays(1));
 
+  document.addEventListener('mjm-lang-changed', renderAll);
+
   winStart = windowFor(viewY, viewM);
-  renderAll();
+  renderAll();                                   // draw at once, from the schedule
+  loadCompletions().then(renderAll);             // then again, minus what is done
 
 
 }

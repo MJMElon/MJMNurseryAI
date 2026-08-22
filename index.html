@@ -428,6 +428,12 @@
          to reach the screen they were always going to see. With no
          permissions fetched yet, fall back to the back end — its own
          guard will redirect if that guess turns out wrong. */
+      /* Route on the EXPLICIT audit module level only. The audit guards
+         (isAuditAdmin / requireAdmin) were fixed to ignore the profile-
+         level role fallback when modules.audit is set, so mirroring that
+         rule here keeps the hub and the guards saying the same thing —
+         a Normal auditor who happens to be admin of another module stays
+         on the auditor view instead of being routed to the back end. */
       const auditLvl = mods ? String(mods.audit || '').toLowerCase() : null;
       auditCard.setAttribute(
         'href',

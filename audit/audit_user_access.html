@@ -20,7 +20,8 @@ MJMModuleAccess.init({
   moduleLabel: 'Audit',
   icon:   '📋',
   accent: 'orange',
-  back:   { href: 'audit_home.html', label: 'Back to Main Page' },
+  // The back end is where this is opened from, and what "Main Page" names.
+  back:   { href: 'audit_admin.html', label: 'Back to Main Page' },
   pages: [
     { key:'plot_audit', label:'Plot Condition Audit', desc:'Pest, animal and disease infestation, and leaf condition',
       actions:[
