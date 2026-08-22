@@ -93,7 +93,8 @@
           <div class="select-wrapper">
             <select id="f-report" class="input-style">
               <option value="batch_production">Batch Production Summary</option>
-              <option value="nursery_movement">Nursery Movement Report (by Plot / Batch)</option>
+              <option value="pre_nursery_movement">Pre-Nursery Movement Report (by Tray / Batch)</option>
+              <option value="main_nursery_movement">Main Nursery Movement Report (by Plot / Batch)</option>
               <option value="seedling_sales">Seedling Sales Report (Yearly)</option>
             </select>
           </div>
@@ -105,13 +106,6 @@
         <div class="md:col-span-2 f-range">
           <label class="label-style">To</label>
           <input id="f-to" type="date" class="input-style">
-        </div>
-        <div class="md:col-span-2 f-group hidden">
-          <label class="label-style">Group By</label>
-          <select id="f-group" class="input-style">
-            <option value="plot">Plot (+ Batch)</option>
-            <option value="batch">Batch</option>
-          </select>
         </div>
         <div class="md:col-span-2 f-breed">
           <label class="label-style">Breed</label>
@@ -439,19 +433,25 @@ async function runBatchProduction() {
 async function runReport() {
   const which = document.getElementById('f-report').value;
   if (which === 'batch_production')   return runBatchProduction();
-  if (which === 'nursery_movement')   return runSummaryMovement();
+  if (which === 'pre_nursery_movement')  return runPreNurseryMovement();
+  if (which === 'main_nursery_movement') return runMainNurseryMovement();
   if (which === 'seedling_sales')     return runSeedlingSales();
 }
 
 // ── Filter visibility by report type ─────────────────────────────────────────
 function syncFilterVisibility() {
   const which     = document.getElementById('f-report').value;
-  const isMove    = (which === 'nursery_movement');
+  const isPre     = (which === 'pre_nursery_movement');
+  const isMain    = (which === 'main_nursery_movement');
+  const isMove    = isPre || isMain;
   const isBatch   = (which === 'batch_production');
   const isSales   = (which === 'seedling_sales');
   document.querySelectorAll('.f-range').forEach(el         => el.classList.toggle('hidden', !(isBatch || isMove)));
-  document.querySelectorAll('.f-group').forEach(el         => el.classList.toggle('hidden', !isMove));
-  document.querySelectorAll('.f-nursery-pick').forEach(el  => el.classList.toggle('hidden', !isMove));
+  // Group By is gone: each movement report now has its own fixed layout —
+  // tray or plot, then batch — so there was nothing left to choose.
+  // Only the main-nursery report has nurseries to pick between; the
+  // pre-nursery one is all one place.
+  document.querySelectorAll('.f-nursery-pick').forEach(el  => el.classList.toggle('hidden', !isMain));
   document.querySelectorAll('.f-breed').forEach(el         => el.classList.toggle('hidden', !isBatch));
   document.querySelectorAll('.f-sales-mode').forEach(el    => el.classList.toggle('hidden', !isSales));
   document.querySelectorAll('.f-sales-years').forEach(el   => el.classList.toggle('hidden', !isSales));
@@ -474,10 +474,14 @@ async function loadNurseryFilter() {
   const { data } = await _supabase.from('shared_plots').select('nursery_name');
   const names = new Set();
   (data || []).forEach(p => { if (p.nursery_name) names.add(p.nursery_name); });
-  names.add('Pre-Nursery'); // virtual aggregate for pre-nursery plots
   const wrap = document.getElementById('f-nursery-chips');
   wrap.innerHTML = '';
-  [...names].sort().forEach(n => {
+  // In the nursery's own order — BNN, UNN 1, UNN 2 — not the alphabet's.
+  // Pre-Nursery is not offered here: it has a report of its own.
+  [...names]
+    .filter(n => !PRE_NURSERY_PLOTS.includes(n) && n !== 'Pre-Nursery')
+    .sort((a, b) => nurseryRank(a) - nurseryRank(b) || String(a).localeCompare(String(b)))
+    .forEach(n => {
     const safe = String(n).replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]));
     const lbl = document.createElement('label');
     lbl.className = 'nursery-chip';
@@ -789,15 +793,6 @@ async function fetchAllRows(buildQuery, pageSize = 1000) {
   return { data: all, error: null };
 }
 
-function _emptyMv() {
-  // trIn / trOut are the batch report's 3rd-culling transfers: seedlings that
-  // left one plot for another without being culled or sold. Without them a
-  // plot that has moved everything on still shows the old quantity sitting
-  // there, and its closing balance never reaches zero.
-  return { seeds:0, planted:0, trans:0, premium:0, dtone:0, damaged:0, cull1:0, cull2:0, cull3:0, sold:0, trIn:0, trOut:0 };
-}
-function _netOfMv(b) { return b.seeds + b.planted + b.trans + b.premium + b.dtone + b.trIn - b.damaged - b.cull1 - b.cull2 - b.cull3 - b.sold - b.trOut; }
-
 /* A delivery order's plot and batch are typed by hand: "225.", " 225",
    "U15 (UPB PREMIER HYBRID)". Read them the way the batch report reads them,
    so a D/O line lands on the row the batch report already has rather than
@@ -820,26 +815,75 @@ function _mvBatchKey(v) {
   return m ? String(parseInt(m[1], 10)) : '';
 }
 
-function _categorise(b, t, q) {
-  switch (t) {
-    case 'Seeds_Received':           b.seeds   += q; break;
-    case 'Planted':                  b.planted += q; break;
-    case 'Transplanted':             b.trans   += q; break;
-    case 'Transplanted_Premium':     b.premium += q; break;
-    case 'Transplanted_DoubleTone':  b.dtone   += q; break;
-    case 'Damaged_Seeds':            b.damaged += Math.abs(q); break;
-    case '1st_Culling':              b.cull1   += Math.abs(q); break;
-    case '2nd_Culling':              b.cull2   += Math.abs(q); break;
-    case '3rd_Culling':              b.cull3   += Math.abs(q); break;
-    case 'Sold':                     b.sold    += q; break;
-    // Split by the synthetic type the event builder gives each side of a
-    // transfer, so one log can add to the target and subtract from the source.
-    case 'Cull3_Transfer_In':        b.trIn    += Math.abs(q); break;
-    case 'Cull3_Transfer_Out':       b.trOut   += Math.abs(q); break;
-  }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOVEMENT REPORTS
+
+   Two reports, not one. The pre-nursery and the main nursery hold different
+   things and move them in different ways, and a single table that tried to
+   serve both left most of its columns empty on every row.
+
+     Pre-nursery   keyed by TRAY · batch. Seeds are planted into a tray, some
+                   are culled, and the rest leave — to a main-nursery plot, or
+                   to the Premium Care / Double Tone trays.
+     Main nursery  keyed by PLOT · batch. Seedlings arrive from pre-nursery,
+                   are culled twice more, sold, or transferred plot to plot.
+
+   Both are built by the same engine below: a column spec says what each
+   column is called, which way it moves the balance, and how it is coloured.
+════════════════════════════════════════════════════════════════════════════ */
+
+/* Nurseries read in the order the nursery works in, not the order the
+   alphabet happens to put them in. Anything not named here follows after. */
+const NURSERY_ORDER = ['BNN', 'UNN 1', 'UNN 2'];
+function nurseryRank(n) {
+  const k = _mvPlotKey(n);
+  const i = NURSERY_ORDER.findIndex(x => _mvPlotKey(x) === k);
+  return i === -1 ? NURSERY_ORDER.length : i;
 }
 
-async function runSummaryMovement() {
+/* sign: how the column moves the balance. 0 means shown but not counted —
+   see Seed Damage, which never entered a tray to begin with. */
+const MOVE_COLS = {
+  pre: [
+    { key: 'trIn',     label: 'Transfer In',      sign: +1, cls: 'text-[#3a7ab4]' },
+    { key: 'planted',  label: 'Planted',          sign: +1, cls: 'text-[#c07820]' },
+    { key: 'damaged',  label: 'Seed Damage',      sign:  0, cls: 'text-[#a83020]' },
+    { key: 'cull1',    label: '1st Culled',       sign: -1, cls: 'text-[#a83020]' },
+    { key: 'transOut', label: 'Transplanted Out', sign: -1, cls: 'text-[#a83020]' },
+    { key: 'premium',  label: 'Premium Care',     sign: -1, cls: 'text-[#a83020]', grp: 'Transfer Out' },
+    { key: 'dtone',    label: 'Double Tone',      sign: -1, cls: 'text-[#a83020]', grp: 'Transfer Out' },
+  ],
+  main: [
+    { key: 'trIn',    label: 'Transfer In',           sign: +1, cls: 'text-[#3a7ab4]' },
+    { key: 'transIn', label: 'Transplanted from PN',  sign: +1, cls: 'text-[#3a7ab4]' },
+    { key: 'cull2',   label: '2nd Culled',            sign: -1, cls: 'text-[#a83020]' },
+    { key: 'sold',    label: 'Sold',                  sign: -1, cls: 'text-[#a83020]' },
+    { key: 'cull3',   label: '3rd Culled',            sign: -1, cls: 'text-[#a83020]' },
+    { key: 'trOut',   label: 'Transfer Out',          sign: -1, cls: 'text-[#a83020]' },
+  ],
+};
+
+const emptyRow = (scope) => MOVE_COLS[scope].reduce((a, c) => { a[c.key] = 0; return a; }, {});
+const netOfRow = (scope, b) => MOVE_COLS[scope].reduce((s, c) => s + c.sign * (b[c.key] || 0), 0);
+
+/* "2 months". Age is measured from the batch's own planting date, so it reads
+   the same whether the batch is still in a tray or long since out in a plot. */
+function ageLabel(planted) {
+  if (!planted) return '—';
+  const d = new Date(planted);
+  if (isNaN(d.getTime())) return '—';
+  const now = new Date();
+  let m = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) m--;
+  if (m < 0) m = 0;
+  return m + (m === 1 ? ' month' : ' months');
+}
+
+async function runPreNurseryMovement()  { return runMovementReport('pre'); }
+async function runMainNurseryMovement() { return runMovementReport('main'); }
+
+async function runMovementReport(scope) {
   const out = document.getElementById('report-output');
   const loading = document.getElementById('loading');
   out.classList.add('hidden');
@@ -847,21 +891,12 @@ async function runSummaryMovement() {
 
   const fromStr = document.getElementById('f-from').value;
   const toStr   = document.getElementById('f-to').value;
-  const groupBy = document.getElementById('f-group').value || 'plot';
+  const fromMs  = fromStr ? new Date(fromStr).getTime() : -Infinity;
+  const toMs    = toStr   ? new Date(toStr).getTime() + 86400000 : Infinity;
 
-  const fromMs = fromStr ? new Date(fromStr).getTime() : -Infinity;
-  const toMs   = toStr   ? new Date(toStr).getTime() + 86400000 : Infinity;
-
-  const [logsRes, dosRes, plotsRes] = await Promise.all([
-    // Every movement column except Sold comes from the batch report's ledger.
-    // remark + created_at are needed because that is where the keyed date
-    // lives for transplanting and culling rows (see _logDate).
-    // Sold is deliberately NOT read from here — it comes from the DO system
-    // below, so a row appearing in both could never be double counted.
+  const [logsRes, dosRes, plotsRes, traysRes] = await Promise.all([
     fetchAllRows(() => _supabase.from('shared_inventory_logs')
       .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
-      // _categorise() only handles these types; fetching the rest of the
-      // table (photos, audit notes, calibration) just burned DB CPU.
       .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
           'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
           '1st_Culling', '2nd_Culling', '3rd_Culling', 'Cull3_Transfer'])
@@ -869,7 +904,8 @@ async function runSummaryMovement() {
     fetchAllRows(() => _supabase.from('shared_do_records')
       .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
       .order('id', { ascending: true })),
-    _supabase.from('shared_plots').select('plot_name, nursery_name')
+    _supabase.from('shared_plots').select('plot_name, nursery_name'),
+    _supabase.from('operation_trays').select('tray_name, nursery_name').then(r => r, () => ({ data: [] }))
   ]);
   if (logsRes.error || dosRes.error || plotsRes.error) {
     loading.classList.add('hidden');
@@ -878,240 +914,234 @@ async function runSummaryMovement() {
     return;
   }
 
-  // Plot → location map. Pre-Nursery aliases collapse to a single virtual one.
+  const logs = logsRes.data || [];
+
+  // ── Where each place belongs ──
   const plotToLoc = {};
   (plotsRes.data || []).forEach(p => { plotToLoc[p.plot_name] = p.nursery_name || 'Unassigned'; });
-  PRE_NURSERY_PLOTS.forEach(p => { plotToLoc[p] = 'Pre-Nursery'; });
-  const locOf = (plot) => (plot && PRE_NURSERY_PLOTS.includes(plot)) ? 'Pre-Nursery' : (plotToLoc[plot] || 'Unassigned');
+  // Trays are pre-nursery whatever nursery they sit in; their own nursery is
+  // kept only so the pre-nursery list can be read in the same order.
+  const trayNames = new Set();
+  const trayNursery = {};
+  ((traysRes && traysRes.data) || []).forEach(t => {
+    if (!t.tray_name) return;
+    trayNames.add(t.tray_name);
+    trayNursery[t.tray_name] = t.nursery_name || '';
+  });
+  PRE_NURSERY_PLOTS.forEach(p => trayNames.add(p));
+  const isTray = (name) => trayNames.has(name);
 
   const selectedLocs = new Set(selectedNurseries());
-  const passLoc = (plot) => selectedLocs.size === 0 ? false : selectedLocs.has(locOf(plot));
+  const passMain = (plot) => !!plot && !isTray(plot) && selectedLocs.has(plotToLoc[plot] || 'Unassigned');
 
-  // Normalise every event into a {date, plot, batch, type, qty} tuple.
-  // Events whose plot doesn't belong to a selected location are dropped.
-  const events = [];
-  (logsRes.data || []).forEach(l => {
+  // ── When each batch was planted, for Age ──
+  // The same source the batch list uses: the keyed date on Seeds_Received.
+  const batchPlantedAt = {};
+  logs.forEach(l => {
+    if (l.transaction_type !== 'Seeds_Received') return;
+    const k = _mvBatchKey(l.batch_name);
+    const d = l.transaction_date || l.created_at;
+    if (!k || !d) return;
+    if (!batchPlantedAt[k] || String(d) < String(batchPlantedAt[k])) batchPlantedAt[k] = d;
+  });
+
+  // ── Every movement, as (place, batch, column, qty) ──
+  const ev = [];
+  const push = (sc, date, place, batch, col, qty) => {
+    if (sc !== scope || !place || !qty) return;
+    ev.push({ date, place, batch: batch || '—', col, qty });
+  };
+  const srcTrayOf = (l) => {
+    const m = (l.remark || '').match(/from tray \[([^\]]+)\]/i);
+    return m ? m[1].trim() : null;
+  };
+
+  // Damaged seeds carry no tray: they are counted at the batch as it is
+  // planted and never enter one. Shown against the tray the batch was mostly
+  // planted into, once, so the column is visible without being invented for
+  // every tray the batch happens to occupy — and it does not move that tray's
+  // balance, because those seeds were never standing in it.
+  const batchHomeTray = {};
+  logs.forEach(l => {
+    if (l.transaction_type !== 'Planted' || !l.plot_name) return;
+    const k = _mvBatchKey(l.batch_name);
+    const q = Math.abs(l.quantity_change || 0);
+    if (!batchHomeTray[k] || q > batchHomeTray[k].qty) batchHomeTray[k] = { tray: l.plot_name, qty: q };
+  });
+
+  logs.forEach(l => {
     if (SUMMARY_SKIP_TYPES.has(l.transaction_type)) return;
-    // A 3rd-culling transfer is one log describing two sides: plot_name is
-    // where the seedlings landed, and the remark says where they left. Each
-    // side is its own event so the source's balance falls and the target's
-    // rises, exactly as the batch report shows them.
-    if (l.transaction_type === 'Cull3_Transfer') {
-      const from = (l.remark || '').match(/From:\s*\[([^\]|]+)\|/);
-      const qty  = Math.abs(Number(l.quantity_change || 0));
-      const date = _logDate(l);
-      if (passLoc(l.plot_name)) {
-        events.push({ date, plot: l.plot_name || '—', batch: l.batch_name || '—',
-                      type: 'Cull3_Transfer_In', qty });
-      }
-      if (from && passLoc(from[1])) {
-        events.push({ date, plot: from[1], batch: l.batch_name || '—',
-                      type: 'Cull3_Transfer_Out', qty });
-      }
+    const d = _logDate(l);
+    const q = Math.abs(l.quantity_change || 0);
+    const t = l.transaction_type;
+    const b = l.batch_name;
+
+    if (t === 'Planted')     { push('pre', d, l.plot_name, b, 'planted', q); return; }
+    if (t === '1st_Culling') { push('pre', d, l.plot_name, b, 'cull1', q); return; }
+    if (t === '2nd_Culling') { if (passMain(l.plot_name)) push('main', d, l.plot_name, b, 'cull2', q); return; }
+    if (t === '3rd_Culling') { if (passMain(l.plot_name)) push('main', d, l.plot_name, b, 'cull3', q); return; }
+
+    if (t === 'Damaged_Seeds') {
+      const home = batchHomeTray[_mvBatchKey(b)];
+      if (home) push('pre', d, home.tray, b, 'damaged', q);
       return;
     }
-    if (!passLoc(l.plot_name)) return;
-    events.push({
-      date:  _logDate(l),
-      plot:  l.plot_name  || '—',
-      batch: l.batch_name || '—',
-      type:  l.transaction_type,
-      qty:   Number(l.quantity_change || 0)
-    });
-  });
-  // Which (plot · batch) rows actually exist, straight from the batch report:
-  // a plot only appears because the batch was transplanted (or planted) into
-  // it, and everything else — culls, transfers, sales — hangs off that row.
-  // Keyed loosely so a D/O's "225." finds the batch report's "MJM-225".
-  const realRows = new Map();   // plotKey → Map(batchKey → { plot, batch })
-  events.forEach(ev => {
-    const pk = _mvPlotKey(ev.plot), bk = _mvBatchKey(ev.batch);
-    if (!pk || !bk) return;
-    if (!realRows.has(pk)) realRows.set(pk, new Map());
-    if (!realRows.get(pk).has(bk)) realRows.get(pk).set(bk, { plot: ev.plot, batch: ev.batch });
+
+    if (t === 'Transplanted') {
+      const src = srcTrayOf(l);
+      if (src) push('pre', d, src, b, 'transOut', q);
+      if (passMain(l.plot_name)) push('main', d, l.plot_name, b, 'transIn', q);
+      return;
+    }
+
+    if (t === 'Transplanted_Premium' || t === 'Transplanted_DoubleTone') {
+      const src = srcTrayOf(l);
+      const col = t === 'Transplanted_Premium' ? 'premium' : 'dtone';
+      if (src) push('pre', d, src, b, col, q);
+      push('pre', d, l.plot_name, b, 'trIn', q);   // the receiving tray
+      return;
+    }
+
+    if (t === 'Cull3_Transfer') {
+      const from = (l.remark || '').match(/From:\s*\[([^\]|]+)\|/);
+      if (passMain(l.plot_name)) push('main', d, l.plot_name, b, 'trIn', q);
+      if (from && passMain(from[1])) push('main', d, from[1], b, 'trOut', q);
+      return;
+    }
   });
 
-  // D/O lines are SALES AGAINST those rows, never rows of their own. The batch
-  // and plot on a delivery order are free text — a mistyped "24D" used to open
-  // its own line in this report showing a batch that does not exist. Anything
-  // that cannot be matched is counted aside and reported under the table
-  // rather than dropped without a word.
+  // ── Sales, only against a plot·batch the batch report already has ──
   const unmatchedSales = [];
-  (dosRes.data || []).forEach(d => {
-    if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
-    for (let i = 1; i <= 5; i++) {
-      const qty  = Number(d[`qty_${i}`] || 0);
-      if (!qty) continue;
-      const plot = d[`plot_${i}`];
-      if (!passLoc(plot)) continue;
-      const hit = (realRows.get(_mvPlotKey(plot)) || new Map()).get(_mvBatchKey(d[`batch_${i}`]));
-      if (!hit) {
-        unmatchedSales.push({ plot: plot || '—', batch: d[`batch_${i}`] || '—', qty });
-        continue;
+  if (scope === 'main') {
+    const realRows = new Map();
+    ev.forEach(e => {
+      const pk = _mvPlotKey(e.place), bk = _mvBatchKey(e.batch);
+      if (!pk || !bk) return;
+      if (!realRows.has(pk)) realRows.set(pk, new Map());
+      if (!realRows.get(pk).has(bk)) realRows.get(pk).set(bk, { place: e.place, batch: e.batch });
+    });
+    (dosRes.data || []).forEach(d => {
+      if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
+      for (let i = 1; i <= 5; i++) {
+        const qty = Number(d[`qty_${i}`] || 0);
+        if (!qty) continue;
+        const plot = d[`plot_${i}`];
+        if (!passMain(plot)) continue;
+        const hit = (realRows.get(_mvPlotKey(plot)) || new Map()).get(_mvBatchKey(d[`batch_${i}`]));
+        if (!hit) { unmatchedSales.push({ plot: plot || '—', batch: d[`batch_${i}`] || '—', qty }); continue; }
+        ev.push({ date: d.delivery_date || null, place: hit.place, batch: hit.batch, col: 'sold', qty });
       }
-      events.push({
-        date:  d.delivery_date || null,
-        // The batch report's own spelling, so the sale lands on its row
-        // instead of sitting beside it under a slightly different name.
-        plot:  hit.plot,
-        batch: hit.batch,
-        type:  'Sold',
-        qty
-      });
-    }
-  });
-
-  // Pick the key extractor based on grouping
-  function makeKey(ev) {
-    if (groupBy === 'batch') return ev.batch;
-    if (groupBy === 'date')  return ev.date ? String(ev.date).slice(0, 10) : '—';
-    return ev.plot + '\u0001' + ev.batch;  // unique per (plot, batch)
+    });
   }
 
-  // bf  = pre-period cumulative net per key
-  // buc = in-period movement per key (one bucket of columns)
-  const bf  = {};
-  const buc = {};
-  for (const ev of events) {
-    const ts = ev.date ? new Date(ev.date).getTime() : NaN;
+  // ── Before the period, and inside it ──
+  const SEP = '';
+  const bf = {}, buc = {}, meta = {};
+  for (const e of ev) {
+    const ts = e.date ? new Date(e.date).getTime() : NaN;
     if (!isFinite(ts)) continue;
-    const k = makeKey(ev);
-    if (!k) continue;
-    if (ts < fromMs) {
-      if (!bf[k]) bf[k] = _emptyMv();
-      _categorise(bf[k], ev.type, ev.qty);
-    } else if (ts <= toMs) {
-      if (!buc[k]) buc[k] = _emptyMv();
-      _categorise(buc[k], ev.type, ev.qty);
-    }
+    const k = e.place + SEP + e.batch;
+    meta[k] = meta[k] || { place: e.place, batch: e.batch };
+    const into = ts < fromMs ? bf : (ts <= toMs ? buc : null);
+    if (!into) continue;
+    if (!into[k]) into[k] = emptyRow(scope);
+    into[k][e.col] += e.qty;
   }
-  const openingOf = (k) => bf[k] ? _netOfMv(bf[k]) : 0;
 
-  // Build a flat row per key (and remember plot/batch/date for grouping)
-  const allKeys = new Set([...Object.keys(buc), ...Object.keys(bf)]);
   let rows = [];
-  for (const k of allKeys) {
-    const b = buc[k] || _emptyMv();
-    const opening = openingOf(k);
-    const inflow  = b.seeds + b.planted + b.trans + b.premium + b.dtone + b.trIn;
-    const outflow = b.damaged + b.cull1 + b.cull2 + b.cull3 + b.sold + b.trOut;
-    const closing = opening + inflow - outflow;
-    // Hide rows that are entirely empty for the chosen period AND have zero opening
-    if (opening === 0 && inflow === 0 && outflow === 0) continue;
-    // Nothing of this batch is left in this plot — everything was culled, sold
-    // or moved on — so the row has nothing to say. A NEGATIVE closing is kept:
-    // that is a figure that needs looking at, not one to hide.
+  for (const k of new Set([...Object.keys(buc), ...Object.keys(bf)])) {
+    const b = buc[k] || emptyRow(scope);
+    const opening = bf[k] ? netOfRow(scope, bf[k]) : 0;
+    const moved = MOVE_COLS[scope].some(c => b[c.key]);
+    if (!opening && !moved) continue;
+    const closing = opening + netOfRow(scope, b);
+    // Nothing of this batch left here — culled, sold or moved on. A NEGATIVE
+    // closing is kept: that is a figure to look into, not one to hide.
     if (closing === 0) continue;
-    let plot = '', batch = '', date = '';
-    if (groupBy === 'plot')  { [plot, batch] = k.split('\u0001'); }
-    else if (groupBy === 'batch') { batch = k; }
-    else if (groupBy === 'date')  { date  = k; }
-    rows.push({ key: k, plot, batch, date, opening, ...b, closing });
+    rows.push({ ...meta[k], ...b, opening, closing,
+                age: ageLabel(batchPlantedAt[_mvBatchKey(meta[k].batch)]) });
   }
 
-  // Sort: plot rows by (plot, batch); batch rows by batch; date rows by date asc
-  // Natural compare so B2 sorts before B10 (instead of after, alphabetically).
   const _natCmp = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }).compare;
-  rows.sort((a, c) => {
-    if (groupBy === 'plot')  return _natCmp(a.plot, c.plot) || _natCmp(a.batch, c.batch);
-    if (groupBy === 'batch') return _natCmp(a.batch, c.batch);
-    return a.date.localeCompare(c.date);
-  });
+  const locOfRow = (r) => scope === 'pre'
+    ? (trayNursery[r.place] || 'Pre-Nursery')
+    : (plotToLoc[r.place] || 'Unassigned');
+  rows.sort((a, c) =>
+    nurseryRank(locOfRow(a)) - nurseryRank(locOfRow(c)) ||
+    _natCmp(locOfRow(a), locOfRow(c)) ||
+    _natCmp(a.place, c.place) || _natCmp(a.batch, c.batch));
 
   loading.classList.add('hidden');
   out.classList.remove('hidden');
+
+  const cols = MOVE_COLS[scope];
+  const placeLabel = scope === 'pre' ? 'Tray No' : 'Plot';
+  const title = scope === 'pre' ? 'Pre-Nursery Movement' : 'Main Nursery Movement';
+
   if (!rows.length) {
-    out.innerHTML = `<div class="glass-panel p-6 rounded-[2rem] text-[#8a7a68] text-sm">No movement found in this period.${
-      unmatchedSales.length ? ` <strong class="text-[#7a4a10]">${unmatchedSales.length} delivery order line(s) name a plot or batch no batch report has — they are not counted.</strong>` : ''
-    }</div>`;
+    out.innerHTML = `<div class="glass-panel p-6 rounded-[2rem] text-[#8a7a68] text-sm">No ${
+      scope === 'pre' ? 'pre-nursery' : 'main nursery'} movement found in this period.</div>`;
     return;
   }
 
   const fmtCell = (n, cls) => `<td class="text-right ${cls || ''}">${n ? fmtNum(n) : '0'}</td>`;
-  // Transfers in and out share one column: what the plot gained, less what it
-  // sent on. Signed, so "−397" reads as seedlings that left for another plot.
-  const fmtTransfer = (r) => {
-    const net = (r.trIn || 0) - (r.trOut || 0);
-    if (!net) return `<td class="text-right">0</td>`;
-    return `<td class="text-right ${net > 0 ? 'text-[#3a7ab4]' : 'text-[#c07820]'}">`
-         + `${net > 0 ? '+' : '\u2212'}${fmtNum(Math.abs(net))}</td>`;
-  };
-  const isPlotMode  = groupBy === 'plot';
-  const isBatchMode = groupBy === 'batch';
-  const isDateMode  = groupBy === 'date';
 
-  // For plot mode, only show the Plot cell once per plot group + emit a per-plot total row
-  const tbodyHtml = (() => {
-    if (!isPlotMode) {
-      return rows.map(r => `
-        <tr>
-          <td class="font-black text-[#3d2610]">${isDateMode ? (r.date || '—') : (r.batch || '—')}</td>
-          ${fmtCell(r.opening)}
-          ${fmtCell(r.seeds,   'text-[#c07820] font-black')}
-          ${fmtCell(r.planted, 'text-[#c07820]')}
-          ${fmtCell(r.trans,   'text-[#3a7ab4]')}
-          ${fmtCell(r.premium, 'text-[#3a7ab4]')}
-          ${fmtCell(r.dtone,   'text-[#3a7ab4]')}
-          ${fmtCell(r.damaged, 'text-[#a83020]')}
-          ${fmtCell(r.cull1,   'text-[#a83020]')}
-          ${fmtCell(r.cull2,   'text-[#a83020]')}
-          ${fmtCell(r.cull3,   'text-[#a83020]')}
-          ${fmtCell(r.sold,    'text-[#a83020]')}
-          ${fmtTransfer(r)}
-          ${fmtCell(r.closing, 'text-[#4a7a2e] font-black')}
-        </tr>`).join('');
-    }
-    // plot mode: group rows by plot. No subtotal row — the plot's running
-    // balance is shown next to its label on the first row of each group.
-    const groups = {};
-    rows.forEach(r => { (groups[r.plot] ||= []).push(r); });
-    const plotKeys = Object.keys(groups).sort(_natCmp);
-    const html = [];
-    for (const p of plotKeys) {
-      const list = groups[p];
-      const plotBalance = list.reduce((s, r) => s + r.closing, 0);
-      list.forEach((r, i) => {
-        const plotCell = (i === 0)
-          ? `<td class="font-black text-[#3d2610]">${r.plot}<br><span class="text-[10px] font-bold text-[#4a7a2e] uppercase tracking-widest">Bal: ${fmtNum(plotBalance)}</span></td>`
-          : `<td></td>`;
-        html.push(`
-          <tr>
-            ${plotCell}
-            <td>${r.batch || '—'}</td>
-            ${fmtCell(r.opening)}
-            ${fmtCell(r.seeds,   'text-[#c07820] font-black')}
-            ${fmtCell(r.planted, 'text-[#c07820]')}
-            ${fmtCell(r.trans,   'text-[#3a7ab4]')}
-            ${fmtCell(r.premium, 'text-[#3a7ab4]')}
-            ${fmtCell(r.dtone,   'text-[#3a7ab4]')}
-            ${fmtCell(r.damaged, 'text-[#a83020]')}
-            ${fmtCell(r.cull1,   'text-[#a83020]')}
-            ${fmtCell(r.cull2,   'text-[#a83020]')}
-            ${fmtCell(r.cull3,   'text-[#a83020]')}
-            ${fmtCell(r.sold,    'text-[#a83020]')}
-            ${fmtTransfer(r)}
-            ${fmtCell(r.closing, 'text-[#4a7a2e] font-black')}
-          </tr>`);
-      });
-    }
-    return html.join('');
-  })();
+  // ── Body: a section per nursery, a group per tray/plot ──
+  const groups = [];
+  rows.forEach(r => {
+    const last = groups[groups.length - 1];
+    if (last && last.place === r.place) last.list.push(r);
+    else groups.push({ place: r.place, loc: locOfRow(r), list: [r] });
+  });
 
-  // Grand totals row
+  const totalCols = 6 + cols.length;
+  const bodyHtml = [];
+  let lastLoc = null;
+  groups.forEach(g => {
+    if (g.loc !== lastLoc) {
+      lastLoc = g.loc;
+      bodyHtml.push(`<tr style="background:#f3ede1"><td colspan="${totalCols}"
+        class="font-black text-[11px] uppercase tracking-widest text-[#3d2610] py-2">${g.loc}</td></tr>`);
+    }
+    const bal = g.list.reduce((s, r) => s + r.closing, 0);
+    g.list.forEach((r, i) => {
+      bodyHtml.push(`<tr>
+        <td class="font-black text-[#3d2610]">${i === 0 ? r.place : ''}</td>
+        <td>${r.batch || '—'}</td>
+        <td class="text-[#8a7a68] text-xs whitespace-nowrap">${r.age}</td>
+        ${fmtCell(r.opening)}
+        ${cols.map(c => fmtCell(r[c.key], c.cls)).join('')}
+        ${fmtCell(r.closing, 'text-[#4a7a2e] font-black')}
+        <td class="text-right font-black text-[#4a7a2e]">${i === 0 ? fmtNum(bal) : ''}</td>
+      </tr>`);
+    });
+  });
+
+  // ── Grand total ──
   const grand = rows.reduce((s, r) => {
-    Object.keys(_emptyMv()).forEach(k => s[k] = (s[k] || 0) + r[k]);
+    cols.forEach(c => { s[c.key] += r[c.key] || 0; });
     s.opening += r.opening; s.closing += r.closing;
     return s;
-  }, { opening: 0, closing: 0, ..._emptyMv() });
+  }, { opening: 0, closing: 0, ...emptyRow(scope) });
 
-  const headLeft = isPlotMode
-    ? `<th>Plot</th><th>Batch</th>`
-    : `<th>${isDateMode ? 'Date' : 'Batch'}</th>`;
-  const grandLeft = isPlotMode ? `<td class="font-black text-[#3d2610]">GRAND TOTAL</td><td></td>` : `<td class="font-black text-[#3d2610]">GRAND TOTAL</td>`;
+  // A grouped header row only where two columns belong together.
+  const grouped = cols.some(c => c.grp);
+  let groupRow = '';
+  if (grouped) {
+    const cells = [];
+    let i = 0;
+    while (i < cols.length) {
+      const g = cols[i].grp;
+      if (!g) { cells.push('<th></th>'); i++; continue; }
+      let n = 0;
+      while (i + n < cols.length && cols[i + n].grp === g) n++;
+      cells.push(`<th colspan="${n}" class="text-center text-[#c07820]">${g}</th>`);
+      i += n;
+    }
+    groupRow = `<tr><th colspan="4"></th>${cells.join('')}<th colspan="2"></th></tr>`;
+  }
 
-  // Sales that name a plot or batch the batch report has never heard of. They
-  // are kept out of the table — a mistyped batch is not a row — but shown here
-  // so the quantity is not simply lost and the D/O can be corrected.
+  const rangeLabel = `${fromStr ? fmtDate(fromStr) : '—'} → ${toStr ? fmtDate(toStr) : '—'}`;
   const unmatchedHtml = unmatchedSales.length ? `
       <div class="mt-4 rounded-2xl border border-[#f0b429] bg-[#fffbeb] p-4">
         <div class="text-[11px] font-black text-[#7a4a10] uppercase tracking-widest mb-2">
@@ -1119,8 +1149,7 @@ async function runSummaryMovement() {
         </div>
         <div class="text-[10px] font-bold text-[#8a7a68] mb-2">
           These are left out of the table above. The plot or batch on the delivery order does not
-          exist in any batch report, so there is no row for the sale to belong to — correct the D/O
-          or the batch report, then run this again.
+          exist in any batch report, so there is no row for the sale to belong to.
         </div>
         <div class="flex flex-wrap gap-2">
           ${unmatchedSales.map(u => `<span class="inline-block bg-white border border-[#e8dcc8] rounded-lg px-2.5 py-1 text-[11px] font-bold text-[#3d2610]">
@@ -1128,50 +1157,35 @@ async function runSummaryMovement() {
         </div>
       </div>` : '';
 
-  const rangeLabel = `${fromStr ? fmtDate(fromStr) : '—'} → ${toStr ? fmtDate(toStr) : '—'}`;
   out.innerHTML = `
     <div class="glass-panel p-6 rounded-[2rem]">
       <div class="flex items-center justify-between mb-4 border-b border-[#e8dcc8] pb-4">
-        <h3 class="text-lg font-black uppercase tracking-widest text-[#3d2610]">Summary Report · by ${groupBy[0].toUpperCase()+groupBy.slice(1)}</h3>
+        <h3 class="text-lg font-black uppercase tracking-widest text-[#3d2610]">${title}</h3>
         <div class="text-[10px] font-bold text-[#8a7a68] uppercase tracking-widest">${rangeLabel}</div>
       </div>
 
       <div class="overflow-x-auto">
         <table class="report-table">
           <thead>
+            ${groupRow}
             <tr>
-              ${headLeft}
+              <th>${placeLabel}</th>
+              <th>Batch</th>
+              <th>Age</th>
               <th class="text-right">B/F</th>
-              <th class="text-right">Seeds In</th>
-              <th class="text-right">Planted</th>
-              <th class="text-right">Transplanted</th>
-              <th class="text-right">Premium</th>
-              <th class="text-right">Double Tone</th>
-              <th class="text-right">Damaged</th>
-              <th class="text-right">1st Cull</th>
-              <th class="text-right">2nd Cull</th>
-              <th class="text-right">3rd Cull</th>
-              <th class="text-right">Sold</th>
-              <th class="text-right">Transfer</th>
-              <th class="text-right">Closing</th>
+              ${cols.map(c => `<th class="text-right">${c.label}</th>`).join('')}
+              <th class="text-right">Batch Balance</th>
+              <th class="text-right">Balance</th>
             </tr>
           </thead>
           <tbody>
-            ${tbodyHtml}
+            ${bodyHtml.join('')}
             <tr style="background:#fdf3e6">
-              ${grandLeft}
+              <td class="font-black text-[#3d2610]">GRAND TOTAL</td>
+              <td></td><td></td>
               ${fmtCell(grand.opening, 'font-black')}
-              ${fmtCell(grand.seeds,   'text-[#c07820] font-black')}
-              ${fmtCell(grand.planted, 'text-[#c07820] font-black')}
-              ${fmtCell(grand.trans,   'text-[#3a7ab4] font-black')}
-              ${fmtCell(grand.premium, 'text-[#3a7ab4] font-black')}
-              ${fmtCell(grand.dtone,   'text-[#3a7ab4] font-black')}
-              ${fmtCell(grand.damaged, 'text-[#a83020] font-black')}
-              ${fmtCell(grand.cull1,   'text-[#a83020] font-black')}
-              ${fmtCell(grand.cull2,   'text-[#a83020] font-black')}
-              ${fmtCell(grand.cull3,   'text-[#a83020] font-black')}
-              ${fmtCell(grand.sold,    'text-[#a83020] font-black')}
-              ${fmtTransfer(grand)}
+              ${cols.map(c => fmtCell(grand[c.key], (c.cls || '') + ' font-black')).join('')}
+              ${fmtCell(grand.closing, 'text-[#4a7a2e] font-black')}
               ${fmtCell(grand.closing, 'text-[#4a7a2e] font-black')}
             </tr>
           </tbody>
@@ -1182,23 +1196,30 @@ async function runSummaryMovement() {
 
       <div class="text-[10px] font-bold text-[#8a7a68] mt-4 leading-relaxed">
         <strong class="text-[#3d2610]">Notes —</strong>
-        Which batch sits in which plot comes from the <strong>batch report</strong>: the transplanting record's
-        destination plot, quantity and keyed date create the (Plot · Batch) row, and every other column
-        (seeds, planted, damaged, 1st / 2nd / 3rd cull) is read from that same batch's report.
-        <em>Sold</em> is the only column sourced elsewhere — it comes from the <strong>Customer DO system</strong>
-        (<code>plot_n / batch_n / qty_n</code> on delivery orders); cancelled DOs are excluded. A delivery
-        order can only ever <em>subtract</em> from a row the batch report already has: it never creates one,
-        so a plot or batch mistyped on a D/O cannot appear here as a batch that does not exist.
-        Its batch is matched on the trailing digits, so "225.", " 225" and "MJM-225" are all batch 225.
-        Dates are the ones keyed into the batch report; where a stage was saved without one
-        (3rd culling), the record's save date is used.
-        <em>Transfer</em> is the 3rd culling's plot transfers, netted: what moved into this plot less what
-        it sent on, so a plot that has passed its seedlings elsewhere no longer appears to be holding them.
-        <em>B/F</em> is the cumulative net of all transactions <strong>before</strong> the From date for the same key.
-        A (Plot · Batch) whose <em>Closing</em> works out to zero is left off — everything has been culled,
-        sold or moved on. A negative closing is still shown, because that is a figure to look into.
-        Audit, photo, and stock-calibration entries are not counted as movements.
-        Pre-nursery plots populate <em>Planted</em> / <em>1st Cull</em>; main-nursery plots populate <em>Transplanted</em> / <em>Double Tone</em> / <em>2nd Cull</em>. Empty cells are zero.
+        <em>Age</em> is measured from the batch's own planting date, so it reads the same
+        wherever the batch has got to.
+        <em>B/F</em> is the net of everything before the From date for the same row.
+        <em>Batch Balance</em> is that row's closing figure; <em>Balance</em> is the
+        ${scope === 'pre' ? 'tray' : 'plot'}'s, shown once against its first row.
+        A row whose balance works out to zero is left off — everything has been
+        ${scope === 'pre' ? 'culled or moved on' : 'culled, sold or moved on'}. A negative
+        balance is still shown, because that is a figure to look into.
+        ${scope === 'pre' ? `
+        Every tray movement names its tray: planting and 1st culling record it directly, and a
+        transplant records the tray it left in its remark, so a tray frees by exactly what left
+        it. <em>Transfer In</em> is what the Premium Care and Double Tone trays receive from
+        other trays. <em>Seed Damage</em> is counted at the batch as it is planted and never
+        enters a tray, so it is shown against the tray the batch was mostly planted into and
+        does <strong>not</strong> reduce that tray's balance.`
+        : `
+        <em>Transplanted from PN</em> is what arrived from the pre-nursery trays.
+        <em>Sold</em> comes from the Customer DO system; cancelled DOs are excluded, and a
+        delivery order can only subtract from a row the batch report already has — it never
+        creates one, so a plot or batch mistyped on a D/O cannot appear here.
+        <em>Transfer In / Out</em> are the 3rd culling's plot-to-plot transfers.`}
+        Dates are the ones keyed into the batch report; where a stage was saved without one,
+        the record's save date is used. Audit, photo and stock-calibration entries are not
+        counted as movements.
       </div>
     </div>
   `;
