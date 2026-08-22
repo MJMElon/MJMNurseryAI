@@ -115,7 +115,7 @@
                     <div class="flex flex-col md:flex-row gap-3 mb-6 bg-amber-50 p-5 rounded-2xl border border-amber-100">
                         <select id="tray-nursery-select" class="input-style text-xs flex-1 font-bold text-slate-700"></select>
                         <input type="text" id="new-tray-name" class="input-style text-xs flex-1 uppercase" placeholder="Tray Name / ID (e.g. T-001)">
-                        <input type="number" id="new-tray-qty" min="0" step="1" class="input-style text-xs w-full md:w-40" placeholder="Quantity (optional)">
+                        <input type="number" id="new-tray-vacant" min="1" step="1" class="input-style text-xs w-full md:w-44" placeholder="Total vacant (e.g. 2560)">
                         <button onclick="addTray(event)" class="btn-purple !bg-amber-500 !px-8 text-xs tracking-widest w-full md:w-auto shadow-amber-500/30">+ Add Tray</button>
                     </div>
                     <ul id="trays-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-h-[350px] overflow-y-auto pr-2"></ul>
@@ -303,15 +303,12 @@
                     <input type="text" id="edit-tray-name" class="input-style text-xs uppercase">
                 </div>
                 <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Quantity (seedlings in tray)</label>
-                    <input type="number" id="edit-tray-qty" min="0" step="1" class="input-style text-xs">
-                    <!-- The batch report adds to this figure as premium-care and
-                         double-tone seedlings are transplanted in. Setting it here
-                         REPLACES that running total, so it is for a stock count or a
-                         correction — not for recording a new transplant. -->
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Total Vacant (holes when empty)</label>
+                    <input type="number" id="edit-tray-vacant" min="1" step="1" class="input-style text-xs">
                     <p class="text-[10px] text-slate-400 font-semibold mt-1 ml-1 leading-snug">
-                        The batch report adds to this as seedlings are transplanted in.
-                        Editing here replaces that total — use it for a stock count or a correction.
+                        The tray's capacity, not what is free right now. The batch report
+                        subtracts what is standing in the tray to show the current vacancy,
+                        and puts it back as seedlings are transplanted out.
                     </p>
                 </div>
                 <div class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4" data-loc-editor data-prefix="tray">
@@ -869,7 +866,7 @@
             if(!tray) return;
             document.getElementById('edit-tray-id').value = tray.id;
             document.getElementById('edit-tray-name').value = tray.tray_name;
-            document.getElementById('edit-tray-qty').value = tray.current_qty ?? '';
+            document.getElementById('edit-tray-vacant').value = tray.total_vacant ?? '';
 
             const select = document.getElementById('edit-tray-nursery'); select.innerHTML = '';
             globalNurseries.forEach(n => {
@@ -888,15 +885,16 @@
             const nursery = document.getElementById('edit-tray-nursery').value;
             const latRaw = document.getElementById('edit-tray-gps-lat').value;
             const lngRaw = document.getElementById('edit-tray-gps-lng').value;
-            const qtyRaw = document.getElementById('edit-tray-qty').value.trim();
+            const vacantRaw = document.getElementById('edit-tray-vacant').value.trim();
             if(!name) return alert("Tray Name required.");
-            const qty = qtyRaw === '' ? null : Number(qtyRaw);
-            if (qty !== null && (!Number.isFinite(qty) || qty < 0)) return alert("Quantity must be zero or more.");
+            const totalVacant = vacantRaw === '' ? null : Number(vacantRaw);
+            if (totalVacant !== null && (!Number.isFinite(totalVacant) || totalVacant < 1))
+                return alert("Total vacant must be at least 1 hole.");
             const btn = document.getElementById('save-tray-btn'); btn.innerText = 'UPDATING...'; btn.disabled = true;
 
-            // Left blank means "not counted", which is not the same as an empty
-            // tray — so a blank clears the figure rather than writing a zero.
-            const update = { tray_name: name, nursery_name: nursery, current_qty: qty };
+            // Left blank means "no size set"; the batch report then falls back to
+            // the 2,560 it assumed before this field existed.
+            const update = { tray_name: name, nursery_name: nursery, total_vacant: totalVacant };
             if (latRaw === '' || lngRaw === '') {
                 update.gps_lat = null; update.gps_lng = null; update.gps_set_at = null;
             } else {
@@ -1028,7 +1026,7 @@
             
             filtered.forEach(item => {
                 const hasGps = item.gps_lat != null && item.gps_lng != null;
-                const qty = Number(item.current_qty || 0);
+                const cap = item.total_vacant == null ? null : Number(item.total_vacant);
                 list.insertAdjacentHTML('beforeend', `
                     <li class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm transition-all hover:border-amber-300 hover:shadow-md">
                         <div class="flex flex-col gap-1">
@@ -1037,11 +1035,11 @@
                                 ${hasGps ? '<span class="text-[9px] text-emerald-700 font-black uppercase tracking-widest bg-emerald-100 px-2 py-1 rounded shadow-inner">📍 Pinned</span>' : ''}
                             </div>
                             <span class="text-base font-black text-slate-800">${item.tray_name}</span>
-                            <!-- What is standing in the tray. Kept up to date by the batch
-                                 report as premium-care and double-tone seedlings are
-                                 transplanted in; editable here for a stock count. -->
-                            <span class="text-[11px] font-black ${qty > 0 ? 'text-amber-700' : 'text-slate-300'}">
-                                ${qty > 0 ? qty.toLocaleString() + ' seedlings' : 'Empty'}
+                            <!-- How many holes the tray has when empty. The batch report
+                                 subtracts what is standing in it to show the current
+                                 vacancy, so this figure only changes if the tray does. -->
+                            <span class="text-[11px] font-black ${cap ? 'text-amber-700' : 'text-slate-300'}">
+                                ${cap ? 'Total vacant: ' + cap.toLocaleString() : 'No size set'}
                             </span>
                         </div>
                         <div class="flex gap-2">
@@ -1177,10 +1175,11 @@
             if (typeof MJMAccess !== 'undefined' && !MJMAccess.requireOperationAction('settings', 'manage')) return;
             const nursery = document.getElementById('tray-nursery-select').value; 
             const trayName = document.getElementById('new-tray-name').value.trim().toUpperCase();
-            const qtyRaw = document.getElementById('new-tray-qty').value.trim();
+            const vacantRaw = document.getElementById('new-tray-vacant').value.trim();
             if(!nursery || !trayName) return alert("Select a Nursery and provide a Tray Name.");
-            const qty = qtyRaw === '' ? null : Number(qtyRaw);
-            if (qty !== null && (!Number.isFinite(qty) || qty < 0)) return alert("Quantity must be zero or more.");
+            const totalVacant = vacantRaw === '' ? null : Number(vacantRaw);
+            if (totalVacant !== null && (!Number.isFinite(totalVacant) || totalVacant < 1))
+                return alert("Total vacant must be at least 1 hole.");
 
             const btn = event.target;
             const originalText = btn.innerText;
@@ -1189,10 +1188,10 @@
 
             try {
                 const { error } = await _supabase.from('operation_trays')
-                    .insert([{ nursery_name: nursery, tray_name: trayName, current_qty: qty }]);
+                    .insert([{ nursery_name: nursery, tray_name: trayName, total_vacant: totalVacant }]);
                 if (error) throw error;
                 document.getElementById('new-tray-name').value = '';
-                document.getElementById('new-tray-qty').value = '';
+                document.getElementById('new-tray-vacant').value = '';
                 fetchData();
             } catch (err) {
                 alert("Database Error (Check if 'operation_trays' table is created and RLS is allowed):\n\n" + err.message);
