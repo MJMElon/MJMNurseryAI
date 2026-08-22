@@ -94,6 +94,12 @@ const TRANSLATIONS = {
     home_papan_desc:         'Audit the condition of every papan tanda across all transplant plots.',
     home_maintenance:        'Maintenance Audit',
     home_maintenance_desc:   'Audit completed maintenance tasks from workers. Verify work quality on-site.',
+    /* Bucket-tile labels on audit_home. Keep the four in step with
+       the BM block below whenever wording changes. */
+    bucket_today:            "Today's Audit",
+    bucket_sched:            'Scheduled',
+    bucket_all:              'All Audit',
+    bucket_over:             'Overdue',
     signout:                 'Sign Out',
     signout_msg:             'You will be returned to the login page.',
     stay:                    'Stay',
@@ -516,6 +522,11 @@ const TRANSLATIONS = {
     home_papan_desc:         'Audit keadaan setiap papan tanda di semua plot yang telah dipindah.',
     home_maintenance:        'Audit Penyelenggaraan',
     home_maintenance_desc:   'Audit tugas penyelenggaraan yang telah siap oleh pekerja. Sahkan kualiti kerja di tapak.',
+    /* Bucket-tile labels (Malay). Match the four in the EN block above. */
+    bucket_today:            'Audit Hari Ini',
+    bucket_sched:            'Dijadualkan',
+    bucket_all:              'Semua Audit',
+    bucket_over:             'Audit Tertunggak',
     signout:                 'Log Keluar',
     signout_msg:             'Anda akan dikembalikan ke halaman log masuk.',
     stay:                    'Kekal',
