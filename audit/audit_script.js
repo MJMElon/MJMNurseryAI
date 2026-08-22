@@ -117,10 +117,17 @@ async function loadRecords(){
     // grid populates from whichever answers.
     const [aRows, tRows, abRows, bMetaRows, balRows] = await Promise.all([
       sb.select('audit_plot_audits', 'select=*'),
+      // Two life stages tell us a batch is standing on a plot:
+      //   Planted            → seeds went into a PN plot (P01–P52)
+      //   Transplanted*      → seedlings went into an MN plot (B/U/N)
+      // Loading only the transplant types missed every PN batch — the
+      // Pre-Nursery grid was permanently blank because pre-nursery
+      // batches never have a Transplanted log (they only have Planted
+      // and later Transplanted OUT to a main nursery plot).
       sb.select('shared_inventory_logs',
                 'select=batch_name,plot_name,transaction_type,breed_name'
-              + '&transaction_type=in.(Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
-        .catch(e => { console.warn('[plot-audit] transplant logs load failed:', e); return []; }),
+              + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+        .catch(e => { console.warn('[plot-audit] life-stage logs load failed:', e); return []; }),
       sb.select('audit_batches', 'select=nursery,plot,batch_no,breed')
         .catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; }),
       sb.select('operation_batches', 'select=name,breed_name')
@@ -710,7 +717,10 @@ async function doDelete(){
 /* --- INIT --- */
 function init(){
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
-  document.getElementById('fab').addEventListener('click',openAddForm);
+  // FAB was removed from the page but a stub is kept so this binding
+  // still succeeds without a null-check. If a future refactor drops
+  // the stub too, the ?. means the whole init doesn't die.
+  document.getElementById('fab')?.addEventListener('click',openAddForm);
   document.getElementById('modal-overlay').addEventListener('click',e=>{
     if(e.target===document.getElementById('modal-overlay'))cancelDelete();
   });
