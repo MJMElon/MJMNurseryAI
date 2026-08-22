@@ -199,7 +199,9 @@ const TRANSLATIONS = {
     worker:              'Worker',
     completed:           'Completed',
     audit_photo:         'Audit Photo',
-    all_audited:         '🎉 All plots audited!',
+    /* Dead entry removed — `all_audited` above is the live one, used as
+       the short "all audited" plot-icon subtitle. The papan empty-state
+       still hard-codes the emoji string, so nothing referenced this. */
 
 
     /* === EXTRA === */
@@ -635,7 +637,7 @@ const TRANSLATIONS = {
     worker:              'Pekerja',
     completed:           'Tarikh Siap',
     audit_photo:         'Gambar Audit',
-    all_audited:         '🎉 Semua plot telah diaudit!',
+    /* Dead entry removed — `all_audited` above is the live one. */
 
 
     /* === EXTRA === */

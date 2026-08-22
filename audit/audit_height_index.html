@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#1a4d1a"/>
 <title>Seedling Height — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="audit_height_styles.css"/>
+<link rel="stylesheet" href="audit_height_styles.css?v=20260822e"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
@@ -34,22 +34,36 @@
     </div>
     <div class="top-bar-actions">
       <!-- BM/EN toggle removed: language is set once on audit_nursery_select.html. -->
-      <button class="top-bar-btn" onclick="loadRecords()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
+      <button class="top-bar-btn" title="Refresh" aria-label="Refresh" onclick="refreshCurrentView()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
     </div>
   </nav>
 
-  <!-- LIST VIEW -->
+  <!-- LIST VIEW — plot-icon grid (same shape as Plot Condition Audit).
+       Corner badge shows pending count in amber, or a green ✓ once every
+       required batch on that plot has been keyed in. Click a plot to open
+       the per-plot detail below (view-plot). -->
   <div id="view-list" class="view page-scroll">
-    <div class="summary-strip">
-      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label" data-t="this_month" data-t="this_month">This Month</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-avg">0</div><div class="stat-label" data-t="plots_150" data-t="plots_150">Plots ≥150cm</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-max">—</div><div class="stat-label" data-t="reached_pct" data-t="reached_pct">Reached %</div></div>
-    </div>
     <div class="list-header">
       <span class="list-heading" id="list-heading">Seedling Height Audit — PN</span>
-      <span class="list-count" id="list-count">0 records</span>
+      <span class="list-count" id="list-count">0 / 0 audited</span>
     </div>
-    <div class="record-list" id="records-list"></div>
+    <div class="plot-grid" id="plot-grid"></div>
+    <!-- Kept as a hidden stub so any old script path that still touches
+         records-list doesn't throw; the actual list is per-plot below. -->
+    <div class="record-list" id="records-list" style="display:none"></div>
+  </div>
+
+  <!-- PLOT DETAIL — one plot's batches, each a row with height numbers
+       when audited, "Pending" while empty, or a greyed "Not Required"
+       row when the operation ledger shows the batch is out. Fed by
+       openPlotDetail(plot); back button returns to the grid. -->
+  <div id="view-plot" class="view page-scroll">
+    <div class="form-view-header">
+      <button class="back-btn" onclick="setView('list')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="form-view-title"><span id="plot-detail-plot">—</span></span>
+      <span class="form-view-id" id="plot-detail-count">0 batches</span>
+    </div>
+    <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
   </div>
 
   <!-- FORM VIEW -->
@@ -76,6 +90,34 @@
             <div class="field-label"><span data-t="batch">Batch</span> <span class="req">*</span></div>
             <input id="f-batch" class="input" type="text" placeholder="e.g. B-2025-01" maxlength="24"/>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Audit Required — one-tap way to close out a batch when the
+         auditor confirms there is nothing to check (plants already
+         moved, plot empty). Mirrors the plot-condition decline flow. -->
+    <div class="form-card" id="no-audit-card">
+      <div class="form-inner" style="padding-top:14px;padding-bottom:14px">
+        <button type="button" id="btn-no-audit" onclick="declineAudit()"
+                style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px dashed var(--g500);background:var(--g50);color:var(--g800);font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s">
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <span>NO AUDIT REQUIRED</span>
+        </button>
+        <div id="no-audit-note" style="display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--g50);border:1px solid var(--g200);color:var(--g800);font-size:12px;font-weight:600;line-height:1.5">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--g600);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><polyline points="5 12 10 17 19 8"/></svg>
+              <strong>Marked "No Audit Required"</strong>
+            </div>
+            <button type="button" id="btn-undo-no-audit" onclick="undoDeclineAudit()"
+                    style="flex-shrink:0;background:transparent;border:1px solid var(--g500);color:var(--g700);font-family:inherit;font-weight:800;font-size:10px;letter-spacing:.5px;padding:5px 11px;border-radius:999px;cursor:pointer;text-transform:uppercase;display:flex;align-items:center;gap:5px">
+              <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L3 7"/></svg>
+              <span>Undo</span>
+            </button>
+          </div>
+          <div style="color:var(--text3);font-weight:500">By <span id="no-audit-by">—</span> · <span id="no-audit-when">—</span></div>
+          <div style="color:var(--text3);font-weight:500;margin-top:6px">Fields below are disabled. Tap Save to close this batch out — no measurements or photos needed.</div>
         </div>
       </div>
     </div>
@@ -210,7 +252,10 @@
     </button>
   </nav>
 
-  <button class="fab" id="fab"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+  <!-- FAB removed — every batch now has its own row in the plot detail.
+       Kept as a hidden stub because init() still binds a click handler
+       and setView() toggles its .hidden class. -->
+  <button class="fab hidden" id="fab" hidden style="display:none" aria-hidden="true" tabindex="-1"></button>
 
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
@@ -236,6 +281,6 @@
 <script src="audit_lang.js"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js"></script>
-<script src="audit_height_script.js"></script>
+<script src="audit_height_script.js?v=20260822e"></script>
 </body>
 </html>

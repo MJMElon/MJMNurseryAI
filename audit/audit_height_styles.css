@@ -228,3 +228,106 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 .loading-text{font-size:13px;font-weight:600;color:#3d5c3d;font-family:'DM Sans',sans-serif}
 @keyframes lspin{to{transform:rotate(360deg)}}
 .hidden{display:none !important}
+
+/* =====================================================================
+   PLOT-ICON GRID — mirrors Plot Condition Audit so the auditor navigates
+   height auditing exactly the same way. Circular plot chip with a corner
+   badge (amber pending count / green ✓ once every required batch on the
+   plot has been keyed in).
+   ===================================================================== */
+:root{
+  --amber600:#d97706;                     /* pending badge fill */
+}
+.plot-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(68px, 1fr));
+  gap:10px;
+  padding:12px 10px;
+}
+.plot-cell{
+  position:relative;
+  background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  transition:transform .12s;
+}
+.plot-cell:active{transform:scale(.94)}
+.plot-icon{
+  width:52px;height:52px;border-radius:50%;
+  border:2px solid var(--g500);
+  background:var(--g50);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;
+  box-shadow:0 1px 2px rgba(16,40,20,.06);
+  transition:box-shadow .15s, border-color .15s, background .15s, transform .12s;
+}
+.plot-cell:hover .plot-icon{
+  border-color:var(--g700);
+  box-shadow:0 4px 10px rgba(16,40,20,.14);
+  transform:translateY(-1px);
+}
+.plot-icon-num{
+  font-size:15px;font-weight:800;color:var(--g900);letter-spacing:.2px;line-height:1;
+  z-index:1;
+}
+.plot-badge{
+  position:absolute;
+  top:-4px;right:-4px;
+  min-width:18px;height:18px;padding:0 5px;
+  border-radius:999px;
+  background:var(--amber600,#d97706);
+  color:#fff;font-size:10px;font-weight:800;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--surface,#f4f6f4);
+  box-shadow:0 2px 4px rgba(0,0,0,.15);
+  z-index:2;
+}
+.plot-badge.done{background:var(--g600)}
+.plot-badge svg{width:11px;height:11px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;display:block}
+.plot-cell.done .plot-badge{background:var(--g600)}
+.plot-cell.done .plot-icon{
+  border-color:var(--g700);
+  background:var(--g100);
+  box-shadow:0 3px 7px rgba(16,80,30,.14);
+}
+.plot-cell.done .plot-icon-num{color:var(--g900)}
+.plot-tick{
+  position:absolute;inset:0;
+  display:none;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.plot-cell.done .plot-tick{display:flex}
+.plot-tick svg{
+  width:44px;height:44px;stroke:var(--g600);fill:none;
+  stroke-width:4;stroke-linecap:round;stroke-linejoin:round;
+  opacity:.35;
+}
+.plot-name{
+  font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.15px;line-height:1.2;
+  text-align:center;
+}
+.plot-cell.done .plot-name{color:var(--g700);font-weight:700}
+.plot-cell:focus-visible{outline:none}
+.plot-cell:focus-visible .plot-icon{
+  outline:2px solid var(--g600);
+  outline-offset:3px;
+  box-shadow:0 0 0 5px rgba(45,122,45,.22);
+}
+.plot-grid-empty{
+  grid-column:1/-1;
+  text-align:center;padding:36px 14px;color:var(--text3);font-size:13px;
+}
+
+/* Per-plot detail: batch rows lifted from the plot-condition list style
+   so the row card + border-left status stripe read the same. Placeholder
+   thumb tile appears when a batch is still pending (no photos yet). */
+.record-thumb-placeholder{
+  width:64px;height:64px;border-radius:10px;background:var(--g100);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  color:var(--g500);
+}
+.record-thumb-placeholder svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mini-chip{
+  display:inline-block;padding:3px 8px;border-radius:999px;
+  font-size:11px;font-weight:700;line-height:1;
+}
