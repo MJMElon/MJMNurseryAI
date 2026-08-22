@@ -279,21 +279,34 @@ function openPlotDetail(plot){
         <span class="mini-chip ${chipClass(audit.bintik)}">Disease:${audit.bintik}</span>
         <span class="mc-w mini-chip" style="background:${WARNA_BG[audit.warna]||'#888'}">Leaf ${audit.warna}</span>
       </div>` : '';
+    // Actions on the right:
+    //   audited → edit + (admin) delete icon buttons
+    //   pending → nothing on the right; the row itself is the tap target
     const actionsHtml = done
-      // Icon buttons — same shape / same shape / same shape as the height and plot list rows.
-      // Delete only shows for audit admins; non-admins see just the edit button.
-      ? `<button class="icon-btn edit-btn" title="Edit audit" aria-label="Edit audit" onclick="openEdit('${audit.uid}')">${editSvg}</button>`
-        + (canDelete ? `<button class="icon-btn del-btn" title="Delete audit" aria-label="Delete audit" onclick="confirmDelete('${audit.uid}')">${delSvg}</button>` : '')
-      // No record yet → keep the text Audit Now action; there is nothing to edit or delete.
-      : `<button class="btn-audit-now" onclick="_openFormForPlot('${plot}','${b.batch}')">Audit Now</button>`;
-    return `<div class="record-item" style="${rowStyle}">
+      ? `<div class="record-actions" onclick="event.stopPropagation()">`
+          + `<button class="icon-btn edit-btn" title="Edit audit" aria-label="Edit audit" onclick="openEdit('${audit.uid}')">${editSvg}</button>`
+          + (canDelete ? `<button class="icon-btn del-btn" title="Delete audit" aria-label="Delete audit" onclick="confirmDelete('${audit.uid}')">${delSvg}</button>` : '')
+        + '</div>'
+      : '';
+    // Whole-row click opens the right form: pending → new audit for this
+    // batch (Audit Now button is no longer needed); audited → edit that
+    // audit. On audited rows the icon buttons live inside their own
+    // stopPropagation wrapper so tapping edit/delete doesn't double-fire.
+    const rowClick = done
+      ? `openEdit('${audit.uid}')`
+      : `_openFormForPlot('${plot}','${b.batch}')`;
+    const rowLabel = done ? 'Edit audit for batch ' + b.batch : 'Audit batch ' + b.batch;
+    return `<div class="record-item" role="button" tabindex="0"
+                 aria-label="${rowLabel}" style="${rowStyle}"
+                 onclick="${rowClick}"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${rowClick};}">
       ${thumbHtml}
       <div class="record-info">
         <div class="record-plot">Batch ${b.batch}${breedHtml}</div>
         <div class="record-meta">${metaHtml}</div>
         ${chipsHtml}
       </div>
-      <div class="record-actions" onclick="event.stopPropagation()">${actionsHtml}</div>
+      ${actionsHtml}
     </div>`;
   }).join('');
   setView('plot');
