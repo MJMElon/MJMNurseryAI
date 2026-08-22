@@ -63,33 +63,67 @@ function selectTab(nursery){
   setView('list');
 }
 
-/* --- LOAD --- */
+/* --- LOAD ---
+   The plot icon grid needs to know 'which batches are on plot Pxx'.
+   Rather than reading the stale audit_batches table (which was a
+   one-shot snapshot from Nursery AI), we pull the same source
+   Operation Reports uses: shared_inventory_logs — every Transplanted*
+   log tells us a batch has landed on a plot. That way the audit's
+   yellow dots always match what the operation module says is out
+   there today. audit_batches would only see rows manually keyed in.
+
+   PLOT_TO_NURSERY is a reverse lookup of NURSERY_PLOTS (plot code →
+   nursery). Anything not in the four scoped lists is skipped so a stray
+   plot name in the logs can't inflate the grid. */
+const PLOT_TO_NURSERY = (function(){
+  const m = {};
+  Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => { m[p] = n; }));
+  return m;
+})();
 async function loadRecords(){
   setLoading(true);
   try{
-    // Load records + batch roster in parallel. audit_batches is the same
-    // table Papan Tanda reads, populated by the Nursery AI sync — each
-    // row is one batch on one plot. We only need the (nursery, plot,
-    // batch_no) triples, but SELECT * keeps the query simple. Fail-open
-    // on batch load errors: plotBatches stays empty and the grid falls
-    // back to one placeholder dot per plot.
-    const [aRows, bRows] = await Promise.all([
-      sb.select('audit_plot_audits','select=*'),
-      sb.select('audit_batches','select=*').catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; })
+    // Pull audit records + transplant logs + operation_batches (for breed
+    // fallback) in parallel. All three are fail-open — a Supabase blip
+    // shouldn't blank the grid.
+    const [aRows, tRows, bMetaRows] = await Promise.all([
+      sb.select('audit_plot_audits', 'select=*'),
+      sb.select('shared_inventory_logs',
+                'select=batch_name,plot_name,transaction_type,breed_name'
+              + '&transaction_type=in.(Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+        .catch(e => { console.warn('[plot-audit] transplant logs load failed:', e); return []; }),
+      sb.select('operation_batches', 'select=name,breed_name')
+        .catch(e => { console.warn('[plot-audit] operation_batches load failed:', e); return []; })
     ]);
-    records=aRows.map(r=>({
+    records = aRows.map(r => ({
       uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
       batch:r.batch,ulat:r.pest,tikus:r.tikus,bintik:r.disease,
       warna:r.warna_daun,photo:r.photo_url,photo2:r.photo_2_url||null,
       date:r.date,createdAt:r.created_at
     }));
-    plotBatches=(bRows||[]).map(r=>({
-      uid:String(r.id),
-      nursery:r.nursery||'',
-      plot:r.plot||'',
-      batch:String(r.batch_no||'').trim(),
-      breed:r.breed||''
-    })).filter(b=>b.nursery && b.plot && b.batch);
+    // breed_name fallback for logs that predate the breed column being filled.
+    const breedByBatch = {};
+    (bMetaRows || []).forEach(b => { if (b && b.name) breedByBatch[b.name] = b.breed_name || ''; });
+
+    // Build (nursery, plot, batch) triples from every transplant log,
+    // deduped so the same batch on the same plot doesn't produce
+    // multiple dots (Transplanted + Transplanted_Premium for one plot).
+    const seen = new Set();
+    plotBatches = [];
+    (tRows || []).forEach(l => {
+      const plot  = l.plot_name;
+      const batch = String(l.batch_name || '').trim();
+      if (!plot || !batch) return;
+      const nursery = PLOT_TO_NURSERY[plot];
+      if (!nursery) return;                            // plot outside PN/BNN/UNN1/UNN2 → ignore
+      const key = nursery + '|' + plot + '|' + batch;
+      if (seen.has(key)) return;
+      seen.add(key);
+      plotBatches.push({
+        nursery, plot, batch,
+        breed: l.breed_name || breedByBatch[batch] || ''
+      });
+    });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
