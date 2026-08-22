@@ -9,6 +9,10 @@ const TASK_TYPES = ['Manuring','Weeding','Racun','Interrow Spray','Other'];
 
 let tasks=[], audits=[];
 let activeTab='audit', activeFilter='All', activeView='list';
+// The nursery filter mirrors Papan Tanda's — one of PN | BNN | UNN1 | UNN2
+// at any time. Deep-link from the auditor hub (?nursery=X) sets this too.
+let activeNursery='PN';
+const NURSERY_LABELS={PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formTaskId=null;
 let formState={result:null,remarks:'',photo:null};
@@ -74,6 +78,23 @@ function setFilter(f,el){
   document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   renderLists();
+  updateStats();
+}
+
+/* Same shape as Papan Tanda's selectNursery: mark the button active,
+   flip the top-bar nursery label, then re-render + re-count. */
+function selectNursery(n, el){
+  activeNursery=n;
+  document.querySelectorAll('.nursery-filter-btn').forEach(b=>b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else {
+    const btn=document.querySelector('.nursery-filter-btn[data-n="'+n+'"]');
+    if (btn) btn.classList.add('active');
+  }
+  const label=document.getElementById('topbar-nursery');
+  if (label) label.textContent=NURSERY_LABELS[n]||n;
+  renderLists();
+  updateStats();
 }
 
 /* --- STATS --- */
@@ -84,7 +105,9 @@ function updateStats(){
   document.getElementById('stat-total').textContent=filtered.length;
   document.getElementById('stat-pending').textContent=pending.length;
   document.getElementById('stat-done').textContent=done.length;
-  // Badge on tab
+  // Badge on tab — total pending across ALL nurseries (nursery-blind so
+  // the auditor sees there is work somewhere even when standing on the
+  // wrong nursery filter).
   const tab=document.querySelector('[data-t="audit"]');
   let badge=tab.querySelector('.tab-badge');
   const allPending=tasks.filter(t=>!getAuditForTask(t.id)).length;
@@ -92,11 +115,32 @@ function updateStats(){
     if(!badge){badge=document.createElement('span');badge.className='tab-badge';tab.appendChild(badge);}
     badge.textContent=allPending;
   } else if(badge) badge.remove();
+
+  // Pending count per nursery on the four filter buttons — same signal
+  // the papan audit uses: a red dot on BNN says work exists there while
+  // you're standing on PN, so nobody has to click through four tabs to
+  // find it.
+  document.querySelectorAll('.nursery-filter-btn').forEach(btn=>{
+    const n=btn.dataset.n; if(!n) return;
+    const count=tasks.filter(t=>t.nursery===n && !getAuditForTask(t.id)).length;
+    let dot=btn.querySelector('.nursery-badge');
+    if(count>0){
+      if(!dot){dot=document.createElement('span');dot.className='nursery-badge';btn.appendChild(dot);}
+      dot.textContent=count;
+      btn.setAttribute('aria-label',(NURSERY_LABELS[n]||n)+' — '+count+' pending');
+    } else {
+      if(dot) dot.remove();
+      btn.removeAttribute('aria-label');
+    }
+  });
 }
 
+/* Applies BOTH filters together — nursery first (cheaper), then task
+   type. Empty/'All' task filter is a no-op. */
 function filterTasks(list){
-  if(activeFilter==='All') return list;
-  return list.filter(t=>t.type===activeFilter);
+  let out = list.filter(t=>t.nursery===activeNursery);
+  if(activeFilter!=='All') out = out.filter(t=>t.type===activeFilter);
+  return out;
 }
 
 /* --- LOAD --- */
@@ -378,12 +422,15 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',e=>{
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
-  selectTab('audit');setView('list');loadAll();
+  selectTab('audit');setView('list');
   // Deep-link support: the auditor hub tags its nursery chips with
-  // ?nursery=X&from=home. Maintenance is task-based rather than per-
-  // nursery, so the nursery param is informational only; the &from=home
-  // flag still swaps the top-bar back arrow into Choose-Another-Nursery.
+  // ?nursery=X&from=home. Set the active nursery BEFORE loadAll() so the
+  // first render already respects the choice; &from=home swaps the
+  // top-bar back arrow into Choose-Another-Nursery.
   const _q = new URLSearchParams(location.search);
+  const _nq = String(_q.get('nursery') || '').toUpperCase();
+  if (NURSERY_LABELS[_nq]) selectNursery(_nq);
+  loadAll();
   if (_q.get('from') === 'home') {
     const back = document.querySelector('.top-bar-back');
     if (back) {
