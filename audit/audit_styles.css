@@ -370,50 +370,79 @@ html, body {
 .record-list { padding: 0 12px; }
 
 /* ── PLOT ICON GRID (list view) ─────────────────────────────────────
-   Replaces the flat record list on the Plot Condition Audit's first
-   page. One circular icon per plot (P01–P52 for PN, etc.), each with a
-   row of dots — one dot per known batch on that plot. Yellow dot means
-   the batch is still to be audited; the dot flips green when audited.
-   Once every dot is green a big check overlays the plot number, so
-   "done" is visible at a glance without opening the plot. */
+   Icons on the Plot Condition Audit's first page. Repainted to sit in
+   the audit system's green palette instead of the previous black-
+   bordered look — now every icon uses the same --g500/--g100 tokens
+   the rest of the audit UI already ships, so a PN → BNN → UNN switch
+   reads as one system rather than four page skins.
+
+   Design:
+     · Circle: light-green surface (--g50) on a mid-green ring (--g500).
+     · Number: near-black-green (--g900) for high contrast on the tint.
+     · Pending dot: warm amber (--amber600). Softer than pure yellow,
+       and readable next to the green border.
+     · Done dot: audit green (--g600). Same shade as the check overlay.
+     · Done state: darker green ring, subtle green wash, and the big
+       check sitting behind the plot number so the plot stays legible.
+     · Hover / focus / active feedback via elevation + a stronger ring.
+
+   Fits the four-nursery scope switch: the same icon is rendered for
+   P01–P52 (PN), B01–B14 (BNN), U01–U18 (UNN 1), N01–N20 (UNN 2). */
 .plot-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(94px, 1fr));
-  gap:12px;
-  padding:12px;
+  grid-template-columns:repeat(auto-fill, minmax(96px, 1fr));
+  gap:14px;
+  padding:14px 12px;
 }
 .plot-cell{
   position:relative;
   background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
   transition:transform .12s;
 }
 .plot-cell:active{transform:scale(.96)}
 .plot-icon{
   width:78px;height:78px;border-radius:50%;
-  border:2.5px solid #182018;background:#fff;
+  border:2px solid var(--g500);
+  background:var(--g50);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   position:relative;
-  transition:box-shadow .15s, border-color .15s;
+  box-shadow:0 1px 2px rgba(16,40,20,.06);
+  transition:box-shadow .15s, border-color .15s, background .15s, transform .12s;
 }
-.plot-cell:hover .plot-icon{box-shadow:0 6px 14px rgba(16,40,20,.16);border-color:var(--g700)}
+.plot-cell:hover .plot-icon{
+  border-color:var(--g700);
+  box-shadow:0 6px 14px rgba(16,40,20,.15);
+  transform:translateY(-1px);
+}
 .plot-icon-num{
-  font-size:18px;font-weight:800;color:#182018;letter-spacing:.3px;line-height:1;
+  font-size:18px;font-weight:800;color:var(--g900);letter-spacing:.3px;line-height:1;
+  z-index:1;
 }
 .plot-icon-dots{
-  display:flex;gap:3.5px;margin-top:5px;
+  display:flex;gap:4px;margin-top:6px;
+  z-index:1;
 }
 .plot-dot{
   width:8px;height:8px;border-radius:50%;
-  background:#f4c94a;                       /* pending — soft yellow */
-  border:1px solid rgba(0,0,0,.10);
+  background:var(--amber600,#d97706);       /* pending — warm amber matches audit --amber600 */
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.10);
 }
-.plot-dot.done{background:#22a34a;border-color:rgba(0,0,0,.15)}
-.plot-cell.done .plot-icon{border-color:#22a34a}
-.plot-cell.done .plot-icon-num{color:#136f2c}
-/* Big green check overlay when every dot is green. Positioned so the
-   number stays visible peeking through. */
+.plot-dot.done{
+  background:var(--g600);border-color:rgba(0,0,0,.12);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.10);
+}
+
+/* Done state — deeper green ring + subtle green fill under the check
+   so the number stays legible when the ✓ sits behind it. */
+.plot-cell.done .plot-icon{
+  border-color:var(--g700);
+  background:var(--g100);
+  box-shadow:0 4px 10px rgba(16,80,30,.14);
+}
+.plot-cell.done .plot-icon-num{color:var(--g900)}
 .plot-tick{
   position:absolute;inset:0;
   display:none;align-items:center;justify-content:center;
@@ -421,14 +450,28 @@ html, body {
 }
 .plot-cell.done .plot-tick{display:flex}
 .plot-tick svg{
-  width:78px;height:78px;stroke:#22a34a;fill:none;
-  stroke-width:6;stroke-linecap:round;stroke-linejoin:round;
-  opacity:.9;
+  width:64px;height:64px;stroke:var(--g600);fill:none;
+  stroke-width:5;stroke-linecap:round;stroke-linejoin:round;
+  opacity:.35;                              /* muted so the P0N number remains readable */
 }
+
+/* Plot subtitle ("1 batch" / "no batches") — subdued green so it reads
+   as metadata, not as a heading. Uses --text3 (already the audit's muted
+   colour) rather than a raw hex, so a theme swap carries it along. */
 .plot-name{
-  font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.2px;
+  font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.2px;
 }
-.plot-cell.done .plot-name{color:#136f2c}
+.plot-cell.done .plot-name{color:var(--g700);font-weight:700}
+
+/* Keyboard focus — a solid green ring matches audit_a11y.css without
+   fighting it. audit_a11y.css only applies its default outline to
+   <button>, but the specificity here keeps the rounded shape. */
+.plot-cell:focus-visible{outline:none}
+.plot-cell:focus-visible .plot-icon{
+  outline:2px solid var(--g600);
+  outline-offset:3px;
+  box-shadow:0 0 0 5px rgba(45,122,45,.22);
+}
 
 /* Empty-state text inside .plot-grid when the nursery has no plots. */
 .plot-grid-empty{
