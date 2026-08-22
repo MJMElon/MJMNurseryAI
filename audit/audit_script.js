@@ -248,20 +248,52 @@ function openPlotDetail(plot){
     setView('plot');
     return;
   }
+  // Card design mirrors the Seedling Height list: thumb on the left,
+  // batch code + breed + audit-id/date, findings as chip pills, and
+  // icon buttons on the right (green edit; red trash for admins only,
+  // matching the height and papan lists — anyone can edit, only an
+  // admin may delete). Pending batches keep a text 'Audit Now' button
+  // because there's no record to edit or delete yet.
+  const canDelete = typeof isAuditAdmin === 'function' && isAuditAdmin();
+  const editSvg = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  const delSvg  = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
+
   listEl.innerHTML = bs.map(b => {
     const audit = records.find(r => r.nursery === activeTab && r.plot === plot &&
                               String(r.batch || '').trim() === b.batch);
     const done = !!audit;
     const rowStyle = done ? 'border-left:4px solid #22a34a' : 'border-left:4px solid #f4c94a';
-    const btnHtml = done
-      ? `<button class="btn-audit-now" style="background:var(--g600)" onclick="openEdit('${audit.uid}')">Re-audit</button>`
+    const thumbHtml = done && audit.photo
+      ? `<img class="record-thumb" src="${audit.photo}" alt="Batch ${b.batch}" onclick="event.stopPropagation();openLightbox('${audit.photo}')"/>`
+      : `<div class="record-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`;
+    const breedHtml = b.breed
+      ? ` <span style="font-size:11px;color:var(--text3);font-weight:500">· ${b.breed}</span>`
+      : '';
+    const metaHtml = done
+      ? `${audit.id || ''}${audit.createdAt ? ' · ' + fmtDT(audit.createdAt) : ''}`
+      : 'Pending';
+    const chipsHtml = done ? `
+      <div class="record-chips">
+        <span class="mini-chip ${chipClass(audit.ulat)}">Pest:${audit.ulat}</span>
+        <span class="mini-chip ${chipClass(audit.tikus)}">Animal:${audit.tikus}</span>
+        <span class="mini-chip ${chipClass(audit.bintik)}">Disease:${audit.bintik}</span>
+        <span class="mc-w mini-chip" style="background:${WARNA_BG[audit.warna]||'#888'}">Leaf ${audit.warna}</span>
+      </div>` : '';
+    const actionsHtml = done
+      // Icon buttons — same shape / same shape / same shape as the height and plot list rows.
+      // Delete only shows for audit admins; non-admins see just the edit button.
+      ? `<button class="icon-btn edit-btn" title="Edit audit" aria-label="Edit audit" onclick="openEdit('${audit.uid}')">${editSvg}</button>`
+        + (canDelete ? `<button class="icon-btn del-btn" title="Delete audit" aria-label="Delete audit" onclick="confirmDelete('${audit.uid}')">${delSvg}</button>` : '')
+      // No record yet → keep the text Audit Now action; there is nothing to edit or delete.
       : `<button class="btn-audit-now" onclick="_openFormForPlot('${plot}','${b.batch}')">Audit Now</button>`;
     return `<div class="record-item" style="${rowStyle}">
+      ${thumbHtml}
       <div class="record-info">
-        <div class="record-plot">Batch ${b.batch}${b.breed ? ' <span style="font-size:11px;color:var(--text3);font-weight:500">· ' + b.breed + '</span>' : ''}</div>
-        <div class="record-meta">${done ? '✓ Audited · ' + (audit.id || '') + (audit.createdAt ? ' · ' + fmtDT(audit.createdAt) : '') : 'Pending'}</div>
+        <div class="record-plot">Batch ${b.batch}${breedHtml}</div>
+        <div class="record-meta">${metaHtml}</div>
+        ${chipsHtml}
       </div>
-      <div class="record-actions" onclick="event.stopPropagation()">${btnHtml}</div>
+      <div class="record-actions" onclick="event.stopPropagation()">${actionsHtml}</div>
     </div>`;
   }).join('');
   setView('plot');
