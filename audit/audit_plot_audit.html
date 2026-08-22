@@ -37,13 +37,28 @@
     </div>
   </nav>
 
-  <!-- LIST VIEW -->
+  <!-- LIST VIEW — now a grid of plot icons instead of a flat record list.
+       Each icon carries N dots (one per known batch on that plot). Yellow
+       dot = batch still to audit; green dot + tick overlay = plot done.
+       Click a plot to open the per-plot detail below (view-plot). -->
   <div id="view-list" class="view page-scroll">
     <div class="list-header">
       <span class="list-heading" id="list-heading">PN</span>
       <span class="list-count" id="list-count">0 <span data-t="records">records</span></span>
     </div>
-    <div class="record-list" id="records-list"></div>
+    <div class="plot-grid" id="plot-grid"></div>
+    <div class="record-list" id="records-list" style="display:none"></div>
+  </div>
+
+  <!-- PLOT DETAIL — one plot's batches, each a row with an Audit / Edit
+       button. Fed by openPlotDetail(plot); back button returns to grid. -->
+  <div id="view-plot" class="view page-scroll">
+    <div class="form-view-header">
+      <button class="back-btn" onclick="setView('list')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="form-view-title"><span id="plot-detail-plot">—</span></span>
+      <span class="form-view-id" id="plot-detail-count">0 batches</span>
+    </div>
+    <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
   </div>
 
   <!-- FORM VIEW -->

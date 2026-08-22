@@ -369,6 +369,73 @@ html, body {
 
 .record-list { padding: 0 12px; }
 
+/* ── PLOT ICON GRID (list view) ─────────────────────────────────────
+   Replaces the flat record list on the Plot Condition Audit's first
+   page. One circular icon per plot (P01–P52 for PN, etc.), each with a
+   row of dots — one dot per known batch on that plot. Yellow dot means
+   the batch is still to be audited; the dot flips green when audited.
+   Once every dot is green a big check overlays the plot number, so
+   "done" is visible at a glance without opening the plot. */
+.plot-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(94px, 1fr));
+  gap:12px;
+  padding:12px;
+}
+.plot-cell{
+  position:relative;
+  background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  transition:transform .12s;
+}
+.plot-cell:active{transform:scale(.96)}
+.plot-icon{
+  width:78px;height:78px;border-radius:50%;
+  border:2.5px solid #182018;background:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;
+  transition:box-shadow .15s, border-color .15s;
+}
+.plot-cell:hover .plot-icon{box-shadow:0 6px 14px rgba(16,40,20,.16);border-color:var(--g700)}
+.plot-icon-num{
+  font-size:18px;font-weight:800;color:#182018;letter-spacing:.3px;line-height:1;
+}
+.plot-icon-dots{
+  display:flex;gap:3.5px;margin-top:5px;
+}
+.plot-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:#f4c94a;                       /* pending — soft yellow */
+  border:1px solid rgba(0,0,0,.10);
+}
+.plot-dot.done{background:#22a34a;border-color:rgba(0,0,0,.15)}
+.plot-cell.done .plot-icon{border-color:#22a34a}
+.plot-cell.done .plot-icon-num{color:#136f2c}
+/* Big green check overlay when every dot is green. Positioned so the
+   number stays visible peeking through. */
+.plot-tick{
+  position:absolute;inset:0;
+  display:none;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.plot-cell.done .plot-tick{display:flex}
+.plot-tick svg{
+  width:78px;height:78px;stroke:#22a34a;fill:none;
+  stroke-width:6;stroke-linecap:round;stroke-linejoin:round;
+  opacity:.9;
+}
+.plot-name{
+  font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.2px;
+}
+.plot-cell.done .plot-name{color:#136f2c}
+
+/* Empty-state text inside .plot-grid when the nursery has no plots. */
+.plot-grid-empty{
+  grid-column:1/-1;
+  text-align:center;padding:36px 14px;color:var(--text3);font-size:13px;
+}
+
 .record-item {
   background: var(--card);
   border: 1px solid var(--border);
