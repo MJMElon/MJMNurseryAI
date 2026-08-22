@@ -319,7 +319,29 @@ function openPlotDetail(plot){
   // Remember which plot is on screen so the top-bar refresh can re-open
   // the same detail after loadRecords() completes.
   window._lastOpenedPlot = plot;
-  const bs = batchesOnPlot(plot);
+  // Row order: pending on top, audited in the middle, Not-Required at
+  // the bottom. Within each band, batch number ascending. That way an
+  // auditor opens the plot and their next task is the first thing under
+  // the thumb; a batch flips to "done" and slides down; anything the
+  // ledger says is out sits at the very bottom out of the way. Sort key
+  // 0/1/2 makes the ordering explicit and future-proof (add 3 for a new
+  // band without touching the compare).
+  const bs = batchesOnPlot(plot).slice().sort((a, b) => {
+    const rank = x => {
+      const aud = records.some(r => r.nursery === activeTab && r.plot === plot &&
+                                String(r.batch || '').trim() === x.batch);
+      if (aud)                                    return 1;    // audited
+      if (isBatchNotRequired(plot, x.batch))      return 2;    // not required
+      return 0;                                                // pending
+    };
+    const rd = rank(a) - rank(b);
+    if (rd) return rd;
+    // Numeric batch sort within a band — '221' before '235', not
+    // '221' after '2350' which localeCompare would give.
+    const na = Number(a.batch) || 0, nb = Number(b.batch) || 0;
+    if (na !== nb) return na - nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
   document.getElementById('plot-detail-plot').textContent = 'Plot ' + plot + ' — ' + NURSERY_LABELS[activeTab];
   document.getElementById('plot-detail-count').textContent =
     bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches on file';
