@@ -273,7 +273,7 @@ function renderList(){
     totalAudited  += required.filter(b => isBatchAudited(p, b.batch)).length;
   });
   document.getElementById('list-count').textContent =
-    totalAudited + ' / ' + totalRequired + ' audited';
+    totalAudited + ' / ' + totalRequired + ' ' + t('audited');
   document.getElementById('list-heading').textContent =
     t('plot_title') + ' — ' + NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
@@ -309,16 +309,16 @@ function renderList(){
     // Subtitle carries the ratio when there is work; falls back to the
     // total-batch count on plots with only Not-Required (or none at all).
     const subtitle = required.length
-      ? done + ' / ' + required.length + ' audited'
-      : (bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches');
+      ? done + ' / ' + required.length + ' ' + t('audited')
+      : (bs.length ? bs.length + ' ' + t(bs.length > 1 ? 'batches_many' : 'batch_one') : t('no_batches'));
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
               onclick="openPlotDetail('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
-                  ? (allDone ? 'all audited' : pending + ' pending')
-                  : 'no audit required'
+                  ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
+                  : t('no_audit_required_a11y')
               }">
         <div class="plot-icon">
           <div class="plot-icon-num">${p}</div>

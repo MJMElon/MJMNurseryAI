@@ -1,7 +1,13 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-22e */
 /* ================================================================
    MJM NURSERY — SEEDLING HEIGHT SYSTEM
    height_script.js — Supabase connected
+
+   Same nav flow as Plot Condition Audit: plot-icon grid → plot detail
+   → form. The grid pulls its batch roster from shared_inventory_logs
+   (Planted for PN, Transplanted* for MN) and uses
+   shared_plot_batch_balance to grey out batches that are "out"
+   (balance ≤ 0) so the auditor never sees a phantom task.
 ================================================================ */
 'use strict';
 
@@ -14,6 +20,13 @@ const NURSERY_PLOTS = {
 const NURSERY_LABELS = {PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
 
 let records=[], activeTab='PN', activeView='list';
+// Roster of known batches per plot — same shape and source as the plot
+// condition audit. Populated in loadRecords().
+let plotBatches=[];
+// Per-(plot,batch) current standing balance from shared_plot_batch_balance.
+// Missing key OR value ≤ 0 → batch is out (culled, sold or moved on) →
+// isBatchNotRequired() returns true and the row goes grey.
+let balanceByPB={};
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formState={nursery:'PN',s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
 let toastTimer=null;
@@ -61,91 +74,393 @@ function selectTab(nursery){
   setView('list');
 }
 
-/* --- LOAD FROM SUPABASE --- */
+/* Canonical plot code — NURSERY_PLOTS is padded ('B01'), but the
+   operation ledger and shared_plots keep the unpadded form ('B1').
+   Preserves the '-R' reserve suffix. Same helper the plot audit uses. */
+function _canonicalPlot(raw){
+  const s=String(raw||'').trim().toUpperCase();
+  const m=s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  if(!m)return s;
+  return m[1]+m[2].padStart(2,'0')+(m[3]||'');
+}
+/* Reverse lookup keyed by BOTH padded and unpadded plot codes so a raw
+   log spelling from the ledger resolves without a normalise-then-lookup
+   two-step. */
+const PLOT_TO_NURSERY=(function(){
+  const m={};
+  Object.keys(NURSERY_PLOTS).forEach(n=>NURSERY_PLOTS[n].forEach(p=>{
+    m[p]=n;
+    const stripped=p.replace(/^([A-Z]+)0+(\d)/,'$1$2');
+    if(stripped!==p)m[stripped]=n;
+  }));
+  return m;
+})();
+
+/* --- LOAD FROM SUPABASE ---
+   Fetch audit records + batch roster (from two sources) + balance in
+   parallel. All non-critical sources fail-open (empty array) so a stray
+   RLS block on one table doesn't take the whole grid down. */
 async function loadRecords(){
   setLoading(true);
   try{
-    const rows=await sb.select('audit_height_records','select=*');
-    records=rows.map(r=>({
-      uid:String(r.id), id:r.record_id, nursery:r.nursery, plot:r.plot, batch:r.batch,
+    const [aRows, tRows, abRows, balRows] = await Promise.all([
+      sb.select('audit_height_records','select=*'),
+      // Planted → PN, Transplanted* → MN. Both are enough to know a
+      // batch is standing on a plot at some point in its life.
+      sb.select('shared_inventory_logs',
+                'select=batch_name,plot_name,transaction_type,breed_name'
+              + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+        .catch(e=>{console.warn('[height-audit] logs load failed:',e);return[];}),
+      sb.select('audit_batches','select=nursery,plot,batch_no,breed')
+        .catch(e=>{console.warn('[height-audit] audit_batches load failed:',e);return[];}),
+      sb.select('shared_plot_batch_balance','select=plot_name,batch_name,qty')
+        .catch(e=>{console.warn('[height-audit] balance load failed:',e);return[];})
+    ]);
+    records = aRows.map(r=>({
+      uid:String(r.id), id:r.record_id, nursery:r.nursery,
+      plot:_canonicalPlot(r.plot),
+      batch:r.batch,
       s1:r.sample_1!=null?String(r.sample_1):'',
       s2:r.sample_2!=null?String(r.sample_2):'',
       s3:r.sample_3!=null?String(r.sample_3):'',
       p1:r.photo_1_url||null, p2:r.photo_2_url||null, p3:r.photo_3_url||null,
-      date:r.date, createdAt:r.created_at
+      date:r.date, createdAt:r.created_at,
+      auditor_name:r.auditor_name||''
     }));
+
+    // Build (nursery, plot, batch) triples from BOTH sources, deduped.
+    const seen=new Set();
+    plotBatches=[];
+    const addBatch=(nursery, plot, batch, breed)=>{
+      if(!nursery||!plot||!batch)return;
+      const key=nursery+'|'+plot+'|'+batch;
+      if(seen.has(key))return;
+      seen.add(key);
+      plotBatches.push({nursery, plot, batch, breed:breed||''});
+    };
+    (tRows||[]).forEach(l=>{
+      const plot=_canonicalPlot(l.plot_name);
+      const batch=String(l.batch_name||'').trim();
+      const nursery=plot?PLOT_TO_NURSERY[plot]:null;
+      addBatch(nursery, plot, batch, l.breed_name);
+    });
+    (abRows||[]).forEach(r=>{
+      const plot=_canonicalPlot(r.plot);
+      const batch=String(r.batch_no||'').trim();
+      const nursery=plot?PLOT_TO_NURSERY[plot]:null;
+      addBatch(nursery, plot, batch, r.breed);
+    });
+
+    balanceByPB={};
+    (balRows||[]).forEach(r=>{
+      const plot=_canonicalPlot(r.plot_name);
+      const batch=String(r.batch_name||'').trim();
+      if(!plot||!batch)return;
+      balanceByPB[plot+'|'+batch]=Number(r.qty||0);
+    });
+
+    console.log('[height-audit] loaded', {
+      audits: records.length,
+      fromLogs:(tRows||[]).length,
+      fromAuditBatches:(abRows||[]).length,
+      totalPlotBatches: plotBatches.length,
+      balanceRows:(balRows||[]).length
+    });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
 }
 
-/* --- RENDER LIST --- */
+/* --- BATCH HELPERS (mirror plot-condition semantics exactly) --- */
+/* Fail closed: no balance data at all → treat every batch as required so
+   the auditor decides by eye instead of skipping real work. */
+function isBatchNotRequired(plot, batch){
+  if(!Object.keys(balanceByPB).length)return false;
+  const key=_canonicalPlot(plot)+'|'+String(batch||'').trim();
+  const qty=balanceByPB[key];
+  return qty===undefined||qty<=0;
+}
+window.isBatchNotRequired=isBatchNotRequired;
+
+function batchesOnPlot(plot){
+  const seen=new Set();
+  const out=[];
+  plotBatches.forEach(b=>{
+    if(b.nursery!==activeTab||b.plot!==plot)return;
+    if(seen.has(b.batch))return;
+    seen.add(b.batch);
+    out.push(b);
+  });
+  // Fold in any batch we have an audit for but no roster row — otherwise
+  // a plot audited before the roster synced would disappear.
+  records.forEach(r=>{
+    if(r.nursery!==activeTab||r.plot!==plot)return;
+    const bn=String(r.batch||'').trim();
+    if(!bn||seen.has(bn))return;
+    seen.add(bn);
+    out.push({batch:bn, breed:''});
+  });
+  return out;
+}
+function isBatchAudited(plot, batch){
+  const wanted=String(batch||'').trim();
+  return records.some(r=>
+    r.nursery===activeTab && r.plot===plot && String(r.batch||'').trim()===wanted);
+}
+
+/* --- RENDER LIST — plot-icon grid --- */
 function renderList(){
-  const recs=records.filter(r=>r.nursery===activeTab);
-  document.getElementById('list-count').textContent=recs.length+' '+(recs.length!==1?t('records'):t('record'));
-  document.getElementById('list-heading').textContent=t('height_title')+' — '+NURSERY_LABELS[activeTab];
-
-  // Stat 1: This month's audits
-  const now=new Date();
-  const thisMonth=recs.filter(r=>{
-    if(!r.createdAt)return false;
-    const d=new Date(r.createdAt);
-    return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  const plots=NURSERY_PLOTS[activeTab]||[];
+  // Count BATCHES (required only). A plot with 4 required batches counts
+  // 4 towards the header ratio; a plot with all Not-Required counts 0.
+  let totalRequired=0;
+  let totalAudited=0;
+  plots.forEach(p=>{
+    const required=batchesOnPlot(p).filter(b=>!isBatchNotRequired(p, b.batch));
+    totalRequired += required.length;
+    totalAudited  += required.filter(b=>isBatchAudited(p, b.batch)).length;
   });
-  document.getElementById('stat-total').textContent=thisMonth.length;
+  document.getElementById('list-count').textContent =
+    totalAudited + ' / ' + totalRequired + ' ' + t('audited');
+  document.getElementById('list-heading').textContent =
+    t('height_title') + ' — ' + NURSERY_LABELS[activeTab];
 
-  // Stat 2 & 3: Plots with avg ≥ 150cm
-  const plotsReached=recs.filter(r=>{
-    const avg=parseFloat(calcAvg(r.s1,r.s2,r.s3));
-    return !isNaN(avg)&&avg>=150;
-  });
-  document.getElementById('stat-avg').textContent=plotsReached.length;
-  document.getElementById('stat-max').textContent=recs.length>0?Math.round((plotsReached.length/recs.length)*100)+'%':'—';
-
-  // tab badges
-  document.querySelectorAll('.tab-item').forEach(t=>{
-    const cnt=records.filter(r=>r.nursery===t.dataset.n).length;
-    let b=t.querySelector('.tab-badge');
-    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';t.appendChild(b);}b.textContent=cnt;}
+  // Tab badges — record count per nursery, same as the plot audit.
+  document.querySelectorAll('.tab-item').forEach(tb=>{
+    const cnt=records.filter(r=>r.nursery===tb.dataset.n).length;
+    let b=tb.querySelector('.tab-badge');
+    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';tb.appendChild(b);}b.textContent=cnt;}
     else if(b)b.remove();
   });
 
-  const el=document.getElementById('records-list');
-  if(!recs.length){
-    el.innerHTML='<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><h3>No height records yet</h3><p>Tap <strong>+</strong> to record seedling heights for '+NURSERY_LABELS[activeTab]+'.</p></div>';
+  const grid=document.getElementById('plot-grid');
+  if(!plots.length){
+    grid.innerHTML='<div class="plot-grid-empty">No plots configured for '+NURSERY_LABELS[activeTab]+'.</div>';
     return;
   }
-  el.innerHTML=recs.map(r=>{
-    const avg=calcAvg(r.s1,r.s2,r.s3);
-    const thumbs=[r.p1,r.p2,r.p3].map(p=>
-      p?'<img src="'+p+'" alt="photo"/>':
-      '<div class="thumb-ph"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>'
-    ).join('');
-    return '<div class="record-item" onclick="openDetail(\''+r.uid+'\')">'+
-      '<div class="record-thumb-stack">'+thumbs+'</div>'+
-      '<div class="record-info">'+
-        '<div class="record-plot">'+r.plot+(r.batch?' <span style="font-size:11px;color:var(--text3)">· '+r.batch+'</span>':'')+'</div>'+
-        '<div class="record-meta">'+r.id+' · '+fmtDT(r.createdAt)+'</div>'+
-        '<div class="record-heights">'+
-          (r.s1?'<span class="height-pill">S1: '+r.s1+' cm</span>':'<span class="height-pill missing">S1: —</span>')+
-          (r.s2?'<span class="height-pill">S2: '+r.s2+' cm</span>':'<span class="height-pill missing">S2: —</span>')+
-          (r.s3?'<span class="height-pill">S3: '+r.s3+' cm</span>':'<span class="height-pill missing">S3: —</span>')+
-          (avg?'<span class="avg-pill">Avg: '+avg+' cm</span>':'')+
-        '</div>'+
-      '</div>'+
-      '<div class="record-actions" onclick="event.stopPropagation()">'+
-        '<button class="icon-btn edit-btn" onclick="openEdit(\''+r.uid+'\')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
-        (isAuditAdmin()?'<button class="icon-btn del-btn" onclick="confirmDelete(\''+r.uid+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>':'')+
-      '</div>'+
-    '</div>';
+  grid.innerHTML = plots.map(p=>{
+    const bs=batchesOnPlot(p);
+    const required=bs.filter(b=>!isBatchNotRequired(p, b.batch));
+    const pending=required.filter(b=>!isBatchAudited(p, b.batch)).length;
+    const done=required.length - pending;
+    const allDone=required.length>0 && pending===0;
+
+    let badgeHtml='';
+    if(required.length){
+      badgeHtml = allDone
+        ? '<div class="plot-badge done" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="5 12 10 17 19 8"/></svg></div>'
+        : '<div class="plot-badge" aria-hidden="true">'+pending+'</div>';
+    }
+    const subtitle = required.length
+      ? done + ' / ' + required.length + ' ' + t('audited')
+      : (bs.length ? bs.length + ' ' + t(bs.length>1?'batches_many':'batch_one') : t('no_batches'));
+    return `
+      <button class="plot-cell ${allDone?'done':''}"
+              data-plot="${p}"
+              onclick="openPlotDetail('${p}')"
+              aria-label="Plot ${p} — ${
+                required.length
+                  ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
+                  : t('no_audit_required_a11y')
+              }">
+        <div class="plot-icon">
+          <div class="plot-icon-num">${p}</div>
+          ${badgeHtml}
+          <div class="plot-tick"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>
+        </div>
+        <div class="plot-name">${subtitle}</div>
+      </button>`;
   }).join('');
 }
+
+/* --- PLOT DETAIL — one plot's batches as a list.
+   Row ordering: pending on top, audited middle, Not-Required at the
+   bottom; ascending batch number within each band. Whole row is the
+   tap target (opens the form pre-linked to that batch). */
+function openPlotDetail(plot){
+  window._lastOpenedPlot=plot;
+  const bs=batchesOnPlot(plot).slice().sort((a,b)=>{
+    const rank=x=>{
+      const aud=records.some(r=>r.nursery===activeTab && r.plot===plot &&
+                             String(r.batch||'').trim()===x.batch);
+      if(aud)                              return 1;   // audited
+      if(isBatchNotRequired(plot,x.batch)) return 2;   // not required
+      return 0;                                        // pending
+    };
+    const rd=rank(a)-rank(b);
+    if(rd)return rd;
+    const na=Number(a.batch)||0, nb=Number(b.batch)||0;
+    if(na!==nb)return na-nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
+  document.getElementById('plot-detail-plot').textContent='Plot '+plot+' — '+NURSERY_LABELS[activeTab];
+  document.getElementById('plot-detail-count').textContent =
+    bs.length ? bs.length+' batch'+(bs.length>1?'es':'') : 'no batches on file';
+  const listEl=document.getElementById('plot-detail-list');
+  if(!bs.length){
+    listEl.innerHTML='<div class="empty-state"><div class="empty-state-icon">'+
+      '<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>'+
+      '</div><h3>No batches on file</h3><p>Add a batch on this plot from the Nursery AI batches table, then it will appear here to audit.</p>'+
+      '<button class="btn-audit-now" style="margin-top:16px" onclick="_openFormForPlot(\''+plot+'\',null)">Audit without a batch</button></div>';
+    setView('plot');
+    return;
+  }
+  const canDelete = typeof isAuditAdmin==='function' && isAuditAdmin();
+  const editSvg='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  const delSvg ='<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
+
+  listEl.innerHTML = bs.map(b=>{
+    const audit=records.find(r=>r.nursery===activeTab && r.plot===plot &&
+                            String(r.batch||'').trim()===b.batch);
+    const done=!!audit;
+    const notReq=!done && isBatchNotRequired(plot, b.batch);
+    const rowStyle = done
+      ? 'border-left:4px solid #22a34a'
+      : notReq
+        ? 'border-left:4px solid #cbd5e1;opacity:.72'
+        : 'border-left:4px solid #f4c94a';
+    // Thumbnail: first photo when audited (skip if it's a sentinel), or
+    // a placeholder tile otherwise.
+    const firstPhoto = done && audit.p1 && audit.p1!=='NO_AUDIT_REQUIRED' ? audit.p1 : null;
+    const thumbHtml = firstPhoto
+      ? `<img class="record-thumb" src="${firstPhoto}" alt="Batch ${b.batch}" style="width:64px;height:64px;object-fit:cover;border-radius:10px;flex-shrink:0" onclick="event.stopPropagation();openLightbox('${firstPhoto}')"/>`
+      : `<div class="record-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`;
+    const breedHtml = b.breed
+      ? ` <span style="font-size:11px;color:var(--text3);font-weight:500">· ${b.breed}</span>`
+      : '';
+    const metaHtml = done
+      ? `${audit.id||''}${audit.createdAt?' · '+fmtDT(audit.createdAt):''}`
+      : notReq
+        ? '<span style="color:#94a3b8;font-weight:600">✕ Not Required</span> · balance ≤ 0 in operation ledger'
+        : 'Pending';
+    // Height chips replace the plot-condition chips. Declined audits get
+    // the same compact "No audit required" pill as the plot audit.
+    const avg = done ? calcAvg(audit.s1, audit.s2, audit.s3) : null;
+    const chipsHtml = done
+      ? (isNoAuditRequired(audit)
+          ? `<div class="record-chips" style="margin-top:6px">
+               <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0">
+                 ✕ No Audit Required · by ${audit.auditor_name||'Auditor'}
+               </span>
+             </div>`
+          : `<div class="record-chips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+               ${audit.s1?`<span class="mini-chip" style="background:#e0f2e0;color:#0f5527">S1:${audit.s1}cm</span>`:'<span class="mini-chip" style="background:#f4f6f4;color:#94a3b8">S1:—</span>'}
+               ${audit.s2?`<span class="mini-chip" style="background:#e0f2e0;color:#0f5527">S2:${audit.s2}cm</span>`:'<span class="mini-chip" style="background:#f4f6f4;color:#94a3b8">S2:—</span>'}
+               ${audit.s3?`<span class="mini-chip" style="background:#e0f2e0;color:#0f5527">S3:${audit.s3}cm</span>`:'<span class="mini-chip" style="background:#f4f6f4;color:#94a3b8">S3:—</span>'}
+               ${avg?`<span class="mini-chip" style="background:#1a4d1a;color:#fff">Avg:${avg}cm</span>`:''}
+             </div>`)
+      : '';
+    const actionsHtml = done
+      ? `<div class="record-actions" onclick="event.stopPropagation()">`
+          + `<button class="icon-btn edit-btn" title="Edit record" aria-label="Edit record" onclick="openEdit('${audit.uid}')">${editSvg}</button>`
+          + (canDelete ? `<button class="icon-btn del-btn" title="Delete record" aria-label="Delete record" onclick="confirmDelete('${audit.uid}')">${delSvg}</button>` : '')
+        + '</div>'
+      : '';
+    const rowClick = done
+      ? `openEdit('${audit.uid}')`
+      : notReq ? '' : `_openFormForPlot('${plot}','${b.batch}')`;
+    const rowLabel = done
+      ? 'Edit record for batch '+b.batch
+      : notReq
+        ? 'Batch '+b.batch+' — audit not required (operation ledger balance ≤ 0)'
+        : 'Audit batch '+b.batch;
+    const rowAttrs = notReq
+      ? `aria-label="${rowLabel}" style="${rowStyle}"`
+      : `role="button" tabindex="0" aria-label="${rowLabel}" style="${rowStyle}" onclick="${rowClick}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${rowClick};}"`;
+    return `<div class="record-item" ${rowAttrs}>
+      ${thumbHtml}
+      <div class="record-info">
+        <div class="record-plot">Batch ${b.batch}${breedHtml}</div>
+        <div class="record-meta">${metaHtml}</div>
+        ${chipsHtml}
+      </div>
+      ${notReq ? '' : actionsHtml}
+    </div>`;
+  }).join('');
+  setView('plot');
+}
+window.openPlotDetail=openPlotDetail;
+
+/* Open the form with plot + batch already selected and LOCKED — the
+   plot / batch pair is what identifies the audit; a stray edit here
+   would silently write against a different batch. */
+function _openFormForPlot(plot, batch){
+  openAddForm();
+  const ps=document.getElementById('f-plot');
+  if(ps){
+    Array.from(ps.options).forEach(o=>{if(o.value===plot)ps.value=plot;});
+    ps.disabled=true;
+    ps.setAttribute('aria-readonly','true');
+    ps.title='Plot is fixed for this audit — cancel and choose another to change';
+    ps.style.background='var(--g50)';
+    ps.style.color='var(--text3)';
+    ps.style.cursor='not-allowed';
+  }
+  const bf=document.getElementById('f-batch');
+  if(bf && batch!=null){
+    bf.value=batch;
+    bf.readOnly=true;
+    bf.setAttribute('aria-readonly','true');
+    bf.title='Batch is fixed for this audit — cancel and choose another to change';
+    bf.style.background='var(--g50)';
+    bf.style.color='var(--text3)';
+    bf.style.cursor='not-allowed';
+  }
+}
+window._openFormForPlot=_openFormForPlot;
+
+/* Refresh that stays on the current view — remember which plot detail
+   was open, reload, and re-open the same detail with fresh data. */
+async function refreshCurrentView(){
+  const rememberPlot=window._lastOpenedPlot;
+  const rememberView=activeView;
+  await loadRecords();
+  if(rememberView==='plot' && rememberPlot){
+    openPlotDetail(rememberPlot);
+  }
+}
+window.refreshCurrentView=refreshCurrentView;
+
+/* Reset the plot/batch input lock so the FAB path (openAddForm) can
+   freely edit them again after a batch-locked flow. */
+function _unlockPlotBatchInputs(){
+  const ps=document.getElementById('f-plot');
+  if(ps){ ps.disabled=false; ps.removeAttribute('aria-readonly'); ps.title=''; ps.style.background=''; ps.style.color=''; ps.style.cursor=''; }
+  const bf=document.getElementById('f-batch');
+  if(bf){ bf.readOnly=false; bf.removeAttribute('aria-readonly'); bf.title=''; bf.style.background=''; bf.style.color=''; bf.style.cursor=''; }
+}
+
+/* Reset the "No Audit Required" UI so a new form doesn't start with the
+   previous decline still greyed-out or its confirmation panel showing. */
+function _resetDeclineUI(){
+  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='';
+  const note=document.getElementById('no-audit-note'); if(note)note.style.display='none';
+  document.querySelectorAll('.height-input, .photo-slot').forEach(el=>{
+    el.style.opacity='';
+    el.style.pointerEvents='';
+    if(el.tagName==='INPUT') el.disabled=false;
+  });
+}
+
+/* --- NO-AUDIT-REQUIRED SENTINEL ---
+   audit_height_records has no boolean column for "declined". We stamp
+   the URL columns with a distinctive non-URL sentinel so the record
+   round-trips through the existing schema untouched. Detection is on
+   photo_1_url + photo_2_url both carrying the sentinel — a real photo
+   would be a base64/https URL, never plain 'NO_AUDIT_REQUIRED'. */
+const NO_AUDIT_SENTINEL='NO_AUDIT_REQUIRED';
+function isNoAuditRequired(r){
+  return !!r && r.p1===NO_AUDIT_SENTINEL && r.p2===NO_AUDIT_SENTINEL;
+}
+window.isNoAuditRequired=isNoAuditRequired;
 
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
   formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
   populateForm();setView('form');
+  _unlockPlotBatchInputs();
+  _resetDeclineUI();
   document.getElementById('form-view-title').textContent='New Record — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
@@ -153,8 +468,91 @@ function openEdit(uid){
   editMode=true;editId=uid;
   formState={nursery:r.nursery,s1:r.s1,s2:r.s2,s3:r.s3,p1:r.p1,p2:r.p2,p3:r.p3};
   populateForm(r);setView('form');
+  _resetDeclineUI();
+  // Replay the declined state if this record was closed with No Audit
+  // Required — the auditor can still Undo and fill in real numbers.
+  if(isNoAuditRequired(r)){
+    const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='none';
+    const note=document.getElementById('no-audit-note'); if(note)note.style.display='';
+    const nb  =document.getElementById('no-audit-by');   if(nb)  nb.textContent=r.auditor_name||'Auditor';
+    const nw  =document.getElementById('no-audit-when'); if(nw)  nw.textContent=fmtDT(r.createdAt);
+    document.querySelectorAll('.height-input').forEach(el=>{
+      el.disabled=true;
+      el.style.opacity='.4';
+      el.style.pointerEvents='none';
+    });
+    document.querySelectorAll('.photo-slot').forEach(s=>{
+      s.style.opacity='.4';
+      s.style.pointerEvents='none';
+    });
+    const photoReq=document.getElementById('photo-req-note');
+    if(photoReq){photoReq.classList.remove('error'); photoReq.textContent='Not required — this batch was closed with No Audit Required.';}
+  }
+  // Plot + batch identify the audit — lock them the same way the plot
+  // audit does. Delete + re-audit to change.
+  _unlockPlotBatchInputs();
+  const ps=document.getElementById('f-plot');
+  const bf=document.getElementById('f-batch');
+  if(ps){ ps.disabled=true; ps.setAttribute('aria-readonly','true'); ps.title='Plot fixed on saved records — delete and re-audit to change'; ps.style.background='var(--g50)'; ps.style.color='var(--text3)'; ps.style.cursor='not-allowed'; }
+  if(bf){ bf.readOnly=true; bf.setAttribute('aria-readonly','true'); bf.title='Batch fixed on saved records — delete and re-audit to change'; bf.style.background='var(--g50)'; bf.style.color='var(--text3)'; bf.style.cursor='not-allowed'; }
   document.getElementById('form-view-title').textContent=t('edit_lbl')+' — '+r.id;
 }
+
+/* Decline: fill formState with the sentinel, grey out the fields, show
+   the "who + when" confirmation panel. The auditor still has to press
+   Save to persist. */
+function declineAudit(){
+  const u=(function(){try{return JSON.parse(localStorage.getItem('mjm_user')||'{}');}catch(e){return{};}})();
+  const who=u.name||u.email||'Auditor';
+  formState.s1=''; formState.s2=''; formState.s3='';
+  formState.p1=NO_AUDIT_SENTINEL;
+  formState.p2=NO_AUDIT_SENTINEL;
+  formState.p3=NO_AUDIT_SENTINEL;
+
+  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='none';
+  const note=document.getElementById('no-audit-note'); if(note)note.style.display='';
+  const nb  =document.getElementById('no-audit-by');   if(nb)  nb.textContent=who;
+  const nw  =document.getElementById('no-audit-when'); if(nw)  nw.textContent=new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+
+  document.querySelectorAll('.height-input').forEach(el=>{
+    el.disabled=true;
+    el.style.opacity='.4';
+    el.style.pointerEvents='none';
+  });
+  document.querySelectorAll('.photo-slot').forEach(s=>{
+    s.style.opacity='.4';
+    s.style.pointerEvents='none';
+  });
+  const photoReq=document.getElementById('photo-req-note');
+  if(photoReq){photoReq.classList.remove('error'); photoReq.textContent='Not required — this batch is being closed with No Audit Required.';}
+  showToast('Marked "No Audit Required". Tap Save to close this batch.');
+}
+window.declineAudit=declineAudit;
+
+/* Undo the decline — clears the sentinel out of formState, re-enables
+   fields, hides the confirmation panel. The height inputs and photo
+   slots keep whatever was in them before the mistap so a two-tap
+   mistake doesn't wipe half-filled real work. */
+function undoDeclineAudit(){
+  if(formState.p1===NO_AUDIT_SENTINEL) formState.p1=null;
+  if(formState.p2===NO_AUDIT_SENTINEL) formState.p2=null;
+  if(formState.p3===NO_AUDIT_SENTINEL) formState.p3=null;
+  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='';
+  const note=document.getElementById('no-audit-note'); if(note)note.style.display='none';
+  document.querySelectorAll('.height-input').forEach(el=>{
+    el.disabled=false;
+    el.style.opacity='';
+    el.style.pointerEvents='';
+  });
+  document.querySelectorAll('.photo-slot').forEach(s=>{
+    s.style.opacity='';
+    s.style.pointerEvents='';
+  });
+  const photoReq=document.getElementById('photo-req-note');
+  if(photoReq){photoReq.classList.remove('error'); photoReq.textContent=t('photo_3_req');}
+  showToast('Undone. Fill in the audit or tap No Audit Required again.');
+}
+window.undoDeclineAudit=undoDeclineAudit;
 function populateForm(r){
   const id=editMode?r.id:nextID(formState.nursery);
   document.getElementById('f-id').value=id;
@@ -187,7 +585,9 @@ function updateAvg(){
 function renderSlot(n,src){
   const slot=document.getElementById('photo-slot-'+n);if(!slot)return;
   while(slot.firstChild)slot.removeChild(slot.firstChild);
-  if(src){
+  // Guard: the "No Audit Required" sentinel lives in the same field, but
+  // is not a URL — render the empty placeholder instead of a broken image.
+  if(src && src!==NO_AUDIT_SENTINEL){
     slot.classList.add('has-photo');
     const img=document.createElement('img');img.src=src;img.alt='S'+n;slot.appendChild(img);
     const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;slot.appendChild(lbl);
@@ -249,25 +649,32 @@ async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot){showToast(t('err_select_plot'));return;}
-  if(!formState.s1&&!formState.s2&&!formState.s3){showToast(t('err_height'));return;}
-  if(!formState.p1||!formState.p2||!formState.p3){
-    const note=document.getElementById('photo-req-note');
-    if(note){note.classList.add('error');note.textContent='⚠ All 3 photos are required';}
-    showToast(t('err_3_photos'));return;
+  // "No Audit Required" bypasses samples + 3 photo checks — the whole
+  // point is that the auditor is closing out a batch without measuring.
+  const declined = formState.p1===NO_AUDIT_SENTINEL && formState.p2===NO_AUDIT_SENTINEL;
+  if(!declined){
+    if(!formState.s1&&!formState.s2&&!formState.s3){showToast(t('err_height'));return;}
+    if(!formState.p1||!formState.p2||!formState.p3){
+      const note=document.getElementById('photo-req-note');
+      if(note){note.classList.add('error');note.textContent='⚠ All 3 photos are required';}
+      showToast(t('err_3_photos'));return;
+    }
   }
   setLoading(true);
   try{
-    // Pass photos as base64 — smartSave handles upload (online) or queues (offline)
-    const avg=calcAvg(formState.s1,formState.s2,formState.s3);
+    // Pass photos as base64 — smartSave handles upload (online) or queues (offline).
+    // Declined rows write nulls into the numeric columns and the sentinel
+    // into the URL columns, so isNoAuditRequired() picks them up on reload.
+    const avg=declined ? null : calcAvg(formState.s1,formState.s2,formState.s3);
     const payload={
       nursery:formState.nursery,plot,batch:batch||null,
-      sample_1:formState.s1?parseFloat(formState.s1):null,
-      sample_2:formState.s2?parseFloat(formState.s2):null,
-      sample_3:formState.s3?parseFloat(formState.s3):null,
-      avg_height:avg?parseFloat(avg):null,
-      photo_1_url:formState.p1||null,
-      photo_2_url:formState.p2||null,
-      photo_3_url:formState.p3||null,
+      sample_1: declined ? null : (formState.s1?parseFloat(formState.s1):null),
+      sample_2: declined ? null : (formState.s2?parseFloat(formState.s2):null),
+      sample_3: declined ? null : (formState.s3?parseFloat(formState.s3):null),
+      avg_height: avg?parseFloat(avg):null,
+      photo_1_url: declined ? NO_AUDIT_SENTINEL : (formState.p1||null),
+      photo_2_url: declined ? NO_AUDIT_SENTINEL : (formState.p2||null),
+      photo_3_url: declined ? NO_AUDIT_SENTINEL : (formState.p3||null),
       date:todayISO(),
       auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
@@ -286,9 +693,10 @@ function openDetail(uid){
   detailId=uid;
   [1,2,3].forEach(n=>{
     const el=document.getElementById('detail-p'+n);if(!el)return;el.innerHTML='';
-    if(r['p'+n]){
-      const img=document.createElement('img');img.src=r['p'+n];img.alt='S'+n;
-      img.onclick=()=>openLightbox(r['p'+n]);el.appendChild(img);
+    const src=r['p'+n];
+    if(src && src!==NO_AUDIT_SENTINEL){
+      const img=document.createElement('img');img.src=src;img.alt='S'+n;
+      img.onclick=()=>openLightbox(src);el.appendChild(img);
       const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;el.appendChild(lbl);
     }else{
       const ph=document.createElement('div');ph.className='detail-photo-empty';
