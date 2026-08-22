@@ -20,10 +20,21 @@
 ALTER TABLE operation_trays
   ADD COLUMN IF NOT EXISTS total_vacant INTEGER;
 
-/* Start every existing tray at the figure the system has been assuming, so
-   the batch report reads exactly as it does today until someone changes one.
+/* Carry over anything already keyed in.
+
+   The Quantity field that briefly stood in Settings wrote to current_qty, and
+   the figures put there were tray sizes — that is what the box was being used
+   for. current_qty only came into existence a day before this, so nothing in
+   it can be the batch report's accumulated seedling count; it is all typed by
+   hand. Take it as the tray's size rather than making it be keyed twice.
+
+   Anything still without a size falls back to the 2,560 the system has been
+   assuming, so the batch report reads exactly as it does today.
+
    Only fills blanks — a tray already given a size is left alone. */
-UPDATE operation_trays SET total_vacant = 2560 WHERE total_vacant IS NULL;
+UPDATE operation_trays
+SET    total_vacant = COALESCE(NULLIF(current_qty, 0), 2560)
+WHERE  total_vacant IS NULL;
 
 
 /* ── Check ─────────────────────────────────────────────────────────────
