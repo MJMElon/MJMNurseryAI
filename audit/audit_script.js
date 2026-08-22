@@ -15,6 +15,13 @@ const WARNA_BG  = {'1':'#1e3d0f','2':'#2d6a1f','3':'#5a8a2a','4':'#b5a800','5':'
 const WARNA_LBL = {'1':'Very Green','2':'Green','3':'Light Green','4':'Yellowish','5':'Very Yellow'};
 
 let records=[], activeTab='PN', activeView='list';
+// `plotBatches` is the roster of known batches per plot, sourced from the
+// audit_batches table (populated by the Nursery AI sync). The first-page
+// icon grid draws one dot per row here — yellow while no audit exists
+// for (plot, batch), green once one does. A plot with zero rows still
+// gets one placeholder dot so the icon is not blank on a plot that has
+// not been keyed in yet.
+let plotBatches=[];
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formState={nursery:'PN',ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
 let toastTimer=null;
@@ -60,55 +67,167 @@ function selectTab(nursery){
 async function loadRecords(){
   setLoading(true);
   try{
-    const rows=await sb.select('audit_plot_audits','select=*');
-    records=rows.map(r=>({
+    // Load records + batch roster in parallel. audit_batches is the same
+    // table Papan Tanda reads, populated by the Nursery AI sync — each
+    // row is one batch on one plot. We only need the (nursery, plot,
+    // batch_no) triples, but SELECT * keeps the query simple. Fail-open
+    // on batch load errors: plotBatches stays empty and the grid falls
+    // back to one placeholder dot per plot.
+    const [aRows, bRows] = await Promise.all([
+      sb.select('audit_plot_audits','select=*'),
+      sb.select('audit_batches','select=*').catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; })
+    ]);
+    records=aRows.map(r=>({
       uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
       batch:r.batch,ulat:r.pest,tikus:r.tikus,bintik:r.disease,
       warna:r.warna_daun,photo:r.photo_url,photo2:r.photo_2_url||null,
       date:r.date,createdAt:r.created_at
     }));
+    plotBatches=(bRows||[]).map(r=>({
+      uid:String(r.id),
+      nursery:r.nursery||'',
+      plot:r.plot||'',
+      batch:String(r.batch_no||'').trim(),
+      breed:r.breed||''
+    })).filter(b=>b.nursery && b.plot && b.batch);
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
 }
 
 /* --- RENDER LIST --- */
+/* Batches on a specific plot in the current nursery, deduped by batch
+   number (audit_batches occasionally carries two rows for the same batch
+   during transplant windows). Also folds in any batches the plot has an
+   AUDIT for but no row in audit_batches — a plot audited before the
+   batches table was synced would otherwise disappear from the grid. */
+function batchesOnPlot(plot){
+  const seen = new Set();
+  const out = [];
+  plotBatches.forEach(b => {
+    if (b.nursery !== activeTab || b.plot !== plot) return;
+    if (seen.has(b.batch)) return;
+    seen.add(b.batch);
+    out.push(b);
+  });
+  records.forEach(r => {
+    if (r.nursery !== activeTab || r.plot !== plot) return;
+    const bn = String(r.batch || '').trim();
+    if (!bn || seen.has(bn)) return;
+    seen.add(bn);
+    out.push({ batch: bn, breed: '' });
+  });
+  return out;
+}
+/* Has this (plot, batch) been audited already? Match on nursery + plot
+   + batch as strings — mirrors how the form saves them. */
+function isBatchAudited(plot, batch){
+  const wanted = String(batch || '').trim();
+  return records.some(r =>
+    r.nursery === activeTab && r.plot === plot && String(r.batch || '').trim() === wanted);
+}
+
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
-  document.getElementById('list-count').textContent=recs.length+' record'+(recs.length!==1?'s':'');
-  document.getElementById('list-heading').textContent=t('plot_title')+' — '+NURSERY_LABELS[activeTab];
+  const plots=NURSERY_PLOTS[activeTab]||[];
+  const donePlots = plots.filter(p => {
+    const bs = batchesOnPlot(p);
+    if (!bs.length) return false;                    // no data → never "done"
+    return bs.every(b => isBatchAudited(p, b.batch));
+  }).length;
+  document.getElementById('list-count').textContent =
+    donePlots + ' / ' + plots.length + ' done';
+  document.getElementById('list-heading').textContent =
+    t('plot_title') + ' — ' + NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
     const cnt=records.filter(r=>r.nursery===t.dataset.n).length;
     let b=t.querySelector('.tab-badge');
     if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';t.appendChild(b);}b.textContent=cnt;}
     else if(b)b.remove();
   });
-  const el=document.getElementById('records-list');
-  if(!recs.length){
-    el.innerHTML='<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg></div><h3>No audits yet</h3><p>Tap <strong>+</strong> to add the first audit for '+NURSERY_LABELS[activeTab]+'.</p></div>';
+
+  const grid=document.getElementById('plot-grid');
+  if(!plots.length){
+    grid.innerHTML = '<div class="plot-grid-empty">No plots configured for ' + NURSERY_LABELS[activeTab] + '.</div>';
     return;
   }
-  el.innerHTML=recs.map(r=>`
-    <div class="record-item" onclick="openDetail('${r.uid}')">
-      ${r.photo
-        ?`<img class="record-thumb" src="${r.photo}" alt="plot" onclick="event.stopPropagation();openLightbox('${r.photo}')"/>`
-        :`<div class="record-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
-      <div class="record-info">
-        <div class="record-plot">${r.plot}</div>
-        <div class="record-meta">${r.id} · ${fmtDT(r.createdAt)}</div>
-        <div class="record-chips">
-          <span class="mini-chip ${chipClass(r.ulat)}">Pest:${r.ulat}</span>
-          <span class="mini-chip ${chipClass(r.tikus)}">Animal:${r.tikus}</span>
-          <span class="mini-chip ${chipClass(r.bintik)}">Disease:${r.bintik}</span>
-          <span class="mc-w mini-chip" style="background:${WARNA_BG[r.warna]||'#888'}">Leaf ${r.warna}</span>
+  grid.innerHTML = plots.map(p => {
+    const bs = batchesOnPlot(p);
+    // No batches on file yet → one placeholder dot so the icon isn't
+    // blank; the plot can't reach "done" until a batch is registered.
+    const dotSpecs = bs.length
+      ? bs.map(b => ({ batch: b.batch, done: isBatchAudited(p, b.batch) }))
+      : [{ batch: '', done: false }];
+    const allDone = bs.length && dotSpecs.every(d => d.done);
+    const dotsHtml = dotSpecs.map(d =>
+      '<span class="plot-dot' + (d.done ? ' done' : '') + '"></span>').join('');
+    return `
+      <button class="plot-cell ${allDone ? 'done' : ''}"
+              data-plot="${p}"
+              onclick="openPlotDetail('${p}')"
+              aria-label="Plot ${p}${allDone ? ' — done' : ''}">
+        <div class="plot-icon">
+          <div class="plot-icon-num">${p}</div>
+          <div class="plot-icon-dots">${dotsHtml}</div>
+          <div class="plot-tick"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>
         </div>
-      </div>
-      <div class="record-actions" onclick="event.stopPropagation()">
-        <button class="icon-btn edit-btn" onclick="openEdit('${r.uid}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        ${isAuditAdmin()?`<button class="icon-btn del-btn"  onclick="confirmDelete('${r.uid}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>`:''}
-      </div>
-    </div>`).join('');
+        <div class="plot-name">${bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches'}</div>
+      </button>`;
+  }).join('');
 }
+
+/* --- PLOT DETAIL VIEW ---
+   One plot's batches as a list, each row → open the audit form with
+   plot + batch pre-selected. Existing audits show an Edit button
+   instead so re-auditing takes the same path everyone else uses. */
+function openPlotDetail(plot){
+  const bs = batchesOnPlot(plot);
+  document.getElementById('plot-detail-plot').textContent = 'Plot ' + plot + ' — ' + NURSERY_LABELS[activeTab];
+  document.getElementById('plot-detail-count').textContent =
+    bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches on file';
+  const listEl = document.getElementById('plot-detail-list');
+  if (!bs.length) {
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' +
+      '<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>' +
+      '</div><h3>No batches on file</h3><p>Add a batch on this plot from the Nursery AI batches table, then it will appear here to audit.</p>' +
+      '<button class="btn-audit-now" style="margin-top:16px" onclick="_openFormForPlot(\'' + plot + '\',null)">Audit without a batch</button></div>';
+    setView('plot');
+    return;
+  }
+  listEl.innerHTML = bs.map(b => {
+    const audit = records.find(r => r.nursery === activeTab && r.plot === plot &&
+                              String(r.batch || '').trim() === b.batch);
+    const done = !!audit;
+    const rowStyle = done ? 'border-left:4px solid #22a34a' : 'border-left:4px solid #f4c94a';
+    const btnHtml = done
+      ? `<button class="btn-audit-now" style="background:var(--g600)" onclick="openEdit('${audit.uid}')">Re-audit</button>`
+      : `<button class="btn-audit-now" onclick="_openFormForPlot('${plot}','${b.batch}')">Audit Now</button>`;
+    return `<div class="record-item" style="${rowStyle}">
+      <div class="record-info">
+        <div class="record-plot">Batch ${b.batch}${b.breed ? ' <span style="font-size:11px;color:var(--text3);font-weight:500">· ' + b.breed + '</span>' : ''}</div>
+        <div class="record-meta">${done ? '✓ Audited · ' + (audit.id || '') + (audit.createdAt ? ' · ' + fmtDT(audit.createdAt) : '') : 'Pending'}</div>
+      </div>
+      <div class="record-actions" onclick="event.stopPropagation()">${btnHtml}</div>
+    </div>`;
+  }).join('');
+  setView('plot');
+}
+
+/* Open the audit form with plot + batch already filled. Reuses the same
+   openAddForm path so nothing on the form changes; just seeds formState
+   and pre-fills the two inputs after the form renders. */
+function _openFormForPlot(plot, batch){
+  openAddForm();
+  const ps = document.getElementById('f-plot');
+  if (ps) {
+    // populateForm rebuilt the options; select the target plot.
+    Array.from(ps.options).forEach(o => { if (o.value === plot) ps.value = plot; });
+  }
+  const bf = document.getElementById('f-batch');
+  if (bf && batch != null) bf.value = batch;
+}
+window.openPlotDetail = openPlotDetail;
+window._openFormForPlot = _openFormForPlot;
 
 /* --- FORM --- */
 function openAddForm(){
