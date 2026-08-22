@@ -1,4 +1,18 @@
-/* BUILD: 2026-08-21k */
+
+/* ── HOW MUCH TO READ ───────────────────────────────────────────────
+   These pages used to ask for the whole table — every audit ever
+   recorded, unfiltered and unlimited, on every page open, ordered by
+   created_at. The cost grew with each record and was paid again by
+   every auditor opening the page; nothing about that read got cheaper
+   as the nursery got busier.
+
+   They read the most recent slice now, newest first, which is what the
+   list shows at the top anyway. When the slice is full the page says
+   so rather than quietly ending the history — older records are in the
+   monthly report. Raise this if the cap is being hit in normal use.
+────────────────────────────────────────────────────────────────────── */
+const RECENT_LIMIT = 400;
+/* BUILD: 2026-08-22a */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table
@@ -151,7 +165,7 @@ async function loadAll(){
   try{
     const [bRows,aRows]=await Promise.all([
       sb.select('audit_batches','select=*'),
-      sb.select('audit_papan_audits','select=*')
+      sb.select('audit_papan_audits','select=*&limit=' + RECENT_LIMIT)
     ]);
 
     // Map batches from Nursery AI

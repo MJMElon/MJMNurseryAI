@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-22a */
 /* ================================================================
    MJM NURSERY — SEEDLING HEIGHT SYSTEM
    height_script.js — Supabase connected
@@ -65,7 +65,8 @@ function selectTab(nursery){
 async function loadRecords(){
   setLoading(true);
   try{
-    const rows=await sb.select('audit_height_records','select=*');
+    const rows=await sb.select('audit_height_records','select=*&limit=' + RECENT_LIMIT);
+    capped = rows.length >= RECENT_LIMIT;
     records=rows.map(r=>({
       uid:String(r.id), id:r.record_id, nursery:r.nursery, plot:r.plot, batch:r.batch,
       s1:r.sample_1!=null?String(r.sample_1):'',
@@ -80,9 +81,27 @@ async function loadRecords(){
 }
 
 /* --- RENDER LIST --- */
+
+/* ── HOW MUCH TO READ ───────────────────────────────────────────────
+   These pages used to ask for the whole table — every audit ever
+   recorded, unfiltered and unlimited, on every page open, ordered by
+   created_at. The cost grew with each record and was paid again by
+   every auditor opening the page; nothing about that read got cheaper
+   as the nursery got busier.
+
+   They read the most recent slice now, newest first, which is what the
+   list shows at the top anyway. When the slice is full the page says
+   so rather than quietly ending the history — older records are in the
+   monthly report. Raise this if the cap is being hit in normal use.
+────────────────────────────────────────────────────────────────────── */
+const RECENT_LIMIT = 400;
+
+let capped = false;
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
-  document.getElementById('list-count').textContent=recs.length+' '+(recs.length!==1?t('records'):t('record'));
+  document.getElementById('list-count').textContent =
+    recs.length + ' ' + (recs.length !== 1 ? t('records') : t('record')) +
+    (capped ? ' · ' + t('most_recent') + ' ' + RECENT_LIMIT : '');
   document.getElementById('list-heading').textContent=t('height_title')+' — '+NURSERY_LABELS[activeTab];
 
   // Stat 1: This month's audits
