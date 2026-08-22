@@ -390,20 +390,23 @@ html, body {
    P01–P52 (PN), B01–B14 (BNN), U01–U18 (UNN 1), N01–N20 (UNN 2). */
 .plot-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(96px, 1fr));
-  gap:14px;
-  padding:14px 12px;
+  /* Tighter cells — icons at ~52px echo the nursery selector circles
+     on the Nursery Operation Management page. auto-fill packs more
+     plots into the viewport without horizontal scroll. */
+  grid-template-columns:repeat(auto-fill, minmax(68px, 1fr));
+  gap:10px;
+  padding:12px 10px;
 }
 .plot-cell{
   position:relative;
   background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
-  display:flex;flex-direction:column;align-items:center;gap:7px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
   transition:transform .12s;
 }
-.plot-cell:active{transform:scale(.96)}
+.plot-cell:active{transform:scale(.94)}
 .plot-icon{
-  width:78px;height:78px;border-radius:50%;
+  width:52px;height:52px;border-radius:50%;
   border:2px solid var(--g500);
   background:var(--g50);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -413,19 +416,22 @@ html, body {
 }
 .plot-cell:hover .plot-icon{
   border-color:var(--g700);
-  box-shadow:0 6px 14px rgba(16,40,20,.15);
+  box-shadow:0 4px 10px rgba(16,40,20,.14);
   transform:translateY(-1px);
 }
 .plot-icon-num{
-  font-size:18px;font-weight:800;color:var(--g900);letter-spacing:.3px;line-height:1;
+  /* Number is the whole icon now — no dot row inside the circle. Dots
+     move to a tiny row below the icon (see .plot-icon-dots). */
+  font-size:13px;font-weight:800;color:var(--g900);letter-spacing:.2px;line-height:1;
   z-index:1;
 }
 .plot-icon-dots{
-  display:flex;gap:4px;margin-top:6px;
+  display:flex;gap:3px;
   z-index:1;
+  min-height:6px;                           /* keep row height stable when empty */
 }
 .plot-dot{
-  width:8px;height:8px;border-radius:50%;
+  width:6px;height:6px;border-radius:50%;
   background:var(--amber600,#d97706);       /* pending — warm amber matches audit --amber600 */
   border:1px solid rgba(0,0,0,.08);
   box-shadow:inset 0 -1px 1px rgba(0,0,0,.10);
@@ -440,7 +446,7 @@ html, body {
 .plot-cell.done .plot-icon{
   border-color:var(--g700);
   background:var(--g100);
-  box-shadow:0 4px 10px rgba(16,80,30,.14);
+  box-shadow:0 3px 7px rgba(16,80,30,.14);
 }
 .plot-cell.done .plot-icon-num{color:var(--g900)}
 .plot-tick{
@@ -450,8 +456,8 @@ html, body {
 }
 .plot-cell.done .plot-tick{display:flex}
 .plot-tick svg{
-  width:64px;height:64px;stroke:var(--g600);fill:none;
-  stroke-width:5;stroke-linecap:round;stroke-linejoin:round;
+  width:44px;height:44px;stroke:var(--g600);fill:none;
+  stroke-width:4;stroke-linecap:round;stroke-linejoin:round;
   opacity:.35;                              /* muted so the P0N number remains readable */
 }
 
@@ -459,7 +465,7 @@ html, body {
    as metadata, not as a heading. Uses --text3 (already the audit's muted
    colour) rather than a raw hex, so a theme swap carries it along. */
 .plot-name{
-  font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.2px;
+  font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.15px;line-height:1.2;
 }
 .plot-cell.done .plot-name{color:var(--g700);font-weight:700}
 
