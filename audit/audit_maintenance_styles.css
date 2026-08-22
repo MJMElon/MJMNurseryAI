@@ -28,35 +28,19 @@ button{cursor:pointer;font-family:inherit}
 html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background:var(--surface);color:var(--text1);-webkit-font-smoothing:antialiased}
 #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--surface)}
 
-/* NURSERY FILTER BUTTONS — sit inside the dark --g800 header row so the
-   count cards below read as belonging to the selected nursery. Matches
-   the Papan Tanda audit's filter row so both audits look and feel the
-   same. Pending-per-nursery badges are painted by updateStats(). */
-.nursery-filter-btn{
-  position:relative;                       /* anchors .nursery-badge */
-  height:36px;border-radius:var(--r-md);
-  font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;
-  border:1.5px solid rgba(255,255,255,.25);
-  background:rgba(255,255,255,.1);
-  color:rgba(255,255,255,.8);
-  cursor:pointer;transition:all .15s;
-  -webkit-tap-highlight-color:transparent;
-}
-.nursery-filter-btn.active{
-  background:#fff;color:var(--g800);border-color:#fff;
-}
-.nursery-filter-btn:not(.active):active{
-  background:rgba(255,255,255,.2);
-}
-.nursery-badge{
-  position:absolute;top:-6px;right:-6px;
-  min-width:17px;height:17px;padding:0 4px;
-  background:#dc2626;color:#fff;
-  font-size:9px;font-weight:700;line-height:1;
-  border-radius:var(--r-full);
-  display:flex;align-items:center;justify-content:center;
-  border:1.5px solid var(--g800);          /* lifts it off the header */
-  pointer-events:none;
+/* NURSERY BOTTOM TABS — mirrors the design used by Plot Condition and
+   Seedling Height audits (see .bottom-tabs base rules below). Overrides
+   the grid to four columns and paints a green pending-count badge on
+   any nursery that has open work, so the count is visible from any
+   nursery tab. Scope hides the out-of-scope tabs on init; grid stretch
+   is set to `repeat(<kept>, 1fr)` at that moment so 1 or 3 buttons
+   still fill the row. */
+.nursery-bottom-tabs{grid-template-columns:repeat(4,1fr)}
+.nursery-tab-item .tab-badge{
+  background:var(--g600);                  /* green — pending, not urgent */
+  border:2px solid #fff;                   /* lifts it off the tab */
+  min-width:18px;height:18px;
+  top:4px;right:calc(50% - 20px);
 }
 
 /* TOP BAR */

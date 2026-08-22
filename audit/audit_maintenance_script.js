@@ -78,11 +78,17 @@ function setView(v){
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
   window.scrollTo(0,0);
 }
+/* selectTab was the old bottom "To Audit / History" toggle. That bar is
+   gone (the bottom bar is now the nursery tabs), and the two sections
+   (pending + audited) both sit on the page one under the other, so this
+   is only kept as a no-op wrapper in case any surviving call site still
+   invokes it. */
 function selectTab(tab){
   activeTab=tab;
-  document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.t===tab));
-  document.getElementById('pending-wrap').style.display=tab==='audit'?'block':'none';
-  document.getElementById('done-wrap').style.display='block';
+  const p=document.getElementById('pending-wrap');
+  const d=document.getElementById('done-wrap');
+  if(p) p.style.display='block';
+  if(d) d.style.display='block';
   renderLists();
 }
 function setFilter(f,el){
@@ -93,14 +99,17 @@ function setFilter(f,el){
   updateStats();
 }
 
-/* Same shape as Papan Tanda's selectNursery: mark the button active,
-   flip the top-bar nursery label, then re-render + re-count. */
+/* Nursery selector is a bottom tab bar (see .nursery-bottom-tabs).
+   Marks the active tab, flips the top-bar `— <nursery>` label, then
+   re-renders + re-counts. `el` is the clicked button when called from
+   the DOM; when called from the URL param handler / scope init it
+   falls back to the matching data-n button. */
 function selectNursery(n, el){
   activeNursery=n;
-  document.querySelectorAll('.nursery-filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.nursery-tab-item').forEach(b=>b.classList.remove('active'));
   if (el) el.classList.add('active');
   else {
-    const btn=document.querySelector('.nursery-filter-btn[data-n="'+n+'"]');
+    const btn=document.querySelector('.nursery-tab-item[data-n="'+n+'"]');
     if (btn) btn.classList.add('active');
   }
   const label=document.getElementById('topbar-nursery');
@@ -117,27 +126,16 @@ function updateStats(){
   document.getElementById('stat-total').textContent=filtered.length;
   document.getElementById('stat-pending').textContent=pending.length;
   document.getElementById('stat-done').textContent=done.length;
-  // Badge on tab — total pending across ALL nurseries (nursery-blind so
-  // the auditor sees there is work somewhere even when standing on the
-  // wrong nursery filter).
-  const tab=document.querySelector('[data-t="audit"]');
-  let badge=tab.querySelector('.tab-badge');
-  const allPending=tasks.filter(t=>!getAuditForTask(t.id)).length;
-  if(allPending>0){
-    if(!badge){badge=document.createElement('span');badge.className='tab-badge';tab.appendChild(badge);}
-    badge.textContent=allPending;
-  } else if(badge) badge.remove();
-
-  // Pending count per nursery on the four filter buttons — same signal
-  // the papan audit uses: a red dot on BNN says work exists there while
-  // you're standing on PN, so nobody has to click through four tabs to
-  // find it.
-  document.querySelectorAll('.nursery-filter-btn').forEach(btn=>{
+  // Pending count per nursery on the bottom tab bar — a green badge on
+  // BNN says work exists there while you're standing on PN, so nobody
+  // has to click through four tabs to find it. Same shape as the plot
+  // audit and height audit's tab-badges.
+  document.querySelectorAll('.nursery-tab-item').forEach(btn=>{
     const n=btn.dataset.n; if(!n) return;
     const count=tasks.filter(t=>t.nursery===n && !getAuditForTask(t.id)).length;
-    let dot=btn.querySelector('.nursery-badge');
+    let dot=btn.querySelector('.tab-badge');
     if(count>0){
-      if(!dot){dot=document.createElement('span');dot.className='nursery-badge';btn.appendChild(dot);}
+      if(!dot){dot=document.createElement('span');dot.className='tab-badge';btn.appendChild(dot);}
       dot.textContent=count;
       btn.setAttribute('aria-label',(NURSERY_LABELS[n]||n)+' — '+count+' pending');
     } else {
@@ -435,32 +433,26 @@ function init(){
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
   selectTab('audit');setView('list');
-  // Hide the nursery buttons that fall outside the current scope
-  // (Pre Nursery = PN only; Main Nursery = BNN/UNN1/UNN2). The buttons
-  // are hard-coded so we filter the DOM in place rather than rebuilding
-  // it; the grid-template stretches the remaining ones to fill the row.
+  // Hide the nursery tabs that fall outside the current scope
+  // (Pre Nursery = PN only; Main Nursery = BNN/UNN1/UNN2). Applies to
+  // the bottom nursery bar; the remaining tabs stretch to fill the row.
   (function _applyScope(){
-    var row = document.querySelector('.nursery-filter-btn') && document.querySelector('.nursery-filter-btn').parentElement;
+    var row = document.querySelector('.nursery-bottom-tabs');
     var kept = 0;
-    document.querySelectorAll('.nursery-filter-btn').forEach(function(b){
+    document.querySelectorAll('.nursery-tab-item').forEach(function(b){
       if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
         b.style.display = 'none';
         b.classList.remove('active');
       } else { kept++; }
     });
     if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
-    // Fresh-active button that matches the scope-default activeNursery.
-    var d = document.querySelector('.nursery-filter-btn[data-n="'+activeNursery+'"]');
+    var d = document.querySelector('.nursery-tab-item[data-n="'+activeNursery+'"]');
     if (d) d.classList.add('active');
     var label = document.getElementById('topbar-nursery');
     if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
   })();
   // Deep-link support: the auditor hub tags its nursery chips with
-  // ?nursery=X&from=home. Set the active nursery BEFORE loadAll() so the
-  // first render already respects the choice; &from=home swaps the
-  // top-bar back arrow into Choose-Another-Nursery. The nursery param is
-  // ignored if it's outside the current scope (a PN auditor can't be
-  // routed to BNN by a hub tap that shouldn't have been offered).
+  // ?nursery=X&from=home. Only honour it when the target is in scope.
   const _q = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
   if (NURSERY_LABELS[_nq] && SCOPE_NURSERIES.indexOf(_nq) !== -1) selectNursery(_nq);
