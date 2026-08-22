@@ -100,6 +100,16 @@ const TRANSLATIONS = {
     bucket_sched:            'Scheduled',
     bucket_all:              'All Audit',
     bucket_over:             'Overdue',
+    /* Ratio-label words used on the plot-icon subtitle and the
+       list-count header on the Plot Condition audit. Kept short so
+       "0 / 6 audited" reads at a glance in either language. */
+    audited:                 'audited',
+    no_batches:              'no batches',
+    batch_one:               'batch',
+    batches_many:            'batches',
+    all_audited:             'all audited',
+    pending_word:            'pending',
+    no_audit_required_a11y:  'no audit required',
     signout:                 'Sign Out',
     signout_msg:             'You will be returned to the login page.',
     stay:                    'Stay',
@@ -527,6 +537,15 @@ const TRANSLATIONS = {
     bucket_sched:            'Dijadualkan',
     bucket_all:              'Semua Audit',
     bucket_over:             'Audit Tertunggak',
+    /* Ratio-label words (Malay) for the plot-icon subtitle and the
+       list-count header on the Plot Condition audit. */
+    audited:                 'Diaudit',
+    no_batches:              'tiada lot',
+    batch_one:               'lot',
+    batches_many:            'lot',
+    all_audited:             'semua diaudit',
+    pending_word:            'belum audit',
+    no_audit_required_a11y:  'audit tidak diperlukan',
     signout:                 'Log Keluar',
     signout_msg:             'Anda akan dikembalikan ke halaman log masuk.',
     stay:                    'Kekal',
