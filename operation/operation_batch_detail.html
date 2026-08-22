@@ -2164,8 +2164,11 @@
                     _supabase.from('operation_trays').select('*'),
                     _supabase.from('shared_plots').select('*'),
                     _supabase.from('shared_inventory_logs').select('plot_name, batch_name, quantity_change').eq('transaction_type', 'Planted'),
-                    _supabase.from('shared_inventory_logs').select('batch_name, quantity_change').in('transaction_type', ['Transplanted', 'Transplanted_Premium', 'Transplanted_DoubleTone']),
-                    _supabase.from('shared_inventory_logs').select('batch_name, quantity_change').eq('transaction_type', '1st_Culling')
+                    // plot_name and remark carry which tray the seedlings LEFT and,
+                    // for premium care and double-tone, which tray they arrived in.
+                    _supabase.from('shared_inventory_logs').select('plot_name, batch_name, quantity_change, remark').in('transaction_type', ['Transplanted', 'Transplanted_Premium', 'Transplanted_DoubleTone']),
+                    // 1st culling names its tray directly in plot_name.
+                    _supabase.from('shared_inventory_logs').select('plot_name, batch_name, quantity_change').eq('transaction_type', '1st_Culling')
                 ]);
 
                 masterBatchesList = batchRes.data || [];
@@ -2203,11 +2206,30 @@
                     trayUsageMap[log.plot_name] = log.batch_name;
                 });
 
-                // Per-tray vacant balance: the tray's own size less what is standing
-                // in it. For each occupying batch, the seeds still left in PN are
-                // distributed across its trays in proportion to how many were
-                // originally planted there — and that figure falls as the batch is
-                // transplanted out, so the tray frees up by exactly what left it.
+                /* ── What is standing in each tray, counted tray by tray ──
+                   Every movement names its tray, so none of this has to be
+                   estimated:
+                     Planted            plot_name IS the tray  → in
+                     1st_Culling        plot_name IS the tray  → out
+                     Transplanted*      remark says "from tray [X]"  → out of X,
+                                        and plot_name is where they went — which
+                                        for premium care and double-tone is itself
+                                        a tray, so those receive.
+                   Transplant a hundred out of P4 and P4 frees exactly a hundred. */
+                const trayNames = new Set(globalTrays.map(t => t.tray_name));
+                const inTray = {}, outTray = {};
+                const addIn  = (tray, q) => { if (trayNames.has(tray)) inTray[tray]  = (inTray[tray]  || 0) + q; };
+                const addOut = (tray, q) => { if (trayNames.has(tray)) outTray[tray] = (outTray[tray] || 0) + q; };
+
+                (usedTrayRes.data || []).forEach(l => addIn(l.plot_name, Math.abs(l.quantity_change || 0)));
+                (cull1Res.data   || []).forEach(l => addOut(l.plot_name, Math.abs(l.quantity_change || 0)));
+                (transplantedRes.data || []).forEach(l => {
+                    const qty = Math.abs(l.quantity_change || 0);
+                    const src = (l.remark || '').match(/from tray \[([^\]]+)\]/i);
+                    if (src) addOut(src[1].trim(), qty);
+                    addIn(l.plot_name, qty);   // only lands if the destination is a tray
+                });
+
                 trayVacantMap = {};
                 trayCapMap = {};
                 trayOccupiedMap = {};
@@ -2215,15 +2237,12 @@
                     const cap = trayCapacity(t);
                     trayCapMap[t.tray_name] = cap;
                     const occupier = trayUsageMap[t.tray_name];
-                    if (!occupier) { trayVacantMap[t.tray_name] = cap; return; }
-                    const plantedInTray   = (plantedByTrayBatch[t.tray_name] || {})[occupier] || 0;
-                    const plantedForBatch = plantedByBatch[occupier] || 0;
-                    const outflowForBatch = (transplantedByBatch[occupier] || 0) + (cull1ByBatch[occupier] || 0);
-                    const remainingForBatch = Math.max(0, plantedForBatch - outflowForBatch);
-                    const remainingInTray = plantedForBatch > 0
-                        ? Math.round(remainingForBatch * (plantedInTray / plantedForBatch))
-                        : 0;
-                    const inUse = Math.min(cap, remainingInTray);
+                    let inUse = Math.max(0, (inTray[t.tray_name] || 0) - (outTray[t.tray_name] || 0));
+                    // Safety net for anything logged before the source tray was
+                    // written into the remark: if no live batch is holding the tray,
+                    // it is free whatever the per-tray sums come to.
+                    if (!occupier) inUse = 0;
+                    inUse = Math.min(cap, inUse);
                     // Remembered per batch so that re-opening a batch does not see its
                     // OWN seedlings as somebody else's occupancy and refuse the figures
                     // already keyed in.
