@@ -248,7 +248,42 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
 .photo-slot-clear{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1;cursor:pointer}
 .photo-req-note{font-size:11px;color:var(--text4);text-align:center;margin-top:8px}
 
-/* NURSERY FILTER BUTTONS */
+/* ── Segmented control (Audit / Batch Info) ──
+   Sits at the top of the list view — a small tab-like pair inside a
+   pill capsule. Same shape as the toggle used on the FC portal, so
+   both audits read the same way. Hidden by default; init reveals it
+   for admins only (batch keying is admin-only). */
+.seg-toggle{
+  display:flex;gap:4px;margin:12px 12px 0;padding:4px;
+  background:var(--white);border:1px solid var(--border);border-radius:var(--r-full);
+  box-shadow:var(--shadow-xs);
+}
+.seg-btn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  height:36px;border:none;background:transparent;border-radius:var(--r-full);
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;
+  color:var(--text3);cursor:pointer;transition:background .15s, color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.seg-btn.active{background:var(--g800);color:#fff}
+.seg-btn:not(.active):hover{background:var(--g50);color:var(--text2)}
+.seg-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Nursery bottom tab bar ──
+   Same class contract as Plot Condition, Height, and Maintenance
+   audits (.bottom-tabs > .tab-item). The bar's own grid stretches to
+   4 columns; scope hides out-of-scope buttons on init and rewrites
+   grid-template-columns to keep the row filled. */
+.nursery-bottom-tabs{grid-template-columns:repeat(4,1fr)}
+.nursery-tab-item .tab-badge{
+  background:var(--g600);                  /* green — matches maintenance */
+  border:2px solid #fff;
+  min-width:18px;height:18px;
+  top:4px;right:calc(50% - 20px);
+}
+
+/* NURSERY FILTER BUTTONS (LEGACY — kept in case any old page still
+   references the class; new pages use .nursery-tab-item above) */
 .nursery-filter-btn{
   height:36px;border-radius:var(--r-md);
   font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;

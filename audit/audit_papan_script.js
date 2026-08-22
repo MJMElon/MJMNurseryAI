@@ -97,20 +97,40 @@ function setView(v){
   if(fab)fab.classList.toggle('hidden',!(v==='list'&&activeTab==='batch'));
   window.scrollTo(0,0);
 }
-function selectTab(tab){
+/* Audit/Batch view toggle — now the segmented control at the top of the
+   list view, not a bottom bar. `el` is the seg-btn that was clicked (or
+   omitted when called programmatically); we mark it and its twin
+   accordingly instead of touching every .tab-item on the page (which
+   would clobber the bottom nursery bar). */
+function selectTab(tab, el){
   activeTab=tab;
-  document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.t===tab));
+  document.querySelectorAll('.seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.t===tab));
   document.getElementById('audit-list-wrap').classList.toggle('hidden',tab!=='audit');
   document.getElementById('batch-list-wrap').classList.toggle('hidden',tab!=='batch');
   const fab=document.getElementById('fab');
   if(fab)fab.classList.toggle('hidden',tab!=='batch'||activeView!=='list');
 }
 
+/* Bottom-bar nursery pick. Same signal Plot Condition and Maintenance
+   use — mirrors selectNursery() but drives the new .nursery-tab-item
+   markup so the two bars stay in sync. Kept selectNursery() unchanged
+   as an alias so the ?nursery=X deep-link handler that already calls it
+   still works. */
+function _pickNursery(n, el){ selectNursery(n, el); }
+
 function selectNursery(nursery, el){
   activeNursery=nursery;
-  document.querySelectorAll('.nursery-filter-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
+  // Support the new bottom nursery bar AND any legacy top-row filter
+  // button that hasn't been removed yet.
+  document.querySelectorAll('.nursery-tab-item, .nursery-filter-btn').forEach(b=>b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else {
+    const b = document.querySelector('.nursery-tab-item[data-n="'+nursery+'"]')
+           || document.querySelector('.nursery-filter-btn[data-n="'+nursery+'"]');
+    if (b) b.classList.add('active');
+  }
+  const label = document.getElementById('topbar-nursery');
+  if (label) label.textContent = NURSERY_LABELS[nursery];
   renderAuditList();
   /* The three counters are per-nursery, but only loadAll() ever refreshed
      them — so switching tabs re-rendered the list and left the previous
@@ -137,17 +157,20 @@ function updateStats(){
     badge.textContent=allPending;
   } else if(badge) badge.remove();
 
-  /* Same count, split per nursery, on the nursery tabs themselves.
-     The total at the bottom says work exists somewhere; this says where,
-     so a pending plot on BNN is visible while standing on PN instead of
-     needing a tap through all four tabs to find it. */
-  document.querySelectorAll('.nursery-filter-btn').forEach(btn=>{
+  /* Pending count per nursery — painted onto both the new bottom tab
+     bar (.nursery-tab-item / .tab-badge, matching the other audits)
+     and any legacy top-row buttons still lying around
+     (.nursery-filter-btn / .nursery-badge). The signal is the same:
+     a red/green dot on BNN says work exists there while you're
+     standing on PN, so nobody clicks through four tabs to find it. */
+  document.querySelectorAll('.nursery-tab-item, .nursery-filter-btn').forEach(btn=>{
     const n=btn.dataset.n;
     if(!n) return;
     const count=latestAll.filter(b=>b.nursery===n&&!getAuditForBatch(b.uid)).length;
-    let dot=btn.querySelector('.nursery-badge');
+    const badgeCls = btn.classList.contains('nursery-tab-item') ? 'tab-badge' : 'nursery-badge';
+    let dot=btn.querySelector('.'+badgeCls);
     if(count>0){
-      if(!dot){dot=document.createElement('span');dot.className='nursery-badge';btn.appendChild(dot);}
+      if(!dot){dot=document.createElement('span');dot.className=badgeCls;btn.appendChild(dot);}
       dot.textContent=count;
       btn.setAttribute('aria-label',NURSERY_LABELS[n]+' — '+count+' pending');
     } else {
@@ -686,36 +709,50 @@ function init(){
   const d=document.getElementById('nav-today');if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))cancelDelete();});
   selectTab('audit');setView('list');
-  // Hide the nursery buttons that fall outside the current scope so a PN
-  // auditor never sees the three MN tabs (and vice versa). Runs before
-  // loadAll so the row is already sized correctly on first render.
+  // Hide the nursery tabs that fall outside the current scope so a PN
+  // auditor never sees the three MN tabs (and vice versa). Applies to
+  // the bottom nursery bar AND any legacy top-row buttons still in
+  // the markup. Runs before loadAll so the row is already sized on
+  // first render.
   (function _applyScope(){
-    var row = document.querySelector('.nursery-filter-btn') && document.querySelector('.nursery-filter-btn').parentElement;
-    var kept = 0;
-    document.querySelectorAll('.nursery-filter-btn').forEach(function(b){
-      if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
-        b.style.display = 'none';
-        b.classList.remove('active');
-      } else { kept++; }
+    ['.nursery-tab-item', '.nursery-filter-btn'].forEach(function(sel){
+      var first = document.querySelector(sel);
+      if (!first) return;
+      var row = first.parentElement;
+      var kept = 0;
+      document.querySelectorAll(sel).forEach(function(b){
+        if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
+          b.style.display = 'none';
+          b.classList.remove('active');
+        } else { kept++; }
+      });
+      if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
     });
-    if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
-    var d = document.querySelector('.nursery-filter-btn[data-n="'+activeNursery+'"]');
+    var d = document.querySelector('.nursery-tab-item[data-n="'+activeNursery+'"]')
+         || document.querySelector('.nursery-filter-btn[data-n="'+activeNursery+'"]');
     if (d) d.classList.add('active');
     var label = document.getElementById('topbar-nursery');
     if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
   })();
+  // Reveal the Audit/Batch segmented control only for admins (batch
+  // keying is admin-only anyway). Non-admins only ever need the audit
+  // list, so hiding the toggle removes a control they can't use.
+  if (typeof isAuditAdmin === 'function' && isAuditAdmin()) {
+    const seg = document.getElementById('papan-view-toggle');
+    if (seg) seg.style.display = '';
+  }
   loadAll();
   // Deep-link support — same contract as the other audit pages: the hub
   // sends ?nursery=X to pick the nursery filter, plus &from=home to
   // re-label the top-bar back arrow as Choose-Another-Nursery. Runs
-  // after loadAll queues so the filter button state settles first, and
-  // ignores nurseries outside the current scope (a stray link from a
-  // hub that shouldn't have offered them).
+  // after loadAll queues so the tab state settles first, and ignores
+  // nurseries outside the current scope (a stray link from a hub that
+  // shouldn't have offered them).
   const _q  = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
   if (NURSERY_PLOTS[_nq] && SCOPE_NURSERIES.indexOf(_nq) !== -1) {
     setTimeout(() => {
-      const btn = document.querySelector('.nursery-filter-btn[data-nursery="'+_nq+'"]')
+      const btn = document.querySelector('.nursery-tab-item[data-n="'+_nq+'"]')
                || document.querySelector('.nursery-filter-btn[data-n="'+_nq+'"]');
       if (btn) btn.click(); else if (typeof selectNursery === 'function') selectNursery(_nq);
     }, 0);
