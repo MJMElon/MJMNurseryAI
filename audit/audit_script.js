@@ -316,6 +316,9 @@ function renderList(){
    plot + batch pre-selected. Existing audits show an Edit button
    instead so re-auditing takes the same path everyone else uses. */
 function openPlotDetail(plot){
+  // Remember which plot is on screen so the top-bar refresh can re-open
+  // the same detail after loadRecords() completes.
+  window._lastOpenedPlot = plot;
   const bs = batchesOnPlot(plot);
   document.getElementById('plot-detail-plot').textContent = 'Plot ' + plot + ' — ' + NURSERY_LABELS[activeTab];
   document.getElementById('plot-detail-count').textContent =
@@ -414,25 +417,77 @@ function openPlotDetail(plot){
 
 /* Open the audit form with plot + batch already filled. Reuses the same
    openAddForm path so nothing on the form changes; just seeds formState
-   and pre-fills the two inputs after the form renders. */
+   and pre-fills the two inputs after the form renders.
+
+   Both fields are LOCKED once auto-linked from the plot detail — the
+   audit's identity (which plot, which batch) is what the whole grid
+   navigation just chose, so allowing the user to edit them here would
+   let a tap on B04's Batch 231 save an audit against B12 · Batch 999
+   by mistake. The user can still cancel and pick a different batch
+   from the grid. */
 function _openFormForPlot(plot, batch){
   openAddForm();
   const ps = document.getElementById('f-plot');
   if (ps) {
     // populateForm rebuilt the options; select the target plot.
     Array.from(ps.options).forEach(o => { if (o.value === plot) ps.value = plot; });
+    ps.disabled = true;
+    ps.setAttribute('aria-readonly', 'true');
+    ps.title = 'Plot is fixed for this audit — cancel and choose another to change';
   }
   const bf = document.getElementById('f-batch');
-  if (bf && batch != null) bf.value = batch;
+  if (bf && batch != null) {
+    bf.value = batch;
+    bf.readOnly = true;
+    bf.setAttribute('aria-readonly', 'true');
+    bf.title = 'Batch is fixed for this audit — cancel and choose another to change';
+    // A readOnly + disabled visual — same subdued tint the other
+    // read-only fields (Audit ID, Date) use.
+    bf.style.background = 'var(--g50)';
+    bf.style.color = 'var(--text3)';
+    bf.style.cursor = 'not-allowed';
+  }
+  if (ps) {
+    ps.style.background = 'var(--g50)';
+    ps.style.color = 'var(--text3)';
+    ps.style.cursor = 'not-allowed';
+  }
 }
+
+/* --- REFRESH THAT STAYS ON THE CURRENT VIEW ---
+   The top-bar refresh button used to call loadRecords() directly. That
+   re-ran the fetch but left the plot detail view showing stale data —
+   or made it look like a bounce back to the grid. This wrapper
+   remembers which view was open, reloads, and re-opens it in place. */
+async function refreshCurrentView(){
+  const rememberPlot = window._lastOpenedPlot;
+  const rememberView = activeView;
+  await loadRecords();
+  if (rememberView === 'plot' && rememberPlot) {
+    openPlotDetail(rememberPlot);      // rebuilds the batch list from fresh data
+  }
+}
+window.refreshCurrentView = refreshCurrentView;
 window.openPlotDetail = openPlotDetail;
 window._openFormForPlot = _openFormForPlot;
+
+/* Reset the lock state that _openFormForPlot sets when auto-linking.
+   The FAB path (openAddForm) needs the plot/batch inputs to be freely
+   editable again — otherwise a manual +New audit after a batch-locked
+   one would still be frozen on the previous batch's identity. */
+function _unlockPlotBatchInputs(){
+  const ps = document.getElementById('f-plot');
+  if (ps){ ps.disabled=false; ps.removeAttribute('aria-readonly'); ps.title=''; ps.style.background=''; ps.style.color=''; ps.style.cursor=''; }
+  const bf = document.getElementById('f-batch');
+  if (bf){ bf.readOnly=false; bf.removeAttribute('aria-readonly'); bf.title=''; bf.style.background=''; bf.style.color=''; bf.style.cursor=''; }
+}
 
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
   formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
   populateForm();setView('form');
+  _unlockPlotBatchInputs();
   document.getElementById('form-view-title').textContent=t('new_audit')+' — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
@@ -440,6 +495,14 @@ function openEdit(uid){
   editMode=true;editId=uid;
   formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,photo1:r.photo||null,photo2:r.photo2||null};
   populateForm(r);setView('form');
+  // Editing an existing audit: plot and batch are what identify the
+  // record; changing them would silently rewrite a different plot's
+  // audit. Lock them the same way _openFormForPlot does.
+  _unlockPlotBatchInputs();     // clear any stale lock…
+  const ps = document.getElementById('f-plot');
+  const bf = document.getElementById('f-batch');
+  if (ps){ ps.disabled=true; ps.setAttribute('aria-readonly','true'); ps.title='Plot fixed on saved audits — delete and re-audit to change'; ps.style.background='var(--g50)'; ps.style.color='var(--text3)'; ps.style.cursor='not-allowed'; }
+  if (bf){ bf.readOnly=true; bf.setAttribute('aria-readonly','true'); bf.title='Batch fixed on saved audits — delete and re-audit to change'; bf.style.background='var(--g50)'; bf.style.color='var(--text3)'; bf.style.cursor='not-allowed'; }
   document.getElementById('form-view-title').textContent='Edit — '+r.id;
 }
 function populateForm(r){
