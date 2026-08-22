@@ -379,5 +379,18 @@ function init(){
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
   selectTab('audit');setView('list');loadAll();
+  // Deep-link support: the auditor hub tags its nursery chips with
+  // ?nursery=X&from=home. Maintenance is task-based rather than per-
+  // nursery, so the nursery param is informational only; the &from=home
+  // flag still swaps the top-bar back arrow into Choose-Another-Nursery.
+  const _q = new URLSearchParams(location.search);
+  if (_q.get('from') === 'home') {
+    const back = document.querySelector('.top-bar-back');
+    if (back) {
+      back.setAttribute('href', 'audit_home.html');
+      back.setAttribute('title', 'Choose another nursery');
+      back.setAttribute('aria-label', 'Choose another nursery');
+    }
+  }
 }
 document.addEventListener('DOMContentLoaded',init);
