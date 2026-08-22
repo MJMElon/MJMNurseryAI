@@ -641,7 +641,9 @@
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
           <span>Main Page</span>
         </a>
-        <button class="lang-toggle-btn" onclick="toggleLang()">BM</button>
+        <!-- BM/EN toggle removed here: language is now set once on
+             audit_nursery_select.html and every audit page inherits
+             the choice from localStorage via setLang(). -->
       </div>
       <div class="header-user-btn" onclick="showLogout()" style="margin-left:8px">
         <div class="notif-dot" id="notif-dot"></div>

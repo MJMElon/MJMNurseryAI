@@ -466,8 +466,8 @@ const TRANSLATIONS = {
     home_modules_title:      'Modul Audit',
     /* === PEMILIHAN NURSERI + PAPAN JADUAL === */
     ask_nursery:      'Nurseri mana anda audit hari ini?',
-    pre_nursery:      'Pre Nurseri',
-    main_nursery:     'Nurseri Utama',
+    pre_nursery:      'Tapak Semaian Kecil',
+    main_nursery:     'Tapak Semaian Besar',
     enter:            'Masuk',
     switch_note:      'Anda boleh tukar nurseri bila-bila masa dari menu audit.',
     main_page:        'Halaman Utama',
