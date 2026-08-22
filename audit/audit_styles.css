@@ -420,26 +420,36 @@ html, body {
   transform:translateY(-1px);
 }
 .plot-icon-num{
-  /* Number is the whole icon now — no dot row inside the circle. Dots
-     move to a tiny row below the icon (see .plot-icon-dots). */
-  font-size:13px;font-weight:800;color:var(--g900);letter-spacing:.2px;line-height:1;
+  /* Number is the whole icon now — pending / done status is carried by
+     a small corner badge (.plot-badge), not a dot row that swelled to
+     nine and started running outside the circle on busy PN plots. */
+  font-size:15px;font-weight:800;color:var(--g900);letter-spacing:.2px;line-height:1;
   z-index:1;
 }
-.plot-icon-dots{
-  display:flex;gap:3px;
-  z-index:1;
-  min-height:6px;                           /* keep row height stable when empty */
+/* Legacy dot row — kept as a no-op selector so a stale render before
+   the reload doesn't produce ugly leftover markup. */
+.plot-icon-dots{display:none}
+.plot-dot{display:none}
+
+/* Corner badge — pending count in amber, or a green ✓ when every
+   required batch on the plot has been audited. Sits at the top-right
+   of the icon like an iOS notification badge, no matter how many
+   batches the plot carries. */
+.plot-badge{
+  position:absolute;
+  top:-4px;right:-4px;
+  min-width:18px;height:18px;padding:0 5px;
+  border-radius:999px;
+  background:var(--amber600,#d97706);
+  color:#fff;font-size:10px;font-weight:800;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--surface,#f4f6f4);   /* halo so the badge lifts off the light-green wash */
+  box-shadow:0 2px 4px rgba(0,0,0,.15);
+  z-index:2;
 }
-.plot-dot{
-  width:6px;height:6px;border-radius:50%;
-  background:var(--amber600,#d97706);       /* pending — warm amber matches audit --amber600 */
-  border:1px solid rgba(0,0,0,.08);
-  box-shadow:inset 0 -1px 1px rgba(0,0,0,.10);
-}
-.plot-dot.done{
-  background:var(--g600);border-color:rgba(0,0,0,.12);
-  box-shadow:inset 0 -1px 1px rgba(0,0,0,.10);
-}
+.plot-badge.done{background:var(--g600)}
+.plot-badge svg{width:11px;height:11px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;display:block}
+.plot-cell.done .plot-badge{background:var(--g600)}
 
 /* Done state — deeper green ring + subtle green fill under the check
    so the number stays legible when the ✓ sits behind it. */

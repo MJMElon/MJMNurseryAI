@@ -290,30 +290,42 @@ function renderList(){
   }
   grid.innerHTML = plots.map(p => {
     const bs = batchesOnPlot(p);
-    // Dots only appear for REQUIRED batches — the operation ledger's
-    // Not-Required rows are hidden from the icon so an amber dot never
-    // shows for a batch nobody has to audit. When a plot has no
-    // required batches at all, we still render one placeholder amber
-    // dot so the icon isn't visually blank on a plot the user might
-    // want to open (e.g. to add an ad-hoc audit).
+    // Only REQUIRED batches count — anything the operation ledger says
+    // is out (balance ≤ 0) is Not Required and never turns into work.
     const required = bs.filter(b => !isBatchNotRequired(p, b.batch));
-    const dotSpecs = required.length
-      ? required.map(b => ({ batch: b.batch, done: isBatchAudited(p, b.batch) }))
-      : [{ batch: '', done: false }];
-    const allDone = required.length && dotSpecs.every(d => d.done);
-    const dotsHtml = dotSpecs.map(d =>
-      '<span class="plot-dot' + (d.done ? ' done' : '') + '"></span>').join('');
+    const pending  = required.filter(b => !isBatchAudited(p, b.batch)).length;
+    const done     = required.length - pending;
+    const allDone  = required.length > 0 && pending === 0;
+
+    // Corner badge — pending count on amber, or a green ✓ when every
+    // required batch is audited. Nothing at all when a plot has no
+    // required batches to audit (avoids a phantom "0" on empty plots).
+    let badgeHtml = '';
+    if (required.length) {
+      badgeHtml = allDone
+        ? '<div class="plot-badge done" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="5 12 10 17 19 8"/></svg></div>'
+        : '<div class="plot-badge" aria-hidden="true">' + pending + '</div>';
+    }
+    // Subtitle carries the ratio when there is work; falls back to the
+    // total-batch count on plots with only Not-Required (or none at all).
+    const subtitle = required.length
+      ? done + ' / ' + required.length + ' audited'
+      : (bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches');
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
               onclick="openPlotDetail('${p}')"
-              aria-label="Plot ${p}${allDone ? ' — done' : ''}">
+              aria-label="Plot ${p} — ${
+                required.length
+                  ? (allDone ? 'all audited' : pending + ' pending')
+                  : 'no audit required'
+              }">
         <div class="plot-icon">
           <div class="plot-icon-num">${p}</div>
-          <div class="plot-icon-dots">${dotsHtml}</div>
+          ${badgeHtml}
           <div class="plot-tick"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>
         </div>
-        <div class="plot-name">${bs.length ? bs.length + ' batch' + (bs.length > 1 ? 'es' : '') : 'no batches'}</div>
+        <div class="plot-name">${subtitle}</div>
       </button>`;
   }).join('');
 }
