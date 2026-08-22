@@ -1658,7 +1658,29 @@
         let globalPlots = [];
         let rowMaps = {}; // Store uploaded map previews
         let trayUsageMap = {};  // { tray_name: 'MJN-2024-001' } — which batch is using each tray
-        let trayVacantMap = {}; // { tray_name: 1234 } — vacant holes (out of 2,560) for each tray
+        let trayVacantMap = {};   // { tray_name: 1234 } — holes free in each tray right now
+        let trayCapMap = {};      // { tray_name: 2560 } — the tray's size when empty, from Settings
+        let trayOccupiedMap = {}; // { tray_name: { batch, qty } } — whose seedlings are in it
+
+        // A tray holds what Settings says it holds. Before that field existed every
+        // tray was assumed to be 2,560, so a tray with no size keeps that figure
+        // rather than reading as having no room at all.
+        const TRAY_CAP_DEFAULT = 2560;
+        function trayCapacity(tray) {
+            const n = Number(tray && tray.total_vacant);
+            return Number.isFinite(n) && n > 0 ? n : TRAY_CAP_DEFAULT;
+        }
+
+        /* How much may still be planted into a tray on THIS batch's form.
+           Another batch's seedlings take up room; this batch's own do not, or
+           re-opening a saved batch would refuse the quantities already in it. */
+        function trayVacantForBatch(trayName, batchName) {
+            const cap = trayCapMap[trayName] != null ? trayCapMap[trayName] : TRAY_CAP_DEFAULT;
+            const held = trayOccupiedMap[trayName];
+            if (!held || !held.qty) return cap;
+            if (batchName && String(held.batch) === String(batchName)) return cap;
+            return Math.max(0, cap - held.qty);
+        }
 
         function switchTab(tabIndex) {
             for(let i = 1; i <= 8; i++) {
@@ -2181,14 +2203,19 @@
                     trayUsageMap[log.plot_name] = log.batch_name;
                 });
 
-                // Per-tray vacant balance (2,560 − seeds currently sitting in the tray).
-                // For each occupying batch, the seeds still left in PN are distributed across
-                // its trays in proportion to how many were originally planted there.
+                // Per-tray vacant balance: the tray's own size less what is standing
+                // in it. For each occupying batch, the seeds still left in PN are
+                // distributed across its trays in proportion to how many were
+                // originally planted there — and that figure falls as the batch is
+                // transplanted out, so the tray frees up by exactly what left it.
                 trayVacantMap = {};
-                const TRAY_CAP = 2560;
+                trayCapMap = {};
+                trayOccupiedMap = {};
                 globalTrays.forEach(t => {
+                    const cap = trayCapacity(t);
+                    trayCapMap[t.tray_name] = cap;
                     const occupier = trayUsageMap[t.tray_name];
-                    if (!occupier) { trayVacantMap[t.tray_name] = TRAY_CAP; return; }
+                    if (!occupier) { trayVacantMap[t.tray_name] = cap; return; }
                     const plantedInTray   = (plantedByTrayBatch[t.tray_name] || {})[occupier] || 0;
                     const plantedForBatch = plantedByBatch[occupier] || 0;
                     const outflowForBatch = (transplantedByBatch[occupier] || 0) + (cull1ByBatch[occupier] || 0);
@@ -2196,8 +2223,12 @@
                     const remainingInTray = plantedForBatch > 0
                         ? Math.round(remainingForBatch * (plantedInTray / plantedForBatch))
                         : 0;
-                    const inUse = Math.min(TRAY_CAP, remainingInTray);
-                    trayVacantMap[t.tray_name] = Math.max(0, TRAY_CAP - inUse);
+                    const inUse = Math.min(cap, remainingInTray);
+                    // Remembered per batch so that re-opening a batch does not see its
+                    // OWN seedlings as somebody else's occupancy and refuse the figures
+                    // already keyed in.
+                    trayOccupiedMap[t.tray_name] = { batch: occupier, qty: inUse };
+                    trayVacantMap[t.tray_name] = Math.max(0, cap - inUse);
                 });
                 
                 // NATURAL ALPHANUMERIC SORTING FOR PLOTS (B2 comes before B10)
@@ -3560,7 +3591,9 @@
                 for (const nurs in grouped) {
                     html += `<optgroup label="${nurs}">`;
                     grouped[nurs].forEach(tray => {
-                        const vacant = trayVacantMap[tray.tray_name] != null ? trayVacantMap[tray.tray_name] : 2560;
+                        // What this batch may plant here — its own seedlings already in
+                        // the tray do not count against it.
+                        const vacant = trayVacantForBatch(tray.tray_name, currentBatch);
                         // Disable only when there are no vacant holes. Any tray with
                         // remaining capacity is selectable — the vacant count already
                         // subtracts another batch's tail-end seedlings.
@@ -3592,6 +3625,7 @@
                     <div>
                         <label class="label-style">Total Planted</label>
                         <input type="text" inputmode="numeric" class="input-style t-planted" oninput="formatNumericInput(this); calcTrayRow('${rowId}')">
+                        <div id="${rowId}-vacancy" class="mt-1 text-[9px] font-bold"></div>
                     </div>
                     <div>
                         <label class="label-style !text-[#a83020]">Empty Holes</label>
@@ -3639,8 +3673,8 @@
                 return;
             }
 
-            // Use cached trayVacantMap (loaded at init, no extra DB call needed).
-            const vacant = trayVacantMap[trayName] != null ? trayVacantMap[trayName] : 2560;
+            // Use the cached maps (loaded at init, no extra DB call needed).
+            const vacant = trayVacantForBatch(trayName, currentBatch);
             if (vacant === 0) {
                 warnEl.querySelector('span').innerText = 'No vacant holes — tray is full';
                 warnEl.classList.remove('hidden');
@@ -3651,21 +3685,62 @@
             }
         }
 
-        // Each pre-nursery tray fits 2,560 holes; vacant = capacity − seeds currently in the tray.
-        // Each pre-nursery tray fits 2,560 holes — used by the dropdown's
-        // per-tray Vacant balance (see trayVacantMap in initDetail).
-        const TRAY_CAPACITY = 2560;
+        // A tray's size now comes from Settings — see trayCapacity() and
+        // TRAY_CAP_DEFAULT near trayVacantMap. The constant that used to live here
+        // was never read and would have been wrong for any tray that is not 2,560.
 
         function calcTrayRow(rowId) {
             const row = document.getElementById(rowId);
-            const planted = readNumericInput(row.querySelector('.t-planted'));
+            let planted = readNumericInput(row.querySelector('.t-planted'));
+
+            // A tray cannot take more than it has room for. Clamp rather than warn
+            // and carry on: a figure that cannot be true should not reach the
+            // totals, the charts or the save.
+            const trayName = row.querySelector('.t-select')?.value || '';
+            const currentBatch = document.getElementById('f-batchno').value.trim();
+            const vacant = trayName ? trayVacantForBatch(trayName, currentBatch) : null;
+            const warnEl = document.getElementById(`${rowId}-warn`);
+            if (vacant != null && planted > vacant) {
+                planted = vacant;
+                row.querySelector('.t-planted').value = planted.toLocaleString();
+                if (warnEl) {
+                    warnEl.querySelector('span').innerText =
+                        `Only ${vacant.toLocaleString()} vacant in ${trayName} — capped`;
+                    warnEl.classList.remove('hidden');
+                    // Flagged as ours so clearing it below cannot wipe out the
+                    // duplicate-tray or tray-full warnings checkTrayInUse puts here.
+                    warnEl.dataset.capWarn = '1';
+                }
+            } else if (warnEl && warnEl.dataset.capWarn) {
+                delete warnEl.dataset.capWarn;
+                warnEl.querySelector('span').innerText = '';
+                warnEl.classList.add('hidden');
+            }
+
             const empty = readNumericInput(row.querySelector('.t-empty'));
             const actual = Math.max(0, planted - empty);
 
             const actualDiv = row.querySelector('.t-actual');
             actualDiv.innerText = actual.toLocaleString();
             actualDiv.dataset.raw = actual;
+            renderTrayVacancy(rowId, trayName, vacant, planted);
             calcPlanting();
+        }
+
+        /* What is left in the tray as the form is filled in: total vacant less what
+           has just been keyed. Shown on the row so the figure the office is typing
+           against is the one in front of them. */
+        function renderTrayVacancy(rowId, trayName, vacant, planted) {
+            const el = document.getElementById(`${rowId}-vacancy`);
+            if (!el) return;
+            if (!trayName || vacant == null) { el.innerHTML = ''; return; }
+            const left = Math.max(0, vacant - planted);
+            const total = trayCapMap[trayName] != null ? trayCapMap[trayName] : TRAY_CAP_DEFAULT;
+            el.innerHTML =
+                `<span class="font-black ${left === 0 ? 'text-[#a83020]' : 'text-[#4a7a2e]'}">` +
+                `${left.toLocaleString()}</span>` +
+                `<span class="text-[#8a7a68]"> vacant left of ${vacant.toLocaleString()}` +
+                `${vacant !== total ? ` (tray holds ${total.toLocaleString()})` : ''}</span>`;
         }
 
         function calcPlanting() {
