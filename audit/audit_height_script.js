@@ -352,12 +352,27 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',e=>{
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
+  // Scope-aware tab bar — Pre Nursery auditor sees only PN, Main
+  // Nursery sees BNN/UNN1/UNN2. Matches plot audit + papan + maintenance.
+  const _SCOPE = (function(){
+    try {
+      var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
+      if (s === 'PN') return ['PN'];
+      if (s === 'MN') return ['BNN','UNN1','UNN2'];
+    } catch(e){}
+    return ['PN','BNN','UNN1','UNN2'];
+  })();
+  document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
+    if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
+  });
   // Deep-link support — same contract as audit_plot_audit: ?nursery=X
   // opens straight on that tab; &from=home re-labels the top-bar back
   // arrow as Choose-Another-Nursery.
   const _q  = new URLSearchParams(location.search);
   const _nq = String(_q.get('nursery') || '').toUpperCase();
-  const _startNursery = NURSERY_PLOTS[_nq] ? _nq : 'PN';
+  const _startNursery = (NURSERY_PLOTS[_nq] && _SCOPE.indexOf(_nq) !== -1)
+    ? _nq
+    : (_SCOPE[0] || 'PN');
   selectTab(_startNursery);
   if (_q.get('from') === 'home') {
     const back = document.querySelector('.top-bar-back');
