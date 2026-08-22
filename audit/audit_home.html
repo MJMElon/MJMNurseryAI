@@ -462,7 +462,55 @@
     .day.sel .day-w,.day.sel .day-n{color:#fff}
     .day.sel .day-dot{background:rgba(255,255,255,.8)}
 
-    /* ── Status filters ── */
+    /* ── The 4 iOS-style bucket tiles that replaced the calendar +
+       due/soon/upcoming/passed chip strip. One row when there is width,
+       2×2 on a phone. The active tile is what filters the timeline
+       beneath. Colours picked to read at a glance:
+         Today's  = blue, Scheduled = red, All = ink, Overdue = amber. */
+    .buckets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+             gap:10px;margin:4px 0 14px}
+    .bkt{display:flex;flex-direction:column;justify-content:space-between;
+         min-height:96px;padding:14px 14px 12px;border-radius:18px;
+         cursor:pointer;font-family:inherit;color:#fff;text-align:left;
+         border:2px solid transparent;box-shadow:0 4px 12px rgba(16,40,60,.10);
+         transition:transform .12s,box-shadow .12s,filter .12s;
+         -webkit-tap-highlight-color:transparent}
+    .bkt:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,40,60,.16)}
+    .bkt.on{border-color:#0f172a;filter:brightness(1.05)}
+    .bkt-top{display:flex;align-items:center;justify-content:space-between}
+    .bkt-ico{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.22);
+             display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .bkt-ico svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;
+                 stroke-linecap:round;stroke-linejoin:round}
+    .bkt-n{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px}
+    .bkt-lbl{font-size:12px;font-weight:700;letter-spacing:.2px;line-height:1.15;opacity:.95}
+    .bkt-today{background:linear-gradient(135deg,#4a90e2,#3a7bd0)}
+    .bkt-sched{background:linear-gradient(135deg,#d97878,#b95656)}
+    .bkt-all  {background:linear-gradient(135deg,#4a4a4d,#2b2b2e)}
+    .bkt-over {background:linear-gradient(135deg,#8a8f95,#5b6270)}
+    @media (max-width:640px){
+      .buckets{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      .bkt{min-height:84px;padding:12px 12px 10px;border-radius:15px}
+      .bkt-n{font-size:28px}
+      .bkt-lbl{font-size:11px}
+    }
+
+    /* Nursery chips inside a timeline card — one per allowed nursery for
+       the current scope. Clicking a chip lands on the destination audit
+       page with ?nursery=X&from=home, so it opens straight on that
+       nursery's tab and the page shows a Choose-Another-Nursery button. */
+    .tl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .tl-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;
+             font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+             padding:5px 10px;border-radius:14px;background:#fff;
+             color:var(--tone,#2d7a2d);border:1.5px solid var(--tone,#c3ced6);
+             text-decoration:none;-webkit-tap-highlight-color:transparent;
+             transition:transform .1s,background .1s}
+    .tl-chip:hover{background:var(--tone,#2d7a2d);color:#fff}
+    .tl-chip:active{transform:scale(.97)}
+
+    /* ── Status filters ── (kept for the anytime badges' colour lookup;
+       the visible chip strip itself is removed) */
     .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none}
     .chips::-webkit-scrollbar{display:none}
     .chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:7px 13px 7px 7px;
@@ -634,29 +682,12 @@
         </div>
       </div>
 
-      <div class="cal">
-        <div class="cal-head">
-          <button class="cal-nav" id="cal-prev" aria-label="Previous month">
-            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div class="cal-month" id="cal-month">—</div>
-          <button class="cal-nav" id="cal-next" aria-label="Next month">
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-          <button class="cal-today" id="cal-today">Today</button>
-        </div>
-        <div class="cal-strip">
-          <button class="cal-step" id="day-prev" aria-label="Earlier days">
-            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div class="cal-days" id="cal-days"></div>
-          <button class="cal-step" id="day-next" aria-label="Later days">
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="chips" id="chips"></div>
+      <!-- Four bucket tiles: Today's / Scheduled / All / Overdue.
+           Replaced the month calendar + due/soon/upcoming/passed chip
+           strip. The active tile filters the timeline below; tapping the
+           same tile again clears the filter. Counts come from the same
+           occurrences() the timeline reads. -->
+      <div class="buckets" id="buckets"></div>
 
       <div class="tl" id="todo-section">
         <!-- Populated by JS -->
@@ -1136,7 +1167,12 @@ function loadAuditTodo(){
   }
 
   function renderCalendar(){
-    document.getElementById('cal-month').textContent = MONTHS_FULL[viewM] + ' ' + viewY;
+    // The month strip and five-day picker were removed with the bucket-tile
+    // redesign. Guard against the missing elements so any stragglers that
+    // still call this helper are a silent no-op instead of a TypeError.
+    const mon = document.getElementById('cal-month');
+    if (!mon) return;
+    mon.textContent = MONTHS_FULL[viewM] + ' ' + viewY;
 
     const occ  = occurrences(viewY, viewM)
       .filter(o => occStatus(o, viewY, viewM) !== 'done');   // done days stop nagging
@@ -1159,6 +1195,7 @@ function loadAuditTodo(){
       </button>`;
     }
     const strip = document.getElementById('cal-days');
+    if (!strip) return;
     strip.innerHTML = html;
     strip.querySelectorAll('.day').forEach(el => {
       el.onclick = () => {
@@ -1191,34 +1228,79 @@ function loadAuditTodo(){
     renderAll();
   }
 
-  /* ── Status filters ── */
-  function renderChips(occ){
-    const counts = {overdue:0, due:0, soon:0, upcoming:0};
+  /* ── Bucket tiles ──
+     Four iOS-style buckets replace the old chip strip. Each tile maps
+     to one or more occStatus values; tapping seeds the legacy `active`
+     Set so the existing timeline filter code keeps working untouched.
+
+       Today's Audit → 'due'                          (windows open today)
+       Scheduled     → 'soon' | 'upcoming'            (still ahead of today)
+       All Audit     → (empty set — no filter)
+       Overdue       → 'overdue'                      (window past, not done)
+
+     Tapping the active tile with the SAME key clears the filter. */
+  const BUCKETS = [
+    {k:'today',  lbl:"Today's Audit",  cls:'bkt-today', statuses:['due']},
+    {k:'sched',  lbl:'Scheduled',      cls:'bkt-sched', statuses:['soon','upcoming']},
+    {k:'all',    lbl:'All Audit',      cls:'bkt-all',   statuses:[]},        // empty = no filter
+    {k:'over',   lbl:'Overdue',        cls:'bkt-over',  statuses:['overdue']}
+  ];
+  const BUCKET_ICONS = {
+    today: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    sched: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+    all:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    over:  '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+  };
+  let activeBucket = 'all';  // which of BUCKETS is highlighted / active
+
+  function renderBuckets(occ){
+    const counts = {today:0, sched:0, over:0, all:occ.length};
     occ.forEach(o => {
-      const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
-      if (k in counts) counts[k]++;          // 'done' is not a filter, it is gone
+      const s = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      if (s === 'due')                           counts.today++;
+      else if (s === 'soon' || s === 'upcoming') counts.sched++;
+      else if (s === 'overdue')                  counts.over++;
     });
-    const box = document.getElementById('chips');
-    box.innerHTML = Object.keys(STATUS).map(k => {
-      const st = STATUS[k];
-      const on  = active.has(k);
-      const off = active.size > 0 && !on;
-      return `<button class="chip ${on?'on':''} ${off?'off':''}" data-k="${k}">
-        <span class="chip-dot" style="background:${st.bg}">${st.emoji}</span>
-        <span class="chip-lbl">${stLbl(k)}</span>
-        <span class="chip-n">${counts[k]}</span>
-      </button>`;
-    }).join('');
-    box.querySelectorAll('.chip').forEach(el => {
+    const box = document.getElementById('buckets');
+    if (!box) return;
+    box.innerHTML = BUCKETS.map(b => `
+      <button class="bkt ${b.cls} ${activeBucket===b.k?'on':''}" data-k="${b.k}">
+        <div class="bkt-top">
+          <div class="bkt-ico"><svg viewBox="0 0 24 24">${BUCKET_ICONS[b.k]}</svg></div>
+          <div class="bkt-n">${counts[b.k]}</div>
+        </div>
+        <div class="bkt-lbl">${b.lbl}</div>
+      </button>
+    `).join('');
+    box.querySelectorAll('.bkt').forEach(el => {
       el.onclick = () => {
-        const k = el.dataset.k;
-        if (active.has(k)) active.delete(k); else active.add(k);
+        activeBucket = el.dataset.k;
+        // Sync the legacy `active` set so renderTimeline's existing filter
+        // logic keeps working without a rewrite.
+        active.clear();
+        const b = BUCKETS.find(x => x.k === activeBucket);
+        (b.statuses || []).forEach(s => active.add(s));
         renderAll();
       };
     });
   }
 
-  /* ── Timeline ── */
+  /* ── Timeline ──
+     Cards now carry a row of nursery chips instead of being one big link.
+     Each chip navigates to the destination page with
+       ?nursery=<code>&from=home
+     so the page opens on the right tab straight away and shows a
+     Choose-Another-Nursery button. PN scope → one chip; MN scope →
+     three (BNN / UNN 1 / UNN 2). */
+  function _chipsHtml(o, tone){
+    return `<div class="tl-chips">${
+      SCOPE_NURSERIES.map(n => `
+        <a class="tl-chip" style="--tone:${tone}"
+           href="${o.href}?nursery=${n}&from=home">${NURSERY_LABELS[n]}</a>`
+      ).join('')
+    }</div>`;
+  }
+
   function renderTimeline(occ){
     let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
     /* Today's view answers "what do I owe", so overdue belongs in it —
@@ -1237,8 +1319,14 @@ function loadAuditTodo(){
       const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
       const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
+      /* Card is a plain div (not an <a>) because each nchip inside it is
+         its own link — one deep-link per nursery, tagged &from=home so
+         the destination re-labels its back button as
+         Choose-Another-Nursery. A ✓ prefix marks the nurseries that have
+         already recorded audits in this window, so the auditor sees at a
+         glance which nursery still needs walking. */
       return `<div class="tl-item ${k==='overdue'?'overdue':''}" style="--tone:${c.tone}">
-        <a class="tl-card" href="${o.href}" style="--tint:${c.tint};--tone:${c.tone}">
+        <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
             <div class="tl-ttl">${o.title}${
@@ -1246,15 +1334,15 @@ function loadAuditTodo(){
                 ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
             <div class="tl-nurs">${
               nurseryState(o, oy, om).map(x =>
-                `<span class="nchip${x.done ? ' on' : ''}">${
-                   x.done ? '✓ ' : ''}${NURSERY_LABELS[x.nursery] || x.nursery}</span>`
+                `<a class="nchip${x.done ? ' on' : ''}" href="${o.href}?nursery=${x.nursery}&from=home">${
+                   x.done ? '✓ ' : ''}${NURSERY_LABELS[x.nursery] || x.nursery}</a>`
               ).join('')}</div>
           </div>
           <div class="tl-when">
             <div class="tl-date">${dateLabel(o, om)}</div>
             <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
           </div>
-        </a>
+        </div>
       </div>`;
     }).join('');
 
@@ -1277,17 +1365,18 @@ function loadAuditTodo(){
       html += ANYTIME.map(o => {
         const c = TONE[o.mod];
         return `<div class="tl-item" style="--tone:${c.tone}">
-          <a class="tl-card" href="${o.href}" style="--tint:${c.tint};--tone:${c.tone}">
+          <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${o.title}</div>
+              ${_chipsHtml(o, c.tone)}
             </div>
             <div class="tl-when">${
               o.badge === 'maint'
                 ? '<div id="maint-pending-badge"><span class="tl-badge" style="background:#e9edf1;color:#5b7280">…</span></div>'
                 : `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">${t('on_demand')}</span>`
             }</div>
-          </a>
+          </div>
         </div>`;
       }).join('');
     }
@@ -1344,8 +1433,12 @@ function loadAuditTodo(){
           : `<span class="count-big">${outstanding}</span> to do in ` +
             `${MONTHS_FULL[viewM]} ${viewY}${doneNote}`);
 
+    // renderCalendar() and renderChips() are now no-ops for the bucket-tile
+    // layout — the month strip and due/soon/etc pills are gone; renderBuckets
+    // replaces the filter role. renderCalendar's own null guards make it safe
+    // to keep the call in case any HTML fragment brings the strip back.
     renderCalendar();
-    renderChips(occ);
+    renderBuckets(occ);
     renderTimeline(occ);
   }
 
@@ -1376,20 +1469,28 @@ function loadAuditTodo(){
     }catch(e){ paint(null); }
   }
 
-  document.getElementById('cal-prev').onclick = () => {
+  /* The month strip is gone with the new bucket-tile design; only wire
+     the calendar / day-strip listeners when those elements still exist,
+     otherwise a fresh page load would throw NPE on the first querySelector
+     and stop everything below it (including renderAll). */
+  const _bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = fn;
+  };
+  _bind('cal-prev', () => {
     viewM--; if (viewM < 0){ viewM = 11; viewY--; }
     winStart = windowFor(viewY, viewM); selDay = null; renderAll();
-  };
-  document.getElementById('cal-next').onclick = () => {
+  });
+  _bind('cal-next', () => {
     viewM++; if (viewM > 11){ viewM = 0; viewY++; }
     winStart = windowFor(viewY, viewM); selDay = null; renderAll();
-  };
-  document.getElementById('cal-today').onclick = () => {
+  });
+  _bind('cal-today', () => {
     viewY = year; viewM = month; winStart = windowFor(year, month);
     selDay = day; active.clear(); renderAll();
-  };
-  document.getElementById('day-prev').onclick = () => stepDays(-1);
-  document.getElementById('day-next').onclick = () => stepDays(1);
+  });
+  _bind('day-prev', () => stepDays(-1));
+  _bind('day-next', () => stepDays(1));
 
   document.addEventListener('mjm-lang-changed', renderAll);
 

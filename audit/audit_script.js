@@ -314,7 +314,22 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',e=>{
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
-  selectTab('PN');
+  // Deep-link support: ?nursery=BNN pre-selects that tab so the auditor
+  // hub can send the user straight to the right nursery. `?from=home` on
+  // top swaps the top-bar back arrow for a Choose-Another-Nursery button
+  // so they can pick another one without re-entering from the hub.
+  const _q  = new URLSearchParams(location.search);
+  const _nq = String(_q.get('nursery') || '').toUpperCase();
+  const _startNursery = NURSERY_PLOTS[_nq] ? _nq : 'PN';
+  selectTab(_startNursery);
+  if (_q.get('from') === 'home') {
+    const back = document.querySelector('.top-bar-back');
+    if (back) {
+      back.setAttribute('href', 'audit_home.html');
+      back.setAttribute('title', 'Choose another nursery');
+      back.setAttribute('aria-label', 'Choose another nursery');
+    }
+  }
   loadRecords();
 }
 document.addEventListener('DOMContentLoaded',init);

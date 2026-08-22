@@ -352,7 +352,21 @@ function init(){
   document.getElementById('lightbox').addEventListener('click',e=>{
     if(e.target===document.getElementById('lightbox'))closeLightbox();
   });
-  selectTab('PN');
+  // Deep-link support — same contract as audit_plot_audit: ?nursery=X
+  // opens straight on that tab; &from=home re-labels the top-bar back
+  // arrow as Choose-Another-Nursery.
+  const _q  = new URLSearchParams(location.search);
+  const _nq = String(_q.get('nursery') || '').toUpperCase();
+  const _startNursery = NURSERY_PLOTS[_nq] ? _nq : 'PN';
+  selectTab(_startNursery);
+  if (_q.get('from') === 'home') {
+    const back = document.querySelector('.top-bar-back');
+    if (back) {
+      back.setAttribute('href', 'audit_home.html');
+      back.setAttribute('title', 'Choose another nursery');
+      back.setAttribute('aria-label', 'Choose another nursery');
+    }
+  }
   loadRecords();
 }
 document.addEventListener('DOMContentLoaded',init);

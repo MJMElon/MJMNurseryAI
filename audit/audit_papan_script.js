@@ -672,5 +672,29 @@ function init(){
   const d=document.getElementById('nav-today');if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))cancelDelete();});
   selectTab('audit');setView('list');loadAll();
+  // Deep-link support — same contract as the other audit pages: the hub
+  // sends ?nursery=X to pick the nursery filter, plus &from=home to
+  // re-label the top-bar back arrow as Choose-Another-Nursery. Runs
+  // after loadAll queues so the filter button state settles first.
+  const _q  = new URLSearchParams(location.search);
+  const _nq = String(_q.get('nursery') || '').toUpperCase();
+  if (NURSERY_PLOTS[_nq]) {
+    // The nursery buttons render inside loadAll → renderAll; wait a tick
+    // so the target element exists, then click it to reuse the same code
+    // path a manual tap uses (state + UI + counts stay in sync).
+    setTimeout(() => {
+      const btn = document.querySelector('.nursery-filter-btn[data-nursery="'+_nq+'"]')
+               || document.querySelector('.nursery-filter-btn[data-n="'+_nq+'"]');
+      if (btn) btn.click(); else if (typeof selectNursery === 'function') selectNursery(_nq);
+    }, 0);
+  }
+  if (_q.get('from') === 'home') {
+    const back = document.querySelector('.top-bar-back');
+    if (back) {
+      back.setAttribute('href', 'audit_home.html');
+      back.setAttribute('title', 'Choose another nursery');
+      back.setAttribute('aria-label', 'Choose another nursery');
+    }
+  }
 }
 document.addEventListener('DOMContentLoaded',init);
