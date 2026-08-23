@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-23a */
+/* BUILD: 2026-08-23b */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -12,28 +12,32 @@
 ================================================================ */
 'use strict';
 
-/* Filter categories — five tiles across the top of the list, mirroring
-   the operation Maintenance module's icons. The values below match the
-   normalised task.type each field row is mapped to in loadAll(). */
-const TASK_TYPES = ['P & D Spraying','Manuring','Weeding','Interrow Spray','Others'];
+/* Filter categories — four work-type tiles + an 'All' tile. P&D
+   Spraying is intentionally NOT audited on this page (business rule:
+   its records are reviewed elsewhere), so it doesn't appear as a
+   filter and any 'pd' rows from the field ledger are dropped in
+   loadAll(). */
+const TASK_TYPES = ['Manuring','Weeding','Interrow Spray','Others'];
 
 /* Map the operation ledger's short work_type codes onto the human
-   labels the audit UI uses. Any code that isn't one of the four known
-   ones falls into "Others". */
+   labels the audit UI uses. 'pd' is deliberately omitted — those rows
+   are filtered out at load time. Anything else that isn't one of the
+   three known codes falls into "Others". */
 const WORK_TYPE_LABEL = {
-  pd:       'P & D Spraying',
   manuring: 'Manuring',
   weeding:  'Weeding',
   interrow: 'Interrow Spray'
 };
 
+/* Which raw work_type codes to skip entirely. Kept as a Set so a
+   future policy change ("actually add Xyz back in") is a one-line
+   edit rather than three grepped call sites. */
+const SKIP_WORK_TYPES = new Set(['pd']);
+
 /* Audit deadline window per work type — how many days after the field
-   recorded the work the auditor still has to close it out. P&D /
-   Manuring / Weeding = 3 days, Interrow = 5 days, Others defaults to
-   3 days. Keyed on the same labels WORK_TYPE_LABEL emits so the lookup
-   works straight off task.type. */
+   recorded the work the auditor still has to close it out. Manuring /
+   Weeding = 3 days, Interrow = 5 days, Others defaults to 3 days. */
 const AUDIT_WINDOW_DAYS = {
-  'P & D Spraying':  3,
   'Manuring':        3,
   'Weeding':         3,
   'Interrow Spray':  5,
@@ -296,25 +300,21 @@ async function loadAll(){
     const [fRows, aRows] = await Promise.all([
       sb.select('nops_maint_field_records',
                 'select=id,work_date,nursery_name,plot_name,work_type,jenis,chemical,'
-              + 'batch_name,reported_by,photo_urls,qty,remark,created_at')
+              + 'batch_name,reported_by,photo_urls,qty,remark,week_no,created_at')
         .catch(e => { console.warn('[maint-audit] nops_maint_field_records unavailable:', e); return []; }),
       sb.select('audit_maintenance_audits','select=*')
     ]);
 
     tasks = [];
     (fRows||[]).forEach(r => {
-      // Prefer nursery_name if the field wrote it; fall back to deriving
-      // from the plot code (older rows written before nursery_name was
-      // required will still map correctly). Unknown plots — stray codes
-      // in the log — are dropped instead of forced into a wrong nursery.
+      // Business rule: P&D Spraying is audited elsewhere — skip 'pd'
+      // rows so they never enter this list (also keeps the pending
+      // counts honest).
+      if (SKIP_WORK_TYPES.has(r.work_type)) return;
       const plot    = _canonicalPlot(r.plot_name);
-      const nursery = (r.nursery_name && PLOT_TO_NURSERY_M[plot])
-                        ? PLOT_TO_NURSERY_M[plot]
-                        : (plot ? PLOT_TO_NURSERY_M[plot] : null);
-      if(!nursery) return;
-      // photo_urls is a comma-separated TEXT column, not JSONB. Split
-      // it into an array so the card's "N worker photos" chip counts
-      // correctly.
+      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
+      if(!nursery) return;                              // stray plot in the log
+      // photo_urls is a comma-separated TEXT column, not JSONB.
       const photos = (typeof r.photo_urls === 'string' && r.photo_urls.length)
         ? r.photo_urls.split(',').map(s => s.trim()).filter(Boolean)
         : (Array.isArray(r.photo_urls) ? r.photo_urls : []);
@@ -323,10 +323,13 @@ async function loadAll(){
         nursery,
         plot,
         type:          WORK_TYPE_LABEL[r.work_type] || 'Others',
-        // Prefer the office-worded chemical when it's set; otherwise
-        // fall back to `jenis` (the wording the FC Scan Portal uses).
+        // Kept off the card chips (user wanted that noise removed) but
+        // still shown on the form banner + detail-info grid where it
+        // matters for context.
         chemical:      r.chemical || r.jenis || '',
-        round:         '',                              // field record doesn't carry a schedule round
+        // Round comes from week_no (1..4) on the field record. Blank
+        // if the older record predates the schedule-week column.
+        round:         (r.week_no != null && r.week_no !== '') ? String(r.week_no) : '',
         batch:         r.batch_name || '',
         worker:        r.reported_by || '',
         qty:           r.qty ?? null,
@@ -440,14 +443,15 @@ function makeTaskCard(t, audit){
   const status = audit ? resultStatusClass(audit.result) : 'status-pending';
   const badgeLabel = audit ? audit.result : 'Pending';
   const badgeClass = audit ? resultBadgeClass(audit.result) : 'badge-pending';
-  // Chip row: no explicit "📅 date" chip any more — the date lives in
-  // the timeline column on the left of the row. Countdown pill only
-  // renders for pending tasks; once audited, the clock stops.
+  // Chip row: no chemical chip (per feedback), no nursery tag (moved
+  // to context), no date pill (the timeline column carries it). Round
+  // is shown as a chip, based on week_no from the field record.
+  // Countdown pill only renders while pending — the clock stops once
+  // the audit is filed.
   const countdownHtml = audit ? '' : _countdownChip(t);
   const chips = `<div class="task-chips">
     ${t.round?`<span class="task-chip">Round ${t.round}</span>`:''}
     ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
-    ${t.chemical?`<span class="task-chip">${t.chemical}</span>`:''}
     ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
     ${countdownHtml}
   </div>`;
@@ -459,12 +463,16 @@ function makeTaskCard(t, audit){
     : `<div class="task-actions">
         <button class="btn-audit-now" onclick="openForm('${t.id}',false,null)">Audit Now</button>
       </div>`;
+  // Top row now only carries the status pill (Pending / Satisfied /
+  // …). The work name is the card's big heading; the plot sits below
+  // it as a slightly smaller subtitle. Nursery tag was removed per
+  // feedback — the auditor already picked the nursery on the bottom
+  // tab bar so it's redundant on every card.
   return `<div class="task-card ${status}">
     <div class="task-card-top">
-      <span class="task-nursery-tag">${t.nursery||'—'}</span>
-      <span class="task-type-tag">${t.type}</span>
       <span class="task-status-badge ${badgeClass}">${badgeLabel}</span>
     </div>
+    <div class="task-work">${t.type}</div>
     <div class="task-plot">${t.plot}</div>
     <div class="task-meta">${t.worker?'Worker: '+t.worker:''}</div>
     ${chips}${actions}

@@ -92,7 +92,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
    filter, tap it again to clear the filter. */
 .filter-icons{
   display:grid;
-  grid-template-columns:repeat(6, 1fr);
+  grid-template-columns:repeat(5, 1fr);            /* All + Manuring / Weeding / Interrow / Others */
   gap:6px;
   padding:12px 12px 4px;
 }
@@ -137,6 +137,19 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 
 /* TASK CARD */
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:9px;padding:13px 14px;box-shadow:var(--shadow-xs)}
+/* Work-name heading — the card's primary label. Sits above the plot
+   line so the auditor sees WHAT the work is before WHERE it happened. */
+.task-work{
+  font-size:20px;font-weight:800;color:var(--g800);line-height:1.15;
+  letter-spacing:-.2px;margin:4px 0 2px;
+}
+/* Plot line is now the secondary label — was the primary before the
+   work name took its place. Slightly smaller + muted so the two lines
+   read as heading + subheading. */
+.task-plot{
+  font-size:14px !important;font-weight:700 !important;color:var(--text2) !important;
+  margin-bottom:2px;
+}
 
 /* ─── Timeline layout ────────────────────────────────────────────────
    Tasks group by the work_date the field recorded, one row per day.
