@@ -92,7 +92,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
    filter, tap it again to clear the filter. */
 .filter-icons{
   display:grid;
-  grid-template-columns:repeat(5, 1fr);
+  grid-template-columns:repeat(6, 1fr);
   gap:6px;
   padding:12px 12px 4px;
 }
