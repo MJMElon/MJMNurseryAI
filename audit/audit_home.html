@@ -484,10 +484,15 @@
                  stroke-linecap:round;stroke-linejoin:round}
     .bkt-n{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px}
     .bkt-lbl{font-size:12px;font-weight:700;letter-spacing:.2px;line-height:1.15;opacity:.95}
-    .bkt-today{background:linear-gradient(135deg,#4a90e2,#3a7bd0)}
-    .bkt-sched{background:linear-gradient(135deg,#d97878,#b95656)}
+    /* Colours picked so the meaning is obvious at a glance:
+         Today's Audit → green   (do this now, healthy urgency)
+         Scheduled     → amber   (coming up, gentle warning)
+         All Audit     → ink     (neutral, overview)
+         Overdue       → red     (blown deadline, high urgency) */
+    .bkt-today{background:linear-gradient(135deg,#2d7a2d,#1a4d1a)}
+    .bkt-sched{background:linear-gradient(135deg,#f59e0b,#c2410c)}
     .bkt-all  {background:linear-gradient(135deg,#4a4a4d,#2b2b2e)}
-    .bkt-over {background:linear-gradient(135deg,#8a8f95,#5b6270)}
+    .bkt-over {background:linear-gradient(135deg,#ef4444,#991b1b)}
     @media (max-width:640px){
       .buckets{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       .bkt{min-height:84px;padding:12px 12px 10px;border-radius:15px}
@@ -531,32 +536,53 @@
     .tl{position:relative;padding:2px 0 6px 26px}
     .tl::before{content:'';position:absolute;left:8px;top:6px;bottom:16px;width:2px;
                 background:linear-gradient(#e3ebf2,#eef3f7)}
-    .tl-item{position:relative;margin-bottom:9px}
+    .tl-item{position:relative;margin-bottom:10px}
     .tl-item::before{content:'';position:absolute;left:-23px;top:17px;width:11px;height:11px;
                      border-radius:50%;background:#fff;border:2.5px solid var(--tone,#c3ced6)}
-    .tl-card{display:flex;align-items:center;gap:12px;text-decoration:none;border-radius:13px;
-             padding:12px 14px;background:var(--tint,#f4f7fa);
-             border-left:4px solid var(--tone,#c3ced6);
+    .tl-card{border-radius:13px;background:var(--tint,#f4f7fa);
+             border-left:4px solid var(--tone,#c3ced6);overflow:hidden;
              transition:transform .14s,box-shadow .14s}
     .tl-card:hover{transform:translateX(2px);box-shadow:0 4px 14px rgba(16,40,60,.08)}
-    .tl-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.75);
+    .tl-item.overdue .tl-card{border-left-width:6px}
+    /* Head is the whole tap target that toggles the nursery list open.
+       Uses a real <button> so keyboard focus and Enter/Space Just Work. */
+    .tl-head-btn{width:100%;display:flex;align-items:center;gap:12px;
+                 background:transparent;border:none;padding:12px 14px;
+                 font-family:inherit;color:inherit;cursor:pointer;text-align:left;
+                 -webkit-tap-highlight-color:transparent}
+    .tl-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.85);
             display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .tl-ico svg{width:17px;height:17px;fill:none;stroke-width:2;
                 stroke-linecap:round;stroke-linejoin:round}
-    .tl-body{flex:1;min-width:0}
-    .tl-ttl{font-size:13.5px;font-weight:800;color:var(--fc-ink);display:flex;
-            align-items:center;gap:7px;flex-wrap:wrap}
-    .tl-when{flex-shrink:0;text-align:right}
-    .tl-date{font-size:12px;font-weight:800;color:var(--fc-ink);white-space:nowrap}
-    .tl-badge{display:inline-block;margin-top:4px;font-size:9px;font-weight:800;
-              padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
-    /* One chip per nursery the task covers, so a main-nursery row says which
-       of the three are done rather than hiding two behind the first. */
-    .tl-nurs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-    .nchip{font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 8px;
+    .tl-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+    .tl-ttl{font-size:14px;font-weight:800;color:var(--fc-ink);display:flex;
+            align-items:center;gap:7px;flex-wrap:wrap;line-height:1.15}
+    /* Meta row is date + status pill, always visible (was hidden on mobile
+       and pushed to a right column on desktop — the auditor could not see
+       when work was due). */
+    .tl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+    .tl-date{font-weight:700;color:var(--fc-ink2)}
+    .tl-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;
+              white-space:nowrap;letter-spacing:.3px}
+    .tl-caret{width:22px;height:22px;flex-shrink:0;color:var(--fc-ink3);
+              display:flex;align-items:center;justify-content:center;
+              transition:transform .18s}
+    .tl-item.open .tl-caret{transform:rotate(180deg)}
+    .tl-caret svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    /* Nursery chips are hidden until the auditor opens the card. Each chip
+       is still a link — the outer button is just a disclosure, so tapping
+       a chip navigates without re-toggling the panel. */
+    .tl-nurs-wrap{max-height:0;overflow:hidden;transition:max-height .22s ease}
+    .tl-item.open .tl-nurs-wrap{max-height:200px}
+    .tl-nurs{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px 14px}
+    .nchip{font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 11px;
            border-radius:20px;background:#fff;border:1.5px solid #d8e2ea;
-           color:var(--fc-ink3);white-space:nowrap}
+           color:var(--fc-ink);white-space:nowrap;text-decoration:none;
+           -webkit-tap-highlight-color:transparent;transition:transform .1s,background .1s}
+    .nchip:hover{background:var(--tone,#2d7a2d);color:#fff;border-color:var(--tone,#2d7a2d)}
+    .nchip:active{transform:scale(.97)}
     .nchip.on{background:#dcfce7;border-color:#a7e0b5;color:#166534}
+    .nchip.on::before{content:'✓ ';font-weight:900}
 
     .count-big{font-size:26px;font-weight:800;color:#2d7a2d;letter-spacing:-.3px}
     .count-note{font-size:12px;font-weight:700;color:var(--fc-ink3)}
@@ -579,7 +605,6 @@
       .sched{padding:14px 12px 6px;border-radius:16px}
       .sched-count{font-size:15px}
       .cal-month{min-width:104px;font-size:13px}
-      .tl-when{display:none}
       .day{width:40px}
     }
 
@@ -794,7 +819,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260822i"></script>
+<script src="audit_lang.js?v=20260823j"></script>
 <script src="audit_supabase.js"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
@@ -985,23 +1010,28 @@ function loadAuditTodo(){
      windows:[[10,10],[20,20],[30,30]]},
     {mod:'height', title:'home_height', href:'audit_height_index.html',
      windows:[[1,5],[15,20]]},
+    // Papan Tanda has to be closed inside the calendar month — auditors
+    // have the whole month to walk it. Window covers day 1 to 31 and
+    // occurrences() clamps to the actual last day of the month, so
+    // February and 30-day months don't leak a day.
     {mod:'papan',  title:'home_papan',  href:'audit_papan_index.html',
-     windows:[[15,20]]}
+     windows:[[1,31]]}
   ];
   const PN_SET = [
     {mod:'plot',   title:'home_plot',   href:'audit_plot_audit.html',
      windows:[[20,25]]},
     {mod:'height', title:'home_height', href:'audit_height_index.html',
-     windows:[[20,25]]}
+     windows:[[20,25]]},
+    // Papan on PN gets the whole-month window too, same as MN.
+    {mod:'papan',  title:'home_papan',  href:'audit_papan_index.html',
+     windows:[[1,31]]}
   ];
-  /* No window at all — these are triggered by events, not by the calendar.
-     Maintenance used to sit here as an "ANYTIME" chip; it now generates
-     its own dated timeline entries (see MAINT_OCCURRENCES / loadMaintTimeline
-     below) so the auditor can see each deadline day the same way the
-     other three audits show their windows. */
+  /* ANYTIME used to hold event-driven audits (maintenance + papan on PN).
+     Both are now dated occurrences on the main timeline — maintenance
+     via MAINT_OCCURRENCES + loadMaintTimeline, papan via the whole-month
+     window on PN_SET / MN_SET — so this stays as a no-op that the
+     downstream renderers can still safely check .length on. */
   const ANYTIME = [];
-  if (showPN) ANYTIME.push({mod:'papan', title:'home_papan',
-                            href:'audit_papan_index.html'});
 
   const SET = showMN ? MN_SET : showPN ? PN_SET : [];
 
@@ -1464,34 +1494,45 @@ function loadAuditTodo(){
     if (active.size)     list = list.filter(o =>
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
-    let html = list.map(o => {
+    let html = list.map((o, idx) => {
       const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
       const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
-      /* Card is a plain div (not an <a>) because each nchip inside it is
-         its own link — one deep-link per nursery, tagged &from=home so
-         the destination re-labels its back button as
-         Choose-Another-Nursery. A ✓ prefix marks the nurseries that have
-         already recorded audits in this window, so the auditor sees at a
-         glance which nursery still needs walking. */
-      return `<div class="tl-item ${k==='overdue'?'overdue':''}" style="--tone:${c.tone}">
+      const nurseries = nurseryState(o, oy, om);
+      const pendingCount = nurseries.filter(x => !x.done).length;
+      const chevronSvg = '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>';
+      // Head is a real button so keyboard focus + Enter/Space toggle the
+      // panel. Each nchip below is still its own link so a tap on the
+      // nursery navigates without toggling. Overdue rows keep the
+      // fatter border-left the CSS already targets.
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
         <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
-          <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
-          <div class="tl-body">
-            <div class="tl-ttl">${t(o.title)}${
-              o.round ? ` <span class="tl-round">Round ${o.round}</span>` : ''
-            }${
-              o.fromY !== undefined
-                ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
+          <button type="button" class="tl-head-btn" data-toggle="${idx}" aria-expanded="false"
+                  aria-controls="tl-nurs-${idx}">
+            <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
+            <div class="tl-body">
+              <div class="tl-ttl">${t(o.title)}${
+                o.round ? ` <span class="tl-round">Round ${o.round}</span>` : ''
+              }${
+                o.fromY !== undefined
+                  ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
+              <div class="tl-meta">
+                <span class="tl-date">${dateLabel(o, om)}</span>
+                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
+                ${pendingCount > 0
+                    ? `<span class="tl-badge" style="background:rgba(0,0,0,.06);color:var(--fc-ink2)">${fmtNum(pendingCount)} ${t(pendingCount === 1 ? 'nursery_1' : 'nurseries_n')}</span>`
+                    : `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`}
+              </div>
+            </div>
+            <div class="tl-caret">${chevronSvg}</div>
+          </button>
+          <div class="tl-nurs-wrap" id="tl-nurs-${idx}">
             <div class="tl-nurs">${
-              nurseryState(o, oy, om).map(x =>
+              nurseries.map(x =>
                 `<a class="nchip${x.done ? ' on' : ''}" href="${o.href}?nursery=${x.nursery}&from=home">${
-                   x.done ? '✓ ' : ''}${NURSERY_LABELS[x.nursery] || x.nursery}</a>`
+                   NURSERY_LABELS[x.nursery] || x.nursery
+                 }</a>`
               ).join('')}</div>
-          </div>
-          <div class="tl-when">
-            <div class="tl-date">${dateLabel(o, om)}</div>
-            <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
           </div>
         </div>
       </div>`;
@@ -1532,7 +1573,21 @@ function loadAuditTodo(){
       }).join('');
     }
 
-    document.getElementById('todo-section').innerHTML = html;
+    const todoBox = document.getElementById('todo-section');
+    todoBox.innerHTML = html;
+    // Wire the head-button toggles: tap once to open the nursery chips,
+    // tap again to close. aria-expanded stays in sync for accessibility.
+    todoBox.querySelectorAll('.tl-head-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        // Ignore clicks that land on a nested link (nchip) — those must
+        // navigate straight through, not accidentally toggle the panel.
+        if (e.target.closest && e.target.closest('.nchip')) return;
+        const item = btn.closest('.tl-item');
+        if (!item) return;
+        const open = item.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    });
     if ((selDay === null || showingToday) && !active.size) countMaintenance();
   }
 
