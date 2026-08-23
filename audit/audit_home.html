@@ -988,11 +988,14 @@ function loadAuditTodo(){
     {mod:'height', title:'home_height', href:'audit_height_index.html',
      windows:[[20,25]]}
   ];
-  /* No window at all — these are triggered by events, not by the calendar. */
+  /* No window at all — these are triggered by events, not by the calendar.
+     Maintenance used to sit here as an "ANYTIME" chip; it now generates
+     its own dated timeline entries (see MAINT_OCCURRENCES / loadMaintTimeline
+     below) so the auditor can see each deadline day the same way the
+     other three audits show their windows. */
   const ANYTIME = [];
   if (showPN) ANYTIME.push({mod:'papan', title:'home_papan',
                             href:'audit_papan_index.html'});
-  ANYTIME.push({mod:'maint', title:'home_maintenance', href:'audit_maintenance_index.html', badge:'maint'});
 
   const SET = showMN ? MN_SET : showPN ? PN_SET : [];
 
@@ -1094,8 +1097,97 @@ function loadAuditTodo(){
     }
   }
 
-  /* Which nurseries have been audited inside this window. */
+  /* ── MAINTENANCE TIMELINE ────────────────────────────────────────
+     Pending maintenance tasks each have their own audit deadline —
+     work_date + window(work_type):
+        Manuring / Weeding / Others → 3 days
+        Interrow Spray              → 5 days
+        P & D Spraying              → skipped (audited elsewhere)
+     We turn each pending task into a synthetic occurrence at the
+     deadline date, then merge them into occurrences(y,m) so they
+     show alongside the other audits' windows with 'overdue' / 'due'
+     / 'soon' status computed the same way. */
+  let MAINT_OCCURRENCES = [];                      // [{y, m, d, nurseries:Set}]
+  const JENIS_TO_WT = {
+    'Penyemburan racun kulat dan serangga': 'pd',
+    'Meracun rumput secara selingan':       'interrow',
+    'Merumput':                             'weeding',
+    'Membaja':                              'manuring'
+  };
+  const WT_WINDOW = { manuring:3, weeding:3, interrow:5 };   // days
+  const _wtWinFor = wt => WT_WINDOW[wt] || 3;
+  function _canonPlot(raw){
+    const s = String(raw||'').trim().toUpperCase();
+    const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+    return m ? m[1] + m[2].padStart(2,'0') + (m[3]||'') : s;
+  }
+  const _PLOT_NUR = (function(){
+    const P = {
+      PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
+      BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
+      UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
+      UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
+    };
+    const m = {};
+    Object.keys(P).forEach(n => P[n].forEach(p => {
+      m[p] = n;
+      const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+      if (stripped !== p) m[stripped] = n;
+    }));
+    return m;
+  })();
+  function _tarikhToISO(t){
+    if (!t || t === '-' || t === '—') return '';
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
+    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+  }
+  async function loadMaintTimeline(){
+    try {
+      const [fRows, aRows, oRows] = await Promise.all([
+        sb.select('nops_maint_field_records', 'select=id,work_date,plot_name,work_type,jenis').catch(_ => []),
+        sb.select('audit_maintenance_audits', 'select=task_id').catch(_ => []),
+        sb.select('nops_maint_records',       'select=records').catch(_ => [])
+      ]);
+      const audited = new Set((aRows||[]).map(a => String(a.task_id)));
+      const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set}
+      const push = (id, workDateISO, workType, plotRaw) => {
+        if (workType === 'pd') return;            // P&D skipped
+        if (audited.has(String(id))) return;
+        if (!workDateISO) return;
+        const [Y,M,D] = workDateISO.split('-').map(Number);
+        const dl = new Date(Y, M-1, D);
+        dl.setDate(dl.getDate() + _wtWinFor(workType));
+        const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
+        const plot = _canonPlot(plotRaw);
+        const n = plot ? _PLOT_NUR[plot] : null;
+        if (!n) return;
+        if (SCOPE_NURSERIES.indexOf(n) === -1) return;   // out-of-scope: don't surface
+        const k = y + '-' + m + '-' + d;
+        if (!buckets.has(k)) buckets.set(k, { y, m, d, nurseries: new Set() });
+        buckets.get(k).nurseries.add(n);
+      };
+      (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name));
+      const officeRecs = (oRows && oRows[0] && Array.isArray(oRows[0].records)) ? oRows[0].records : [];
+      officeRecs.forEach(rec => {
+        push(rec.id, _tarikhToISO(rec.tarikh), JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
+      });
+      MAINT_OCCURRENCES = Array.from(buckets.values());
+    } catch (e) {
+      console.warn('[audit-home] maintenance timeline load failed:', e);
+      MAINT_OCCURRENCES = [];
+    }
+  }
+
+  /* Which nurseries have been audited inside this window. Maintenance
+     is a different shape: each occurrence carries a set of nurseries
+     that STILL have pending tasks on that deadline, so we invert it. */
   function nurseryState(o, y, m){
+    if (o.mod === 'maint' && o._maintNurseries) {
+      return SCOPE_NURSERIES.map(n => ({
+        nursery: n,
+        done: !o._maintNurseries.has(n)             // pending? then not done
+      }));
+    }
     return SCOPE_NURSERIES.map(n => {
       let ok = false;
       if (done && done[o.mod])
@@ -1126,6 +1218,19 @@ function loadAuditTodo(){
         end:   Math.min(w[1], last)
       }));
     }));
+    // Maintenance — one synthetic occurrence per deadline day this
+    // month. Each carries the set of nurseries with pending tasks so
+    // nurseryState can invert it into ✓ / pending chips.
+    MAINT_OCCURRENCES.filter(mo => mo.y === y && mo.m === m).forEach(mo => {
+      out.push({
+        mod: 'maint',
+        title: 'home_maintenance',
+        href: 'audit_maintenance_index.html',
+        start: mo.d,
+        end:   mo.d,
+        _maintNurseries: mo.nurseries
+      });
+    });
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
   }
 
@@ -1507,6 +1612,7 @@ function loadAuditTodo(){
   winStart = windowFor(viewY, viewM);
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
+  loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
 
 
 }
