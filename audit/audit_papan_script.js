@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22j */
+/* BUILD: 2026-08-23c */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table PLUS
@@ -157,16 +157,31 @@ function selectTab(tab, el){
 function _pickNursery(n, el){ selectNursery(n, el); }
 
 function selectNursery(nursery, el){
-  activeNursery=nursery;
-  // Support the new bottom nursery bar AND any legacy top-row filter
-  // button that hasn't been removed yet.
-  document.querySelectorAll('.nursery-tab-item, .nursery-filter-btn').forEach(b=>b.classList.remove('active'));
-  if (el) el.classList.add('active');
-  else {
-    const b = document.querySelector('.nursery-tab-item[data-n="'+nursery+'"]')
-           || document.querySelector('.nursery-filter-btn[data-n="'+nursery+'"]');
-    if (b) b.classList.add('active');
-  }
+  activeNursery = nursery;
+  // Self-heal the bottom nursery bar on every click. Prior renders (or
+  // a stray inline style leaking in from another interaction) can leave
+  // the bar or an individual button in a display:none state — the report
+  // was "click BNN on the BNN page and the tab / content vanish". Force
+  // the bar visible and force every in-scope button visible before
+  // touching the active class, so a single tap can never leave the
+  // auditor stranded on an invisible nursery.
+  const bar = document.querySelector('.nursery-bottom-tabs');
+  if (bar) { bar.style.display = ''; bar.style.visibility = ''; }
+  document.querySelectorAll('.nursery-tab-item, .nursery-filter-btn').forEach(b => {
+    b.classList.remove('active');
+    // Restore visibility for anything inside scope; anything outside
+    // stays hidden (init put it there deliberately).
+    if (b.dataset && b.dataset.n && SCOPE_NURSERIES.indexOf(b.dataset.n) !== -1) {
+      b.style.display = '';
+      b.style.visibility = '';
+    }
+  });
+  // Prefer the specific button that was clicked, but fall back to
+  // querying by data-n so a programmatic call (deep-link, refresh)
+  // still marks the right tab.
+  const target = el || document.querySelector('.nursery-tab-item[data-n="'+nursery+'"]')
+                    || document.querySelector('.nursery-filter-btn[data-n="'+nursery+'"]');
+  if (target) target.classList.add('active');
   const label = document.getElementById('topbar-nursery');
   if (label) label.textContent = NURSERY_LABELS[nursery];
   renderAuditList();
