@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22m */
+/* BUILD: 2026-08-23a */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -26,6 +26,63 @@ const WORK_TYPE_LABEL = {
   weeding:  'Weeding',
   interrow: 'Interrow Spray'
 };
+
+/* Audit deadline window per work type — how many days after the field
+   recorded the work the auditor still has to close it out. P&D /
+   Manuring / Weeding = 3 days, Interrow = 5 days, Others defaults to
+   3 days. Keyed on the same labels WORK_TYPE_LABEL emits so the lookup
+   works straight off task.type. */
+const AUDIT_WINDOW_DAYS = {
+  'P & D Spraying':  3,
+  'Manuring':        3,
+  'Weeding':         3,
+  'Interrow Spray':  5,
+  'Others':          3
+};
+function _windowFor(type){ return AUDIT_WINDOW_DAYS[type] || 3; }
+
+/* Add N calendar days to a YYYY-MM-DD string and return the same shape.
+   Uses local time (matching how the field records their work_date), not
+   UTC — the deadline for "22 Aug" work is "25 Aug", not "24 Aug" in some
+   negative timezone. */
+function _addDaysISO(iso, days){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('T')[0].split('-').map(Number);
+  const dt = new Date(y, (m||1)-1, d||1);
+  dt.setDate(dt.getDate() + (days||0));
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+function _daysBetween(fromISO, toISO){
+  if(!fromISO || !toISO) return 0;
+  const [ya,ma,da] = fromISO.split('T')[0].split('-').map(Number);
+  const [yb,mb,db] = toISO.split('T')[0].split('-').map(Number);
+  const a = Date.UTC(ya,(ma||1)-1,da||1);
+  const b = Date.UTC(yb,(mb||1)-1,db||1);
+  return Math.round((b - a) / 86400000);
+}
+
+/* Countdown chip for a task's audit deadline. Deadline = work_date +
+   window(type). Returns a coloured pill so the auditor sees at a
+   glance whether the window is still comfortable, running out, or
+   already blown. Audited tasks skip the pill entirely — no clock left
+   to run once the audit is filed. */
+function _countdownChip(t){
+  if(!t || !t.completedDate) return '';
+  const win = _windowFor(t.type);
+  const deadline = _addDaysISO(t.completedDate, win);
+  const today = todayISO();
+  const left = _daysBetween(today, deadline);
+  const clockSvg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>';
+  let cls, label;
+  if (left > 1)       { cls = 'cd-ok';   label = left + ' days left'; }
+  else if (left === 1){ cls = 'cd-soon'; label = '1 day left'; }
+  else if (left === 0){ cls = 'cd-soon'; label = 'Due today'; }
+  else                { cls = 'cd-over'; label = 'Overdue ' + Math.abs(left) + (Math.abs(left) === 1 ? ' day' : ' days'); }
+  return '<span class="countdown-chip ' + cls + '" title="Audit deadline: ' + fmtDate(deadline) + ' (' + win + '-day window)">'
+       + clockSvg + label
+       + '</span>'
+       + '<span class="deadline-note">by ' + fmtDate(deadline) + '</span>';
+}
 
 let tasks=[], audits=[];
 let activeTab='audit';
@@ -307,9 +364,11 @@ async function loadAll(){
 }
 
 /* --- RENDER ---
-   Both lists sort oldest → newest by work_date so the auditor works the
-   backlog in the order it happened. Ties fall through to plot code so
-   two jobs on the same day still land in a repeatable order. */
+   Timeline layout: one row per work_date (oldest → newest), the date
+   itself sits in a prominent column on the left, and every task the
+   field recorded on that date stacks in the right column. Each card
+   carries its own countdown chip so the auditor can see at a glance
+   how much time is left inside the audit window. */
 function renderLists(){
   const filtered = filterTasks(tasks);
   const pending  = filtered.filter(t=>!getAuditForTask(t.id));
@@ -318,15 +377,7 @@ function renderLists(){
   document.getElementById('pending-count').textContent = fmtNum(pending.length) + ' task' + (pending.length!==1?'s':'');
   document.getElementById('done-count').textContent    = fmtNum(done.length)    + ' task' + (done.length!==1?'s':'');
 
-  const byWorkDateAsc = (a,b) => {
-    const cmp = String(a.completedDate||'').localeCompare(String(b.completedDate||''));
-    if (cmp) return cmp;
-    return String(a.plot||'').localeCompare(String(b.plot||''));
-  };
-
-  // Pending list — oldest task the field recorded is at the top so the
-  // auditor works through the backlog in date order.
-  const pendingEl=document.getElementById('pending-list');
+  const pendingEl = document.getElementById('pending-list');
   if(!pending.length){
     pendingEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
@@ -334,28 +385,71 @@ function renderLists(){
       <p>Once a worker keys in a work date on the Maintenance system, it appears here automatically.</p>
     </div>`;
   } else {
-    pendingEl.innerHTML=pending.slice().sort(byWorkDateAsc).map(t=>makeTaskCard(t,null)).join('');
+    pendingEl.innerHTML = _timelineHtml(pending, /*isAudited=*/false);
   }
 
-  // Done list — same ordering rule so the auditor can scan chronologically.
-  const doneEl=document.getElementById('done-list');
+  const doneEl = document.getElementById('done-list');
   if(!done.length){
     doneEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--text4);font-size:13px">No audited tasks yet.</div>';
   } else {
-    doneEl.innerHTML=done.slice().sort(byWorkDateAsc).map(t=>makeTaskCard(t,getAuditForTask(t.id))).join('');
+    doneEl.innerHTML = _timelineHtml(done, /*isAudited=*/true);
   }
+}
+
+/* Group a task list by work_date and render one .timeline-day row per
+   day, oldest first. Undated tasks (a rare edge case if the ledger has
+   a row without work_date) get a "No date" bucket at the bottom. */
+function _timelineHtml(list, isAudited){
+  const groups = new Map();                       // date → [tasks]
+  list.forEach(t => {
+    const key = t.completedDate || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  });
+  const keys = Array.from(groups.keys()).sort((a,b) => {
+    if (!a) return  1;                            // undated bucket → bottom
+    if (!b) return -1;
+    return a.localeCompare(b);                    // ascending: oldest first
+  });
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const WEEKS  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return keys.map(k => {
+    const items = groups.get(k).slice().sort((a,b) => String(a.plot||'').localeCompare(String(b.plot||'')));
+    let dateBox;
+    if (k) {
+      const [y,m,d] = k.split('T')[0].split('-').map(Number);
+      const dt = new Date(y, (m||1)-1, d||1);
+      dateBox = `<div class="timeline-date">
+        <div class="td-day">${String(d).padStart(2,'0')}</div>
+        <div class="td-mon">${MONTHS[(m||1)-1]}</div>
+        <div class="td-yr">'${String(y).slice(-2)}</div>
+        <div class="td-wk">${WEEKS[dt.getDay()]}</div>
+      </div>`;
+    } else {
+      dateBox = `<div class="timeline-date">
+        <div class="td-day">—</div>
+        <div class="td-mon">NO DATE</div>
+      </div>`;
+    }
+    const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t.id) : null)).join('');
+    return `<div class="timeline-day">${dateBox}<div class="timeline-tasks">${cards}</div></div>`;
+  }).join('');
 }
 
 function makeTaskCard(t, audit){
   const status = audit ? resultStatusClass(audit.result) : 'status-pending';
   const badgeLabel = audit ? audit.result : 'Pending';
   const badgeClass = audit ? resultBadgeClass(audit.result) : 'badge-pending';
+  // Chip row: no explicit "📅 date" chip any more — the date lives in
+  // the timeline column on the left of the row. Countdown pill only
+  // renders for pending tasks; once audited, the clock stops.
+  const countdownHtml = audit ? '' : _countdownChip(t);
   const chips = `<div class="task-chips">
     ${t.round?`<span class="task-chip">Round ${t.round}</span>`:''}
     ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
     ${t.chemical?`<span class="task-chip">${t.chemical}</span>`:''}
-    <span class="task-chip">📅 ${fmtDate(t.completedDate)}</span>
-    ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${t.workerPhotos.length} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
+    ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
+    ${countdownHtml}
   </div>`;
   const actions = audit
     ? `<div class="task-actions">
@@ -370,7 +464,6 @@ function makeTaskCard(t, audit){
       <span class="task-nursery-tag">${t.nursery||'—'}</span>
       <span class="task-type-tag">${t.type}</span>
       <span class="task-status-badge ${badgeClass}">${badgeLabel}</span>
-      <span class="task-card-date">${fmtDate(t.completedDate)}</span>
     </div>
     <div class="task-plot">${t.plot}</div>
     <div class="task-meta">${t.worker?'Worker: '+t.worker:''}</div>

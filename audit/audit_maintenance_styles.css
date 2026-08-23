@@ -137,6 +137,76 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 
 /* TASK CARD */
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:9px;padding:13px 14px;box-shadow:var(--shadow-xs)}
+
+/* ─── Timeline layout ────────────────────────────────────────────────
+   Tasks group by the work_date the field recorded, one row per day.
+   The date column on the left carries a big prominent day-of-month +
+   short month (23 · AUG · '26) so the auditor scans the schedule down
+   the page. Cards stack in the right column, one below the other. */
+.timeline-day{
+  display:flex;gap:12px;
+  padding:0 0 12px;                                 /* horizontal padding comes from .record-list */
+  align-items:stretch;
+}
+.timeline-day + .timeline-day{padding-top:2px}
+.timeline-date{
+  flex:0 0 64px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding-top:14px;
+  border-radius:var(--r-md);
+  background:var(--g50);
+  border:1px solid var(--border);
+  color:var(--g800);
+  position:relative;
+  min-height:88px;
+}
+.timeline-date .td-day{
+  font-size:26px;font-weight:800;line-height:1;letter-spacing:-.5px;
+}
+.timeline-date .td-mon{
+  font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--g700);
+  margin-top:4px;text-transform:uppercase;
+}
+.timeline-date .td-yr{
+  font-size:10px;font-weight:600;color:var(--text3);
+  margin-top:2px;
+}
+.timeline-date .td-wk{
+  font-size:9px;font-weight:600;color:var(--text4);text-transform:uppercase;
+  margin-top:6px;letter-spacing:.5px;
+}
+.timeline-tasks{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+/* Card sits flush with the timeline column, no left margin */
+.timeline-tasks .task-card{margin-bottom:0}
+/* Screens under ~340px — tighten the date column so long batch codes
+   still fit next to it without wrapping onto a second line. */
+@media (max-width:359px){
+  .timeline-date{flex-basis:52px}
+  .timeline-date .td-day{font-size:22px}
+}
+
+/* Countdown pill — one per card, telling the auditor how long they
+   have left to complete the audit. Colour ladder:
+     ≥ 2 days   → green   (comfortable)
+     1 day      → amber   (soon)
+     due today  → amber
+     overdue    → red     (past the window)                            */
+.countdown-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:.2px;
+  padding:4px 9px;border-radius:var(--r-full);
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.countdown-chip svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.countdown-chip.cd-ok  {background:var(--ok-bg);   color:var(--ok-text);   border-color:var(--ok-border)}
+.countdown-chip.cd-soon{background:var(--warn-bg); color:var(--warn-text); border-color:var(--warn-border)}
+.countdown-chip.cd-over{background:var(--danger-bg);color:var(--danger-text);border-color:var(--danger-border)}
+/* Deadline text under the countdown pill — small, muted, so the pill
+   itself is the eye-catch. */
+.deadline-note{
+  font-size:10px;color:var(--text3);margin-left:6px;
+}
 .task-card.status-pending{border-left:3px solid #f59e0b}
 .task-card.status-satisfactory{border-left:3px solid var(--g500)}
 .task-card.status-unsatisfactory{border-left:3px solid #dc2626}
