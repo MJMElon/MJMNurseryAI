@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22k */
+/* BUILD: 2026-08-22l */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -29,10 +29,10 @@ const WORK_TYPE_LABEL = {
 
 let tasks=[], audits=[];
 let activeTab='audit';
-// The filter row has no "All" tile anymore — an empty activeFilter means
-// no filter is applied and every task shows. Tapping an active tile a
-// second time clears it back to '', which is the whole-list view.
-let activeFilter='', activeView='list';
+// Default filter is 'All' — the first tile in the row is pre-selected
+// and the type filter is a no-op until the auditor picks a specific
+// work type. 'All' or '' both mean "no type filter".
+let activeFilter='All', activeView='list';
 // The nursery filter respects the scope chosen on audit_nursery_select:
 //   Pre Nursery scope → only PN
 //   Main Nursery scope → BNN, UNN1, UNN2
@@ -116,13 +116,18 @@ function selectTab(tab){
   renderLists();
 }
 function setFilter(f,el){
-  // Toggle behaviour: tap an active tile a second time to clear the
-  // filter and see every task again. Keeps the row at 5 tiles without
-  // needing an explicit "All" one.
+  // 'All' is a real tile now — tapping it just clears the type filter
+  // and stays highlighted so the row always shows one active tile.
+  // Tapping a specific tile while it's already active reverts to 'All'.
   const alreadyActive = (activeFilter === f);
-  activeFilter = alreadyActive ? '' : f;
+  activeFilter = (f === 'All' || alreadyActive) ? 'All' : f;
   document.querySelectorAll('.filter-icon, .filter-chip').forEach(c=>c.classList.remove('active'));
-  if (!alreadyActive && el) el.classList.add('active');
+  if (activeFilter === 'All') {
+    const allBtn = document.querySelector('.filter-icon[data-f="All"]');
+    if (allBtn) allBtn.classList.add('active');
+  } else if (el) {
+    el.classList.add('active');
+  }
   renderLists();
   updateStats();
 }
@@ -174,10 +179,11 @@ function updateStats(){
 }
 
 /* Applies BOTH filters together — nursery first (cheaper), then task
-   type. Empty activeFilter means "no type filter, show all". */
+   type. 'All' (or an empty activeFilter as a legacy fallback) means
+   "no type filter, show every task on this nursery". */
 function filterTasks(list){
   let out = list.filter(t=>t.nursery===activeNursery);
-  if(activeFilter) out = out.filter(t=>t.type===activeFilter);
+  if(activeFilter && activeFilter !== 'All') out = out.filter(t=>t.type===activeFilter);
   return out;
 }
 
@@ -223,29 +229,53 @@ async function loadAll(){
     // audit. The legacy audit_maintenance_tasks table was never keyed
     // into and its UUID ids don't fit the BIGINT task_id column on
     // audit_maintenance_audits anyway, so it's no longer read.
+    // Column list must match the actual schema of nops_maint_field_records
+    // (see shared/fix_nops_maint_field_records.sql + add_maint_field_batch.sql
+    // + add_maint_field_photos.sql). The worker's name is `reported_by`,
+    // NOT `worker_name` — the previous query asked for a column that
+    // doesn't exist, Supabase 400'd the whole request, the .catch() below
+    // swallowed it, and every auditor saw an empty task list even when
+    // the operation Maintenance system was actively logging work.
     const [fRows, aRows] = await Promise.all([
       sb.select('nops_maint_field_records',
-                'select=id,work_date,plot_name,work_type,jenis,batch_name,worker_name,photo_urls,created_at')
+                'select=id,work_date,nursery_name,plot_name,work_type,jenis,chemical,'
+              + 'batch_name,reported_by,photo_urls,qty,remark,created_at')
         .catch(e => { console.warn('[maint-audit] nops_maint_field_records unavailable:', e); return []; }),
       sb.select('audit_maintenance_audits','select=*')
     ]);
 
     tasks = [];
     (fRows||[]).forEach(r => {
+      // Prefer nursery_name if the field wrote it; fall back to deriving
+      // from the plot code (older rows written before nursery_name was
+      // required will still map correctly). Unknown plots — stray codes
+      // in the log — are dropped instead of forced into a wrong nursery.
       const plot    = _canonicalPlot(r.plot_name);
-      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
-      if(!nursery) return;                              // stray plot in the log
+      const nursery = (r.nursery_name && PLOT_TO_NURSERY_M[plot])
+                        ? PLOT_TO_NURSERY_M[plot]
+                        : (plot ? PLOT_TO_NURSERY_M[plot] : null);
+      if(!nursery) return;
+      // photo_urls is a comma-separated TEXT column, not JSONB. Split
+      // it into an array so the card's "N worker photos" chip counts
+      // correctly.
+      const photos = (typeof r.photo_urls === 'string' && r.photo_urls.length)
+        ? r.photo_urls.split(',').map(s => s.trim()).filter(Boolean)
+        : (Array.isArray(r.photo_urls) ? r.photo_urls : []);
       tasks.push({
-        id:            String(r.id),                    // field-record integer id
+        id:            String(r.id),                    // field-record BIGSERIAL id
         nursery,
         plot,
         type:          WORK_TYPE_LABEL[r.work_type] || 'Others',
-        chemical:      r.jenis || '',
-        round:         '',                              // field record doesn't carry a round
+        // Prefer the office-worded chemical when it's set; otherwise
+        // fall back to `jenis` (the wording the FC Scan Portal uses).
+        chemical:      r.chemical || r.jenis || '',
+        round:         '',                              // field record doesn't carry a schedule round
         batch:         r.batch_name || '',
-        worker:        r.worker_name || '',
+        worker:        r.reported_by || '',
+        qty:           r.qty ?? null,
+        remark:        r.remark || '',
         completedDate: r.work_date || '',
-        workerPhotos:  Array.isArray(r.photo_urls) ? r.photo_urls : [],
+        workerPhotos:  photos,
         createdAt:     r.created_at,
         _source:       'field'
       });
