@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22h */
+/* BUILD: 2026-08-22j */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table PLUS
@@ -418,6 +418,9 @@ function renderAuditList(){
       <h3>No new plots this month</h3>
       <p>No ${evName} events recorded on ${NURSERY_LABELS[activeNursery]} this month. Newly-placed batches appear here automatically, or add one manually in <strong>Batch Info</strong>.</p>
     </div>`;
+    // Reset the header pill so a previous nursery's "N / M audited"
+    // doesn't sit above the empty-state message.
+    document.getElementById('audit-count').textContent = '0 / 0 ' + t('audited');
     if(compSection)compSection.style.display='none';
     return;
   }
@@ -426,10 +429,13 @@ function renderAuditList(){
   const pending=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))==='pending');
   const audited=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))!=='pending');
 
-  // Header count carries the "this month" context so it's clear which
-  // window the pending count is against; the log auto-adds anything new,
-  // so the number reflects today, not everything ever keyed.
-  document.getElementById('audit-count').textContent=fmtNum(pending.length)+' plot'+(pending.length!==1?'s':'')+' · this month';
+  // Header ratio matches Plot Condition / Seedling Height: "X / Y
+  // audited" where X is what's been audited so far this month and Y is
+  // everything auto-detected + manually keyed for the current nursery.
+  // Translates on the BM flip because t('audited') is used the same way
+  // the other audits use it.
+  document.getElementById('audit-count').textContent =
+    fmtNum(audited.length) + ' / ' + fmtNum(latest.length) + ' ' + t('audited');
 
   /* opts.canView  — may open the read-only detail of a finished audit
      opts.canAudit — may start or redo an audit
