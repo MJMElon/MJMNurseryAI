@@ -107,6 +107,22 @@ async function retryBlocked(){
   return rows.length;
 }
 window.retryBlocked = retryBlocked;
+
+/* Drop stuck records permanently — the escape hatch for the audit
+   whose linked batch or task no longer exists on the server. Retrying
+   would just fail again with the same 23503, so the sensible action
+   is discarding. Called from the badge tap when only blocked rows
+   are left in the queue. */
+async function discardBlocked(){
+  const db = await getDB();
+  const rows = await getBlocked();
+  const ids  = rows.map(r => r.id);
+  if(ids.length) await db.queue.bulkDelete(ids);
+  console.log('[Sync] Discarded', ids.length, 'blocked record(s)');
+  refreshBadge();
+  return ids.length;
+}
+window.discardBlocked = discardBlocked;
 async function setDone(id){
   const db = await getDB();
   await db.queue.update(id, {synced:1});
@@ -396,20 +412,38 @@ async function refreshBadge(){
         b = document.createElement('div');
         b.id = '_offl_badge';
         b.onclick = async ()=>{
+          const blk = await countBlocked();
+          const pen = await countPending();
+          // Stuck-only badge → the queue has records the server keeps
+          // refusing (23503, RLS, etc). Retrying does not fix that. Ask
+          // whether to drop them; only fall back to retry when the user
+          // explicitly declines the discard prompt.
+          if(blk > 0 && pen === blk){
+            const why    = (await getBlocked())[0];
+            const reason = (why && why.last_error) ? why.last_error : 'sync failed';
+            const msg    = 'Delete '+blk+' stuck record'+(blk>1?'s':'')+' permanently?\n\n'
+                         + 'Reason: '+reason+'\n\n'
+                         + 'These will not sync — the linked batch or task no longer '
+                         + 'exists on the server. OK deletes them; Cancel keeps them '
+                         + 'in the queue.';
+            if(confirm(msg)){
+              await discardBlocked();
+              showToast('Cleared '+blk+' stuck record'+(blk>1?'s':''));
+            }
+            return;
+          }
           if(!navigator.onLine) return;
-          // Tapping a parked record is a deliberate "try that again".
-          if(await countBlocked()) await retryBlocked();
+          if(blk) await retryBlocked();
           else await syncNow();
         };
         b.style.cssText = 'position:fixed;top:0;left:0;right:0;margin:0 auto;width:fit-content;max-width:480px;padding:5px 18px;border-radius:0 0 12px 12px;font-size:11px;font-weight:700;z-index:99999;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center';
         document.body.appendChild(b);
       }
       if(blocked>0 && n===0){
-        // Nothing is going to happen on its own — say so, and say the reason.
-        const why = (await getBlocked())[0];
+        // Nothing is going to happen on its own — say so, and prompt the
+        // tap that surfaces the confirm dialog (reason + Delete option).
         b.style.background = '#b91c1c';
-        b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — '
-                      + (why && why.last_error ? why.last_error : 'tap to retry');
+        b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — tap to clear';
       } else {
         b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
         b.textContent = navigator.onLine
