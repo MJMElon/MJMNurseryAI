@@ -90,7 +90,9 @@
     <p class="text-xs text-[#8a7a68] mt-2">Ask an administrator to grant you access to the Operation module.</p>
   </div>
 
-  <div id="report-area">
+  <!-- space-y so the filter panel, the loading line and the report itself are
+       never flush against one another, whichever of them is on screen. -->
+  <div id="report-area" class="space-y-6">
 
     <!-- Report selector + filters -->
     <div class="glass-panel p-6 rounded-[2rem] no-print">
