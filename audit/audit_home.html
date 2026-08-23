@@ -1142,38 +1142,49 @@ function loadAuditTodo(){
     return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
   }
   async function loadMaintTimeline(){
+    const diag = { fRows: 0, oRecs: 0, audited: 0, kept: 0, skippedPd: 0,
+                   skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
+                   skippedNoDate: 0, sampleKept: [] };
     try {
       const [fRows, aRows, oRows] = await Promise.all([
-        sb.select('nops_maint_field_records', 'select=id,work_date,plot_name,work_type,jenis').catch(_ => []),
-        sb.select('audit_maintenance_audits', 'select=task_id').catch(_ => []),
-        sb.select('nops_maint_records',       'select=records').catch(_ => [])
+        sb.select('nops_maint_field_records', 'select=id,work_date,plot_name,work_type,jenis').catch(e => { diag.fError = String(e?.message||e); return []; }),
+        sb.select('audit_maintenance_audits', 'select=task_id').catch(e => { diag.aError = String(e?.message||e); return []; }),
+        sb.select('nops_maint_records',       'select=records').catch(e => { diag.oError = String(e?.message||e); return []; })
       ]);
+      diag.fRows = (fRows||[]).length;
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
+      diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set}
       const push = (id, workDateISO, workType, plotRaw) => {
-        if (workType === 'pd') return;            // P&D skipped
-        if (audited.has(String(id))) return;
-        if (!workDateISO) return;
+        if (workType === 'pd')                     { diag.skippedPd++; return; }
+        if (audited.has(String(id)))               { diag.skippedAudited++; return; }
+        if (!workDateISO)                          { diag.skippedNoDate++; return; }
         const [Y,M,D] = workDateISO.split('-').map(Number);
         const dl = new Date(Y, M-1, D);
         dl.setDate(dl.getDate() + _wtWinFor(workType));
         const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
         const plot = _canonPlot(plotRaw);
         const n = plot ? _PLOT_NUR[plot] : null;
-        if (!n) return;
-        if (SCOPE_NURSERIES.indexOf(n) === -1) return;   // out-of-scope: don't surface
+        if (!n)                                    { diag.skippedNoPlot++; return; }
+        if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
         const k = y + '-' + m + '-' + d;
         if (!buckets.has(k)) buckets.set(k, { y, m, d, nurseries: new Set() });
         buckets.get(k).nurseries.add(n);
+        diag.kept++;
+        if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
       };
       (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name));
       const officeRecs = (oRows && oRows[0] && Array.isArray(oRows[0].records)) ? oRows[0].records : [];
+      diag.oRecs = officeRecs.length;
       officeRecs.forEach(rec => {
         push(rec.id, _tarikhToISO(rec.tarikh), JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
       });
       MAINT_OCCURRENCES = Array.from(buckets.values());
+      diag.buckets = MAINT_OCCURRENCES.length;
+      console.log('[audit-home] maintenance timeline:', diag,
+                  'SCOPE_NURSERIES=', SCOPE_NURSERIES);
     } catch (e) {
-      console.warn('[audit-home] maintenance timeline load failed:', e);
+      console.warn('[audit-home] maintenance timeline load failed:', e, diag);
       MAINT_OCCURRENCES = [];
     }
   }
