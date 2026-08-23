@@ -872,7 +872,33 @@ const MOVE_COLS = {
 };
 
 const emptyRow = (scope) => MOVE_COLS[scope].reduce((a, c) => { a[c.key] = 0; return a; }, {});
-const netOfRow = (scope, b) => MOVE_COLS[scope].reduce((s, c) => s + c.sign * (b[c.key] || 0), 0);
+
+/**
+ * What a row's movements come to.
+ *
+ * The 3rd culling count is cumulative: it is keyed against the ORIGINAL
+ * transplanted figure rather than against what was left by then, so it
+ * already contains the 2nd culling. Taking both off subtracts the 2nd
+ * culling twice — which is why B1's batch 237 read -2 when 1,182
+ * transplanted less 90 culled, 989 sold and 103 transferred away comes to
+ * exactly nought.
+ *
+ * So the 2nd culling counts only while no 3rd culling has been recorded.
+ * Before the 3rd it is the live deduction; after it, it is already inside
+ * the figure that replaced it.
+ */
+function netOfRow(scope, b) {
+  const superseded = scope === 'main' && (b.cull3 || 0) > 0;
+  return MOVE_COLS[scope].reduce((s, c) => {
+    if (superseded && c.key === 'cull2') return s;
+    return s + c.sign * (b[c.key] || 0);
+  }, 0);
+}
+const addRows = (a, b) => {
+  const out = { ...a };
+  Object.keys(b || {}).forEach((k) => { out[k] = (out[k] || 0) + b[k]; });
+  return out;
+};
 
 /* "2 months". Age is measured from the batch's own planting date, so it reads
    the same whether the batch is still in a tray or long since out in a plot. */
@@ -1061,7 +1087,11 @@ async function runMovementReport(scope) {
     const opening = bf[k] ? netOfRow(scope, bf[k]) : 0;
     const moved = MOVE_COLS[scope].some(c => b[c.key]);
     if (!opening && !moved) continue;
-    const closing = opening + netOfRow(scope, b);
+    // Worked out on everything up to the To date rather than added to the
+    // opening: a 2nd culling before the period and a 3rd culling inside it
+    // would otherwise be counted separately, one in each half, and the 2nd
+    // would be taken off again after the 3rd had already absorbed it.
+    const closing = netOfRow(scope, addRows(bf[k] || emptyRow(scope), b));
     // Nothing of this batch left here — culled, sold or moved on. A NEGATIVE
     // closing is kept: that is a figure to look into, not one to hide.
     if (closing === 0) continue;

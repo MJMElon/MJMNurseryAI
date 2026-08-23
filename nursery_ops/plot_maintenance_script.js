@@ -3109,6 +3109,23 @@ async function loadMovementData() {
   }
 }
 
+/* What is actually standing, from one batch's movements up to a date.
+
+   The 3rd culling count is cumulative: it is keyed against the ORIGINAL
+   transplanted figure, not against what was left, so it already contains the
+   2nd culling. Subtracting both takes the 2nd culling off twice — which is
+   why B1's batch 237 read -2 when 1,182 transplanted less 90 culled, 989 sold
+   and 103 transferred away comes to exactly nought.
+
+   So the 2nd culling counts only while no 3rd culling has been recorded yet.
+   Before the 3rd, it is the live deduction; after it, it is already inside
+   the figure that replaced it. */
+function _liveCount(evs) {
+  const superseded = evs.some(e => e.type === '3rd_Culling');
+  return evs.reduce((sum, e) =>
+    sum + (superseded && e.type === '2nd_Culling' ? 0 : _mvSigned(e.type, e.qty)), 0);
+}
+
 /* The linked quantity for one work record.
    Returns null when it cannot be resolved (data not loaded, no plot, or the
    plot/batch has no movement at all) so the caller can fall back gracefully. */
@@ -3125,11 +3142,12 @@ function linkedPlotQty(plot, batchStr, tarikh) {
   for (const ev of _mvEvents) {
     if (ev.plotKey !== pk) continue;
     if (wanted.length && !wanted.includes(ev.batchKey)) continue;
-    const b = (per[ev.batchKey] ||= { closing: 0, label: ev.batch });
     // Only movement up to the work date counts — anything dated later had
     // not happened yet, so those seedlings were still standing.
-    if (ev.ms <= cutoff) b.closing += _mvSigned(ev.type, ev.qty);
+    if (ev.ms > cutoff) continue;
+    (per[ev.batchKey] ||= { evs: [], label: ev.batch }).evs.push(ev);
   }
+  Object.values(per).forEach(b => { b.closing = _liveCount(b.evs); });
 
   const keys = Object.keys(per);
   if (!keys.length) return null;
