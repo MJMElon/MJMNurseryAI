@@ -273,13 +273,13 @@ function renderList(){
     totalAudited  += required.filter(b => isBatchAudited(p, b.batch)).length;
   });
   document.getElementById('list-count').textContent =
-    totalAudited + ' / ' + totalRequired + ' ' + t('audited');
+    fmtNum(totalAudited) + ' / ' + fmtNum(totalRequired) + ' ' + t('audited');
   document.getElementById('list-heading').textContent =
     t('plot_title') + ' — ' + NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
     const cnt=records.filter(r=>r.nursery===t.dataset.n).length;
     let b=t.querySelector('.tab-badge');
-    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';t.appendChild(b);}b.textContent=cnt;}
+    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';t.appendChild(b);}b.textContent=fmtNum(cnt);}
     else if(b)b.remove();
   });
 

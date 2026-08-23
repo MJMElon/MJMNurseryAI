@@ -788,7 +788,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260822h"></script>
+<script src="audit_lang.js?v=20260822i"></script>
 <script src="audit_supabase.js"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
@@ -1277,7 +1277,7 @@ function loadAuditTodo(){
       <button class="bkt ${b.cls} ${activeBucket===b.k?'on':''}" data-k="${b.k}">
         <div class="bkt-top">
           <div class="bkt-ico"><svg viewBox="0 0 24 24">${BUCKET_ICONS[b.k]}</svg></div>
-          <div class="bkt-n">${counts[b.k]}</div>
+          <div class="bkt-n">${fmtNum(counts[b.k])}</div>
         </div>
         <div class="bkt-lbl">${t(b.lbl)}</div>
       </button>
@@ -1422,9 +1422,9 @@ function loadAuditTodo(){
     const todayN  = actionable.length;
 
     const doneNote = finished
-      ? ` <span class="count-note">· ${finished} ${t('n_done_month')}</span>` : '';
+      ? ` <span class="count-note">· ${fmtNum(finished)} ${t('n_done_month')}</span>` : '';
     const overNote = carried
-      ? ` <span class="count-note over">· ${carried} ${t('n_overdue')}</span>` : '';
+      ? ` <span class="count-note over">· ${fmtNum(carried)} ${t('n_overdue')}</span>` : '';
 
     document.getElementById('sched-count').innerHTML = thisMonth
       ? (beforeStart(viewY, viewM)
@@ -1434,13 +1434,13 @@ function loadAuditTodo(){
           ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅${doneNote}`
           /* "2 audit" stays singular inside the big text — pluralising both
              halves read "2 audits tasks". Only "task" takes the s. */
-          : `${t('you_have')} <span class="count-big">${todayN} ${t('audit_word')}</span> ` +
+          : `${t('you_have')} <span class="count-big">${fmtNum(todayN)} ${t('audit_word')}</span> ` +
             `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')} 👍${overNote}${doneNote}`)
       : (monthOcc.length === 0
           ? (beforeStart(viewY, viewM)
               ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
               : `No scheduled audits in ${MONTHS_FULL[viewM]} ${viewY} 🌱`)
-          : `<span class="count-big">${outstanding}</span> to do in ` +
+          : `<span class="count-big">${fmtNum(outstanding)}</span> to do in ` +
             `${MONTHS_FULL[viewM]} ${viewY}${doneNote}`);
 
     // renderCalendar() and renderChips() are now no-ops for the bucket-tile

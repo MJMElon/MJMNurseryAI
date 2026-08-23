@@ -754,6 +754,24 @@ function t(key){
   return TRANSLATIONS[currentLang][key] || TRANSLATIONS['en'][key] || key;
 }
 
+/* Standard thousands grouping (1,234,567). Applied to any user-visible
+   number in the audit surface — qty, stat totals, counts. Preserves any
+   non-numeric passthrough (null, '', '—', 'Pending') unchanged so callers
+   can pipe values through it without pre-checking. Decimals are kept
+   as-is, formatted with the en-MY locale (which matches the rest of the
+   audit UI's date formatting).
+
+   Callers: papan stat cards + card qty + detail grid, height stat
+   cards (when re-added), maintenance stat cards. Kept as a global so
+   every audit page picks it up via the audit_lang.js include order. */
+function fmtNum(n){
+  if (n == null || n === '' || n === '—') return n;
+  const num = Number(n);
+  if (!Number.isFinite(num)) return String(n);      // "Pending", "N/A", etc.
+  return num.toLocaleString('en-MY');
+}
+window.fmtNum = fmtNum;
+
 function setLang(lang){
   currentLang = lang;
   localStorage.setItem('mjm_lang', lang);

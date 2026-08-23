@@ -225,7 +225,7 @@ select.input:focus{border-color:var(--g400);background:var(--white)}
   </div>
 
 </div>
-<script src="audit_lang.js?v=20260822h"></script>
+<script src="audit_lang.js?v=20260822i"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js"></script>
 <script>
@@ -291,19 +291,19 @@ function buildModTable(mod, rows){
   if(mod==='plot'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Pest</th><th>Animal</th><th>Disease</th><th>Leaf</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.pest||'—'}</td><td>${r.tikus||'—'}</td><td>${r.disease||'—'}</td><td>${r.warna_daun||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${rows.length} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   } else if(mod==='height'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>S1 (cm)</th><th>S2 (cm)</th><th>S3 (cm)</th><th>Avg (cm)</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.sample_1||'—'}</td><td>${r.sample_2||'—'}</td><td>${r.sample_3||'—'}</td><td><b>${r.avg_height||'—'}</b></td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${rows.length} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   } else if(mod==='papan'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Presence</th><th>Info</th><th>Height</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch_no||'—'}</td><td>${r.presence||'—'}</td><td>${r.info_correct||'—'}</td><td>${r.condition||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${rows.length} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   } else if(mod==='maint'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Task</th><th>Result</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.task_type||'—'}</td><td>${r.result||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="5">Total: ${rows.length} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="5">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   }
   return`<div style="overflow-x:auto"><table class="rec-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
@@ -321,7 +321,7 @@ function buildNurserySection(label, sub, headClass, data, nurseries){
       <div style="border-top:1px solid var(--border)">
         <div style="padding:10px 14px;background:var(--g50);display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:12px;font-weight:700;color:var(--g800)">${modLabels[mod]}</span>
-          <span class="badge ${modBadge[mod]}">${rows.length} records</span>
+          <span class="badge ${modBadge[mod]}">${fmtNum(rows.length)} records</span>
         </div>
         ${buildModTable(mod,rows)}
       </div>`;
@@ -360,11 +360,11 @@ async function generateReport(){
     const papanTotal  = filterByNursery(data.papan||[],  selectedNurseries).length;
     const maintTotal  = filterByNursery(data.maint||[],  selectedNurseries).length;
 
-    let summaryCards=`<div class="sum-card"><div class="sum-val">${grandTotal}</div><div class="sum-label">Total Audits</div></div>`;
-    if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1a4d1a">${plotTotal}</div><div class="sum-label">Plot Condition</div></div>`;
-    if(selectedMods.has('height')) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1565c0">${heightTotal}</div><div class="sum-label">Seedling Height</div></div>`;
-    if(selectedMods.has('papan'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#e65100">${papanTotal}</div><div class="sum-label">Papan Tanda</div></div>`;
-    if(selectedMods.has('maint'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#880e4f">${maintTotal}</div><div class="sum-label">Maintenance</div></div>`;
+    let summaryCards=`<div class="sum-card"><div class="sum-val">${fmtNum(grandTotal)}</div><div class="sum-label">Total Audits</div></div>`;
+    if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1a4d1a">${fmtNum(plotTotal)}</div><div class="sum-label">Plot Condition</div></div>`;
+    if(selectedMods.has('height')) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1565c0">${fmtNum(heightTotal)}</div><div class="sum-label">Seedling Height</div></div>`;
+    if(selectedMods.has('papan'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#e65100">${fmtNum(papanTotal)}</div><div class="sum-label">Papan Tanda</div></div>`;
+    if(selectedMods.has('maint'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#880e4f">${fmtNum(maintTotal)}</div><div class="sum-label">Maintenance</div></div>`;
 
     let sections='';
     if(showPN) sections+=buildNurserySection('Pre Nursery (PN)','Plots P01 – P52','mod-head-pn',data,PN_NURSERIES);

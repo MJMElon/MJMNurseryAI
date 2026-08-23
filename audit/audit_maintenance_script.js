@@ -123,9 +123,9 @@ function updateStats(){
   const filtered=filterTasks(tasks);
   const pending=filtered.filter(t=>!getAuditForTask(t.id));
   const done=filtered.filter(t=>!!getAuditForTask(t.id));
-  document.getElementById('stat-total').textContent=filtered.length;
-  document.getElementById('stat-pending').textContent=pending.length;
-  document.getElementById('stat-done').textContent=done.length;
+  document.getElementById('stat-total').textContent=fmtNum(filtered.length);
+  document.getElementById('stat-pending').textContent=fmtNum(pending.length);
+  document.getElementById('stat-done').textContent=fmtNum(done.length);
   // Pending count per nursery on the bottom tab bar — a green badge on
   // BNN says work exists there while you're standing on PN, so nobody
   // has to click through four tabs to find it. Same shape as the plot
@@ -136,8 +136,8 @@ function updateStats(){
     let dot=btn.querySelector('.tab-badge');
     if(count>0){
       if(!dot){dot=document.createElement('span');dot.className='tab-badge';btn.appendChild(dot);}
-      dot.textContent=count;
-      btn.setAttribute('aria-label',(NURSERY_LABELS[n]||n)+' — '+count+' pending');
+      dot.textContent=fmtNum(count);
+      btn.setAttribute('aria-label',(NURSERY_LABELS[n]||n)+' — '+fmtNum(count)+' pending');
     } else {
       if(dot) dot.remove();
       btn.removeAttribute('aria-label');
