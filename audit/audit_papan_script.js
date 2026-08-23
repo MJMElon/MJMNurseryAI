@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-23d */
+/* BUILD: 2026-08-23e */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table PLUS
@@ -59,6 +59,32 @@ function fmtDate(iso){
 function _startOfThisMonthISO(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+}
+
+/* Add N calendar months to a YYYY-MM-DD string. Local time to match how
+   the ledger records dates — using new Date('YYYY-MM-DD') would parse
+   as UTC midnight and drift a day in a negative timezone. */
+function _addMonthsISO(iso, months){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('T')[0].split('-').map(Number);
+  const dt = new Date(y, (m||1)-1, d||1);
+  dt.setMonth(dt.getMonth() + (months||0));
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+
+/* Main-nursery maturity rule: BNN / UNN 1 / UNN 2 batches mature
+   9 months after they were transplanted onto their plot. Fill in an
+   empty dateMature from dateTransplant so the auditor sees the real
+   maturity date on every card + banner + detail — matching what the
+   office computes on the operation Maintenance schedule. PN batches
+   are left alone (no maturity concept there yet). */
+function _deriveMatureDate(b){
+  if (!b) return;
+  if (b.dateMature) return;                                // office keyed one — trust it
+  if (!b.dateTransplant) return;                           // nothing to add 9 months to
+  if (b.nursery !== 'BNN' && b.nursery !== 'UNN1' && b.nursery !== 'UNN2') return;
+  b.dateMature = _addMonthsISO(b.dateTransplant, 9);
+  b._matureDerived = true;
 }
 /* Canonical plot code — the papan grid uses the padded form ('B01'),
    the operation ledger keeps the unpadded form ('B1'). Same helper
@@ -341,11 +367,17 @@ async function loadAll(){
         qtyTransplant:  a.qtySum > 0 ? String(a.qtySum) : '',
         datePlanted:    a.datePlanted,
         dateTransplant: a.dateTransplant,
-        dateMature:     '',
+        dateMature:     '',                    // filled by _deriveMatureDate below (MN only)
         createdAt:      a.createdAt,
         _source:        'log'
       });
     });
+
+    // Fill in the maturity date for every MN batch that doesn't already
+    // carry one from the office. Both the manual + log-derived batches
+    // pass through the same helper so the auditor sees the same "Mature:
+    // <date>" everywhere (banner, detail-info grid, chip row).
+    batches.forEach(_deriveMatureDate);
 
     // Map papan audits — batch_ref = batches.id
     audits=aRows.map(r=>({
