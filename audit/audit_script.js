@@ -891,15 +891,23 @@ function init(){
     } catch(e){}
     return ['PN','BNN','UNN1','UNN2'];      // unknown scope → show all
   })();
+  // Hide out-of-scope tabs AND rewrite grid-template-columns so the
+  // remaining tabs stretch evenly across the row. Without the rewrite,
+  // MN scope leaves the three kept buttons pinned to whichever grid
+  // columns they had (empty space where PN used to sit). Matches how
+  // Papan and Maintenance already do it.
+  const _bar = document.querySelector('.bottom-tabs');
+  let _kept = 0;
   document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
     if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
+    else _kept++;
   });
+  if (_bar && _kept > 1) _bar.style.gridTemplateColumns = 'repeat(' + _kept + ',1fr)';
   // PN scope only has one nursery — the tab bar is redundant and just
   // shows a lonely PN chip with empty space next to it. Hide it and
   // drop --tab-h to 0 so the page reclaims the space and the toast /
   // FAB positions collapse back to the bottom edge.
   if (_SCOPE.length <= 1) {
-    const _bar = document.querySelector('.bottom-tabs');
     if (_bar) _bar.style.display = 'none';
     document.documentElement.style.setProperty('--tab-h', '0px');
   }
