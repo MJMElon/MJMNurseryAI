@@ -894,6 +894,15 @@ function init(){
   document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
     if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
   });
+  // PN scope only has one nursery — the tab bar is redundant and just
+  // shows a lonely PN chip with empty space next to it. Hide it and
+  // drop --tab-h to 0 so the page reclaims the space and the toast /
+  // FAB positions collapse back to the bottom edge.
+  if (_SCOPE.length <= 1) {
+    const _bar = document.querySelector('.bottom-tabs');
+    if (_bar) _bar.style.display = 'none';
+    document.documentElement.style.setProperty('--tab-h', '0px');
+  }
   // Deep-link support: ?nursery=BNN pre-selects that tab so the auditor
   // hub can send the user straight to the right nursery. Falls back to
   // the first in-scope tab if the URL param is outside the scope (a

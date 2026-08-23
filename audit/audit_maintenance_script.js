@@ -717,6 +717,13 @@ function init(){
     if (d) d.classList.add('active');
     var label = document.getElementById('topbar-nursery');
     if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
+    // PN scope only has one nursery — hide the bar entirely and drop
+    // --tab-h to 0 so page-scroll padding + toast offset collapse. Same
+    // fix pattern that Plot Condition / Height / Papan use.
+    if (SCOPE_NURSERIES.length <= 1) {
+      if (row) row.style.display = 'none';
+      document.documentElement.style.setProperty('--tab-h', '0px');
+    }
   })();
   // Deep-link support: the auditor hub tags its nursery chips with
   // ?nursery=X&from=home. Only honour it when the target is in scope.

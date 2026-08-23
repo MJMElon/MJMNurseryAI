@@ -964,6 +964,15 @@ function init(){
     if (d) d.classList.add('active');
     var label = document.getElementById('topbar-nursery');
     if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
+    // PN scope only has one nursery — hide the bar entirely and
+    // reclaim the height. --tab-h is used by .page-scroll padding,
+    // the toast bottom offset, and (unused here but harmless) the FAB.
+    if (SCOPE_NURSERIES.length <= 1) {
+      var _bar = document.querySelector('.nursery-bottom-tabs')
+              || document.querySelector('.bottom-tabs');
+      if (_bar) _bar.style.display = 'none';
+      document.documentElement.style.setProperty('--tab-h', '0px');
+    }
   })();
   // Batch tab has been removed — the audit list is fed automatically
   // from the operation ledger, so manual batch keying isn't needed on

@@ -773,6 +773,14 @@ function init(){
   document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
     if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
   });
+  // PN scope has only one nursery — hide the whole bar so a lonely PN
+  // chip doesn't sit next to empty space, and reclaim the height by
+  // dropping --tab-h to 0 (page-scroll / toast / FAB all use it).
+  if (_SCOPE.length <= 1) {
+    const _bar = document.querySelector('.bottom-tabs');
+    if (_bar) _bar.style.display = 'none';
+    document.documentElement.style.setProperty('--tab-h', '0px');
+  }
   // Deep-link support — same contract as audit_plot_audit: ?nursery=X
   // opens straight on that tab; &from=home re-labels the top-bar back
   // arrow as Choose-Another-Nursery.
