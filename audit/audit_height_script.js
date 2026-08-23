@@ -770,9 +770,25 @@ function init(){
     } catch(e){}
     return ['PN','BNN','UNN1','UNN2'];
   })();
+  // Hide out-of-scope tabs AND rewrite grid-template-columns so the
+  // remaining ones stretch evenly across the row. Otherwise MN scope
+  // leaves BNN/UNN1/UNN2 pinned to their original grid columns with
+  // empty space where PN used to sit. Same fix Papan / Maintenance
+  // already apply.
+  const _bar = document.querySelector('.bottom-tabs');
+  let _kept = 0;
   document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b){
     if (_SCOPE.indexOf(b.dataset.n) === -1) b.style.display = 'none';
+    else _kept++;
   });
+  if (_bar && _kept > 1) _bar.style.gridTemplateColumns = 'repeat(' + _kept + ',1fr)';
+  // PN scope has only one nursery — hide the whole bar so a lonely PN
+  // chip doesn't sit next to empty space, and reclaim the height by
+  // dropping --tab-h to 0 (page-scroll / toast / FAB all use it).
+  if (_SCOPE.length <= 1) {
+    if (_bar) _bar.style.display = 'none';
+    document.documentElement.style.setProperty('--tab-h', '0px');
+  }
   // Deep-link support — same contract as audit_plot_audit: ?nursery=X
   // opens straight on that tab; &from=home re-labels the top-bar back
   // arrow as Choose-Another-Nursery.
