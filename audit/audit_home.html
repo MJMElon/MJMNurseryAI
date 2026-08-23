@@ -564,6 +564,12 @@
 
     .tl-from{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
              padding:2px 7px;border-radius:20px;background:#fee2e2;color:#7f1d1d}
+    /* Round chip next to the audit title — for audits that repeat
+       across the month (Plot Condition: 3 rounds, Height: 2). Uses
+       the same size + shape as .tl-from so the two chips line up. */
+    .tl-round{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+             padding:2px 7px;border-radius:20px;background:var(--fc-tint,#e9edf1);color:var(--tone,#182018);
+             border:1px solid rgba(0,0,0,.06)}
     .tl-item.overdue .tl-card{border-left-width:6px}
     .tl-head{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
              color:var(--fc-ink3);margin:14px 0 8px}
@@ -1223,10 +1229,17 @@ function loadAuditTodo(){
     if (beforeStart(y, m)) return [];
     const last = daysIn(y, m);
     const out = [];
-    SET.forEach(sc => sc.windows.forEach(w => {
+    SET.forEach(sc => sc.windows.forEach((w, i) => {
+      // Windows are listed in month order; assign a round number when
+      // the audit type has more than one window (Plot Condition MN
+      // has 3, Seedling Height MN has 2). Types with a single window
+      // (Papan MN, PN Plot, PN Height) are left round-less so the
+      // card doesn't display a redundant "Round 1".
+      const withRound = sc.windows.length > 1;
       out.push(Object.assign({}, sc, {
         start: Math.min(w[0], last),
-        end:   Math.min(w[1], last)
+        end:   Math.min(w[1], last),
+        round: withRound ? (i + 1) : 0
       }));
     }));
     // Maintenance — one synthetic occurrence per deadline day this
@@ -1366,7 +1379,10 @@ function loadAuditTodo(){
      t(b.lbl) so the tiles update immediately on mjm-lang-changed
      without re-declaring the array. */
   const BUCKETS = [
-    {k:'today',  lbl:'bucket_today',  cls:'bkt-today', statuses:['due']},
+    // "Today's Audit" bundles due + overdue: yesterday's window that
+    // slipped is still work the auditor owes today, so it belongs in
+    // the same bucket as work whose window is open right now.
+    {k:'today',  lbl:'bucket_today',  cls:'bkt-today', statuses:['due','overdue']},
     {k:'sched',  lbl:'bucket_sched',  cls:'bkt-sched', statuses:['soon','upcoming']},
     {k:'all',    lbl:'bucket_all',    cls:'bkt-all',   statuses:[]},        // empty = no filter
     {k:'over',   lbl:'bucket_over',   cls:'bkt-over',  statuses:['overdue']}
@@ -1377,15 +1393,22 @@ function loadAuditTodo(){
     all:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
     over:  '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
   };
-  let activeBucket = 'all';  // which of BUCKETS is highlighted / active
+  // Landing here should show what the auditor owes today, not the
+  // whole month at once. 'today' includes due + overdue, so the
+  // first thing on screen is the backlog + what's live right now.
+  let activeBucket = 'today';
+  // Sync the legacy `active` set that renderTimeline reads.
+  active.clear(); (BUCKETS.find(b => b.k === 'today')?.statuses || []).forEach(s => active.add(s));
 
   function renderBuckets(occ){
     const counts = {today:0, sched:0, over:0, all:occ.length};
     occ.forEach(o => {
       const s = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
-      if (s === 'due')                           counts.today++;
-      else if (s === 'soon' || s === 'upcoming') counts.sched++;
-      else if (s === 'overdue')                  counts.over++;
+      // Today's tile shows due + overdue together — matches the tile's
+      // filter above and the intent of "everything I owe today".
+      if (s === 'due' || s === 'overdue')        counts.today++;
+      if (s === 'soon' || s === 'upcoming')      counts.sched++;
+      if (s === 'overdue')                       counts.over++;
     });
     const box = document.getElementById('buckets');
     if (!box) return;
@@ -1456,6 +1479,8 @@ function loadAuditTodo(){
           <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
           <div class="tl-body">
             <div class="tl-ttl">${t(o.title)}${
+              o.round ? ` <span class="tl-round">Round ${o.round}</span>` : ''
+            }${
               o.fromY !== undefined
                 ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
             <div class="tl-nurs">${
