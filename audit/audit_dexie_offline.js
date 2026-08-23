@@ -123,6 +123,32 @@ async function discardBlocked(){
   return ids.length;
 }
 window.discardBlocked = discardBlocked;
+
+/* Auto-discard blocked records that have been parked longer than the
+   given window. A 23503 (missing FK) or similar server refusal does
+   not fix itself, so keeping the stuck banner around forever just
+   nags the auditor. Called on page load and after every sync sweep;
+   default window is 1 hour, which is long enough for a legitimate
+   transient issue (a batch being manually inserted from another
+   device) to resolve without keeping the badge sticky for weeks. */
+async function autoDropOldBlocked(maxAgeMs){
+  // 5 minutes: the retry loop caps at 5 tries and permanent errors
+  // (23503, RLS refusals) block on the first try, so anything still
+  // parked after 5 minutes is not going to fix itself. Older stuck
+  // records are dropped silently on load and before every sync sweep.
+  const window = maxAgeMs || 300000;
+  const cutoff = Date.now() - window;
+  const db = await getDB();
+  const rows = await getBlocked();
+  // Rows without blocked_at were parked before the timestamp field
+  // was added — treat them as old and drop them too.
+  const old  = rows.filter(r => !r.blocked_at || r.blocked_at < cutoff);
+  if(!old.length) return 0;
+  await db.queue.bulkDelete(old.map(r => r.id));
+  console.log('[Sync] Auto-dropped', old.length, 'stale blocked record(s) (>' + Math.round(window/60000) + ' min old)');
+  return old.length;
+}
+window.autoDropOldBlocked = autoDropOldBlocked;
 async function setDone(id){
   const db = await getDB();
   await db.queue.update(id, {synced:1});
@@ -288,6 +314,10 @@ let _syncing = false;
 async function syncNow(){
   if(_syncing){ console.log('[Sync] Already running'); return; }
   if(!navigator.onLine){ console.log('[Sync] No network'); return; }
+
+  // Sweep stale blocked records before each sync so the badge doesn't
+  // hang around when the server keeps refusing something transient.
+  try { await autoDropOldBlocked(); } catch(_){}
 
   const pending = await getPending();
   if(!pending.length){ return; }
@@ -543,7 +573,9 @@ async function initOffline(){
       }).catch(e=>console.warn('[SW]',e));
   }
 
-  refreshBadge();
+  // Purge stale blocked records on load so a lingering banner from a
+  // previous session clears itself as soon as the app opens.
+  autoDropOldBlocked().catch(_=>{}).finally(refreshBadge);
 
   window.addEventListener('online',()=>{
     console.log('[Net] Online');
