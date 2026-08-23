@@ -85,6 +85,50 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 .filter-chip{flex-shrink:0;height:32px;padding:0 14px;border-radius:var(--r-full);font-size:12px;font-weight:600;border:1px solid var(--border2);background:var(--white);color:var(--text2);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .filter-chip.active{background:var(--g800);color:#fff;border-color:var(--g800)}
 
+/* Icon-row filter — five tiles in a single row (P&D Spraying, Manuring,
+   Weeding, Interrow Spraying, Others), mirroring the operation
+   Maintenance module's own iconography. No horizontal scroll: the row
+   sizes each tile as an equal fraction of the width. Tap a tile to
+   filter, tap it again to clear the filter. */
+.filter-icons{
+  display:grid;
+  grid-template-columns:repeat(5, 1fr);
+  gap:6px;
+  padding:12px 12px 4px;
+}
+.filter-icon{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:10px 4px;
+  border:1px solid var(--border2);
+  background:var(--white);
+  color:var(--text2);
+  border-radius:12px;
+  font-family:inherit;font-size:10px;font-weight:700;
+  letter-spacing:.2px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .12s, color .12s, border-color .12s, transform .1s;
+}
+.filter-icon:active{transform:scale(.96)}
+.filter-icon svg{
+  width:22px;height:22px;
+  stroke:currentColor;fill:none;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+}
+.filter-icon.active{
+  background:var(--g800);color:#fff;border-color:var(--g800);
+}
+.filter-icon:focus-visible{
+  outline:2px solid var(--g600);outline-offset:2px;
+}
+/* Slim tile label — the icon carries most of the meaning; text is a
+   backup for accessibility and clarity on the widest phones. */
+.filter-icon span{
+  line-height:1;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:100%;
+}
+
 /* LIST */
 .list-header{padding:8px 16px;display:flex;align-items:center;justify-content:space-between}
 .list-heading{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3)}

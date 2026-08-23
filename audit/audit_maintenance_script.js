@@ -1,14 +1,38 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-22k */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
+
+   Task source: nops_maint_field_records (the same table the operation
+   Maintenance system writes into when a field worker records a
+   completed job). As soon as the work_date is keyed in over there, the
+   task shows up here with a "Pending" audit status. The auditor's
+   verdict continues to be written to audit_maintenance_audits, keyed
+   by field_records.id.
 ================================================================ */
 'use strict';
 
-const TASK_TYPES = ['Manuring','Weeding','Racun','Interrow Spray','Other'];
+/* Filter categories — five tiles across the top of the list, mirroring
+   the operation Maintenance module's icons. The values below match the
+   normalised task.type each field row is mapped to in loadAll(). */
+const TASK_TYPES = ['P & D Spraying','Manuring','Weeding','Interrow Spray','Others'];
+
+/* Map the operation ledger's short work_type codes onto the human
+   labels the audit UI uses. Any code that isn't one of the four known
+   ones falls into "Others". */
+const WORK_TYPE_LABEL = {
+  pd:       'P & D Spraying',
+  manuring: 'Manuring',
+  weeding:  'Weeding',
+  interrow: 'Interrow Spray'
+};
 
 let tasks=[], audits=[];
-let activeTab='audit', activeFilter='All', activeView='list';
+let activeTab='audit';
+// The filter row has no "All" tile anymore — an empty activeFilter means
+// no filter is applied and every task shows. Tapping an active tile a
+// second time clears it back to '', which is the whole-list view.
+let activeFilter='', activeView='list';
 // The nursery filter respects the scope chosen on audit_nursery_select:
 //   Pre Nursery scope → only PN
 //   Main Nursery scope → BNN, UNN1, UNN2
@@ -92,9 +116,13 @@ function selectTab(tab){
   renderLists();
 }
 function setFilter(f,el){
-  activeFilter=f;
-  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
-  el.classList.add('active');
+  // Toggle behaviour: tap an active tile a second time to clear the
+  // filter and see every task again. Keeps the row at 5 tiles without
+  // needing an explicit "All" one.
+  const alreadyActive = (activeFilter === f);
+  activeFilter = alreadyActive ? '' : f;
+  document.querySelectorAll('.filter-icon, .filter-chip').forEach(c=>c.classList.remove('active'));
+  if (!alreadyActive && el) el.classList.add('active');
   renderLists();
   updateStats();
 }
@@ -146,35 +174,82 @@ function updateStats(){
 }
 
 /* Applies BOTH filters together — nursery first (cheaper), then task
-   type. Empty/'All' task filter is a no-op. */
+   type. Empty activeFilter means "no type filter, show all". */
 function filterTasks(list){
   let out = list.filter(t=>t.nursery===activeNursery);
-  if(activeFilter!=='All') out = out.filter(t=>t.type===activeFilter);
+  if(activeFilter) out = out.filter(t=>t.type===activeFilter);
   return out;
 }
 
-/* --- LOAD --- */
+/* Field records only carry plot_name (e.g. 'B1', 'B4-R'); the audit
+   grid keys everything by nursery + padded plot code ('B01', 'B04-R').
+   This is the same helper the Plot / Height / Papan audits use. */
+function _canonicalPlot(raw){
+  const s = String(raw||'').trim().toUpperCase();
+  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  if(!m) return s;
+  return m[1] + m[2].padStart(2,'0') + (m[3]||'');
+}
+const PLOT_TO_NURSERY_M = (function(){
+  const P = {
+    PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
+    BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
+    UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
+    UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
+  };
+  const m = {};
+  Object.keys(P).forEach(n => P[n].forEach(p => {
+    m[p] = n;
+    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+    if(stripped !== p) m[stripped] = n;
+  }));
+  return m;
+})();
+
+/* --- LOAD ---
+   Tasks now come from the operation Maintenance module's own ledger
+   (nops_maint_field_records). Every row there is a completed job the
+   field worker keyed in; the moment its work_date is set, the row
+   arrives here as a Pending audit task. Fall back to the legacy
+   audit_maintenance_tasks table when nops_maint_field_records isn't
+   readable (RLS gap on a fresh auditor account), so the page always
+   renders something rather than staying blank. */
 async function loadAll(){
   setLoading(true);
   try{
-    const [tRows, aRows] = await Promise.all([
-      sb.select('audit_maintenance_tasks','select=*'),
+    // nops_maint_field_records is the SINGLE source of truth for tasks
+    // now. As soon as a field worker keys a work_date over on the
+    // operation Maintenance page, the row shows up here as a Pending
+    // audit. The legacy audit_maintenance_tasks table was never keyed
+    // into and its UUID ids don't fit the BIGINT task_id column on
+    // audit_maintenance_audits anyway, so it's no longer read.
+    const [fRows, aRows] = await Promise.all([
+      sb.select('nops_maint_field_records',
+                'select=id,work_date,plot_name,work_type,jenis,batch_name,worker_name,photo_urls,created_at')
+        .catch(e => { console.warn('[maint-audit] nops_maint_field_records unavailable:', e); return []; }),
       sb.select('audit_maintenance_audits','select=*')
     ]);
 
-    tasks = tRows.map(r=>({
-      id:        String(r.id),
-      nursery:   r.nursery||'',
-      plot:      r.plot||'',
-      type:      r.task_type||'',
-      chemical:  r.chemical||'',
-      round:     r.round||'',
-      batch:     r.batch||'',
-      worker:    r.worker_name||'',
-      completedDate: r.completed_date||'',
-      workerPhotos: r.photo_urls||[],
-      createdAt: r.created_at
-    }));
+    tasks = [];
+    (fRows||[]).forEach(r => {
+      const plot    = _canonicalPlot(r.plot_name);
+      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
+      if(!nursery) return;                              // stray plot in the log
+      tasks.push({
+        id:            String(r.id),                    // field-record integer id
+        nursery,
+        plot,
+        type:          WORK_TYPE_LABEL[r.work_type] || 'Others',
+        chemical:      r.jenis || '',
+        round:         '',                              // field record doesn't carry a round
+        batch:         r.batch_name || '',
+        worker:        r.worker_name || '',
+        completedDate: r.work_date || '',
+        workerPhotos:  Array.isArray(r.photo_urls) ? r.photo_urls : [],
+        createdAt:     r.created_at,
+        _source:       'field'
+      });
+    });
 
     audits = aRows.map(r=>({
       uid:     String(r.id),
@@ -188,6 +263,11 @@ async function loadAll(){
       createdAt: r.created_at
     }));
 
+    console.log('[maint-audit] loaded', {
+      fromFieldRecords: (fRows||[]).length,
+      totalTasks:       tasks.length,
+      audits:           audits.length
+    });
     renderLists();
     updateStats();
   }catch(e){
@@ -196,37 +276,43 @@ async function loadAll(){
   setLoading(false);
 }
 
-/* --- RENDER --- */
+/* --- RENDER ---
+   Both lists sort oldest → newest by work_date so the auditor works the
+   backlog in the order it happened. Ties fall through to plot code so
+   two jobs on the same day still land in a repeatable order. */
 function renderLists(){
   const filtered = filterTasks(tasks);
   const pending  = filtered.filter(t=>!getAuditForTask(t.id));
   const done     = filtered.filter(t=>!!getAuditForTask(t.id));
 
-  document.getElementById('pending-count').textContent=pending.length+' task'+(pending.length!==1?'s':'');
-  document.getElementById('done-count').textContent=done.length+' task'+(done.length!==1?'s':'');
+  document.getElementById('pending-count').textContent = fmtNum(pending.length) + ' task' + (pending.length!==1?'s':'');
+  document.getElementById('done-count').textContent    = fmtNum(done.length)    + ' task' + (done.length!==1?'s':'');
 
-  // Pending list
+  const byWorkDateAsc = (a,b) => {
+    const cmp = String(a.completedDate||'').localeCompare(String(b.completedDate||''));
+    if (cmp) return cmp;
+    return String(a.plot||'').localeCompare(String(b.plot||''));
+  };
+
+  // Pending list — oldest task the field recorded is at the top so the
+  // auditor works through the backlog in date order.
   const pendingEl=document.getElementById('pending-list');
   if(!pending.length){
     pendingEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
       <h3>No tasks to audit</h3>
-      <p>Completed work orders from workers will appear here automatically.</p>
+      <p>Once a worker keys in a work date on the Maintenance system, it appears here automatically.</p>
     </div>`;
   } else {
-    pendingEl.innerHTML=pending
-      .sort((a,b)=>a.plot.localeCompare(b.plot))
-      .map(t=>makeTaskCard(t,null)).join('');
+    pendingEl.innerHTML=pending.slice().sort(byWorkDateAsc).map(t=>makeTaskCard(t,null)).join('');
   }
 
-  // Done list
+  // Done list — same ordering rule so the auditor can scan chronologically.
   const doneEl=document.getElementById('done-list');
   if(!done.length){
     doneEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--text4);font-size:13px">No audited tasks yet.</div>';
   } else {
-    doneEl.innerHTML=done
-      .sort((a,b)=>b.completedDate.localeCompare(a.completedDate))
-      .map(t=>makeTaskCard(t,getAuditForTask(t.id))).join('');
+    doneEl.innerHTML=done.slice().sort(byWorkDateAsc).map(t=>makeTaskCard(t,getAuditForTask(t.id))).join('');
   }
 }
 
