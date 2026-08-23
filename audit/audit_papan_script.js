@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-23c */
+/* BUILD: 2026-08-23d */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table PLUS
@@ -190,6 +190,12 @@ function selectNursery(nursery, el){
      nursery's numbers sitting above it. Landing on PN (empty) and tapping
      BNN gave "Total 0 / Pending 0" over a list with a plot in it. */
   updateStats();
+  // If the auditor was mid-form (or on the detail view) when they
+  // tapped a nursery tab, the tap has to be a navigation, not a
+  // silent state change: send them back to the list of the nursery
+  // they just picked. Plot Condition and Height audits already do
+  // this on their equivalent handlers.
+  setView('list');
 }
 
 /* --- STATS --- */

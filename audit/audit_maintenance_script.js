@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-23b */
+/* BUILD: 2026-08-23d */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -210,6 +210,11 @@ function selectNursery(n, el){
   if (label) label.textContent=NURSERY_LABELS[n]||n;
   renderLists();
   updateStats();
+  // Nursery tap is a navigation: if the auditor was mid-form (or on
+  // the detail view) when they tapped it, take them back to the list
+  // for the nursery they just picked. Matches Plot Condition + Height
+  // audits' selectTab().
+  setView('list');
 }
 
 /* --- STATS --- */
