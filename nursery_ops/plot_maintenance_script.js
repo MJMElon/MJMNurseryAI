@@ -1727,7 +1727,7 @@ async function loadFieldRecords() {
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
     let res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty')
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
@@ -1791,6 +1791,7 @@ function applyFieldRecords(nursery, monthLbl) {
       // rather than leaving another month's answer sitting in it.
       if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
       if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
+      if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
       return;
     }
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
@@ -1800,6 +1801,13 @@ function applyFieldRecords(nursery, monthLbl) {
     if (f.batch_name && (!r.batch || r._fromFieldBatch)) {
       r.batch = f.batch_name;
       r._fromFieldBatch = 1;
+    }
+    // The field counted the batches it ticked, so the quantity is already
+    // answered — leaving the cell to fall back to the linked figure asked the
+    // batch report a question the record had already settled.
+    if (f.qty != null && f.qty !== '' && (r.qty == null || r._fromFieldQty)) {
+      r.qty = Number(f.qty);
+      r._fromFieldQty = 1;
     }
   });
 }
@@ -2989,9 +2997,13 @@ function _mvSigned(type, qty) {
   switch (type) {
     case 'Seeds_Received': case 'Planted': case 'Transplanted':
     case 'Transplanted_Premium': case 'Transplanted_DoubleTone':
+    // One 3rd-culling transfer log describes two sides; the event builder
+    // splits it so the plot it arrived at gains and the one it left loses.
+    case 'Cull3_Transfer_In':
       return q;
     case 'Damaged_Seeds': case '1st_Culling': case '2nd_Culling':
     case '3rd_Culling':   case 'Sold':
+    case 'Cull3_Transfer_Out':
       return -Math.abs(q);
     default: return 0;
   }
@@ -3021,7 +3033,11 @@ async function loadMovementData() {
         .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
         .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
             'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
-            '1st_Culling', '2nd_Culling', '3rd_Culling'])
+            '1st_Culling', '2nd_Culling', '3rd_Culling',
+            // A transfer plot (-R) is filled entirely by these. Without them
+            // such a plot has no movement at all, and every quantity on it
+            // reads as a dash.
+            'Cull3_Transfer'])
         .order('id', { ascending: true })),
       // Sold comes from the customer DO system, exactly as the report does it.
       _mvFetchAll(() => _supabase.from('shared_do_records')
@@ -3038,8 +3054,25 @@ async function loadMovementData() {
         plotKey:  _mvPlotKey(l.plot_name),
         batchKey: _mvBatchKey(l.batch_name),
         batch:    l.batch_name || '—',
-        type:     l.transaction_type,
+        type:     l.transaction_type === 'Cull3_Transfer' ? 'Cull3_Transfer_In' : l.transaction_type,
         qty:      Number(l.quantity_change || 0),
+        ms
+      });
+    });
+    // The other side of every transfer: plot_name above is where the
+    // seedlings landed, and the remark says which plot they left.
+    (logsRes.data || []).forEach(l => {
+      if (l.transaction_type !== 'Cull3_Transfer') return;
+      const from = (l.remark || '').match(/From:\s*\[([^\]|]+)\|/);
+      if (!from) return;
+      const ms = _mvParseDate(_mvLogDate(l));
+      if (ms == null) return;
+      evs.push({
+        plotKey:  _mvPlotKey(from[1]),
+        batchKey: _mvBatchKey(l.batch_name),
+        batch:    l.batch_name || '—',
+        type:     'Cull3_Transfer_Out',
+        qty:      Math.abs(Number(l.quantity_change || 0)),
         ms
       });
     });
