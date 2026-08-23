@@ -467,7 +467,11 @@
        2×2 on a phone. The active tile is what filters the timeline
        beneath. Colours picked to read at a glance:
          Today's  = blue, Scheduled = red, All = ink, Overdue = amber. */
-    .buckets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+    /* Three tiles across: Today / Overdue / All. Scheduled was
+       removed at the auditor's request. Falls to two columns on
+       phones (see the media query below), so All wraps to a full
+       row when the screen is narrow. */
+    .buckets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
              gap:10px;margin:4px 0 14px}
     .bkt{display:flex;flex-direction:column;justify-content:space-between;
          min-height:96px;padding:14px 14px 12px;border-radius:18px;
@@ -494,11 +498,37 @@
     .bkt-all  {background:linear-gradient(135deg,#4a4a4d,#2b2b2e)}
     .bkt-over {background:linear-gradient(135deg,#ef4444,#991b1b)}
     @media (max-width:640px){
-      .buckets{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      .buckets{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
       .bkt{min-height:84px;padding:12px 12px 10px;border-radius:15px}
       .bkt-n{font-size:28px}
       .bkt-lbl{font-size:11px}
     }
+    /* Narrowest phones — three tiles are too tight, drop to two per
+       row (Today + Overdue on top, All wraps to a full row below). */
+    @media (max-width:420px){
+      .buckets{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .bkt-all{grid-column:1 / -1}
+    }
+
+    /* ── Today's progress bar ──
+       Rendered right under the "Hi 😊, you have N audit tasks today"
+       line while today has work left. Reads "N / M done today · P%"
+       so the auditor can watch the day fill up. */
+    .today-progress{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+    .tp-track{width:100%;height:10px;background:#e6ecec;border-radius:999px;
+              overflow:hidden;position:relative}
+    .tp-fill{height:100%;background:linear-gradient(90deg,#2d7a2d,#22a34a);
+             border-radius:999px;transition:width .4s ease}
+    .tp-text{font-size:11.5px;font-weight:700;color:var(--fc-ink2);letter-spacing:.2px}
+
+    /* Congratulations banner — replaces the greeting text on days
+       when every one of today's tasks is closed out. Kept soft-green
+       so it reads as celebration, not alarm. */
+    .today-congrats{font-size:18px;font-weight:800;color:#166534;
+                    background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+                    border:1.5px solid #86efac;border-radius:14px;
+                    padding:14px 16px;line-height:1.35;
+                    box-shadow:0 4px 14px rgba(22,101,52,.15)}
 
     /* Nursery chips inside a timeline card — one per allowed nursery for
        the current scope. Clicking a chip lands on the destination audit
@@ -716,14 +746,19 @@
         <div style="min-width:0">
           <div class="sched-kicker"><span>📋 Audit To-Do</span></div>
           <div class="sched-count" id="sched-count">&nbsp;</div>
+          <!-- Per-day progress bar. Populated by renderAll() when the
+               view is on the current month and today has real work.
+               Reads "N / M done today · P%" so the auditor can see
+               how much of the day is closed out. -->
+          <div class="today-progress" id="today-progress" style="display:none"></div>
         </div>
       </div>
 
-      <!-- Four bucket tiles: Today's / Scheduled / All / Overdue.
-           Replaced the month calendar + due/soon/upcoming/passed chip
-           strip. The active tile filters the timeline below; tapping the
-           same tile again clears the filter. Counts come from the same
-           occurrences() the timeline reads. -->
+      <!-- Three bucket tiles: Today's / Overdue / All (Scheduled was
+           removed at the auditor's request). The active tile filters
+           the timeline below; tapping the same tile again clears the
+           filter. Counts come from the same occurrences() the timeline
+           reads. -->
       <div class="buckets" id="buckets"></div>
 
       <div class="tl" id="todo-section">
@@ -819,7 +854,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260823j"></script>
+<script src="audit_lang.js?v=20260823k"></script>
 <script src="audit_supabase.js"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
@@ -1408,14 +1443,15 @@ function loadAuditTodo(){
   /* Labels are translation KEYS, not strings — renderBuckets() runs
      t(b.lbl) so the tiles update immediately on mjm-lang-changed
      without re-declaring the array. */
+  // Bucket order: Today → Overdue → All. "Today's Audit" bundles
+  // due + overdue so it reads as the whole day's workload; Overdue
+  // isolates the backlog subset; All is the full month for context.
+  // Scheduled was removed at the auditor's request — soon/upcoming
+  // items are still countable via the All tile.
   const BUCKETS = [
-    // "Today's Audit" bundles due + overdue: yesterday's window that
-    // slipped is still work the auditor owes today, so it belongs in
-    // the same bucket as work whose window is open right now.
     {k:'today',  lbl:'bucket_today',  cls:'bkt-today', statuses:['due','overdue']},
-    {k:'sched',  lbl:'bucket_sched',  cls:'bkt-sched', statuses:['soon','upcoming']},
-    {k:'all',    lbl:'bucket_all',    cls:'bkt-all',   statuses:[]},        // empty = no filter
-    {k:'over',   lbl:'bucket_over',   cls:'bkt-over',  statuses:['overdue']}
+    {k:'over',   lbl:'bucket_over',   cls:'bkt-over',  statuses:['overdue']},
+    {k:'all',    lbl:'bucket_all',    cls:'bkt-all',   statuses:[]}          // empty = no filter
   ];
   const BUCKET_ICONS = {
     today: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
@@ -1431,13 +1467,10 @@ function loadAuditTodo(){
   active.clear(); (BUCKETS.find(b => b.k === 'today')?.statuses || []).forEach(s => active.add(s));
 
   function renderBuckets(occ){
-    const counts = {today:0, sched:0, over:0, all:occ.length};
+    const counts = {today:0, over:0, all:occ.length};
     occ.forEach(o => {
       const s = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
-      // Today's tile shows due + overdue together — matches the tile's
-      // filter above and the intent of "everything I owe today".
       if (s === 'due' || s === 'overdue')        counts.today++;
-      if (s === 'soon' || s === 'upcoming')      counts.sched++;
       if (s === 'overdue')                       counts.over++;
     });
     const box = document.getElementById('buckets');
@@ -1613,31 +1646,66 @@ function loadAuditTodo(){
       const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
       return k === 'overdue' || k === 'due';   // 'due' already means today is inside it
     }) : [];
-    const carried = actionable.filter(o =>
-      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue').length;
     const todayN  = actionable.length;
 
-    const doneNote = finished
-      ? ` <span class="count-note">· ${fmtNum(finished)} ${t('n_done_month')}</span>` : '';
-    const overNote = carried
-      ? ` <span class="count-note over">· ${fmtNum(carried)} ${t('n_overdue')}</span>` : '';
+    /* Today's total = anything whose deadline is today or already past,
+       including items that have since been audited. isForToday captures
+       that whole set so the progress bar reads N of TOTAL, where TOTAL
+       is the day's real workload (not just what's still open). */
+    const _t0 = new Date(year, month, day);
+    const isForToday = o => {
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const e0 = new Date(oy, om, o.end);
+      const s0 = new Date(oy, om, o.start);
+      return _t0 > e0 || (_t0 >= s0 && _t0 <= e0);
+    };
+    const todayScope   = thisMonth ? occ.filter(isForToday) : [];
+    const todayDoneN   = todayScope.filter(o =>
+                          isDone(o, o.fromY ?? viewY, o.fromM ?? viewM)).length;
+    const todayTotalN  = todayScope.length;
+    const todayPct     = todayTotalN ? Math.round(todayDoneN * 100 / todayTotalN) : 0;
+    const todayAllDone = todayTotalN > 0 && todayPct === 100;
 
+    /* Greeting rewritten per feedback:
+       - "Hi 😊, you have N audit tasks today" — no overdue count in
+         the greeting line (Overdue is its own tile below and gets its
+         own coloured pill on each row).
+       - When today's work is 100% done, the greeting is replaced by
+         a congratulations banner. */
     document.getElementById('sched-count').innerHTML = thisMonth
       ? (beforeStart(viewY, viewM)
           ? `<span class="count-big">${t('no_audit')}</span> ${t('sched_starts')} ` +
             `${MONTHS_FULL[START_M]} ${START_Y}`
+        : todayAllDone
+          ? `<div class="today-congrats">🎉 ${t('today_congrats')}</div>`
         : todayN === 0
-          ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅${doneNote}`
-          /* "2 audit" stays singular inside the big text — pluralising both
-             halves read "2 audits tasks". Only "task" takes the s. */
-          : `${t('you_have')} <span class="count-big">${fmtNum(todayN)} ${t('audit_word')}</span> ` +
-            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')} 👍${overNote}${doneNote}`)
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅`
+          : `${t('hi_greeting')} 😊, ${t('you_have')} <span class="count-big">${fmtNum(todayN)} ${t('audit_word')}</span> ` +
+            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')}`)
       : (monthOcc.length === 0
           ? (beforeStart(viewY, viewM)
               ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
               : `No scheduled audits in ${MONTHS_FULL[viewM]} ${viewY} 🌱`)
           : `<span class="count-big">${fmtNum(outstanding)}</span> to do in ` +
-            `${MONTHS_FULL[viewM]} ${viewY}${doneNote}`);
+            `${MONTHS_FULL[viewM]} ${viewY}`);
+
+    /* Progress bar for today. Only rendered when today has real work
+       (todayTotalN > 0) and we're actually looking at the current
+       month. The bar container is created / removed here so back-in-
+       time month views stay clean. */
+    const progWrap = document.getElementById('today-progress');
+    if (progWrap) {
+      if (thisMonth && todayTotalN > 0 && !todayAllDone) {
+        progWrap.style.display = '';
+        progWrap.innerHTML =
+          '<div class="tp-track"><div class="tp-fill" style="width:' + todayPct + '%"></div></div>' +
+          '<div class="tp-text">' + fmtNum(todayDoneN) + ' / ' + fmtNum(todayTotalN) +
+          ' ' + t('done_today') + ' · ' + todayPct + '%</div>';
+      } else {
+        progWrap.style.display = 'none';
+        progWrap.innerHTML = '';
+      }
+    }
 
     // renderCalendar() and renderChips() are now no-ops for the bucket-tile
     // layout — the month strip and due/soon/etc pills are gone; renderBuckets
