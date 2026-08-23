@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Maintenance Audit — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="audit_maintenance_styles.css?v=20260822l"/>
+<link rel="stylesheet" href="audit_maintenance_styles.css?v=20260822m"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
@@ -124,44 +124,55 @@
       </div>
     </div>
 
-    <!-- Audit result -->
+    <!-- Audit result — two options only. Picking Satisfied is the whole
+         audit (no remark, no photo needed). Picking Unsatisfied reveals
+         the remarks + photo cards below via #unsat-only; the photo is
+         then compulsory, the remark stays optional. -->
     <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg data-t="maint_result">Audit Result</div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span data-t="maint_result">Audit Result</span></div>
       <div class="form-inner">
         <div class="form-field">
           <div class="field-label" data-t="work_quality">Work Quality <span class="req">*</span></div>
-          <div class="tri-group" id="f-result-grp">
-            <button class="tri-btn" data-val="Satisfactory"   onclick="pickResult('Satisfactory',this)">✓ Satisfactory</button>
-            <button class="tri-btn" data-val="Unsatisfactory" onclick="pickResult('Unsatisfactory',this)">✗ Unsatisfactory</button>
-            <button class="tri-btn" data-val="Not Done"       onclick="pickResult('Not Done',this)">— Not Done</button>
+          <div class="tri-group two-opt" id="f-result-grp">
+            <button class="tri-btn" data-val="Satisfactory"   onclick="pickResult('Satisfactory',this)">✓ Satisfied</button>
+            <button class="tri-btn" data-val="Unsatisfactory" onclick="pickResult('Unsatisfactory',this)">✗ Unsatisfied</button>
           </div>
-        </div>
-        <div class="divider-line"></div>
-        <div class="form-field">
-          <div class="field-label">Remarks <span class="opt">optional</span></div>
-          <textarea id="f-remarks" class="input" placeholder="Any observations or notes..."></textarea>
         </div>
       </div>
     </div>
 
-    <!-- Photo -->
-    <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Audit Photo <span class="req" style="margin-left:4px">*</span></div>
-      <div class="form-inner">
-        <div id="photo-drop" class="photo-drop">
-          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-          <div class="photo-drop-title">Add Audit Photo</div>
-          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
-            <button type="button" onclick="document.getElementById('photo-camera').click()" style="flex:1;height:36px;border-radius:8px;background:#1a4d1a;color:#fff;font-size:12px;font-weight:600;border:none;font-family:inherit">📷 Camera</button>
-            <button type="button" onclick="document.getElementById('photo-gallery').click()" style="flex:1;height:36px;border-radius:8px;background:#fff;color:#3d5c3d;font-size:12px;font-weight:600;border:1px solid #c4d8c4;font-family:inherit">🖼 Gallery</button>
+    <!-- Unsatisfied-only cards — hidden by default; pickResult() flips
+         display when the auditor chooses Unsatisfied. Remarks stays
+         optional, photo becomes compulsory. -->
+    <div id="unsat-only" style="display:none">
+      <div class="form-card">
+        <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5"/></svg><span data-t="remarks_head">Remarks</span></div>
+        <div class="form-inner">
+          <div class="form-field">
+            <div class="field-label">Remarks <span class="opt">optional</span></div>
+            <textarea id="f-remarks" class="input" placeholder="Any observations or notes..."></textarea>
           </div>
         </div>
-        <div id="photo-preview" class="photo-preview-wrap">
-          <img id="photo-img" src="" alt="Audit photo" onclick="openLightbox(this.src)"/>
-          <button class="photo-clear" onclick="clearPhoto()">×</button>
+      </div>
+
+      <div class="form-card">
+        <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Audit Photo <span class="req" style="margin-left:4px">*</span></div>
+        <div class="form-inner">
+          <div id="photo-drop" class="photo-drop">
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <div class="photo-drop-title">Add Audit Photo</div>
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+              <button type="button" onclick="document.getElementById('photo-camera').click()" style="flex:1;height:36px;border-radius:8px;background:#1a4d1a;color:#fff;font-size:12px;font-weight:600;border:none;font-family:inherit">📷 Camera</button>
+              <button type="button" onclick="document.getElementById('photo-gallery').click()" style="flex:1;height:36px;border-radius:8px;background:#fff;color:#3d5c3d;font-size:12px;font-weight:600;border:1px solid #c4d8c4;font-family:inherit">🖼 Gallery</button>
+            </div>
+          </div>
+          <div id="photo-preview" class="photo-preview-wrap">
+            <img id="photo-img" src="" alt="Audit photo" onclick="openLightbox(this.src)"/>
+            <button class="photo-clear" onclick="clearPhoto()">×</button>
+          </div>
+          <input type="file" id="photo-camera"  accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
+          <input type="file" id="photo-gallery" accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
         </div>
-        <input type="file" id="photo-camera"  accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
-        <input type="file" id="photo-gallery" accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
       </div>
     </div>
 
@@ -254,6 +265,6 @@
 <script src="audit_lang.js?v=20260822i"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js"></script>
-<script src="audit_maintenance_script.js?v=20260822l"></script>
+<script src="audit_maintenance_script.js?v=20260822m"></script>
 </body>
 </html>

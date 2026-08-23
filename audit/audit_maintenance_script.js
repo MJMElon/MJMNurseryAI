@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22l */
+/* BUILD: 2026-08-22m */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -407,15 +407,24 @@ function openForm(taskId, isEdit, existingAuditUid){
     const btn=document.querySelector(`#f-result-grp [data-val="${formState.result}"]`);
     if(btn)btn.classList.add(getTriClass(formState.result));
   }
-  document.getElementById('f-remarks').value=formState.remarks||'';
-  if(formState.photo){
-    document.getElementById('photo-img').src=formState.photo;
-    document.getElementById('photo-drop').style.display='none';
-    document.getElementById('photo-preview').style.display='block';
+  // Legacy 'Not Done' audits map onto the Unsatisfied branch so their
+  // remark / photo stays visible on re-open. The button itself stays
+  // unselected (there's no 'Not Done' button any more), but the
+  // Unsatisfied section shows so the auditor can review or update.
+  const isUnsat = formState.result === 'Unsatisfactory' || formState.result === 'Not Done';
+  const wrap = document.getElementById('unsat-only');
+  if (wrap) wrap.style.display = isUnsat ? '' : 'none';
+
+  const rem = document.getElementById('f-remarks');
+  if (rem) rem.value = formState.remarks || '';
+  if (formState.photo) {
+    document.getElementById('photo-img').src = formState.photo;
+    document.getElementById('photo-drop').style.display = 'none';
+    document.getElementById('photo-preview').style.display = 'block';
   } else {
-    document.getElementById('photo-drop').style.display='block';
-    document.getElementById('photo-preview').style.display='none';
-    document.getElementById('photo-img').src='';
+    document.getElementById('photo-drop').style.display = 'block';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-img').src = '';
   }
   setView('form');
 }
@@ -424,10 +433,27 @@ function getTriClass(v){
   if(v==='Unsatisfactory')return'sel-bad';
   return'sel-na';
 }
+/* Two-option flow: Satisfied is the whole audit; Unsatisfied reveals
+   the Remarks + Photo cards (photo becomes compulsory, remark stays
+   optional). Toggle #unsat-only here so the form stays honest — the
+   only time the auditor sees the photo card is when the answer needs it. */
 function pickResult(val,el){
   document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
-  el.classList.add(getTriClass(val));
+  if (el) el.classList.add(getTriClass(val));
   formState.result=val;
+  const wrap = document.getElementById('unsat-only');
+  if (wrap) wrap.style.display = (val === 'Unsatisfactory') ? '' : 'none';
+  // Clear a stale Satisfied → Unsatisfied swap: if the auditor flipped
+  // back to Satisfied, drop any remark / photo they'd tentatively keyed
+  // so the saved record can't carry misleading residue.
+  if (val === 'Satisfactory') {
+    const rem = document.getElementById('f-remarks'); if (rem) rem.value = '';
+    formState.remarks = '';
+    formState.photo = null;
+    const drop = document.getElementById('photo-drop');    if (drop) drop.style.display = 'block';
+    const prev = document.getElementById('photo-preview'); if (prev) prev.style.display = 'none';
+    const img  = document.getElementById('photo-img');     if (img)  img.src = '';
+  }
 }
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
@@ -446,23 +472,42 @@ function clearPhoto(){
 }
 function cancelForm(){setView('list');}
 
-/* --- SAVE --- */
+/* --- SAVE ---
+   Two-branch validation matching the new UI:
+     Satisfied   → just needs the result; no remark or photo required
+     Unsatisfied → photo is compulsory (auditor has to show what's wrong);
+                   remark stays optional
+*/
 async function saveAudit(){
   if(!formState.result){showToast('⚠ Please select Work Quality');return;}
-  if(!formState.photo){showToast('⚠ Please upload an audit photo');return;}
+  const isUnsat = (formState.result === 'Unsatisfactory');
+  if (isUnsat && !formState.photo){
+    showToast('⚠ A photo is required when the work is Unsatisfied');
+    return;
+  }
   const t=tasks.find(x=>x.id===formTaskId);if(!t)return;
-  const remarks=document.getElementById('f-remarks').value.trim();
+  const remEl = document.getElementById('f-remarks');
+  const remarks = remEl ? remEl.value.trim() : '';
   const user=JSON.parse(localStorage.getItem('mjm_user')||'{}');
   setLoading(true);
   try{
-    let photoUrl=formState.photo;
-    if(photoUrl&&photoUrl.startsWith('data:'))
-      photoUrl=await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
+    // Photo only uploaded on the Unsatisfied branch — a Satisfied audit
+    // leaves photo_url null in the DB, which is the honest signal that
+    // no exception photo was needed.
+    let photoUrl = null;
+    if (isUnsat && formState.photo) {
+      photoUrl = formState.photo;
+      if (photoUrl && photoUrl.startsWith('data:'))
+        photoUrl = await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
+    }
     const payload={
       task_id:parseInt(formTaskId),
       nursery:t.nursery,plot:t.plot,task_type:t.type,
-      result:formState.result,remarks:remarks||null,
-      photo_url:photoUrl||null,
+      result:formState.result,
+      // Satisfied → drop any residual remark too; only the Unsatisfied
+      // branch is supposed to carry commentary.
+      remarks: isUnsat ? (remarks || null) : null,
+      photo_url: photoUrl,
       auditor_name:user.name||'',
       date:todayISO()
     };
