@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-22g */
+/* BUILD: 2026-08-22h */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table PLUS
@@ -237,7 +237,7 @@ async function loadAll(){
     // event date when set; the created_at fallback keeps rows written
     // before the transaction_date backfill visible.
     const logQuery =
-        'select=plot_name,batch_name,transaction_type,breed_name,transaction_date,created_at'
+        'select=plot_name,batch_name,transaction_type,breed_name,quantity_change,transaction_date,created_at'
       + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)'
       + '&or=(transaction_date.gte.' + monthStart + ',and(transaction_date.is.null,created_at.gte.' + monthStart + '))'
       + '&order=id.desc';
@@ -268,39 +268,61 @@ async function loadAll(){
 
     // Auto-detected batches from the operation ledger. Dedupe against
     // audit_batches on (canonical plot, batch) — a manual row for the
-    // same batch always wins. Within the log itself, the ".desc" order
-    // and this seen-set keep only the first (most recent) occurrence,
-    // so a Transplanted + Transplanted_Premium pair on one plot only
-    // produces one card.
+    // same batch always wins. Within the log, roll multiple rows for
+    // the same (nursery, plot, batch) into ONE card so tranched
+    // transplants (two Transplanted_Premium entries a week apart on
+    // the same plot) appear as a single line with the SUMMED quantity
+    // and the most recent date.
     const manualKeys = new Set(batches.map(b =>
       (b.nursery||'') + '|' + _canonicalPlot(b.plot) + '|' + (b.batch||'').trim()));
-    const seenLogKeys = new Set();
+    const logAgg = new Map();       // key → aggregated card
     (lRows||[]).forEach(l => {
       const plot = _canonicalPlot(l.plot_name);
       const batch = String(l.batch_name||'').trim();
       const nursery = plot ? PLOT_TO_NURSERY_P[plot] : null;
       if(!nursery || !plot || !batch) return;
       const key = nursery + '|' + plot + '|' + batch;
-      if(manualKeys.has(key) || seenLogKeys.has(key)) return;
-      seenLogKeys.add(key);
+      if(manualKeys.has(key)) return;
       // PN gets Planted → datePlanted; everything else is a Transplanted*
-      // event → dateTransplant. Only one date is ever set on a log-derived
-      // card because the log carries only one event at a time.
-      const evDate = l.transaction_date || (l.created_at ? l.created_at.split('T')[0] : '');
+      // event → dateTransplant. One log row carries one event, but we
+      // may see several per (plot, batch) and want them merged.
+      const evDate  = l.transaction_date || (l.created_at ? l.created_at.split('T')[0] : '');
       const isPlanted = l.transaction_type === 'Planted';
+      const qty     = Math.abs(Number(l.quantity_change||0)) || 0;
+      const existing = logAgg.get(key);
+      if(existing){
+        existing.qtySum += qty;
+        if(!existing.breed && l.breed_name) existing.breed = l.breed_name;
+        // Keep the most recent date per event class — a plot that gets
+        // planted on the 3rd and transplanted-in on the 20th should show
+        // both distinct dates, not a single collapsed one.
+        if(isPlanted   && (!existing.datePlanted    || evDate > existing.datePlanted))    existing.datePlanted = evDate;
+        if(!isPlanted  && (!existing.dateTransplant || evDate > existing.dateTransplant)) existing.dateTransplant = evDate;
+      } else {
+        logAgg.set(key, {
+          nursery, plot, batch,
+          breed: l.breed_name || '',
+          qtySum: qty,
+          datePlanted:   isPlanted ? evDate : '',
+          dateTransplant: isPlanted ? '' : evDate,
+          createdAt:     l.created_at || null
+        });
+      }
+    });
+    logAgg.forEach((a, key) => {
       batches.push({
-        uid:           'LOG:' + key,          // synthetic — materialised on save
-        id:            'LOG-' + nursery + '-' + plot + '-' + batch,
-        nursery,
-        plot,
-        batch,
-        breed:         l.breed_name || '',
-        qtyTransplant: '',
-        datePlanted:   isPlanted ? evDate : '',
-        dateTransplant: isPlanted ? '' : evDate,
-        dateMature:    '',
-        createdAt:     l.created_at || null,
-        _source:       'log'
+        uid:            'LOG:' + key,          // synthetic — materialised on save
+        id:             'LOG-' + a.nursery + '-' + a.plot + '-' + a.batch,
+        nursery:        a.nursery,
+        plot:           a.plot,
+        batch:          a.batch,
+        breed:          a.breed,
+        qtyTransplant:  a.qtySum > 0 ? String(a.qtySum) : '',
+        datePlanted:    a.datePlanted,
+        dateTransplant: a.dateTransplant,
+        dateMature:     '',
+        createdAt:      a.createdAt,
+        _source:        'log'
       });
     });
 
@@ -435,10 +457,8 @@ function renderAuditList(){
     if(!audit && o.canAudit)
       btns.push(`<button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>`);
     const actions=btns.length?`<div class="audit-item-actions">${btns.join('')}</div>`:'';
-    // Event date: use whichever the batch actually carries. PN batches
-    // detected from the log have a Planted date instead of a transplant
-    // date; log-detected MN batches have a transplant date. Manual
-    // entries usually carry both.
+    // Top-right date: the most recent event we know about. PN cards
+    // land here as a Planted date; MN cards as a Transplant date.
     const evDate = b.dateTransplant || b.datePlanted || '';
     const evLabel = b.dateTransplant ? '' : (b.datePlanted ? ' (planted)' : '');
     // Log-detected cards get a compact chip so it's obvious the record
@@ -446,6 +466,15 @@ function renderAuditList(){
     const sourceChip = (b._source === 'log')
       ? `<span class="audit-nursery-tag" style="background:#eef7f0;color:#0f5527;border:1px solid #a7d5b0" title="Auto-detected from Operation ledger">✨ Auto</span>`
       : '';
+    // Batch-info chip row (same style Batch Info tab used before it was
+    // removed). Only render a chip for a date the batch actually carries
+    // — a PN card with no transplant date just skips that chip instead
+    // of drawing "Transplant: —".
+    const infoChips = `<div class="audit-checks">
+      ${b.datePlanted    ? `<span class="check-chip cc-na">Planted: ${fmtDate(b.datePlanted)}</span>` : ''}
+      ${b.dateTransplant ? `<span class="check-chip cc-na">Transplant: ${fmtDate(b.dateTransplant)}</span>` : ''}
+      ${b.dateMature     ? `<span class="check-chip cc-na">Mature: ${fmtDate(b.dateMature)}</span>` : ''}
+    </div>`;
     return `<div class="audit-item status-${status}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
@@ -455,6 +484,7 @@ function renderAuditList(){
       </div>
       <div class="audit-plot">${b.plot}</div>
       <div class="audit-batch">Batch: ${b.batch}${b.breed?' · '+b.breed:''}${b.qtyTransplant?' · Qty: '+b.qtyTransplant:''}</div>
+      ${infoChips}
       ${chips}${actions}
     </div>`;
   }
@@ -748,7 +778,7 @@ async function saveAudit(){
         plot:           b.plot,
         batch_no:       b.batch,
         breed:          b.breed || null,
-        qty_transplant: null,
+        qty_transplant: b.qtyTransplant ? parseInt(b.qtyTransplant, 10) : null,
         date_planted:   b.datePlanted || null,
         date_transplant:b.dateTransplant || null,
         date_mature:    b.dateMature || null
@@ -876,13 +906,15 @@ function init(){
     var label = document.getElementById('topbar-nursery');
     if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
   })();
-  // Reveal the Audit/Batch segmented control only for admins (batch
-  // keying is admin-only anyway). Non-admins only ever need the audit
-  // list, so hiding the toggle removes a control they can't use.
-  if (typeof isAuditAdmin === 'function' && isAuditAdmin()) {
-    const seg = document.getElementById('papan-view-toggle');
-    if (seg) seg.style.display = '';
-  }
+  // Batch tab has been removed — the audit list is fed automatically
+  // from the operation ledger, so manual batch keying isn't needed on
+  // this page any more. The toggle element stays as a hidden stub for
+  // any code path that still queries it, but it's never revealed and
+  // the audit tab is the only reachable view.
+  const _seg = document.getElementById('papan-view-toggle');
+  if (_seg) _seg.style.display = 'none';
+  const _fab = document.getElementById('fab');
+  if (_fab) _fab.style.display = 'none';
   loadAll();
   // Deep-link support — same contract as the other audit pages: the hub
   // sends ?nursery=X to pick the nursery filter, plus &from=home to
