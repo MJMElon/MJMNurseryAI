@@ -180,11 +180,11 @@ function selectNursery(nursery, el){
 /* --- STATS --- */
 function updateStats(){
   const latest=getLatestBatchPerPlot().filter(b=>b.nursery===activeNursery);
-  document.getElementById('stat-total').textContent=latest.length;
+  document.getElementById('stat-total').textContent=fmtNum(latest.length);
   const pending=latest.filter(b=>!getAuditForBatch(b.uid)).length;
   const passed=latest.filter(b=>{const a=getAuditForBatch(b.uid);return a&&overallStatus(a)==='pass';}).length;
-  document.getElementById('stat-pending').textContent=pending;
-  document.getElementById('stat-pass').textContent=passed;
+  document.getElementById('stat-pending').textContent=fmtNum(pending);
+  document.getElementById('stat-pass').textContent=fmtNum(passed);
   // Badge on audit tab — total pending across ALL nurseries
   const latestAll=getLatestBatchPerPlot();
   const allPending=latestAll.filter(b=>!getAuditForBatch(b.uid)).length;
@@ -192,7 +192,7 @@ function updateStats(){
   let badge=auditTab?auditTab.querySelector('.tab-badge'):null;
   if(allPending>0&&auditTab){
     if(!badge){badge=document.createElement('span');badge.className='tab-badge';auditTab.appendChild(badge);}
-    badge.textContent=allPending;
+    badge.textContent=fmtNum(allPending);
   } else if(badge) badge.remove();
 
   /* Pending count per nursery — painted onto both the new bottom tab
@@ -209,8 +209,8 @@ function updateStats(){
     let dot=btn.querySelector('.'+badgeCls);
     if(count>0){
       if(!dot){dot=document.createElement('span');dot.className=badgeCls;btn.appendChild(dot);}
-      dot.textContent=count;
-      btn.setAttribute('aria-label',NURSERY_LABELS[n]+' — '+count+' pending');
+      dot.textContent=fmtNum(count);
+      btn.setAttribute('aria-label',NURSERY_LABELS[n]+' — '+fmtNum(count)+' pending');
     } else {
       if(dot) dot.remove();
       btn.removeAttribute('aria-label');
@@ -429,7 +429,7 @@ function renderAuditList(){
   // Header count carries the "this month" context so it's clear which
   // window the pending count is against; the log auto-adds anything new,
   // so the number reflects today, not everything ever keyed.
-  document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'')+' · this month';
+  document.getElementById('audit-count').textContent=fmtNum(pending.length)+' plot'+(pending.length!==1?'s':'')+' · this month';
 
   /* opts.canView  — may open the read-only detail of a finished audit
      opts.canAudit — may start or redo an audit
@@ -483,7 +483,7 @@ function renderAuditList(){
         <span class="audit-item-date">${fmtDate(evDate)}${evLabel}</span>
       </div>
       <div class="audit-plot">${b.plot}</div>
-      <div class="audit-batch">Batch: ${b.batch}${b.breed?' · '+b.breed:''}${b.qtyTransplant?' · Qty: '+b.qtyTransplant:''}</div>
+      <div class="audit-batch">Batch: ${b.batch}${b.breed?' · '+b.breed:''}${b.qtyTransplant?' · Qty: '+fmtNum(b.qtyTransplant):''}</div>
       ${infoChips}
       ${chips}${actions}
     </div>`;
@@ -500,7 +500,7 @@ function renderAuditList(){
   // Completion section — visible to all, re-audit only for admin
   if(audited.length){
     if(compSection)compSection.style.display='block';
-    document.getElementById('completion-count').textContent=audited.length+' audited';
+    document.getElementById('completion-count').textContent=fmtNum(audited.length)+' audited';
     const admin=isAdmin();
     compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot))
       .map(b=>makeCard(b,{canView:true,canAudit:admin})).join('');
@@ -512,7 +512,7 @@ function renderAuditList(){
 /* --- RENDER BATCH TABLE --- */
 function renderBatchTable(){
   const tbody=document.getElementById('batch-tbody');
-  document.getElementById('batch-count').textContent=batches.length+' batch'+(batches.length!==1?'es':'');
+  document.getElementById('batch-count').textContent=fmtNum(batches.length)+' batch'+(batches.length!==1?'es':'');
   if(!batches.length){
     tbody.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
@@ -535,7 +535,7 @@ function renderBatchTable(){
         <span class="audit-item-date">${fmtDate(b.dateTransplant)}</span>
       </div>
       <div class="audit-plot">${b.plot}</div>
-      <div class="audit-batch">Batch: ${b.batch||'—'} · ${b.breed||'—'} · Qty: ${b.qtyTransplant||'—'}</div>
+      <div class="audit-batch">Batch: ${b.batch||'—'} · ${b.breed||'—'} · Qty: ${b.qtyTransplant?fmtNum(b.qtyTransplant):'—'}</div>
       <div class="audit-checks">
         <span class="check-chip cc-na">Planted: ${fmtDate(b.datePlanted)}</span>
         <span class="check-chip cc-na">Transplant: ${fmtDate(b.dateTransplant)}</span>
@@ -656,7 +656,7 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   document.getElementById('banner-plot').textContent=b.plot;
   document.getElementById('banner-batch').textContent=b.batch||'—';
   document.getElementById('banner-breed').textContent=b.breed||'—';
-  document.getElementById('banner-qty').textContent=b.qtyTransplant||'—';
+  document.getElementById('banner-qty').textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
   document.getElementById('banner-dt').textContent=fmtDate(b.dateTransplant);
   document.getElementById('banner-dm').textContent=fmtDate(b.dateMature);
   document.getElementById('audit-form-title').textContent='Audit — '+b.plot;
@@ -828,7 +828,7 @@ function openDetail(auditUid){
       <div class="bbg-row"><span class="bbg-label">Nursery:</span><span class="bbg-val">${b.nursery}</span></div>
       <div class="bbg-row"><span class="bbg-label">Plot:</span><span class="bbg-val">${b.plot}</span></div>
       <div class="bbg-row"><span class="bbg-label">Breed:</span><span class="bbg-val">${b.breed||'—'}</span></div>
-      <div class="bbg-row"><span class="bbg-label">Qty:</span><span class="bbg-val">${b.qtyTransplant||'—'}</span></div>
+      <div class="bbg-row"><span class="bbg-label">Qty:</span><span class="bbg-val">${b.qtyTransplant?fmtNum(b.qtyTransplant):'—'}</span></div>
       <div class="bbg-row"><span class="bbg-label">Transplant:</span><span class="bbg-val">${fmtDate(b.dateTransplant)}</span></div>
       <div class="bbg-row"><span class="bbg-label">Planted:</span><span class="bbg-val">${fmtDate(b.datePlanted)}</span></div>
       <div class="bbg-row"><span class="bbg-label">Mature:</span><span class="bbg-val">${fmtDate(b.dateMature)}</span></div>`;

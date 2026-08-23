@@ -221,7 +221,7 @@ function renderList(){
     totalAudited  += required.filter(b=>isBatchAudited(p, b.batch)).length;
   });
   document.getElementById('list-count').textContent =
-    totalAudited + ' / ' + totalRequired + ' ' + t('audited');
+    fmtNum(totalAudited) + ' / ' + fmtNum(totalRequired) + ' ' + t('audited');
   document.getElementById('list-heading').textContent =
     t('height_title') + ' — ' + NURSERY_LABELS[activeTab];
 
@@ -229,7 +229,7 @@ function renderList(){
   document.querySelectorAll('.tab-item').forEach(tb=>{
     const cnt=records.filter(r=>r.nursery===tb.dataset.n).length;
     let b=tb.querySelector('.tab-badge');
-    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';tb.appendChild(b);}b.textContent=cnt;}
+    if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';tb.appendChild(b);}b.textContent=fmtNum(cnt);}
     else if(b)b.remove();
   });
 
