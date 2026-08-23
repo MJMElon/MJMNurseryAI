@@ -3076,6 +3076,12 @@ async function loadMovementData() {
         ms
       });
     });
+    // Which plot-batch rows the ledger actually has. The movement report only
+    // counts a delivery order against one of these, so a batch mistyped on a
+    // D/O cannot subtract from a plot; this has to agree with it or the two
+    // screens quote different numbers for the same plot.
+    const real = new Set(evs.filter(e => e.plotKey && e.batchKey)
+                            .map(e => `${e.plotKey}\u0001${e.batchKey}`));
     (dosRes.data || []).forEach(d => {
       if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
       const ms = _mvParseDate(d.delivery_date);
@@ -3083,11 +3089,13 @@ async function loadMovementData() {
       for (let i = 1; i <= 5; i++) {
         const qty = Number(d[`qty_${i}`] || 0);
         if (!qty) continue;
+        const plotKey  = _mvPlotKey(d[`plot_${i}`]);
+        const batchKey = _mvBatchKey(d[`batch_${i}`]);
+        if (!real.has(`${plotKey}\u0001${batchKey}`)) continue;
         evs.push({
-          plotKey:  _mvPlotKey(d[`plot_${i}`]),
-          batchKey: _mvBatchKey(d[`batch_${i}`]),
-          batch:    d[`batch_${i}`] || '—',
-          type:     'Sold',
+          plotKey, batchKey,
+          batch: d[`batch_${i}`] || '—',
+          type:  'Sold',
           qty, ms
         });
       }
@@ -3128,7 +3136,10 @@ function linkedPlotQty(plot, batchStr, tarikh) {
   let raw = 0;
   keys.forEach(k => { raw += per[k].closing; });
   return {
-    qty: Math.max(0, Math.round(raw)),
+    // NOT floored at zero: the movement report shows a negative closing
+    // because it is a figure to look into, and a work record quoting 0 for
+    // the same plot and batch would be quietly disagreeing with it.
+    qty: Math.round(raw),
     raw: Math.round(raw),
     batches: keys.map(k => per[k].label),
     allBatches: wanted.length === 0,
