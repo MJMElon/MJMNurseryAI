@@ -497,17 +497,23 @@
     .bkt-sched{background:linear-gradient(135deg,#f59e0b,#c2410c)}
     .bkt-all  {background:linear-gradient(135deg,#4a4a4d,#2b2b2e)}
     .bkt-over {background:linear-gradient(135deg,#ef4444,#991b1b)}
+    /* Phones — three tiles stay on ONE row per feedback. Padding +
+       icon shrink so nothing overflows on the narrowest devices. */
     @media (max-width:640px){
-      .buckets{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-      .bkt{min-height:84px;padding:12px 12px 10px;border-radius:15px}
-      .bkt-n{font-size:28px}
-      .bkt-lbl{font-size:11px}
+      .buckets{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+      .bkt{min-height:78px;padding:10px 10px 8px;border-radius:14px}
+      .bkt-ico{width:24px;height:24px;border-radius:7px}
+      .bkt-ico svg{width:14px;height:14px}
+      .bkt-n{font-size:24px}
+      .bkt-lbl{font-size:10px;letter-spacing:.1px}
     }
-    /* Narrowest phones — three tiles are too tight, drop to two per
-       row (Today + Overdue on top, All wraps to a full row below). */
-    @media (max-width:420px){
-      .buckets{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .bkt-all{grid-column:1 / -1}
+    @media (max-width:400px){
+      .buckets{gap:5px}
+      .bkt{min-height:70px;padding:9px 8px 7px;border-radius:12px}
+      .bkt-n{font-size:20px;letter-spacing:-.5px}
+      .bkt-lbl{font-size:9.5px;line-height:1.1}
+      .bkt-ico{width:20px;height:20px}
+      .bkt-ico svg{width:12px;height:12px}
     }
 
     /* ── Today's progress bar ──
@@ -599,11 +605,11 @@
               transition:transform .18s}
     .tl-item.open .tl-caret{transform:rotate(180deg)}
     .tl-caret svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-    /* Nursery chips are hidden until the auditor opens the card. Each chip
-       is still a link — the outer button is just a disclosure, so tapping
-       a chip navigates without re-toggling the panel. */
-    .tl-nurs-wrap{max-height:0;overflow:hidden;transition:max-height .22s ease}
-    .tl-item.open .tl-nurs-wrap{max-height:200px}
+    /* Nursery chips are ALWAYS visible now — per-card expand/collapse
+       was dropped so the auditor sees which nurseries still need work
+       without an extra tap. The whole timeline is collapsed via the
+       active bucket tile instead (see applyTimelineOpen()). */
+    .tl-nurs-wrap{}
     .tl-nurs{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px 14px}
     .nchip{font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 11px;
            border-radius:20px;background:#fff;border:1.5px solid #d8e2ea;
@@ -854,7 +860,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260823k"></script>
+<script src="audit_lang.js?v=20260823m"></script>
 <script src="audit_supabase.js"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
@@ -1486,15 +1492,40 @@ function loadAuditTodo(){
     `).join('');
     box.querySelectorAll('.bkt').forEach(el => {
       el.onclick = () => {
-        activeBucket = el.dataset.k;
-        // Sync the legacy `active` set so renderTimeline's existing filter
-        // logic keeps working without a rewrite.
-        active.clear();
-        const b = BUCKETS.find(x => x.k === activeBucket);
-        (b.statuses || []).forEach(s => active.add(s));
+        const k = el.dataset.k;
+        // Same-tile tap toggles the timeline. First tap after landing
+        // opens the section (in case it was hidden); every tap on the
+        // already-active tile after that flips it. Different tile:
+        // switch filter and force the timeline visible.
+        if (k === activeBucket) {
+          timelineOpen = !timelineOpen;
+        } else {
+          activeBucket = k;
+          active.clear();
+          const b = BUCKETS.find(x => x.k === k);
+          (b.statuses || []).forEach(s => active.add(s));
+          timelineOpen = true;
+        }
+        applyTimelineOpen();
         renderAll();
       };
     });
+    applyTimelineOpen();
+  }
+
+  // Whole-timeline open/closed. Toggled by a same-tile tap on a
+  // bucket; defaults to open on load so the auditor sees today's
+  // work first thing.
+  let timelineOpen = true;
+  function applyTimelineOpen(){
+    const box = document.getElementById('todo-section');
+    if (!box) return;
+    box.style.display = timelineOpen ? '' : 'none';
+    // Mirror on the buckets themselves so a CSS hook can highlight
+    // the "collapsed" active tile if we ever want to (currently just
+    // a data-attribute — no visual change).
+    document.querySelectorAll('.bkt.on').forEach(b =>
+      b.setAttribute('data-collapsed', timelineOpen ? 'false' : 'true'));
   }
 
   /* ── Timeline ──
@@ -1532,16 +1563,16 @@ function loadAuditTodo(){
       const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
       const nurseries = nurseryState(o, oy, om);
-      const pendingCount = nurseries.filter(x => !x.done).length;
-      const chevronSvg = '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>';
-      // Head is a real button so keyboard focus + Enter/Space toggle the
-      // panel. Each nchip below is still its own link so a tap on the
-      // nursery navigates without toggling. Overdue rows keep the
-      // fatter border-left the CSS already targets.
+      // Show only the nurseries that STILL need an audit. Done ones
+      // drop off entirely — the row's "3 nurseries to audit" summary
+      // was removed at the auditor's request, so we no longer need
+      // the ✓ chips to spell out which are finished.
+      const pending = nurseries.filter(x => !x.done);
+      // Chips render inline (no expand/collapse) so the auditor can
+      // tap through without an extra tap first.
       return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
         <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
-          <button type="button" class="tl-head-btn" data-toggle="${idx}" aria-expanded="false"
-                  aria-controls="tl-nurs-${idx}">
+          <div class="tl-head">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${t(o.title)}${
@@ -1552,20 +1583,18 @@ function loadAuditTodo(){
               <div class="tl-meta">
                 <span class="tl-date">${dateLabel(o, om)}</span>
                 <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
-                ${pendingCount > 0
-                    ? `<span class="tl-badge" style="background:rgba(0,0,0,.06);color:var(--fc-ink2)">${fmtNum(pendingCount)} ${t(pendingCount === 1 ? 'nursery_1' : 'nurseries_n')}</span>`
-                    : `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`}
               </div>
             </div>
-            <div class="tl-caret">${chevronSvg}</div>
-          </button>
-          <div class="tl-nurs-wrap" id="tl-nurs-${idx}">
+          </div>
+          <div class="tl-nurs-wrap">
             <div class="tl-nurs">${
-              nurseries.map(x =>
-                `<a class="nchip${x.done ? ' on' : ''}" href="${o.href}?nursery=${x.nursery}&from=home">${
-                   NURSERY_LABELS[x.nursery] || x.nursery
-                 }</a>`
-              ).join('')}</div>
+              pending.length
+                ? pending.map(x =>
+                    `<a class="nchip" href="${o.href}?nursery=${x.nursery}&from=home">${
+                       NURSERY_LABELS[x.nursery] || x.nursery}</a>`
+                  ).join('')
+                : `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`
+            }</div>
           </div>
         </div>
       </div>`;
@@ -1608,19 +1637,9 @@ function loadAuditTodo(){
 
     const todoBox = document.getElementById('todo-section');
     todoBox.innerHTML = html;
-    // Wire the head-button toggles: tap once to open the nursery chips,
-    // tap again to close. aria-expanded stays in sync for accessibility.
-    todoBox.querySelectorAll('.tl-head-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        // Ignore clicks that land on a nested link (nchip) — those must
-        // navigate straight through, not accidentally toggle the panel.
-        if (e.target.closest && e.target.closest('.nchip')) return;
-        const item = btn.closest('.tl-item');
-        if (!item) return;
-        const open = item.classList.toggle('open');
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-    });
+    // Nursery chips are always visible now — no per-card toggle to
+    // wire. The whole timeline is collapsible via the bucket tile tap
+    // (see renderBuckets), which toggles the todo-section visibility.
     if ((selDay === null || showingToday) && !active.size) countMaintenance();
   }
 
