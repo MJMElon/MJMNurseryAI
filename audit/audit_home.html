@@ -1037,14 +1037,14 @@ function loadAuditTodo(){
      offline and still queued are not visible to this either, for the same
      reason: they count once they sync. */
   /* ── WHERE THE SCHEDULE BEGINS ──
-     The audit schedule runs from September 2026. Months before it are not
+     The audit schedule runs from August 2026. Months before it are not
      part of it: they show no tasks, count for nothing, and never turn
      overdue — the records from that period were kept differently and
      dragging them in would open the list on a backlog nobody owes.
 
-     Month is zero-based, so 8 is September. Move this and everything —
+     Month is zero-based, so 7 is August. Move this and everything —
      the board, the counts, the carry-over — moves with it. */
-  let START_Y = 2026, START_M = 8;
+  let START_Y = 2026, START_M = 7;
   /* Overridable as "YYYY-MM" so the behaviour around a live window — due
      today, closing unfinished, carrying over — can be exercised without
      waiting for the calendar to reach it. Also the lever to pull if the
