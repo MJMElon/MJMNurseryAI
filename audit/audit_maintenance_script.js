@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-23d */
+/* BUILD: 2026-08-23i */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -33,6 +33,39 @@ const WORK_TYPE_LABEL = {
    future policy change ("actually add Xyz back in") is a one-line
    edit rather than three grepped call sites. */
 const SKIP_WORK_TYPES = new Set(['pd']);
+
+/* Office schedule → work_type mapping. The Maintenance system on
+   nops_maint_records writes rows with `jenis` in Malay, not the short
+   code the FC Scan Portal uses. Values below match the exact strings
+   the operation module emits. Anything unrecognised falls into
+   'other' (which resolves to "Others" via WORK_TYPE_LABEL fallback). */
+const JENIS_TO_WORKTYPE = {
+  'Penyemburan racun kulat dan serangga': 'pd',
+  'Meracun rumput secara selingan':       'interrow',
+  'Merumput':                             'weeding',
+  'Membaja':                              'manuring'
+};
+
+/* "07-08-2026" → "2026-08-07". The office module stores tarikh
+   DD-MM-YYYY (or "-" for a not-yet-checked row). Returns '' when the
+   value isn't a real date so the caller can drop the record. */
+function _tarikhToISO(t){
+  if (!t || t === '-' || t === '—') return '';
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
+  if (m) return m[3] + '-' + m[2] + '-' + m[1];
+  // Some seeds carry ISO-like values already; pass those through if
+  // they parse.
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(t).trim());
+  return m2 ? (m2[0]) : '';
+}
+
+/* "Round 2: Antracol 50gm..." or "R2: ..." → 2. Blank string when the
+   racun text has no round marker so the round chip is skipped. */
+function _parseRound(racun){
+  if (!racun) return '';
+  const m = /^\s*R(?:ound)?\s*(\d+)\s*:/i.exec(String(racun));
+  return m ? m[1] : '';
+}
 
 /* Audit deadline window per work type — how many days after the field
    recorded the work the auditor still has to close it out. Manuring /
@@ -302,12 +335,25 @@ async function loadAll(){
     // doesn't exist, Supabase 400'd the whole request, the .catch() below
     // swallowed it, and every auditor saw an empty task list even when
     // the operation Maintenance system was actively logging work.
-    const [fRows, aRows] = await Promise.all([
+    // Task sources:
+    //  1. nops_maint_field_records  — FC Scan Portal (mobile) submissions.
+    //  2. nops_maint_records         — the office Maintenance module's
+    //     record blob. A row here becomes an audit task the moment an
+    //     admin fills in its `tarikh` (or ticks Check) on the operation
+    //     Maintenance page. This is the source the user watches when
+    //     they say "I saw work date but audit is empty" — until this
+    //     PR we only read the field portal, not the office schedule.
+    //
+    // Both sources are optional: any RLS gap fails the fetch open so
+    // the page still renders whatever the other source produced.
+    const [fRows, aRows, oRows] = await Promise.all([
       sb.select('nops_maint_field_records',
                 'select=id,work_date,nursery_name,plot_name,work_type,jenis,chemical,'
               + 'batch_name,reported_by,photo_urls,qty,remark,week_no,created_at')
         .catch(e => { console.warn('[maint-audit] nops_maint_field_records unavailable:', e); return []; }),
-      sb.select('audit_maintenance_audits','select=*')
+      sb.select('audit_maintenance_audits','select=*'),
+      sb.select('nops_maint_records', 'select=id,records,updated_at')
+        .catch(e => { console.warn('[maint-audit] nops_maint_records unavailable:', e); return []; })
     ]);
 
     tasks = [];
@@ -346,6 +392,48 @@ async function loadAll(){
       });
     });
 
+    // --- Office schedule records (nops_maint_records → records[]) ---
+    // Single-row JSONB blob at id=1 for the whole database (per the
+    // operation Maintenance module's persistRecords()). Every element
+    // carries {id, tarikh, jenis, racun, plot, batch, qty, gaia,
+    // remark, checked}. A row without a real tarikh is still pending
+    // on the office side — skip it. Dedupe against field_records on
+    // (nursery, plot, batch, work_type, work_date) so a row that the
+    // field portal also submitted only produces one card.
+    const officeBlob = Array.isArray(oRows) && oRows.length ? oRows[0] : null;
+    const officeRecs = (officeBlob && Array.isArray(officeBlob.records)) ? officeBlob.records : [];
+    const seenKey = new Set(tasks.map(t =>
+      t.nursery + '|' + t.plot + '|' + (t.batch||'') + '|' + t.type + '|' + (t.completedDate||'')));
+    officeRecs.forEach(rec => {
+      const workType = JENIS_TO_WORKTYPE[rec.jenis] || 'other';
+      if (SKIP_WORK_TYPES.has(workType)) return;
+      const workDate = _tarikhToISO(rec.tarikh);
+      if (!workDate) return;                                // still pending on the office
+      const plot = _canonicalPlot(rec.plot);
+      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
+      if (!nursery) return;
+      const round = _parseRound(rec.racun);
+      const key = nursery + '|' + plot + '|' + (rec.batch||'') + '|' + (WORK_TYPE_LABEL[workType]||'Others') + '|' + workDate;
+      if (seenKey.has(key)) return;                         // field portal already carried this
+      seenKey.add(key);
+      tasks.push({
+        id:            String(rec.id),                      // record.id is JS Date.now() — fits BIGINT, unlikely to clash
+        nursery,
+        plot,
+        type:          WORK_TYPE_LABEL[workType] || 'Others',
+        chemical:      rec.racun || rec.jenis || '',
+        round,
+        batch:         rec.batch || '',
+        worker:        '',                                  // office records don't carry a worker name
+        qty:           rec.qty ?? null,
+        remark:        rec.remark || '',
+        completedDate: workDate,
+        workerPhotos:  [],
+        createdAt:     rec.updated_at || officeBlob?.updated_at || null,
+        _source:       'office'
+      });
+    });
+
     audits = aRows.map(r=>({
       uid:     String(r.id),
       id:      r.audit_id,
@@ -360,6 +448,7 @@ async function loadAll(){
 
     console.log('[maint-audit] loaded', {
       fromFieldRecords: (fRows||[]).length,
+      fromOfficeRecords:(officeRecs||[]).length,
       totalTasks:       tasks.length,
       audits:           audits.length
     });
