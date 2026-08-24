@@ -42,6 +42,9 @@ const TRANSLATIONS = {
     home_greeting_evening:   'Good evening,',
     home_alert_title:        '⚠ Alert Summary',
     home_modules_title:      'Audit Modules',
+    home_history_title:      'Audit History',
+    home_history_loading:    'Loading history…',
+    home_history_empty:      'No audits filed this month.',
     /* === NURSERY CHOOSER + SCHEDULE BOARD === */
     ask_nursery:      'Which nursery are you auditing today?',
     pre_nursery:      'Pre Nursery',
@@ -420,6 +423,9 @@ const TRANSLATIONS = {
     home_greeting_evening:   'Selamat petang,',
     home_alert_title:        '⚠ Ringkasan Amaran',
     home_modules_title:      'Modul Audit',
+    home_history_title:      'Sejarah Audit',
+    home_history_loading:    'Memuatkan sejarah…',
+    home_history_empty:      'Tiada audit direkodkan bulan ini.',
     /* === PEMILIHAN NURSERI + PAPAN JADUAL === */
     ask_nursery:      'Nurseri mana anda audit hari ini?',
     pre_nursery:      'Tapak Semaian Kecil',

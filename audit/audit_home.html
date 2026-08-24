@@ -325,6 +325,48 @@
 
     /* ── TO-DO rows: same card language as the modules ── */
     .todo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+
+    /* ── AUDIT HISTORY ────────────────────────────────────────
+       Card-shaped list of every completed audit, month by month.
+       The nav row is a fixed rhythm — arrow / month / arrow — so
+       the month name stays centred no matter how wide it prints. */
+    .history{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
+             padding:12px 14px 10px;margin-bottom:22px}
+    .hist-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;
+              padding:6px 4px 12px;border-bottom:1px solid var(--fc-line);margin-bottom:10px}
+    .hist-arrow{width:34px;height:34px;border-radius:50%;background:#f4f7fa;
+                border:1px solid var(--fc-line);color:var(--fc-ink);
+                display:flex;align-items:center;justify-content:center;
+                cursor:pointer;padding:0;font-family:inherit;
+                transition:background .15s,border-color .15s,color .15s,opacity .15s;
+                -webkit-tap-highlight-color:transparent;flex-shrink:0}
+    .hist-arrow:hover:not(:disabled){background:#e5edf5;border-color:#cbd7e2}
+    .hist-arrow:active:not(:disabled){transform:scale(.96)}
+    /* Disabled = there's no record on the other side. Muted, and the
+       cursor tells the auditor tapping again will do nothing. */
+    .hist-arrow:disabled{opacity:.32;cursor:not-allowed;background:#f4f7fa}
+    .hist-arrow svg{width:14px;height:14px;stroke:currentColor;fill:none;
+                    stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .hist-month{flex:1;text-align:center;font-size:15px;font-weight:800;
+                letter-spacing:.6px;color:var(--fc-ink);min-width:0}
+
+    .hist-list{display:flex;flex-direction:column}
+    .hist-row{display:flex;align-items:center;gap:12px;padding:12px 4px;
+              border-bottom:1px solid var(--fc-line)}
+    .hist-row:last-child{border-bottom:0}
+    .hist-ico{width:34px;height:34px;border-radius:10px;flex-shrink:0;
+              display:flex;align-items:center;justify-content:center}
+    .hist-ico svg{width:18px;height:18px;fill:none;stroke-width:1.9;
+                  stroke-linecap:round;stroke-linejoin:round}
+    .hist-body{flex:1;min-width:0}
+    .hist-ttl{font-size:13.5px;font-weight:800;color:var(--fc-ink);line-height:1.25;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hist-sub{font-size:11.5px;font-weight:600;color:var(--fc-ink2);margin-top:2px;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hist-date{font-size:11px;font-weight:800;color:var(--fc-ink3);white-space:nowrap;
+               flex-shrink:0;letter-spacing:.3px;text-transform:uppercase}
+    .hist-empty{padding:26px 12px;text-align:center;font-size:12.5px;
+                font-weight:600;color:var(--fc-ink3)}
     /* ── AUDIT SCHEDULE BOARD ────────────────────────────────────────
        Month strip, status filters, and a timeline of the windows that fall
        in the month you are looking at. ── */
@@ -756,15 +798,36 @@
         </div>
       </div>
 
-      <!-- Three bucket tiles: Today's / Overdue / All (Scheduled was
-           removed at the auditor's request). The active tile filters
-           the timeline below; tapping the same tile again clears the
-           filter. Counts come from the same occurrences() the timeline
-           reads. -->
-      <div class="buckets" id="buckets"></div>
+      <!-- Bucket tiles (Today / Overdue / All) were cancelled — the
+           timeline below shows the whole month's to-do list directly,
+           without a filter above it. The Audit History section further
+           down carries the completed work, month by month. -->
 
       <div class="tl" id="todo-section">
         <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- AUDIT HISTORY — every completed audit, grouped by month, with
+         < > arrows that only enable when there is actually a record in
+         the direction they point. -->
+    <div class="section-head fade-in" style="margin-top:22px">
+      <span data-t="home_history_title">Audit History</span>
+    </div>
+    <div class="history fade-in" id="history-section">
+      <div class="hist-nav">
+        <button class="hist-arrow" id="hist-prev" onclick="histShift(-1)"
+                aria-label="Previous month" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="hist-month" id="hist-month">—</div>
+        <button class="hist-arrow" id="hist-next" onclick="histShift(1)"
+                aria-label="Next month" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="hist-list" id="hist-list">
+        <div class="hist-empty" data-t="home_history_loading">Loading history…</div>
       </div>
     </div>
 
@@ -856,7 +919,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260823o"></script>
+<script src="audit_lang.js?v=20260824d"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
 <!-- The portal permission layer used to load here for the User Access card.
@@ -1469,52 +1532,19 @@ function loadAuditTodo(){
     all:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
     over:  '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
   };
-  // Landing here should show what the auditor owes today, not the
-  // whole month at once. 'today' includes due + overdue, so the
-  // first thing on screen is the backlog + what's live right now.
-  let activeBucket = 'today';
-  // Sync the legacy `active` set that renderTimeline reads.
-  active.clear(); (BUCKETS.find(b => b.k === 'today')?.statuses || []).forEach(s => active.add(s));
+  /* Bucket tiles were cancelled — no Today/Overdue/All filter above
+     the timeline. The auditor lands on the whole month's work at
+     once; the Audit History section below carries what has been
+     closed out. `active` stays empty so renderTimeline shows every
+     occurrence in the month rather than a filtered slice. */
+  let activeBucket = null;
+  active.clear();
 
-  function renderBuckets(occ){
-    const counts = {today:0, over:0, all:occ.length};
-    occ.forEach(o => {
-      const s = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
-      if (s === 'due' || s === 'overdue')        counts.today++;
-      if (s === 'overdue')                       counts.over++;
-    });
-    const box = document.getElementById('buckets');
-    if (!box) return;
-    box.innerHTML = BUCKETS.map(b => `
-      <button class="bkt ${b.cls} ${activeBucket===b.k?'on':''}" data-k="${b.k}">
-        <div class="bkt-top">
-          <div class="bkt-ico"><svg viewBox="0 0 24 24">${BUCKET_ICONS[b.k]}</svg></div>
-          <div class="bkt-n">${fmtNum(counts[b.k])}</div>
-        </div>
-        <div class="bkt-lbl">${t(b.lbl)}</div>
-      </button>
-    `).join('');
-    box.querySelectorAll('.bkt').forEach(el => {
-      el.onclick = () => {
-        const k = el.dataset.k;
-        // Same-tile tap toggles the timeline. First tap after landing
-        // opens the section (in case it was hidden); every tap on the
-        // already-active tile after that flips it. Different tile:
-        // switch filter and force the timeline visible.
-        if (k === activeBucket) {
-          timelineOpen = !timelineOpen;
-        } else {
-          activeBucket = k;
-          active.clear();
-          const b = BUCKETS.find(x => x.k === k);
-          (b.statuses || []).forEach(s => active.add(s));
-          timelineOpen = true;
-        }
-        applyTimelineOpen();
-        renderAll();
-      };
-    });
-    applyTimelineOpen();
+  /* Buckets were cancelled — this function is a no-op now, kept only
+     so any older code that still calls it does nothing rather than
+     throws. The #buckets element is gone from the HTML too. */
+  function renderBuckets(_occ){
+    /* nothing to render */
   }
 
   // Whole-timeline open/closed. Toggled by a same-tile tap on a
@@ -1795,13 +1825,172 @@ function loadAuditTodo(){
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
   loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
-
-
 }
 
 loadAuditTodo();
 
 
+/* ── AUDIT HISTORY ──────────────────────────────────────────────────
+   Reads every audit table for the current nursery scope, groups the
+   records by 'YYYY-MM', and draws the currently-selected month.
+   The < > arrows are enabled only when a month with records exists
+   in that direction, so tapping them can never land on a blank page. */
+const HIST_MODS = {
+  plot: {
+    label:'Plot Condition', bg:'#e8f5e9', fg:'#2d7a2d',
+    icon:'<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>' +
+         '<rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/>'
+  },
+  height: {
+    label:'Seedling Height', bg:'#e0f2fe', fg:'#0369a1',
+    icon:'<line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/>' +
+         '<path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/>' +
+         '<path d="M12 10C12 10 15 13 15 15"/>'
+  },
+  papan: {
+    label:'Papan Tanda', bg:'#fff1e6', fg:'#c2410c',
+    icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>'
+  },
+  maint: {
+    label:'Maintenance', bg:'#e8eefc', fg:'#1e3a8a',
+    icon:'<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l' +
+         '-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'
+  }
+};
+let HIST_ALL = [];       // [{mod,date,nursery,plot,auditor}]
+let HIST_MONTH = null;   // 'YYYY-MM' being shown
+
+async function loadHistory(){
+  /* Nursery scope decides which rows count as "our" records; the
+     Switch pill toggles it, but that reloads the whole page and this
+     runs again from scratch. */
+  const scope = MJMAuditLogin.scope();
+  const inScope = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  const okNur = n => n && inScope.indexOf(n) !== -1;
+
+  try {
+    /* select=* rather than a column list — the four tables' column
+       sets have drifted in the past, and a named column that no
+       longer exists fails the whole row silently (which is how the
+       old sign-in showed "Auditor" for everyone). * is safe under
+       RLS and only a shade heavier for a page-sized read. */
+    const results = await Promise.all([
+      sb.select('audit_plot_audits',       'select=date,nursery,plot,auditor_name').catch(()=>[]),
+      sb.select('audit_height_records',    'select=date,nursery,plot,auditor_name').catch(()=>[]),
+      sb.select('audit_papan_audits',      'select=date,nursery,plot,auditor_name').catch(()=>[]),
+      sb.select('audit_maintenance_audits','select=date,nursery,plot,auditor_name').catch(()=>[])
+    ]);
+    const mods = ['plot','height','papan','maint'];
+    const all = [];
+    results.forEach((rows, i) => {
+      const mod = mods[i];
+      (rows || []).forEach(r => {
+        if (r && r.date && okNur(r.nursery)) {
+          all.push({
+            mod,
+            date: String(r.date).slice(0,10),
+            nursery: r.nursery,
+            plot: r.plot || '',
+            auditor: r.auditor_name || ''
+          });
+        }
+      });
+    });
+    /* Newest first inside each month reads the way a paper book does
+       — you flip open on the most recent entry. */
+    HIST_ALL = all.sort((a,b) => (a.date < b.date ? 1 : -1));
+
+    /* Default to the current calendar month; if the current month is
+       empty, fall back to the most recent month that isn't. */
+    const now = new Date();
+    const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const months = histMonthsWithData();
+    HIST_MONTH = months.indexOf(thisMonth) !== -1 ? thisMonth
+              : (months.length ? months[months.length - 1] : thisMonth);
+    renderHistory();
+  } catch (e) {
+    console.warn('Could not load audit history:', e);
+    const list = document.getElementById('hist-list');
+    if (list) list.innerHTML =
+      '<div class="hist-empty">Could not load history.</div>';
+  }
+}
+
+function histMonthsWithData(){
+  const set = new Set();
+  HIST_ALL.forEach(r => set.add(r.date.slice(0,7)));
+  return [...set].sort();      // ascending
+}
+
+/* Move to the next month that actually has records in the direction
+   the arrow points. Same-month with no data still snaps to the nearest
+   populated one. */
+function histShift(dir){
+  const months = histMonthsWithData();
+  if (!months.length) return;
+  let target;
+  if (dir > 0) target = months.find(m => m > HIST_MONTH);
+  else         target = [...months].reverse().find(m => m < HIST_MONTH);
+  if (!target) return;         // arrow was disabled anyway
+  HIST_MONTH = target;
+  renderHistory();
+}
+
+function renderHistory(){
+  const monthEl = document.getElementById('hist-month');
+  const prevBtn = document.getElementById('hist-prev');
+  const nextBtn = document.getElementById('hist-next');
+  const list    = document.getElementById('hist-list');
+  if (!monthEl || !list || !HIST_MONTH) return;
+
+  const [y, m] = HIST_MONTH.split('-').map(Number);
+  const first  = new Date(y, m - 1, 1);
+  const lang   = (typeof currentLang !== 'undefined' && currentLang === 'ms') ? 'ms-MY' : 'en-MY';
+  monthEl.textContent = first.toLocaleDateString(lang,
+    { month:'long', year:'numeric' });
+
+  const months = histMonthsWithData();
+  if (prevBtn) prevBtn.disabled = !months.some(mo => mo < HIST_MONTH);
+  if (nextBtn) nextBtn.disabled = !months.some(mo => mo > HIST_MONTH);
+
+  const rows = HIST_ALL.filter(r => r.date.slice(0,7) === HIST_MONTH);
+  if (!rows.length) {
+    /* Never actually reached at the moment — the arrows can only land
+       on months with records — but the empty state matters if the
+       initial default month is a fresh one with nothing filed yet. */
+    list.innerHTML =
+      '<div class="hist-empty">' +
+      (typeof t === 'function' ? t('home_history_empty') : 'No audits filed this month.') +
+      '</div>';
+    return;
+  }
+
+  list.innerHTML = rows.map(r => {
+    const mod = HIST_MODS[r.mod];
+    if (!mod) return '';
+    const d = new Date(r.date + 'T00:00:00');
+    const dstr = d.toLocaleDateString(lang, { day:'numeric', month:'short' });
+    const nur  = (typeof NURSERY_LABELS !== 'undefined' && NURSERY_LABELS[r.nursery]) || r.nursery;
+    const meta = [nur, r.auditor].filter(Boolean).join(' · ');
+    return '<div class="hist-row">' +
+      '<div class="hist-ico" style="background:' + mod.bg + '">' +
+        '<svg viewBox="0 0 24 24" style="stroke:' + mod.fg + '">' + mod.icon + '</svg>' +
+      '</div>' +
+      '<div class="hist-body">' +
+        '<div class="hist-ttl">' + mod.label + (r.plot ? ' — ' + r.plot : '') + '</div>' +
+        '<div class="hist-sub">' + meta + '</div>' +
+      '</div>' +
+      '<div class="hist-date">' + dstr + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* Kick history now that its definitions above are in place. Kept at the
+   bottom of the script so the let-bindings are past their TDZ before
+   the fetch begins; hoisted function declarations mean HIST_MODS is
+   already assigned by the time loadHistory runs. */
+loadHistory();
+document.addEventListener('mjm-lang-changed', renderHistory);
 
 </script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
