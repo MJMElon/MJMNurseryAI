@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nelos — Nursery Carlos</title>
+<title>Nursery Case Log</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -92,8 +92,8 @@
 
 <div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
   <div>
-    <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nelos</span>
-    <span class="text-[10px] font-bold text-slate-400 ml-2 hidden sm:inline">Nursery Carlos · Case Log</span>
+    <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Case Log</span>
+    <span class="text-[10px] font-bold text-slate-400 ml-2 hidden sm:inline">Nelos · Nursery Carlos</span>
   </div>
   <div class="flex items-center gap-2">
     <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
@@ -108,8 +108,8 @@
   <!-- Tools -->
   <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
     <button class="tool-btn tool-btn-primary" id="new-case-btn">➕ Raise a Case</button>
-    <a class="tool-btn" data-page="settings" href="nelos_settings.html">⚙️ Categories</a>
-    <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nelos_user_access.html">🔐 User Access</a>
+    <a class="tool-btn" href="nelos_settings.html">⚙️ Categories</a>
+    <a class="tool-btn tool-btn-access hidden" id="user-setting-btn" href="nelos_user_setting.html">👥 User Setting</a>
   </div>
 
   <!-- Stat tiles double as filters: click one to narrow the list -->
@@ -188,12 +188,11 @@
       <textarea id="c-desc" class="inp" placeholder="What happened, what needs doing, anything the assignee needs to know."></textarea></div>
 
     <div class="mb-4"><label class="lbl" for="c-source">Raised from</label>
+      <!-- Filled from nelos_modules, so the linked modules on the User
+           Setting page and the ones you can raise against stay the same
+           list. Falls back to Nelos alone if that table is unreachable. -->
       <select id="c-source" class="inp">
         <option value="nelos">Nelos</option>
-        <option value="operation">Nursery Seedling Stock</option>
-        <option value="nursery_ops">Nursery Operation</option>
-        <option value="audit">Nursery Audit</option>
-        <option value="scan">FC Portal</option>
       </select></div>
 
     <button id="c-save" class="save-btn">Create Case</button>
@@ -229,6 +228,15 @@ function fmtDate(d) {
   return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
 }
 
+/* Where the case is WAITING, shown only when that differs from where it was
+   raised — otherwise every card would carry the same word twice. */
+function queueChip(c) {
+  const queue = c.assigned_module || c.source_module;
+  if (!queue || queue === c.source_module) return '';
+  return `<span class="pill src" style="background:#ecfdf5;color:#047857;">→ ${
+    esc(MJMNelos.SOURCE_LABEL[queue] || queue)}</span>`;
+}
+
 function cardHtml(c) {
   const subject = [
     c.batch_name && 'Batch ' + c.batch_name,
@@ -247,6 +255,7 @@ function cardHtml(c) {
         <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
         <span class="pill st-${esc(c.status)}">${esc(MJMNelos.STATUS_LABEL[c.status] || c.status)}</span>
         <span class="pill src">${esc(MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '')}</span>
+        ${queueChip(c)}
       </div>
       <div class="case-title">${esc(c.title)}</div>
       <div class="case-meta">
@@ -324,8 +333,11 @@ async function loadCases() {
   }
   // Worst priority first inside each status, since priority is a word in
   // the database and cannot be ordered there.
-  allCases = (data || []).sort((a, b) =>
+  const sorted = (data || []).sort((a, b) =>
     (MJMNelos.PRIORITY_RANK[a.priority] ?? 9) - (MJMNelos.PRIORITY_RANK[b.priority] ?? 9));
+  // Narrow to the modules and categories this person is set up for on the
+  // User Setting page. Someone in no block at all still sees everything.
+  allCases = await MJMNelos.applyScope(sorted);
   renderStats();
   render();
 }
@@ -345,6 +357,23 @@ async function loadAssignees() {
   const users = data || [];
   $('c-assignee').innerHTML = '<option value="">— unassigned —</option>' +
     users.map(u => `<option value="${esc(u.id)}">${esc(u.full_name || u.email)}</option>`).join('');
+}
+
+/* The linked modules, for the "Raised from" picker. Nelos itself is always
+   an option — a case need not come from another module. */
+async function loadModules() {
+  // Only sections that may raise a case are offered. A section switched off
+  // on the User Setting page stops appearing here rather than raising cases
+  // that route nowhere.
+  const { data } = await _supabase.from('nelos_modules').select('key,label')
+    .eq('active', true).eq('can_create', true).order('sort_order')
+    .then(r => r, () => ({ data: [] }));
+  const mods = data || [];
+  if (!mods.length) return;
+  $('c-source').innerHTML =
+    mods.map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join('') +
+    '<option value="nelos">Nelos (no module)</option>';
+  $('c-source').value = 'nelos';
 }
 
 function loadSourceFilter() {
@@ -448,20 +477,13 @@ $('f-q').addEventListener('input', render);
     $('who').textContent = me.name;
     MJMNelos.init(_supabase, { root: '../' });
 
-    // Per-page access, set on this module's own User Access. Fails OPEN if
-    // shared_access.js is an older cached copy without canDo — a stale
-    // script must not hide the module from people entitled to it.
-    try {
-      const may = (page, act) => typeof MJMAccess.canDo !== 'function' ||
-                                 MJMAccess.canDo('nelos', page, act || 'view');
-      document.querySelectorAll('.tool-btn[data-page]').forEach(a => {
-        if (!may(a.dataset.page)) a.style.display = 'none';
-      });
-      if (!may('cases', 'create')) $('new-case-btn').style.display = 'none';
-      if (MJMAccess.canManageUsers()) $('user-access-btn').classList.remove('hidden');
-    } catch (_) { /* keep the dashboard usable */ }
+    // User Setting decides who sees which module's cases. Only a Nelos
+    // admin (or a portal admin who manages users) may open it.
+    if (MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers()) {
+      $('user-setting-btn').classList.remove('hidden');
+    }
 
-    await Promise.all([loadCases(), loadCategories(), loadAssignees()]);
+    await Promise.all([loadCases(), loadCategories(), loadAssignees(), loadModules()]);
     loadSourceFilter();
 
     $('loading').classList.add('hidden');

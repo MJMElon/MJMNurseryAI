@@ -649,8 +649,8 @@ setInterval(function(){
     if (MJMAccess.canAccess('nelos')) {
       MJMNelos.init(supa, { root: '../' });
       MJMNelos.mountTodo('#nelos-todo', {
-        source: 'audit',
-        title:  'Nelos — Pending Audit Cases',
+        module: 'audit',
+        title:  'Nelos — Cases For This Module',
         hideIfEmpty: true
       });
     }
@@ -659,5 +659,9 @@ setInterval(function(){
 
 }
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

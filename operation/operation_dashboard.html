@@ -430,8 +430,8 @@
             if (MJMAccess.canAccess('nelos')) {
                 MJMNelos.init(_supabase, { root: '../' });
                 MJMNelos.mountTodo('#nelos-todo', {
-                    source: 'operation',
-                    title:  'Nelos — Pending Stock Cases',
+                    module: 'operation',
+                    title:  'Nelos — Cases For This Module',
                     hideIfEmpty: false
                 });
             }
@@ -532,5 +532,9 @@
         grid.addEventListener('dragover', e => e.preventDefault());
     }
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

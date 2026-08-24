@@ -258,8 +258,8 @@
             <path d="M21.5 25l1.2 1.3L25 23" stroke="#f97316" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <div class="module-name">Nursery<br>Audit</div>
-        <div class="module-tag">audit_</div>
+        <div class="module-name">555 Audit<br>Portal</div>
+        <div class="module-tag">555_Audit</div>
       </a>
 
       <!-- Nelos — Nursery Carlos. The case log every other module raises into.
@@ -280,7 +280,7 @@
             <path d="M12 25h7" stroke="#c084fc" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </div>
-        <div class="module-name">Nelos<br>Case Log</div>
+        <div class="module-name">Nursery<br>Case Log</div>
         <div class="module-tag">nelos_</div>
       </a>
 
@@ -317,8 +317,29 @@
             <path d="M6 8h4M24 8h4M6 26h4M24 26h4" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </div>
-        <div class="module-name">FC Scan<br>Portal</div>
-        <div class="module-tag">scan_</div>
+        <div class="module-name">555 FC<br>Portal</div>
+        <div class="module-tag">555_FC</div>
+      </a>
+
+      <!-- 555 Admin Portal — the ops portal that used to live in the Mobile
+           repo (mobile.mjmnursery.com): Collection DO issuing, customer
+           consent and collection booking. Gated by the existing `mobile`
+           module permission, which User Access already grants. -->
+      <a class="module-card" data-card="admin555" data-module="mobile" href="https://mobile.mjmnursery.com" target="_blank" rel="noopener"
+         style="--accent:#06b6d4;--glow:rgba(6,182,212,.25);--glow-strong:rgba(6,182,212,.35);--icon-bg:rgba(6,182,212,.12);">
+        <div class="card-corner card-tl"></div><div class="card-corner card-tr"></div>
+        <div class="card-corner card-bl"></div><div class="card-corner card-br"></div>
+        <div class="module-icon-wrap">
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <rect x="10" y="3" width="14" height="28" rx="3.5" fill="rgba(6,182,212,.18)" stroke="#06b6d4" stroke-width="1.5"/>
+            <path d="M14.5 6.5h5" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="17" cy="27.5" r="1.3" fill="#06b6d4"/>
+            <path d="M13.5 14l2.2 2.2 4.8-5" stroke="#22d3ee" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13.5 20h7" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="module-name">555 Admin<br>Portal</div>
+        <div class="module-tag">555_Admin</div>
       </a>
 
         </div>
@@ -822,5 +843,9 @@
     });
   })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="shared/shared_nelos_dock.js"></script>
 </body>
 </html>

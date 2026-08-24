@@ -235,8 +235,8 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
     if (MJMAccess.canAccess('nelos')) {
       MJMNelos.init(_supabase, { root: '../' });
       MJMNelos.mountTodo('#nelos-todo', {
-        source: 'nursery_ops',
-        title:  'Nelos — Pending Nursery Cases',
+        module: 'nursery_ops',
+        title:  'Nelos — Cases For This Module',
         hideIfEmpty: true
       });
     }
@@ -252,5 +252,9 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
   }
 })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

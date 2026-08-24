@@ -11,6 +11,10 @@
      • MJMNelos.pending({…})        the same data, raw, if you want to
                                     render it yourself
      • MJMNelos.countPending({…})   just the number, for a badge
+     • MJMNelos.scope() / applyScope(rows)
+                                    who may see which cases, as set on
+                                    the User Setting page — see the block
+                                    above scope() for the exact rule
 
    Usage in any module page:
 
@@ -19,7 +23,7 @@
      <script src="../shared/shared_nelos.js"></script>
      …
      MJMNelos.init(_supabase);                     // once, after load()
-     MJMNelos.mountTodo('#nelos-todo', { source: 'operation' });
+     MJMNelos.mountTodo('#nelos-todo', { module: 'operation' });
 
    Everything here fails SOFT. A dashboard is not allowed to break
    because the case log is unreachable or the migration has not been run
@@ -38,12 +42,15 @@
     open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed'
   };
 
-  /* Which module a case came from, for the chip on each line. */
+  /* Which module a case came from, for the chip on each line. These are the
+     fallback labels: the live ones are rows in nelos_modules, which the User
+     Setting page renders and can rename. Keep the two in step. */
   const SOURCE_LABEL = {
-    operation:   'Stock',
-    nursery_ops: 'Nursery Ops',
-    audit:       'Audit',
+    operation:   'Seedling Stock System',
+    nursery_ops: 'Nursery Operation',
     scan:        'FC Portal',
+    mobile:      'Admin Portal',
+    audit:       'Audit Portal',
     npayroll:    'Payroll',
     nelos:       'Nelos'
   };
@@ -90,9 +97,97 @@
   function currentUser() {
     try {
       const u = global.MJMAccess && global.MJMAccess.user && global.MJMAccess.user();
-      if (!u) return { id: null, name: null };
-      return { id: u.id || null, name: u.full_name || u.email || null };
-    } catch (_) { return { id: null, name: null }; }
+      if (!u) return { id: null, name: null, email: null };
+      return { id: u.id || null, name: u.full_name || u.email || null, email: u.email || null };
+    } catch (_) { return { id: null, name: null, email: null }; }
+  }
+
+  /* ── Who may see which cases ────────────────────────────────────
+     A person is pinned to one home module on the User Setting page —
+     "this person handles Nursery Operation cases". From that pin:
+
+       • every case in their home module's QUEUE (assigned_module), no
+         matter which page they are looking at. An auditor pinned to Audit
+         still gets the To-Do dock on the Stock system, showing Audit's
+         queue — that is the whole reason this replaced per-module
+         membership.
+       • plus every case ASSIGNED TO THEM personally, whatever queue it
+         sits in. So work handed to you follows you around.
+       • optionally narrowed by category inside the home queue. A case
+         with your name on it is never hidden by that narrowing — somebody
+         has already decided it is yours.
+
+       • not pinned yet → sees everything. Somebody who has just been
+         granted Nelos must not find an empty screen.
+       • Nelos admin    → sees everything regardless, so an admin cannot
+         lock themselves out of their own case log.
+
+     Note this keys on assigned_module, not source_module: an FC Portal
+     case routed to Audit belongs to Audit's queue while still reading as
+     an FC Portal case. Rows written before the routing migration have
+     assigned_module backfilled from source_module, and the fallback below
+     covers any that slipped through.
+
+     Loaded once per page and cached; call scope({reload:true}) after
+     changing a pin. Any failure yields the unrestricted scope — a lookup
+     that cannot run must not hide cases from anyone. */
+
+  let _scope = null;
+
+  const QUEUE_OF = c => c.assigned_module || c.source_module;
+
+  async function scope(opts) {
+    if (_scope && !(opts && opts.reload)) return _scope;
+
+    const open = { unrestricted: true, home: null, cats: null, userId: null };
+    const supa = requireClient();
+    if (!supa) return (_scope = open);
+
+    try {
+      if (global.MJMAccess && global.MJMAccess.isAdminOf &&
+          global.MJMAccess.isAdminOf('nelos')) return (_scope = open);
+    } catch (_) { /* fall through and ask the database */ }
+
+    const me = currentUser();
+    if (!me.id) return (_scope = open);
+
+    try {
+      // nelos_my_scope() answers for the caller only, so this works for an
+      // ordinary user — nelos_people() is admin-only and would return
+      // nothing here.
+      const { data, error } = await supa.rpc('nelos_my_scope');
+      const row = (data && data[0]) || null;
+      if (error || !row) return (_scope = open);
+      if (row.is_admin) return (_scope = open);
+      if (!row.primary_module) return (_scope = open);   // not pinned yet
+
+      const list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
+      return (_scope = {
+        unrestricted: false,
+        home: row.primary_module,
+        cats: list.length ? new Set(list) : null,
+        userId: me.id
+      });
+    } catch (_) {
+      return (_scope = open);
+    }
+  }
+
+  /* True when this case is inside the given scope. */
+  function inScope(c, sc) {
+    if (!sc || sc.unrestricted) return true;
+    // Assigned to me — mine wherever it sits, and never category-filtered.
+    if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
+    if (QUEUE_OF(c) !== sc.home) return false;
+    if (!sc.cats) return true;                      // every category in my queue
+    return !!c.category && sc.cats.has(c.category);
+  }
+
+  /* Filter a list of cases by the signed-in user's scope. */
+  async function applyScope(rows) {
+    const sc = await scope();
+    if (sc.unrestricted) return rows;
+    return rows.filter(c => inScope(c, sc));
   }
 
   /* ── Raising a case ─────────────────────────────────────────── */
@@ -186,7 +281,9 @@
 
   /**
    * MJMNelos.pending({
-   *   source,     // only cases raised by this module
+   *   module,     // only cases waiting in this module's QUEUE — what a
+   *               //   module's own To-Do list wants
+   *   source,     // only cases RAISED by this module (rarely what you want)
    *   mine,       // true → only cases assigned to the signed-in user
    *   plot, batch, nursery,
    *   limit       // default 50
@@ -199,10 +296,15 @@
 
     try {
       let q = supa.from('nelos_cases')
-        .select('id,case_no,title,category,priority,status,source_module,source_ref,' +
-                'nursery_name,plot_name,batch_name,assignee_name,due_date,created_at')
+        .select('id,case_no,title,category,priority,status,source_module,assigned_module,' +
+                'source_ref,nursery_name,plot_name,batch_name,assignee_id,assignee_name,' +
+                'due_date,created_at')
         .in('status', PENDING);
 
+      // `module` is the QUEUE a case is waiting in — what a module's own
+      // To-Do list wants. `source` is where it was raised, which is only
+      // useful for asking "what has this module been reporting?".
+      if (opts.module)  q = q.eq('assigned_module', opts.module);
       if (opts.source)  q = q.eq('source_module', opts.source);
       if (opts.plot)    q = q.eq('plot_name', opts.plot);
       if (opts.batch)   q = q.eq('batch_name', opts.batch);
@@ -223,7 +325,8 @@
       // here rather than in the query.
       const rows = (data || []).slice().sort((a, b) =>
         (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
-      return { data: rows, error: null };
+      // Narrow to what this person is set up to see (User Setting page).
+      return { data: await applyScope(rows), error: null };
     } catch (e) {
       return { data: [], error: e };
     }
@@ -311,7 +414,8 @@
 
   /**
    * MJMNelos.mountTodo(target, {
-   *   source,      // filter to one module's cases (omit for all)
+   *   module,      // this module's queue — cases it has to work
+   *   source,      // cases this module raised, wherever they went
    *   mine,        // true → only what is assigned to me
    *   plot, batch, nursery,
    *   limit,       // rows to show (default 6)
@@ -342,8 +446,14 @@
     if (!data.length && opts.hideIfEmpty) { el.innerHTML = ''; return 0; }
 
     const total = data.length;
+    // Raising from a dashboard means raising AS that module, so the prefill
+    // follows `module` when the caller filtered by queue rather than source
+    // — otherwise a widget mounted with { module: 'audit' } would open the
+    // form with no section chosen and the case would route as if raised in
+    // Nelos itself.
+    const raisedAs = opts.source || opts.module;
     const newBtn = opts.newCase === false ? '' :
-      `<a class="nelos-new" href="${esc(homeHref())}?new=1${opts.source ? '&source=' + encodeURIComponent(opts.source) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}">➕ Raise a Case</a>`;
+      `<a class="nelos-new" href="${esc(homeHref())}?new=1${raisedAs ? '&source=' + encodeURIComponent(raisedAs) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}">➕ Raise a Case</a>`;
 
     el.innerHTML = `
       <div class="nelos-todo">
@@ -362,6 +472,7 @@
 
   const api = {
     init, raise, pending, countPending, mountTodo,
+    scope, inScope, applyScope,
     homeHref, caseHref,
     PENDING, PRIORITY_LABEL, STATUS_LABEL, SOURCE_LABEL, PRIORITY_RANK,
     esc
