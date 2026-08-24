@@ -19,7 +19,7 @@
        admin goes straight to the nursery chooser, since this page is what
        the portal's Nursery Audit tile opens for everybody. -->
   <script src="audit_login_guard.js?v=20260824a"></script>
-  <script>MJMAuditLogin.requireAdmin('audit_nursery_select.html');</script>
+  <script>MJMAuditLogin.requireAdmin('audit_home.html');</script>
   <style>body{opacity:0;transition:opacity .2s ease}</style>
 
   <style>
@@ -254,12 +254,11 @@
 
   <div class="content">
 
-    <!-- Way through to the auditor view. It opens the nursery chooser
-         rather than the to-do list: an admin may audit either nursery,
-         and which one they are walking is the first thing to settle.
-         Sits at the very top of the content, above the alerts, so it is
-         the first thing an admin sees on the back end. -->
-    <a class="portal-btn" href="audit_nursery_select.html" style="margin-bottom:22px">
+    <!-- Way through to the auditor view. Opens the to-do list directly
+         — the nursery chooser was cancelled, and the auditor view
+         defaults to whichever nursery was last chosen (or PN on a fresh
+         session), with a Switch pill on the ribbon to flip PN ↔ MN. -->
+    <a class="portal-btn" href="audit_home.html" style="margin-bottom:22px">
       <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
       <span>Visit Auditor Portal</span>
       <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
