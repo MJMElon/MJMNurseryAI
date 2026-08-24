@@ -36,6 +36,19 @@
 -- Safe to re-run: every statement is guarded.
 -- ============================================================================
 
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+-- Stop with a sentence somebody can act on, rather than letting the first
+-- ALTER fail with a bare 'relation does not exist'. Requires: migration_nelos.sql.
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_cases') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos migrations are out of order: "nelos_cases" does not exist yet.',
+      HINT    = 'Run migration_nelos.sql first. The full order is: migration_nelos.sql, migration_nelos_modules.sql, migration_nelos_routing.sql, migration_nelos_roles.sql, migration_nelos_seats.sql — or just run migration_nelos_all.sql, which is all five in one paste.';
+  END IF;
+END $preflight$;
+
+
 -- ────────────────────────────────────────────────────────────────
 -- PART 1: The linked modules
 -- ────────────────────────────────────────────────────────────────
