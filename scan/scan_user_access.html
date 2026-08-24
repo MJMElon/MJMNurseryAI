@@ -28,13 +28,13 @@ MJMModuleAccess.init({
   // "back" to it would otherwise mean leaving this one behind.
   portal: { href: 'https://scan.mjmnursery.com', label: 'Back to Portal' },
   note:   `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
-           For each of them, tick which of the five modules they can open and exactly what they can do
+           For each of them, tick which of the modules they can open and exactly what they can do
            inside each — and whether they can <strong>change other users' roles</strong>.
            <br><br>
            <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
              <strong>Nurseries</strong> are set separately, below the modules. Switch <em>All nurseries</em>
              off for someone and tick only the ones they should see — that one setting governs
-             <strong>Plot Status</strong>, <strong>Maintenance</strong> and <strong>PALMS</strong> together,
+             <strong>Maintenance</strong> and <strong>PALMS</strong> together,
              so a BNN-only Field Conductor sees BNN on every screen.
              <br><br>
              A module with nothing ticked here stays open, so nobody loses access by never having been
@@ -44,10 +44,6 @@ MJMModuleAccess.init({
   pages: [
     { key:'barcode', label:'Scan Barcode Counter', desc:'Counting seedlings by scanning barcodes' },
     { key:'do', label:'Issue Collection DO', desc:'Raising and managing collection delivery orders' },
-    { key:'plot_status', label:'Plot Status', desc:'Daily plot stage reporting',
-      actions:[
-        { key:'report', label:'Report a plot stage', desc:'Submit today\u2019s stage for a plot' }
-      ]},
     { key:'maintenance', label:'Maintenance', desc:'Maintenance work recorded through the Scan Portal',
       actions:[
         { key:'record', label:'Record maintenance work', desc:'Scan and submit a maintenance record' },
@@ -61,9 +57,12 @@ MJMModuleAccess.init({
   ],
   scopes: [
     {
+      // Named for the retired Plot Status module. Renaming the key would
+      // silently reopen every nursery for anyone already narrowed down, so it
+      // keeps the old name and governs Maintenance and PALMS.
       key:      'plot_status_nurseries',
       label:    'Nurseries',
-      desc:     'Which nurseries this person sees in Plot Status, Maintenance and PALMS',
+      desc:     'Which nurseries this person sees in Maintenance and PALMS',
       allLabel: 'All nurseries',
       emptyText:'No nurseries found in shared_plots yet.',
       // Read from the plots themselves, so a nursery added later shows up here

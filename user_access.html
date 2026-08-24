@@ -245,14 +245,14 @@
           <select id="d-mod-scan" class="lvl-select"></select>
         </div>
 
-        <!-- FC Portal · Plot Status — which nurseries this user can see -->
+        <!-- FC Portal · nursery scope — which nurseries this user can see -->
         <div id="fc-nursery-panel" class="ml-3 pl-4 border-l-2 border-slate-100 hidden">
           <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">555 FC Portal — Nursery Access</div>
           <label class="flex items-center gap-2 text-[13px] font-bold text-slate-700 py-1 cursor-pointer">
             <input type="checkbox" id="d-psn-all" class="w-4 h-4 accent-emerald-600"> All nurseries
           </label>
           <div id="d-psn-list" class="grid grid-cols-2 gap-x-3"></div>
-          <p class="text-[10px] text-slate-400 mt-1.5">Controls which nurseries this user sees in <strong>Plot Status</strong>, <strong>Maintenance</strong> and <strong>PALMS</strong> on the 555 FC Portal. Scan Barcode Counter and Issue Collection DO are not limited by nursery.</p>
+          <p class="text-[10px] text-slate-400 mt-1.5">Controls which nurseries this user sees in <strong>Maintenance</strong> and <strong>PALMS</strong> on the 555 FC Portal. Scan Barcode Counter and Issue Collection DO are not limited by nursery.</p>
         </div>
       </div>
 
@@ -344,7 +344,8 @@ function normPerms(p) {
   // Per-function ticks managed inside the operation module's own User
   // Access page — carry them through so saving here never wipes them.
   if (p.operation_actions && typeof p.operation_actions === 'object') out.operation_actions = p.operation_actions;
-  // FC Portal · Plot Status nursery restriction. Array = only those
+  // FC Portal nursery restriction (key named for the retired Plot Status
+  // module; renaming it would reopen every nursery). Array = only those
   // nurseries; key absent = all nurseries allowed.
   if (Array.isArray(p.plot_status_nurseries)) out.plot_status_nurseries = p.plot_status_nurseries;
   return out;
@@ -477,7 +478,7 @@ function applyPresetToPending(level) {
   });
 }
 
-// ── FC Portal · Plot Status nursery checklist ─────────────────
+// ── FC Portal · nursery checklist ─────────────────────────────
 let allNurseries = []; // distinct nursery names from shared_plots
 
 function renderNurseryPanel() {
