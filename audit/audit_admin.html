@@ -9,6 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
+  <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
+       arrow, language, sign-out. Also loaded by audit_home.html and
+       audit_nursery_select.html so the three surfaces read as one. -->
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+
   <!-- Admin only, decided in the head so the page never renders for anyone
        else. Not signed in goes to the one MJM AI login; signed in without
        admin goes straight to the nursery chooser, since this page is what
@@ -226,44 +231,40 @@
 <body>
 <div id="app">
 
-  <div class="header">
-    <div class="header-top">
-      <div class="header-logo">
-        <div class="header-logo-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/></svg>
-        </div>
-        <div>
-          <div class="header-logo-text">MJM Nursery</div>
-          <div class="header-logo-sub">Audit Back End</div>
-        </div>
-      </div>
-      <div class="header-actions" style="display:flex;align-items:center;gap:6px;margin-left:auto">
-        <a href="../index.html" class="hbtn">
-          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>Back to Portal</span>
-        </a>
-        <div class="user-chip" onclick="signOut()">
-          <div class="avatar" id="avatar">A</div>
-          <span class="uname" id="uname">Admin</span>
-        </div>
-      </div>
+  <!-- FC-style ribbon (see audit_ribbon.css). Back arrow returns to the
+       portal — the old "Back to Portal" pill folded into it, since the
+       arrow-plus-wordmark row is the standard way back on every module
+       page this style is used on. -->
+  <nav class="fcr" role="navigation" aria-label="Auditor Portal">
+    <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <div class="fcr-brand">
+      <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-sub">Auditor Portal</div>
     </div>
-    <div class="welcome">
-      <div class="w-hi" id="w-hi">Good morning,</div>
-      <div class="w-name" id="w-name">Admin <span style="color:#3d9c3d">👋</span></div>
-      <div class="w-date" id="w-date"></div>
-      <!-- The way through to the auditor view. It opens the nursery chooser
-           rather than the to-do list: an admin may audit either nursery, and
-           which one they are walking is the first thing to settle. -->
-      <a class="portal-btn" href="audit_nursery_select.html">
-        <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
-        <span>Visit Auditor Portal</span>
-        <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
-      </a>
-    </div>
-  </div>
+    <div class="fcr-spacer"></div>
+    <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
+    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+      <span id="lang-toggle-label">BM</span>
+    </button>
+    <button class="fcr-signout" onclick="signOut()">Sign Out</button>
+  </nav>
 
   <div class="content">
+
+    <!-- Way through to the auditor view. It opens the nursery chooser
+         rather than the to-do list: an admin may audit either nursery,
+         and which one they are walking is the first thing to settle.
+         Sits at the very top of the content, above the alerts, so it is
+         the first thing an admin sees on the back end. -->
+    <a class="portal-btn" href="audit_nursery_select.html" style="margin-bottom:22px">
+      <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
+      <span>Visit Auditor Portal</span>
+      <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+    </a>
+
 
     <!-- No section heading here: every group already announces itself as
          "Alerts — <nursery>", and stacking the two just repeated the word. -->
@@ -310,6 +311,11 @@
 </div>
 
 <script src="audit_supabase.js"></script>
+<!-- Language store + welcome-name fill for the shared FC ribbon. Admin
+     has nothing to translate here, but persisting the toggle means the
+     rest of the audit pages honour whatever was picked. -->
+<script src="audit_lang.js?v=20260823o"></script>
+<script src="audit_ribbon.js?v=20260824b"></script>
 
 <!-- The portal permission layer, for the User Access card only. An admin who
      signed in through the audit login has no portal session, so the card
@@ -324,18 +330,10 @@
    through. */
 document.body.style.opacity = '1';
 
-const user = JSON.parse(localStorage.getItem('mjm_user') || '{"name":"Admin"}');
-
-const h = new Date().getHours();
-document.getElementById('w-hi').textContent =
-  h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
-document.getElementById('w-name').innerHTML =
-  user.name + ' <span style="color:#3d9c3d">👋</span>';
-document.getElementById('w-date').textContent =
-  new Date().toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-document.getElementById('avatar').textContent =
-  user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-document.getElementById('uname').textContent = user.name.split(' ')[0];
+/* Greeting section and avatar chip both retired: the FC-style ribbon
+   already shows "Welcome, <name>", which is the only place the name
+   needs to appear at the top. Everything else on the back end is data,
+   not a hello. audit_ribbon.js fills the ribbon's welcome text. */
 
 function signOut(){
   if(!confirm('Sign out of the audit system?')) return;

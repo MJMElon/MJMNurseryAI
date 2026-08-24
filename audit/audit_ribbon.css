@@ -1,0 +1,117 @@
+/* ══════════════════════════════════════════════════════════════════
+   555 AUDITOR PORTAL — shared FC-style top ribbon
+   ══════════════════════════════════════════════════════════════════
+   Thin white bar. Round back-arrow on the left, "555 / AUDITOR PORTAL"
+   wordmark, welcome text, language pill, sign-out pill on the right.
+
+   Loaded by audit_admin.html, audit_home.html and audit_nursery_select
+   .html so the three surfaces read as one system. Deliberately does
+   NOT use the older .header-* class names — those still exist on the
+   pages as dead selectors so nothing else that touched them breaks,
+   and can be trimmed on a later pass.
+   ══════════════════════════════════════════════════════════════════ */
+
+.fcr{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 20px;
+  background:#fff;
+  border-bottom:1px solid #e6ecf2;
+  font-family:'DM Sans','Outfit',system-ui,-apple-system,sans-serif;
+  position:sticky;top:0;z-index:60;
+  box-shadow:0 1px 3px rgba(16,40,60,.04);
+}
+
+/* Round back-arrow. Was a plain-text "Main Page" pill on the old
+   ribbon; here it takes the role and is the whole way back to the
+   portal, so it needs to be an obvious tap target — 36px keeps a
+   thumb happy without dominating the bar. */
+.fcr-back{
+  width:36px;height:36px;
+  border-radius:50%;
+  background:#f1f5f9;
+  border:1px solid #e6ecf2;
+  display:flex;align-items:center;justify-content:center;
+  text-decoration:none;color:#16323f;
+  flex-shrink:0;
+  transition:background .15s,border-color .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;
+  cursor:pointer;
+  font-family:inherit;
+  padding:0;
+}
+.fcr-back:hover{background:#e5edf5;border-color:#cbd7e2;color:#0d2635}
+.fcr-back:active{transform:scale(.96)}
+.fcr-back svg{
+  width:15px;height:15px;
+  stroke:currentColor;fill:none;
+  stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+}
+
+/* Wordmark. "555" is the loud line, "AUDITOR PORTAL" the quiet green
+   caption — same rhythm as the FC portal it borrows from. */
+.fcr-brand{min-width:0;line-height:1.05;flex-shrink:0}
+.fcr-brand-name{
+  font-size:19px;font-weight:900;color:#16323f;letter-spacing:.2px;
+}
+.fcr-brand-sub{
+  font-size:10px;font-weight:800;color:#22a34a;
+  text-transform:uppercase;letter-spacing:2px;margin-top:3px;
+}
+
+/* Push the right cluster to the far end. */
+.fcr-spacer{flex:1}
+
+.fcr-welcome{
+  font-size:12px;font-weight:600;color:#5b7280;white-space:nowrap;
+  margin-right:2px;
+}
+
+/* Language + sign-out pills share one shape so they read as a pair. */
+.fcr-lang,
+.fcr-signout{
+  height:34px;
+  padding:0 14px;
+  border-radius:20px;
+  background:#fff;
+  border:1px solid #e0e7ee;
+  color:#16323f;
+  font-size:10.5px;font-weight:800;
+  letter-spacing:1.4px;text-transform:uppercase;
+  font-family:inherit;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:background .15s,border-color .15s,color .15s;
+  flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;
+  text-decoration:none;
+}
+.fcr-lang:hover{background:#f4f7fa;border-color:#cbd7e2}
+.fcr-signout:hover{background:#fef2f2;border-color:#f5c9c9;color:#b91c1c}
+.fcr-lang:active,.fcr-signout:active{transform:scale(.98)}
+
+.fcr-lang svg,
+.fcr-signout svg{
+  width:14px;height:14px;
+  stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+.fcr-lang svg{width:13px;height:13px;stroke-width:1.8}
+
+/* ── PHONE ──
+   The bar has more items than a phone width can hold at their full
+   size, so items step aside in the order they can be spared: welcome
+   text (name known from context), then the wordmark's caption, then
+   pill labels shrink before anything falls off the row. */
+@media (max-width:640px){
+  .fcr{gap:8px;padding:10px 12px}
+  .fcr-welcome{display:none}
+  .fcr-brand-name{font-size:16px}
+  .fcr-brand-sub{font-size:9px;letter-spacing:1.4px;margin-top:2px}
+  .fcr-lang,.fcr-signout{height:32px;padding:0 11px;font-size:9.5px;letter-spacing:1px}
+}
+
+@media (max-width:380px){
+  .fcr-brand-sub{display:none}
+  .fcr-lang,.fcr-signout{padding:0 9px}
+  .fcr-back{width:32px;height:32px}
+}

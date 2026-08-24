@@ -21,6 +21,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
+  <!-- Shared FC-style top ribbon (same file used by audit_admin +
+       audit_nursery_select). Replaces the audit-specific header band
+       that used to sit under the standardised #mjm-ribbon; the two
+       were doing overlapping work. -->
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+
   <!-- Anti-flicker auth guard -->
   <script src="audit_login_guard.js?v=20260824a"></script>
   <script>MJMAuditLogin.requireSignIn();</script>
@@ -691,46 +697,27 @@
 <body>
 <div id="app">
 
-  <!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
-  <div id="mjm-ribbon"></div>
-  <script src="../shared/shared_ribbon.js"></script>
-
-  <!-- HEADER — audit-specific band kept below the ribbon; the user chip
-       still opens the sign-out modal, and the language toggle stays. -->
-  <div class="header">
-    <div class="header-top">
-      <div class="header-logo">
-        <div class="header-logo-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg>
-        </div>
-        <div>
-          <div class="header-logo-text">MJM Nursery</div>
-          <div class="header-logo-sub">Audit System</div>
-        </div>
-      </div>
-      <div class="header-actions" style="display:flex;align-items:center;gap:6px;margin-left:auto">
-        <!-- Portal button removed here — the standardised ribbon above already
-             provides it; keeping two would double up the same navigation. -->
-        <a href="audit_admin.html" class="back-to-portal" id="backend-btn" style="display:none">
-          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>Main Page</span>
-        </a>
-        <!-- BM/EN toggle removed here: language is now set once on
-             audit_nursery_select.html and every audit page inherits
-             the choice from localStorage via setLang(). -->
-      </div>
-      <div class="header-user-btn" onclick="showLogout()" style="margin-left:8px">
-        <div class="notif-dot" id="notif-dot"></div>
-        <div class="user-avatar" id="user-avatar">A</div>
-        <span class="user-name" id="user-name">Admin</span>
-      </div>
+  <!-- FC-style shared ribbon (see audit_ribbon.css). Replaces both the
+       #mjm-ribbon that lived at the top and the audit-specific band that
+       repeated similar navigation below it. The optional Back-End
+       button that used to appear here for admin accounts is now reached
+       from the portal tile or the ribbon's back arrow. -->
+  <nav class="fcr" role="navigation" aria-label="Auditor Portal">
+    <a class="fcr-back" href="audit_nursery_select.html" aria-label="Change nursery" title="Change nursery">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <div class="fcr-brand">
+      <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
-    <div class="header-welcome">
-      <div class="welcome-greeting">Good morning,</div>
-      <div class="welcome-name" id="welcome-name">Welcome back <span>👋</span></div>
-      <div class="welcome-date" id="welcome-date"></div>
-    </div>
-  </div>
+    <div class="fcr-spacer"></div>
+    <span class="fcr-welcome" id="fcr-welcome">Welcome</span>
+    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+      <span id="lang-toggle-label">BM</span>
+    </button>
+    <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" data-t="signout">Sign Out</button>
+  </nav>
 
   <!-- MAIN CONTENT -->
   <div class="content">
@@ -869,25 +856,15 @@
 
 <script src="audit_lang.js?v=20260823o"></script>
 <script src="audit_supabase.js"></script>
+<script src="audit_ribbon.js?v=20260824b"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
      signal no longer waits on a CDN and two shared files to see the page. -->
-<script>
-/* The report and user access moved to the back end (audit_admin.html), so
-   this page is now purely the auditor view. An admin gets here by entering
-   the portal from the back end — show them the way back, or the only route
-   out is signing in again. */
-function syncBackendLink(){
-  const b = document.getElementById('backend-btn');
-  if (b && typeof isAuditAdmin === 'function')
-    b.style.display = isAuditAdmin() ? 'flex' : 'none';
-}
-syncBackendLink();
-/* Again once the server's answer arrives — a role granted in User Access
-   would otherwise not appear until the load after next. */
-document.addEventListener('mjm-audit-access-ready', syncBackendLink);
-</script>
+<!-- backend-btn used to sit in the header ribbon and was toggled on for
+     admin accounts. The FC-style ribbon does not carry it; admins reach
+     the back end from the portal tile. -->
+
 <script>
 /* ── Auth ── */
 const userRaw = localStorage.getItem('mjm_user');
@@ -898,12 +875,10 @@ const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
 /* ── Greeting ── */
 function getGreeting(){const h=new Date().getHours();return h<12?t('home_greeting_morning'):h<17?t('home_greeting_afternoon'):t('home_greeting_evening');}
 function fmtDate(d){return d.toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
-document.querySelector('.welcome-greeting').textContent = getGreeting();
-document.getElementById('welcome-name').innerHTML = user.name+' <span style="color:var(--g300)">👋</span>';
-document.getElementById('welcome-date').textContent = fmtDate(new Date());
-const initials = user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-document.getElementById('user-avatar').textContent = initials;
-document.getElementById('user-name').textContent   = user.name.split(' ')[0];
+/* Greeting section removed with the header band retirement; the ribbon
+   already carries "Welcome, <name>" via audit_ribbon.js, and the date is
+   easier to read from the top-of-screen system clock than from a page
+   header the auditor is trying to scroll past. */
 
 /* ── Logout ── */
 function showLogout(){document.getElementById('logout-modal').classList.add('show');}
