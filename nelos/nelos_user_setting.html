@@ -45,7 +45,6 @@
               margin:20px 2px 8px; padding-bottom:6px; border-bottom:2px solid #ede9fe; }
   .grp-head:first-child { margin-top:2px; }
   .grp-title { font-size:12.5px; font-weight:900; color:#4c1d95; letter-spacing:.02em; }
-  .grp-sub { font-size:10.5px; font-weight:700; color:#a78bfa; }
   .grp-n { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em;
            padding:2px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
   .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:6px 4px 10px; }
@@ -63,10 +62,24 @@
          border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; box-sizing:border-box; }
   .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
 
-  .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:0 14px; }
-  .cat-lbl { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:#334155;
-             padding:4px 0; cursor:pointer; }
-  .cat-lbl input { width:15px; height:15px; accent-color:#7c3aed; }
+  /* ── Number ticks ───────────────────────────────────────────── */
+  .seat-list { display:flex; flex-direction:column; gap:5px; }
+  .seat-row { display:flex; align-items:center; gap:9px; padding:7px 11px; border-radius:10px;
+              border:1.5px solid #e9e3fb; background:#fff; cursor:pointer; }
+  .seat-row:hover { border-color:#c4b5fd; }
+  .seat-row.on { border-color:#7c3aed; background:#f5f3ff; }
+  .seat-row.taken { opacity:.55; cursor:not-allowed; background:#f8fafc; }
+  .seat-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; }
+  .seat-badge { width:24px; height:24px; border-radius:7px; background:#ede9fe; color:#6d28d9;
+                display:flex; align-items:center; justify-content:center;
+                font-size:12px; font-weight:900; flex-shrink:0; }
+  .seat-row.on .seat-badge { background:#7c3aed; color:#fff; }
+  .seat-who { font-size:12.5px; font-weight:700; color:#475569; }
+  .seat-add { align-self:flex-start; margin-top:3px; padding:7px 13px; border-radius:9px; border:1.5px dashed #ddd6fe;
+              background:#fff; color:#6d28d9; font-size:10.5px; font-weight:900; letter-spacing:.06em;
+              text-transform:uppercase; cursor:pointer; }
+  .seat-add:hover { background:#f5f3ff; border-style:solid; }
+  .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
 
   .btn { padding:9px 17px; border-radius:10px; border:none; cursor:pointer; font-size:10px;
          font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
@@ -125,34 +138,11 @@
 
   <!-- ── People ──────────────────────────────────────────────── -->
   <div id="tab-people">
-    <div class="note">
-      <div class="note-h">What a tag does</div>
-      <p class="note-p">
-        Everyone granted Nelos on the main portal's
-        <a href="../user_access.html" class="underline font-black">User Access</a> appears below —
-        nothing to add by hand. Tag a person with the system they answer for and they are numbered
-        inside it: first person on the Admin Portal is <strong>Admin 1</strong>, the next is
-        <strong>Admin 2</strong>. That number is the name Case Routing uses, so one kind of case can
-        go to Admin 1 and another to Admin 2.<br>
-        A tagged person sees their system's queue from anywhere in the portal, plus anything with
-        their own name on it. Untagged sees every case; a Nelos admin always does.
-      </p>
-    </div>
     <div id="people"></div>
   </div>
 
   <!-- ── Routing ─────────────────────────────────────────────── -->
   <div id="tab-routing" class="hidden">
-    <div class="note">
-      <div class="note-h">Where a new case goes</div>
-      <p class="note-p">
-        A case raised in a section is worked by the handlers of whichever section you point it at —
-        an Audit Portal case going to Nursery Operation, an FC Portal case going to Audit. Leave it on
-        <em>itself</em> and the section works its own cases. Untick <strong>Can raise</strong> and that
-        section stops offering the case form at all.<br>
-        This applies when a case is created; moving an existing case is done on the case itself.
-      </p>
-    </div>
     <div class="card"><div id="routing"></div></div>
   </div>
 
@@ -169,6 +159,7 @@ let categories = [];   // active category names
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
 let openRoute = null;  // module key whose category rules are expanded
+let extraSeats = 0;    // how many extra numbers the + button is offering
 let me = { name: '' };
 
 function toast(msg, ok) {
@@ -205,15 +196,13 @@ const routeFor = (mod, cat) =>
 
 function personHtml(p) {
   const admin = p.nelos_level === 'admin';
-  const cats = Array.isArray(p.categories) ? p.categories.filter(Boolean) : [];
   const tagged = !!p.primary_module;
 
-  const sub = admin
-    ? '<span class="p-pin pin-set">Nelos admin — sees every case</span>'
-    : tagged
-      ? `<span class="p-pin pin-set">${esc(seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module))}${
-            cats.length ? ' · ' + esc(cats.join(', ')) : ''}</span>`
-      : '<span class="p-pin pin-unset">No system tag — sees every case</span>';
+  const sub = tagged
+    ? `<span class="p-pin pin-set">${esc(seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module))}</span>`
+    : admin
+      ? '<span class="p-pin pin-set">Nelos admin</span>'
+      : '<span class="p-pin pin-unset">Not allocated</span>';
 
   return `
     <div class="card">
@@ -233,61 +222,60 @@ function personHtml(p) {
     </div>`;
 }
 
-/* The numbers on offer in a system: those already free, plus this person's
-   own so it stays selected, plus the next one up so a new handler can
-   always be added without renumbering anybody. */
-function seatOptions(p, moduleKey) {
+/* The numbers on offer in a system. Each row shows who holds it, so it is
+   obvious that 1 is taken before somebody ticks 2, and "+" offers one more
+   when a system needs another handler. There is no separate list of numbers
+   kept anywhere — a number exists because somebody holds it, plus the next
+   one up. */
+function seatRows(p, moduleKey) {
   const key = moduleKey !== undefined ? moduleKey : p.primary_module;
-  if (!key) return '<option value="">— tag a system first —</option>';
+  if (!key) return '<div class="seat-hint">Choose a system first.</div>';
 
-  const used = seatsUsed(key, p.id);
-  const highest = Math.max(0, ...people.filter(x => x.primary_module === key).map(x => x.seat_no || 0));
-  const opts = [];
-  for (let n = 1; n <= highest + 1; n++) {
-    if (used.has(n) && n !== p.seat_no) continue;          // taken by somebody else
-    opts.push(`<option value="${n}" ${p.seat_no === n ? 'selected' : ''}>${esc(handlerLabel(key))} ${n}</option>`);
+  const held = {};                       // number → who holds it
+  people.filter(x => x.primary_module === key && x.seat_no)
+        .forEach(x => { held[x.seat_no] = x; });
+
+  const highest = Math.max(0, ...Object.keys(held).map(Number));
+  // Always offer one past the highest so a system can grow; extraSeats is
+  // however many more the + button has asked for on top of that.
+  const upto = Math.max(highest + 1, p.seat_no || 0, extraSeats);
+
+  let rows = '';
+  for (let n = 1; n <= upto; n++) {
+    const holder = held[n];
+    const mine = p.seat_no === n;
+    const takenByOther = holder && holder.id !== p.id;
+    rows += `
+      <label class="seat-row ${mine ? 'on' : ''} ${takenByOther ? 'taken' : ''}">
+        <input type="radio" name="seat" value="${n}" ${mine ? 'checked' : ''} ${takenByOther ? 'disabled' : ''}>
+        <span class="seat-badge">${n}</span>
+        <span class="seat-who">${
+          takenByOther ? esc(holder.full_name || holder.email)
+          : mine ? 'this person'
+          : '<em>free</em>'}</span>
+      </label>`;
   }
-  return '<option value="">— no number (shares the whole system) —</option>' + opts.join('');
+  return rows +
+    '<button type="button" class="seat-add" data-act="add-seat">＋ add another number</button>';
 }
 
 function panelHtml(p) {
   const admin = p.nelos_level === 'admin';
-  const cats = new Set(Array.isArray(p.categories) ? p.categories.filter(Boolean) : []);
-  const all = cats.size === 0;
-
   return `
     <div class="panel" data-panel="${esc(p.id)}">
       ${admin ? `
-        <p class="text-[12px] font-bold text-violet-700 mt-3">
-          This person is a Nelos admin, so they see every case whatever is set here.
-          A tag still says which system they answer for, for everyone else's benefit.
+        <p class="text-[11.5px] font-bold text-violet-700 mt-3">
+          A Nelos admin sees every case whatever is set here.
         </p>` : ''}
 
-      <label class="lbl" for="pm-${esc(p.id)}">Responsible for this system</label>
+      <label class="lbl" for="pm-${esc(p.id)}">System</label>
       <select class="inp" id="pm-${esc(p.id)}">
-        <option value="">— no system tag (sees every case) —</option>
+        <option value="">— none —</option>
         ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
       </select>
 
-      <label class="lbl" for="rl-${esc(p.id)}">Their number in it</label>
-      <select class="inp" id="rl-${esc(p.id)}">
-        ${seatOptions(p)}
-      </select>
-      <p class="text-[10.5px] font-semibold text-slate-400 mt-1.5">
-        This is the name Case Routing uses. Without a number they take anything sent to the
-        system as a whole, but no rule can single them out.
-      </p>
-
-      <label class="lbl">Only these categories <span class="normal-case tracking-normal font-bold text-slate-400">(applies to their queue — a case assigned to them personally always shows)</span></label>
-      <label class="cat-lbl" style="font-weight:900;">
-        <input type="checkbox" class="cat-all" ${all ? 'checked' : ''}> All categories
-      </label>
-      <div class="cat-grid" style="${all ? 'opacity:.45;pointer-events:none;' : ''}">
-        ${categories.map(c => `
-          <label class="cat-lbl">
-            <input type="checkbox" class="cat-one" value="${esc(c)}" ${cats.has(c) ? 'checked' : ''}> ${esc(c)}
-          </label>`).join('')}
-      </div>
+      <label class="lbl">Number</label>
+      <div class="seat-list" id="rl-${esc(p.id)}">${seatRows(p)}</div>
 
       <div class="flex gap-2 mt-4">
         <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
@@ -310,7 +298,6 @@ function renderPeople() {
   const groups = modules.map(m => ({
     key: m.key,
     title: `${m.icon || '📦'} ${m.label}`,
-    sub: `numbered as “${handlerLabel(m.key)} 1”, “${handlerLabel(m.key)} 2”…`,
     rows: peopleIn(m.key)
   }));
 
@@ -318,8 +305,7 @@ function renderPeople() {
   if (untagged.length) {
     groups.push({
       key: null,
-      title: '❓ No system tag yet',
-      sub: 'these people see every case until they are tagged',
+      title: '⏳ Pending Allocation',
       rows: untagged
     });
   }
@@ -327,7 +313,6 @@ function renderPeople() {
   $('people').innerHTML = groups.map(g => `
     <div class="grp-head">
       <span class="grp-title">${esc(g.title)}</span>
-      <span class="grp-sub">${g.rows.length ? esc(g.sub) : 'nobody tagged here yet'}</span>
       <span class="grp-n">${g.rows.length}</span>
     </div>
     ${g.rows.length ? g.rows.map(personHtml).join('')
@@ -341,6 +326,7 @@ function wirePeople() {
   $('people').querySelectorAll('.person').forEach(row =>
     row.addEventListener('click', () => {
       open = open === row.dataset.person ? null : row.dataset.person;
+      extraSeats = 0;
       renderPeople();
     }));
 
@@ -356,25 +342,35 @@ function wirePeople() {
   if (!panel) return;
   panel.addEventListener('click', e => e.stopPropagation());
 
-  // Changing the pinned system re-offers that system's seats, and drops a
-  // seat belonging to the system they just left.
+  // Changing the system re-offers that system's numbers — a number belongs
+  // to one system, so the one they held elsewhere does not carry over.
   const pm = panel.parentElement.querySelector('select[id^="pm-"]');
-  const rl = panel.parentElement.querySelector('select[id^="rl-"]');
+  const rl = panel.parentElement.querySelector('.seat-list');
+  const person = pm ? (people.find(x => x.id === pm.id.slice(3)) || {}) : {};
+
   if (pm && rl) {
     pm.addEventListener('change', () => {
-      const person = people.find(x => x.id === pm.id.slice(3)) || {};
-      // A number belongs to one system, so moving somebody re-offers the
-      // numbers free in the system they are moving to.
-      rl.innerHTML = seatOptions({ id: person.id, seat_no: null }, pm.value || null);
+      extraSeats = 0;
+      rl.innerHTML = seatRows({ id: person.id, seat_no: null }, pm.value || null);
+      wireSeats(rl, pm, person);
     });
+    wireSeats(rl, pm, person);
   }
+}
 
-  const all = panel.querySelector('.cat-all');
-  const grid = panel.querySelector('.cat-grid');
-  all.addEventListener('change', () => {
-    grid.style.opacity = all.checked ? '.45' : '';
-    grid.style.pointerEvents = all.checked ? 'none' : '';
-    if (all.checked) grid.querySelectorAll('.cat-one').forEach(c => c.checked = false);
+/* The + button just offers one more number than the system currently uses.
+   Nothing is written until Save, so pressing it repeatedly costs nothing. */
+function wireSeats(rl, pm, person) {
+  const add = rl.querySelector('[data-act="add-seat"]');
+  if (!add) return;
+  add.addEventListener('click', e => {
+    e.preventDefault();
+    const picked = rl.querySelector('input[name="seat"]:checked');
+    extraSeats = rl.querySelectorAll('.seat-row').length + 1;
+    rl.innerHTML = seatRows(
+      { id: person.id, seat_no: picked ? Number(picked.value) : (person.seat_no || null) },
+      pm.value || null);
+    wireSeats(rl, pm, person);
   });
 }
 
@@ -384,16 +380,8 @@ async function savePerson(userId) {
   if (!p || !panel) return;
 
   const primary = $(`pm-${userId}`).value || null;
-  const seatEl = $(`rl-${userId}`);
-  const seatNo = primary && seatEl && seatEl.value ? Number(seatEl.value) : null;
-  const all = panel.querySelector('.cat-all').checked;
-  const picked = all ? [] : [...panel.querySelectorAll('.cat-one:checked')].map(c => c.value);
-
-  if (!all && !picked.length) { toast('Tick at least one category, or choose All categories.', false); return; }
-  if (!primary && picked.length) {
-    toast('Categories narrow a queue, so pin them to a module first.', false);
-    return;
-  }
+  const ticked = panel.querySelector('input[name="seat"]:checked');
+  const seatNo = primary && ticked ? Number(ticked.value) : null;
 
   // upsert on user_id: one handler row per person, so re-saving edits it
   // rather than stacking a second.
@@ -403,7 +391,6 @@ async function savePerson(userId) {
     full_name: p.full_name,
     primary_module: primary,
     seat_no: seatNo,
-    categories: picked.length ? picked : null,
     updated_at: new Date().toISOString(),
     updated_by: me.name
   }], { onConflict: 'user_id' });
@@ -479,9 +466,6 @@ function routeHtml(m) {
       </div>
       ${expanded ? `
         <div style="padding:6px 16px 14px;">
-          <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 mt-2">
-            Cases raised in ${esc(m.label)}, by category
-          </div>
           ${categories.length ? categories.map(cat => `
             <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:12px;align-items:start;
                         padding:9px 0;border-bottom:1px dashed #ede9fe;">
