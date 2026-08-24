@@ -223,3 +223,110 @@ the two live side by side.
 `react-pilot/README.md` has the full cost/benefit, including the part that would
 hurt most: with a build step, nothing can be fixed by editing a file on GitHub
 from your phone any more.
+
+---
+
+# Addendum — 24 Aug 2026, evening
+
+A second pass, after the 555 rebranding, the Plot Status retirement and the
+PALMS server work went in. **This is the list for tomorrow.** Items marked
+**[done]** were finished on the way here — do not do them twice.
+
+## A. Run these two migrations, in this order [action required]
+
+Nothing below matters until these are run in the Supabase SQL Editor.
+
+1. **`shared/create_palms_tables.sql`** — creates the five `fcportal_palms_*`
+   tables. It has been sitting unrun since it was written, on the grounds that
+   empty tables are useless. They are not useless any more: the FC Portal now
+   syncs the plot log up to them (`src/modules/palms/sync.js`), and the two new
+   office pages read it back.
+
+2. **`shared/migration_palms_rls.sql`** — **[new, and it is the important
+   one]**. `create_palms_tables.sql` ships the same `USING (true)` hole item 1
+   of this document describes: any signed-in account, including one a stranger
+   made on the booking page, could read every plot's activity, rewrite the log,
+   and delete a year of field records. That was theoretical while nothing was
+   written to those tables. It is not theoretical now.
+
+   Verified on a real Postgres, not by reading it:
+
+   | | stranger (no scan) | Field Conductor (scan) | admin |
+   |---|---|---|---|
+   | read the plot log | **0 rows** | 1 row | 1 row |
+   | add an entry | **rejected** | accepted | accepted |
+   | delete an entry | rejected | **0 rows deleted** | accepted |
+   | rewrite settings | rejected | **rejected** | accepted |
+
+   Every one of those was permitted before.
+
+**The other ~30 tables in item 1 of this document still have the same hole.**
+`nops_maint_*`, `mjmnpayroll_*`, `nops_*` and
+`shared_batch_customer_allocations` are all still `USING (true)`. PALMS and
+Nelos now have the pattern to copy — `migration_palms_rls.sql` and
+`migration_nelos_rls.sql` are the same shape, so the remaining ones are
+mechanical rather than a design problem. **This is the highest-value thing on
+either list.**
+
+## B. On "I don't want the code exposed in Inspect"
+
+Section 9 above already answers this with a working React pilot and the `grep`
+output: **no framework hides client code, and React would not.** Minification
+renames local variables; it cannot rename a table, a column or a key, because
+the server expects those exact strings.
+
+Worth stating plainly, because it is good news: **every Supabase key in every
+one of your repositories is the `anon` key.** Checked all seven today —
+`Barcode_Counter`, `Mobile`, `mjm-ai-system`, and the four older ones. No
+`service_role` key, and no Gemini key, is in any client bundle; the Gemini one
+was moved into an Edge Function during the Mobile rewrite. The anon key is
+*designed* to be public.
+
+So the thing you are worried about is already fine, and the thing that actually
+protects you is item A. A stranger reading your JavaScript learns your table
+names. A stranger with `USING (true)` reads your payroll.
+
+## C. PALMS is half-migrated [needs a decision]
+
+`sync.js` moves the **plot log** and the **daily report** to the server. Three
+of the five tables are still unused, so this data is still one-device-only:
+
+- `fcportal_palms_requests` — a drone request raised for the Site Auditor is
+  still visible only on the phone that raised it. This is the one that is
+  actually broken in daily use: the request is *for somebody else*.
+- `fcportal_palms_culling` — Pokok Inang amounts keyed in the field.
+- `fcportal_palms_settings` — plot layout, attention thresholds and the
+  incentive floor. These are the nursery's rules, and every device currently
+  has its own copy of them, which is how two Field Conductors end up seeing
+  different plots split different ways.
+
+Settings is the one to do next: it is one row, it is read at startup, and the
+office pages currently cannot honour a plot split at all because they cannot
+see `MULTI`.
+
+## D. The Culling Calculator now reads real figures — check them against the office
+
+Transplant and Baki used to be `randInt(900, 1200)`. They now come off
+`shared_plot_batch_balance` and the `Transplanted*` movements, scoped to the
+batches standing in the plot now. **Open the calculator beside the office
+movement report on a real plot and confirm the two agree** before anybody acts
+on a rate. A plot the ledger cannot answer for shows `—` rather than `0.00%`,
+so anything showing `—` is a batch-naming mismatch worth chasing.
+
+## E. Smaller things found today
+
+- **`palms_culling_v1` is orphaned.** The calculator moved to `_v2` when the
+  figures became real; amounts saved against the old random numbers described
+  plots whose figures were never real, so they were deliberately not migrated.
+  Harmless, but it is dead data on every device.
+- **`plot_status_nurseries` is named after a module that no longer exists.**
+  Renaming it would read as "no restriction saved" and silently reopen every
+  nursery for everyone narrowed down, so it keeps the name. Three files now
+  carry a comment saying why. Leave it alone.
+- **`i18n.js` has four duplicate keys** — `set.saveRules` and `set.rulesSaved`
+  appear twice in `en` and not at all in `ms`. Pre-existing, cosmetic, and a
+  two-minute fix.
+- **The FC Portal seeds demo data on a fresh device.** It now only does so when
+  the server has nothing either, and demo entries are flagged and never synced
+  — but the flag is the only thing standing between generated data and the
+  office board. Worth a look before the tables go live.
