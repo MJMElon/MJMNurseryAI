@@ -28,7 +28,7 @@ const TRANSLATIONS = {
 
     /* === LOGIN === */
     login_welcome:  'Welcome back',
-    login_sub:      'Sign in to access the Audit System',
+    login_sub:      'Sign in to the 555 Auditor Portal',
     login_email:    'EMAIL',
     login_password: 'PASSWORD',
     login_btn:      'Sign In',
@@ -361,7 +361,7 @@ const TRANSLATIONS = {
     reset_sent:         '✓ Reset link sent! Check your email.',
     reset_failed:       'Failed to send reset email. Please try again.',
     signup_title:       'Create Account',
-    signup_sub:         'Register to access the MJM Nursery Audit System.',
+    signup_sub:         'Register to access the 555 Auditor Portal.',
     sign_up_btn:        'Create Account',
     creating:           'Creating...',
     signup_success:     '✓ Account created! Please check your email to verify, then log in.',
@@ -406,7 +406,7 @@ const TRANSLATIONS = {
 
     /* === LOGIN === */
     login_welcome:  'Selamat Kembali',
-    login_sub:      'Log masuk untuk akses Sistem Audit',
+    login_sub:      'Log masuk ke Portal Juruaudit 555',
     login_email:    'E-MEL',
     login_password: 'KATA LALUAN',
     login_btn:      'Log Masuk',
@@ -733,7 +733,7 @@ const TRANSLATIONS = {
     reset_sent:         '✓ Pautan dihantar! Semak e-mel anda.',
     reset_failed:       'Gagal menghantar e-mel reset. Sila cuba lagi.',
     signup_title:       'Buat Akaun',
-    signup_sub:         'Daftar untuk akses Sistem Audit MJM Nursery.',
+    signup_sub:         'Daftar untuk akses Portal Juruaudit 555.',
     sign_up_btn:        'Buat Akaun',
     creating:           'Mencipta...',
     signup_success:     '✓ Akaun dibuat! Sila semak e-mel anda untuk pengesahan, kemudian log masuk.',
