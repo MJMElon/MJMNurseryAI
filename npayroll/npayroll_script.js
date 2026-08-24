@@ -695,7 +695,12 @@ function maintTotals(nursery, month) {
         const cells  = store[r.id] || {};
         const ticked = wk.filter(w => cells[w]);
         if (!ticked.length) return;
-        const cap = Number(r.qty) || 0;
+        /* Same quantity the Work Maintenance record list shows: whatever was
+           keyed on the row, and when nothing was keyed, the batch report's
+           closing balance for that plot, batch and work date. Reading r.qty
+           alone left every FC-saved record at nought, so a plot with four
+           workers ticked still paid RM 0.00. */
+        const cap = PlotMovement.recQty(r).value || 0;
         const share = cap / ticked.length;
         ticked.forEach(w => { per[w][t.code] += share; });
       });
@@ -776,7 +781,7 @@ function renderMaint() {
   const missing = MAINT_TYPES.filter(t => rateOf(t.code) == null).map(t => t.label);
   $('maint-note').textContent = missing.length
     ? `No piece rate set for ${missing.join(', ')} — set it under Nursery Operation → Work Maintenance → Setting → Piece Rate.`
-    : 'Capacity comes from the Worker Record in Work Maintenance — a plot’s quantity divided among the workers ticked on that row. The money is worked out here.';
+    : 'Capacity comes from the Worker Record in Work Maintenance — a plot’s quantity divided among the workers ticked on that row. A row with no quantity keyed uses the batch report’s closing balance for that plot, batch and work date. The money is worked out here.';
 }
 
 /* ════════════ MONTHLY PAYROLL ════════════ */
@@ -1150,6 +1155,14 @@ $('global-month').addEventListener('change', async () => {
 
     await Promise.all([loadWorkers(), loadRates(), loadEntries(), loadMaint()]);
     resolveMaintWorkers();
+
+    /* The batch-report ledger is a much larger read than anything above, and
+       only the maintenance capacity needs it — so let the page open first and
+       repaint once it lands. */
+    PlotMovement.load(_supabase).then(() => {
+      if (!PlotMovement.ready()) return;
+      try { refreshPayrollTab(); } catch (_) {}
+    });
 
     applyPageAccess();
 

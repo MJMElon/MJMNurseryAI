@@ -2941,32 +2941,12 @@ function pillCls(jenis) {
    summed. Listing batches ("234, 237, 241") restricts it to those.
 ════════════════════════════════════════════════════════════════ */
 
-/* Same date resolution the batch report needs: it saves most movement rows
-   without transaction_date and puts the keyed date in the remark instead. */
-const _RE_MV_DATE = /(?:Cull)?Date:\s*(\d{4}-\d{2}-\d{2})/i;
-function _mvLogDate(l) {
-  if (l.transaction_date) return String(l.transaction_date).slice(0, 10);
-  const m = l.remark ? String(l.remark).match(_RE_MV_DATE) : null;
-  if (m) return m[1];
-  return l.created_at ? String(l.created_at).slice(0, 10) : null;
-}
-
-/* Tarikh is now stored as YYYY-MM-DD (the date picker's own format), but older
-   records hold "09-03-2026", "20 apr 2026" or "-" for work not yet done, so all
-   of those still have to read. */
-function _mvParseDate(s) {
-  const str = String(s == null ? '' : s).trim();
-  if (!str || str === '-') return null;
-  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
-  m = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
-  const d = new Date(str);
-  if (isNaN(d)) return null;
-  // Text like "20 apr 2026" parses in LOCAL time; pin it to UTC midnight so a
-  // round-trip through the picker can never slip to the day before.
-  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-}
+/* The arithmetic behind all of this lives in shared/shared_plot_movement.js:
+   the movement report, this page and the payroll salary claim all quote the
+   same closing balance, and three copies of it is three chances to disagree.
+   The local names stay as thin aliases so nothing else here has to change. */
+const _mvLogDate   = PlotMovement.logDate;
+const _mvParseDate = PlotMovement.parseDate;
 
 const _MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 /* YYYY-MM-DD for the <input type="date">; '' when there is no date yet. */
@@ -2985,194 +2965,15 @@ function _tarikhDisplay(s) {
   return `${String(d.getUTCDate()).padStart(2, '0')} ${_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-const _mvPlotKey  = v => String(v == null ? '' : v).trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
-const _mvBatchKey = v => String(v == null ? '' : v).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
-function _mvBatchList(s) {
-  return String(s == null ? '' : s).split(/[,;/|]+/).map(_mvBatchKey).filter(Boolean);
-}
-
-/* Sign a movement the way the report's closing balance does. */
-function _mvSigned(type, qty) {
-  const q = Number(qty || 0);
-  switch (type) {
-    case 'Seeds_Received': case 'Planted': case 'Transplanted':
-    case 'Transplanted_Premium': case 'Transplanted_DoubleTone':
-    // One 3rd-culling transfer log describes two sides; the event builder
-    // splits it so the plot it arrived at gains and the one it left loses.
-    case 'Cull3_Transfer_In':
-      return q;
-    case 'Damaged_Seeds': case '1st_Culling': case '2nd_Culling':
-    case '3rd_Culling':   case 'Sold':
-    case 'Cull3_Transfer_Out':
-      return -Math.abs(q);
-    default: return 0;
-  }
-}
-
-let _mvEvents = null;      // [{plotKey, batchKey, batch, type, qty, ms}]
-let _mvReady  = false;
-let _mvLoadErr = null;
-
-async function _mvFetchAll(build, pageSize = 1000) {
-  const all = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await build().range(from, from + pageSize - 1);
-    if (error) return { data: null, error };
-    all.push(...(data || []));
-    if (!data || data.length < pageSize) break;
-  }
-  return { data: all, error: null };
-}
-
-/* Pulled once per page load; the ledger is far too big to re-read per row. */
-async function loadMovementData() {
-  if (!_supabase) return;
-  try {
-    const [logsRes, dosRes] = await Promise.all([
-      _mvFetchAll(() => _supabase.from('shared_inventory_logs')
-        .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
-        .in('transaction_type', ['Seeds_Received', 'Planted', 'Transplanted',
-            'Transplanted_Premium', 'Transplanted_DoubleTone', 'Damaged_Seeds',
-            '1st_Culling', '2nd_Culling', '3rd_Culling',
-            // A transfer plot (-R) is filled entirely by these. Without them
-            // such a plot has no movement at all, and every quantity on it
-            // reads as a dash.
-            'Cull3_Transfer'])
-        .order('id', { ascending: true })),
-      // Sold comes from the customer DO system, exactly as the report does it.
-      _mvFetchAll(() => _supabase.from('shared_do_records')
-        .select('delivery_date, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
-        .order('id', { ascending: true }))
-    ]);
-    if (logsRes.error) throw logsRes.error;
-
-    const evs = [];
-    (logsRes.data || []).forEach(l => {
-      const ms = _mvParseDate(_mvLogDate(l));
-      if (ms == null) return;
-      evs.push({
-        plotKey:  _mvPlotKey(l.plot_name),
-        batchKey: _mvBatchKey(l.batch_name),
-        batch:    l.batch_name || '—',
-        type:     l.transaction_type === 'Cull3_Transfer' ? 'Cull3_Transfer_In' : l.transaction_type,
-        qty:      Number(l.quantity_change || 0),
-        ms
-      });
-    });
-    // The other side of every transfer: plot_name above is where the
-    // seedlings landed, and the remark says which plot they left.
-    (logsRes.data || []).forEach(l => {
-      if (l.transaction_type !== 'Cull3_Transfer') return;
-      const from = (l.remark || '').match(/From:\s*\[([^\]|]+)\|/);
-      if (!from) return;
-      const ms = _mvParseDate(_mvLogDate(l));
-      if (ms == null) return;
-      evs.push({
-        plotKey:  _mvPlotKey(from[1]),
-        batchKey: _mvBatchKey(l.batch_name),
-        batch:    l.batch_name || '—',
-        type:     'Cull3_Transfer_Out',
-        qty:      Math.abs(Number(l.quantity_change || 0)),
-        ms
-      });
-    });
-    // Which plot-batch rows the ledger actually has. The movement report only
-    // counts a delivery order against one of these, so a batch mistyped on a
-    // D/O cannot subtract from a plot; this has to agree with it or the two
-    // screens quote different numbers for the same plot.
-    const real = new Set(evs.filter(e => e.plotKey && e.batchKey)
-                            .map(e => `${e.plotKey}\u0001${e.batchKey}`));
-    (dosRes.data || []).forEach(d => {
-      if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
-      const ms = _mvParseDate(d.delivery_date);
-      if (ms == null) return;
-      for (let i = 1; i <= 5; i++) {
-        const qty = Number(d[`qty_${i}`] || 0);
-        if (!qty) continue;
-        const plotKey  = _mvPlotKey(d[`plot_${i}`]);
-        const batchKey = _mvBatchKey(d[`batch_${i}`]);
-        if (!real.has(`${plotKey}\u0001${batchKey}`)) continue;
-        evs.push({
-          plotKey, batchKey,
-          batch: d[`batch_${i}`] || '—',
-          type:  'Sold',
-          qty, ms
-        });
-      }
-    });
-    _mvEvents = evs;
-    _mvReady  = true;
-    _mvLoadErr = null;
-  } catch (e) {
-    _mvLoadErr = e.message || String(e);
-    console.warn('[maint] movement data load failed:', _mvLoadErr);
-  }
-}
-
-/* What is actually standing, from one batch's movements up to a date.
-
-   The 3rd culling count is cumulative: it is keyed against the ORIGINAL
-   transplanted figure, not against what was left, so it already contains the
-   2nd culling. Subtracting both takes the 2nd culling off twice — which is
-   why B1's batch 237 read -2 when 1,182 transplanted less 90 culled, 989 sold
-   and 103 transferred away comes to exactly nought.
-
-   So the 2nd culling counts only while no 3rd culling has been recorded yet.
-   Before the 3rd, it is the live deduction; after it, it is already inside
-   the figure that replaced it. */
-function _liveCount(evs) {
-  const superseded = evs.some(e => e.type === '3rd_Culling');
-  return evs.reduce((sum, e) =>
-    sum + (superseded && e.type === '2nd_Culling' ? 0 : _mvSigned(e.type, e.qty)), 0);
-}
-
-/* The linked quantity for one work record.
-   Returns null when it cannot be resolved (data not loaded, no plot, or the
-   plot/batch has no movement at all) so the caller can fall back gracefully. */
-function linkedPlotQty(plot, batchStr, tarikh) {
-  if (!_mvReady || !_mvEvents || !plot) return null;
-  const pk = _mvPlotKey(plot);
-  if (!pk) return null;
-  const wanted = _mvBatchList(batchStr);
-  // No date keyed yet ("-") → stand at today, the plot's current standing count.
-  const asOf = _mvParseDate(tarikh);
-  const cutoff = asOf == null ? Infinity : asOf;
-
-  const per = {};
-  for (const ev of _mvEvents) {
-    if (ev.plotKey !== pk) continue;
-    if (wanted.length && !wanted.includes(ev.batchKey)) continue;
-    // Only movement up to the work date counts — anything dated later had
-    // not happened yet, so those seedlings were still standing.
-    if (ev.ms > cutoff) continue;
-    (per[ev.batchKey] ||= { evs: [], label: ev.batch }).evs.push(ev);
-  }
-  Object.values(per).forEach(b => { b.closing = _liveCount(b.evs); });
-
-  const keys = Object.keys(per);
-  if (!keys.length) return null;
-  let raw = 0;
-  keys.forEach(k => { raw += per[k].closing; });
-  return {
-    // NOT floored at zero: the movement report shows a negative closing
-    // because it is a figure to look into, and a work record quoting 0 for
-    // the same plot and batch would be quietly disagreeing with it.
-    qty: Math.round(raw),
-    raw: Math.round(raw),
-    batches: keys.map(k => per[k].label),
-    allBatches: wanted.length === 0,
-    asOf: asOf == null ? null : tarikh
-  };
-}
-
-/* Quantity shown for a record: a keyed value always wins; otherwise the
-   linked one. */
-function recQty(r) {
-  if (r && (r.qty === 0 || r.qty)) return { value: Number(r.qty), linked: false };
-  const link = linkedPlotQty(r?.plot, r?.batch, r?.tarikh);
-  if (!link) return { value: null, linked: false };
-  return { value: link.qty, linked: true, info: link };
-}
+const _mvPlotKey    = PlotMovement.plotKey;
+const _mvBatchKey   = PlotMovement.batchKey;
+const _mvBatchList  = PlotMovement.batchList;
+const _mvSigned     = PlotMovement.signed;
+const _mvFetchAll   = PlotMovement.fetchAll;
+const _liveCount    = PlotMovement.liveCount;
+const linkedPlotQty = PlotMovement.linkedQty;
+const recQty        = PlotMovement.recQty;
+function loadMovementData() { return PlotMovement.load(_supabase); }
 
 /* Quantity cell. A linked value is marked with 🔗 and explains itself on
    hover, so nobody mistakes a derived number for one somebody keyed. */
@@ -3338,8 +3139,8 @@ function refreshLinkedQty() {
   const typed  = (document.getElementById('rf-qty').value ?? '').trim();
 
   if (!plot) { box.innerHTML = ''; return; }
-  if (!_mvReady) {
-    box.innerHTML = _mvLoadErr
+  if (!PlotMovement.ready()) {
+    box.innerHTML = PlotMovement.error()
       ? `<span style="color:#a83020;">${t('link.unreachable')}</span>`
       : t('link.loading');
     return;
@@ -4190,7 +3991,7 @@ async function initDb() {
   // The batch-report ledger is a separate, larger read — don't hold the page
   // on it. Repaint the pieces that show a linked quantity once it lands.
   loadMovementData().then(() => {
-    if (!_mvReady) return;
+    if (!PlotMovement.ready()) return;
     try { renderRecords(); } catch (_) {}
     try { renderPayroll(); } catch (_) {}
     try { refreshLinkedQty(); } catch (_) {}
