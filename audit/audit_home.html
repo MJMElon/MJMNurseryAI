@@ -703,7 +703,7 @@
        button that used to appear here for admin accounts is now reached
        from the portal tile or the ribbon's back arrow. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
-    <a class="fcr-back" href="audit_nursery_select.html" aria-label="Change nursery" title="Change nursery">
+    <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
       <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </a>
     <div class="fcr-brand">
@@ -727,10 +727,12 @@
          used to sit beside "Audit To-Do" was easy to miss, and reading the
          wrong nursery's schedule is the one mistake this page can cause. -->
     <div class="ribbon fade-in" id="ribbon">
-      <a href="audit_nursery_select.html" class="ribbon-btn" id="scope-switch">
+      <!-- Switch is a direct PN ↔ MN toggle now: no chooser page to walk
+           through, and the account still lands wherever it was last. -->
+      <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
         <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         <span>Switch</span>
-      </a>
+      </button>
       <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
       <div class="ribbon-spacer"></div>
     </div>
@@ -971,16 +973,21 @@ function loadAuditTodo(){
   const mayPN = allowed.indexOf('PN') !== -1;
   const mayMN = allowed.indexOf('MN') !== -1;
 
-  /* … and which half of it they chose on the way in. The list used to carry
-     both nurseries at once, so an auditor walking the pre nursery read past
-     three main-nursery rows to reach theirs. Chosen once on
-     audit_nursery_select.html; anyone arriving without a choice is sent
-     there rather than shown the wrong nursery's schedule. */
-  const scope = MJMAuditLogin.scope();
-  /* Stop here rather than carrying on. Without the return this went on to
-     build the board and fire its queries while the browser was already
-     navigating away — work and REST calls thrown away on every visit. */
-  if (!scope) { window.location.replace('audit_nursery_select.html'); return; }
+  /* … and which half of it they chose on the way in. The old flow used
+     to send anyone without a choice through audit_nursery_select.html;
+     that page was cancelled — an auditor going straight to the work
+     list from the login is one screen fewer to tap through. The scope
+     defaults instead: from a profile-set preference if one exists,
+     otherwise Pre Nursery. The Switch pill on the ribbon toggles it
+     PN ↔ MN in place, so the choice is never a one-way door. */
+  let scope = MJMAuditLogin.scope();
+  if (!scope) {
+    const pref = (user.audit_scope || user.default_nursery || '').toUpperCase();
+    const preferred = (pref === 'PN' || pref === 'MN') ? pref
+                    : (mayPN ? 'PN' : (mayMN ? 'MN' : 'PN'));
+    MJMAuditLogin.setScope(preferred);
+    scope = MJMAuditLogin.scope() || preferred;
+  }
 
   const showPN = mayPN && scope === 'PN';
   const showMN = mayMN && scope === 'MN';
@@ -1000,6 +1007,21 @@ function loadAuditTodo(){
   }
   paintRibbon();
   document.addEventListener('mjm-lang-changed', paintRibbon);
+
+  /* Switch pill click: flip the stored scope PN ↔ MN and reload. A
+     reload rather than a live re-render because half a dozen queries
+     were run against the previous scope on first paint, and untangling
+     them mid-session is more surface than one refresh saves. Exposed
+     on window so the inline onclick on .ribbon-btn can reach it. */
+  window.toggleScope = function () {
+    if (allowed.length < 2) return;   /* nothing to toggle to */
+    const next = scope === 'PN' ? 'MN' : 'PN';
+    MJMAuditLogin.setScope(next);
+    /* Only navigate if the write stuck — same guard the old chooser
+       relied on. A blocked or full localStorage would otherwise leave
+       the tab reloading against the previous scope forever. */
+    if (MJMAuditLogin.scope() === next) window.location.reload();
+  };
 
   /* ── The month being looked at. Starts on this one. ── */
   /* Today is selected from the start: the question this screen answers is

@@ -435,11 +435,15 @@
          a Normal auditor who happens to be admin of another module stays
          on the auditor view instead of being routed to the back end. */
       const auditLvl = mods ? String(mods.audit || '').toLowerCase() : null;
+      /* Auditors land on the to-do list directly — the nursery chooser
+         was cancelled, and the audit home defaults to whichever nursery
+         they last chose (or Pre Nursery on a fresh session), with a
+         Switch pill to flip between PN and MN. */
       auditCard.setAttribute(
         'href',
         auditLvl === 'admin' || !perms
           ? 'audit/audit_admin.html'
-          : 'audit/audit_nursery_select.html'
+          : 'audit/audit_home.html'
       );
     }
     const ua = document.getElementById('hub-user-access');
