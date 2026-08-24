@@ -25,7 +25,7 @@
        audit_nursery_select). Replaces the audit-specific header band
        that used to sit under the standardised #mjm-ribbon; the two
        were doing overlapping work. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824c"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824d"/>
 
   <!-- Anti-flicker auth guard -->
   <script src="audit_login_guard.js?v=20260824a"></script>
@@ -375,10 +375,17 @@
     /* The count and the calendar are one thing: what is owed, and when. They
        read as two stacked boxes when the count sat above with its own space,
        so the rule below joins them instead of separating them. */
-    .sched-top{display:flex;align-items:flex-start;gap:12px;padding-bottom:14px;
+    /* Stacked, not a row: the title, the nursery it applies to, the
+       greeting and the progress bar are four things in sequence, each
+       qualifying the one below it. */
+    .sched-top{display:block;padding-bottom:14px;
                margin-bottom:14px;border-bottom:1px solid var(--fc-line)}
-    .sched-kicker{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;
-                  letter-spacing:1px;text-transform:uppercase;color:var(--fc-ink3)}
+    /* The block's title. Centred and set large enough to read as one —
+       at 10px uppercase grey it was a label on the greeting beneath it
+       rather than the name of the section. */
+    .sched-kicker{display:flex;align-items:center;justify-content:center;gap:8px;
+                  font-size:19px;font-weight:800;letter-spacing:.4px;
+                  color:var(--fc-ink);margin-bottom:12px}
     /* ── HEADER ON A NARROW SCREEN ──
        On a phone this band broke: "MJM Nursery" wrapped onto three lines,
        "Audit System" onto two, and the user chip was pushed off the right
@@ -440,7 +447,7 @@
        important fact on the screen. */
     .ribbon{display:flex;align-items:center;gap:12px;background:var(--fc-card);
             border:1.5px solid var(--fc-line);border-left:6px solid var(--rib,#2d7a2d);
-            border-radius:16px;padding:14px 16px;margin-bottom:16px;
+            border-radius:16px;padding:12px 14px;margin-bottom:14px;
             box-shadow:0 1px 3px rgba(16,40,60,.05)}
     .ribbon-btn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
                 padding:8px 14px;border-radius:22px;background:#f4f7fa;
@@ -457,7 +464,8 @@
        shunted right by it. */
     .ribbon-spacer{flex:0 0 auto;width:92px}
     @media (max-width:640px){
-      .ribbon{padding:12px;gap:8px;border-radius:14px}
+      .sched-kicker{font-size:16px;margin-bottom:10px}
+      .ribbon{padding:10px 12px;gap:8px;border-radius:14px}
       .ribbon-ttl{font-size:15px;letter-spacing:1px}
       .ribbon-btn{padding:7px 10px;font-size:9.5px}
       .ribbon-btn span{display:none}
@@ -650,12 +658,6 @@
     .tl-item.overdue .tl-plot{border-color:#b91c1c;color:#b91c1c;
                               background:#fef2f2}
     .tl-item.overdue .tl-plot:hover{background:#b91c1c;color:#fff}
-    /* Main nursery runs three nurseries at once and the plot codes
-       already carry their nursery (B / U / N), so they share one flat
-       strip rather than three labelled groups. When the strip is long
-       it says how many rather than running down the screen. */
-    .tl-plots-more{align-self:center;font-size:11px;font-weight:700;
-                   color:var(--fc-ink3);padding:0 2px}
     @media (max-width:640px){
       .tl-plots{padding:8px 10px 10px 12px;gap:6px}
       .tl-plot{width:34px;height:34px;font-size:10px}
@@ -812,6 +814,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </a>
     <div class="fcr-brand">
+      <div class="fcr-brand-top">MJM Nursery</div>
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
@@ -832,24 +835,6 @@
   <div class="content">
 
     <!-- AUDIT TO-DO -->
-    <!-- Names the nursery this whole screen is about. The small badge that
-         used to sit beside "Audit To-Do" was easy to miss, and reading the
-         wrong nursery's schedule is the one mistake this page can cause. -->
-    <div class="ribbon fade-in" id="ribbon">
-      <div class="ribbon-spacer"></div>
-      <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
-      <!-- Switch is a direct PN ↔ MN toggle: no chooser page to walk
-           through, and the account still lands wherever it was last.
-           It sits at the trailing edge pointing forward, because the
-           same move is now also a left-swipe across this bar and the
-           to-do list under it — an arrow on the left pointing back
-           described the opposite gesture. -->
-      <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
-        <span>Switch</span>
-        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-    </div>
-
     <!-- ── THE AUDIT SCHEDULE BOARD ──
          A flat list of four rows could not say when anything was due beyond
          a line of text, and every month looked identical. The month, the
@@ -858,15 +843,39 @@
     <div class="sched fade-in">
 
       <div class="sched-top">
-        <div style="min-width:0">
-          <div class="sched-kicker"><span>📋 Audit To-Do</span></div>
-          <div class="sched-count" id="sched-count">&nbsp;</div>
-          <!-- Per-day progress bar. Populated by renderAll() when the
-               view is on the current month and today has real work.
-               Reads "N / M done today · P%" so the auditor can see
-               how much of the day is closed out. -->
-          <div class="today-progress" id="today-progress" style="display:none"></div>
+        <!-- Audit To-Do is the fixed title of this whole block, so it sits
+             above everything the block contains — including which nursery
+             the list is for. The nursery bar used to float above it as a
+             separate band, which read as a heading in its own right and
+             left two competing titles stacked on one screen. -->
+        <div class="sched-kicker"><span>📋 Audit To-Do</span></div>
+
+        <!-- Names the nursery this list is about, and the way to the other
+             one. Reading the wrong nursery's schedule is the one mistake
+             this page can cause, so it stays directly under the title and
+             directly above the work it qualifies.
+
+             Switch is a direct PN ↔ MN toggle: no chooser page to walk
+             through, and the account still lands wherever it was last. It
+             sits at the trailing edge pointing forward, because the same
+             move is also a left-swipe across this bar and the to-do list
+             under it — an arrow on the left pointing back described the
+             opposite gesture. -->
+        <div class="ribbon" id="ribbon">
+          <div class="ribbon-spacer"></div>
+          <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
+          <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
+            <span>Switch</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
+
+        <div class="sched-count" id="sched-count">&nbsp;</div>
+        <!-- Per-day progress bar. Populated by renderAll() when the
+             view is on the current month and today has real work.
+             Reads "N / M done today · P%" so the auditor can see
+             how much of the day is closed out. -->
+        <div class="today-progress" id="today-progress" style="display:none"></div>
       </div>
 
       <!-- Bucket tiles (Today / Overdue / All) were cancelled — the
@@ -1725,18 +1734,19 @@ function loadAuditTodo(){
      both ask about the window's dates, so a row can never sit at "due"
      over an empty strip, or read "done" above plots still waiting.
 
-     Main nursery puts BNN, UNN 1 and UNN 2 in one flat strip. The plot
-     codes carry their own nursery (B / U / N), so grouping them under
-     three headings would cost a lot of height to repeat what the codes
-     already say. Per-nursery filtering is coming with user access;
-     until then everyone in scope sees the lot.
+     Main nursery keeps one flat strip, but ordered by nursery: every B
+     plot, then every U, then every N. An auditor works a nursery at a
+     time — they are separate sites — so the strip is grouped the way
+     the walking is done, and finishing BNN means clearing a run of
+     circles rather than picking them out of an interleaved list. The
+     codes carry their own nursery, so the grouping needs no headings
+     to be legible.
 
-     Long strips are cut at PLOT_CAP and say how many were left off —
-     PN plot condition can owe fifty-two at the start of a window, and
-     seven rows of circles under one card buries the three modules
-     below it. The remainder is a link, not a footnote: it opens the
-     module, which lists all of them. */
-  const PLOT_CAP = 12;
+     Nothing is capped. An earlier version showed twelve and counted
+     the rest, which read fine on pre nursery but meant a main-nursery
+     auditor could never see past BNN into their own nursery's plots —
+     which is precisely what the grouping is for. The strip is as long
+     as the work is; that is the honest length for a to-do list. */
   function _plotsHtml(o, oy, om, pending){
     if (!pending.length) return '';
     const fromISO = iso(oy, om, o.start);
@@ -1754,26 +1764,10 @@ function loadAuditTodo(){
       return list.map(pl => ({ nursery: x.nursery, plot: pl }));
     });
 
-    const total = byNursery.reduce((n, l) => n + l.length, 0);
-    if (!total) return '';
-
-    /* Take one from each nursery in turn rather than draining the first.
-       On main nursery a whole window opens owing all fifty-two plots,
-       and BNN's fourteen alone would fill the twelve on show — leaving
-       somebody working UNN 2 looking at a strip with nothing of theirs
-       in it. Round-robin puts every nursery in the visible dozen. */
-    const shown = [];
-    for (let i = 0; shown.length < PLOT_CAP; i++) {
-      let took = false;
-      for (const list of byNursery) {
-        if (i >= list.length) continue;
-        shown.push(list[i]);
-        took = true;
-        if (shown.length === PLOT_CAP) break;
-      }
-      if (!took) break;
-    }
-    const rest = total - shown.length;
+    /* pending is in SCOPE_NURSERIES order, so flattening it groups the
+       strip by nursery without any further sorting. */
+    const shown = byNursery.flat();
+    if (!shown.length) return '';
     const label = t(o.title);
 
     const circles = shown.map(e => {
@@ -1785,13 +1779,7 @@ function loadAuditTodo(){
                  aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
     }).join('');
 
-    const more = rest > 0
-      ? `<a class="tl-plots-more"
-             href="${o.href}?nursery=${encodeURIComponent(pending[0].nursery)}&from=home"
-             aria-label="${label} — ${fmtNum(rest)} more plots">+${fmtNum(rest)}</a>`
-      : '';
-
-    return `<div class="tl-plots">${circles}${more}</div>`;
+    return `<div class="tl-plots">${circles}</div>`;
   }
 
   function renderTimeline(occ){
@@ -1937,7 +1925,51 @@ function loadAuditTodo(){
       const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
       return k === 'overdue' || k === 'due';   // 'due' already means today is inside it
     }) : [];
-    const todayN  = actionable.length;
+
+    /* ── ONE PLOT, ONE TASK ────────────────────────────────────────
+       The greeting used to count module rows: four audits due across a
+       whole nursery read as "4 tasks today", which is the shape of the
+       schedule rather than the size of the day. Walking fifty-two plots
+       is fifty-two jobs, and that is the number an auditor is actually
+       deciding their day against.
+
+       So a task is a plot with work left on it, counted once per module
+       — a plot owing both a plot-condition and a height audit is two
+       tasks, because it is two visits' worth of work.
+
+       Falls back to counting rows when the batch roster could not
+       answer, which is the same fallback the rows themselves use: a
+       number too small is worse than a number of the old kind. */
+    function plotsOwed(o, y, m){
+      if (o.mod === 'maint')
+        return o._maintPlots
+          ? SCOPE_NURSERIES.reduce((n, nur) =>
+              n + ((o._maintPlots.get(nur) || {size: 0}).size), 0)
+          : 0;
+      if (!window.MJMAuditPending) return 0;
+      const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
+      return SCOPE_NURSERIES.reduce((n, nur) =>
+        MJMAuditPending.covers(o.mod, nur)
+          ? n + MJMAuditPending.plots(o.mod, nur, fromISO, toISO).length
+          : n, 0);
+    }
+    /* The whole job, audited or not — what the progress bar divides by.
+       Maintenance has no such figure: an audited task leaves the ledger
+       entirely, so its pending count IS its total. */
+    function plotsTotal(o){
+      if (o.mod === 'maint') return 0;
+      if (!window.MJMAuditPending) return 0;
+      return SCOPE_NURSERIES.reduce((n, nur) =>
+        MJMAuditPending.covers(o.mod, nur)
+          ? n + MJMAuditPending.plotsAll(o.mod, nur).length
+          : n, 0);
+    }
+
+    const todayPlots = actionable.reduce((n, o) =>
+      n + plotsOwed(o, o.fromY ?? viewY, o.fromM ?? viewM), 0);
+    /* Nothing countable in plots (roster unreadable, or only maintenance
+       with no plots resolved) → fall back to the row count. */
+    const todayN = todayPlots || actionable.length;
 
     /* Today's total = anything whose deadline is today or already past,
        including items that have since been audited. isForToday captures
@@ -1951,9 +1983,30 @@ function loadAuditTodo(){
       return _t0 > e0 || (_t0 >= s0 && _t0 <= e0);
     };
     const todayScope   = thisMonth ? occ.filter(isForToday) : [];
-    const todayDoneN   = todayScope.filter(o =>
-                          isDone(o, o.fromY ?? viewY, o.fromM ?? viewM)).length;
-    const todayTotalN  = todayScope.length;
+
+    /* The bar counts the same unit the greeting does. "3 tasks today"
+       above "0 / 4 done" was two different questions wearing the same
+       word, and the one that moved when an auditor finished a plot was
+       neither of them.
+
+       Total is every plot with work in today's rows; done is the ones
+       no longer owed. Maintenance contributes only to the pending side
+       — an audited maintenance task leaves the ledger, so it cannot be
+       counted as done here; it simply stops being counted at all. */
+    let todayDoneN = 0, todayTotalN = 0;
+    todayScope.forEach(o => {
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const owed  = plotsOwed(o, oy, om);
+      const total = plotsTotal(o) || owed;
+      todayTotalN += total;
+      todayDoneN  += Math.max(0, total - owed);
+    });
+    /* Same fallback as the greeting: no plots resolved → count rows. */
+    if (!todayTotalN) {
+      todayDoneN  = todayScope.filter(o =>
+                      isDone(o, o.fromY ?? viewY, o.fromM ?? viewM)).length;
+      todayTotalN = todayScope.length;
+    }
     const todayPct     = todayTotalN ? Math.round(todayDoneN * 100 / todayTotalN) : 0;
     const todayAllDone = todayTotalN > 0 && todayPct === 100;
 
