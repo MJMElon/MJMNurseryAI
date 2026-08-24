@@ -300,6 +300,10 @@
         const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        /* Thousands-grouped display for any quantity in the tables.
+           `null` / `''` / non-numeric strings pass through as '0' so
+           callers can pipe values through without pre-checking. */
+        const fmtQty = (n) => Number(n || 0).toLocaleString('en-MY');
         
         const _k1 = 'AIzaSyCvSAVEeOa_'; const _k2 = 'PkZxRKDJkYz3hqzdgvbGIyQ'; const GEMINI_API_KEY = _k1 + _k2; 
         
@@ -470,7 +474,7 @@
                         <td class="p-4">${alHtml}</td>
                         <td class="p-4 font-bold uppercase ${isCancelled ? 'text-red-800' : 'text-slate-800'}">${doRec._custName}</td>
                         <td class="p-4">${baHtml}</td>
-                        <td class="p-4 text-center font-black ${isCancelled ? 'text-red-500 line-through' : 'text-emerald-700'} text-lg">${doRec.total_qty || 0}</td>
+                        <td class="p-4 text-center font-black ${isCancelled ? 'text-red-500 line-through' : 'text-emerald-700'} text-lg">${fmtQty(doRec.total_qty)}</td>
                         <td class="p-4 text-right"><button onclick="openManageDOModal('${doRec.id}')" class="text-blue-700 uppercase text-[10px] font-bold px-4 py-2 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors relative z-40">Manage / View</button></td>
                     </tr>
                 `;
@@ -542,7 +546,7 @@
                         const isBaMatched = (d.status === 'Verified') || (d.remark && d.remark.includes('[BA MATCHED]')); 
                         baHtml = `<span class="font-black uppercase text-[11px] ${isBaMatched ? 'text-emerald-700' : 'text-amber-800'}">${baKey}</span>`; 
                     }
-                    historyHtml += `<tr class="${rowColor}"><td class="py-3 pl-2">${doNumHtml}</td><td class="py-3 text-slate-500">${displayDate}</td><td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td><td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${d.total_qty || 0}</td><td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${bal}</td><td class="py-3">${baHtml}</td><td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td></tr>`;
+                    historyHtml += `<tr class="${rowColor}"><td class="py-3 pl-2">${doNumHtml}</td><td class="py-3 text-slate-500">${displayDate}</td><td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td><td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${fmtQty(d.total_qty)}</td><td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${fmtQty(bal)}</td><td class="py-3">${baHtml}</td><td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td></tr>`;
                 });
                 historyBody.innerHTML = historyHtml;
             }
