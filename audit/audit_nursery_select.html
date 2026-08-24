@@ -13,9 +13,9 @@
 
   <!-- Shared FC-style top ribbon (same file used by audit_admin +
        audit_home). -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824c"/>
 
-  <script src="audit_lang.js?v=20260823o"></script>
+  <script src="audit_lang.js?v=20260824e"></script>
   <script src="audit_login_guard.js?v=20260824a"></script>
   <!-- The nursery chooser was cancelled: sign-in now lands straight on
        the to-do list, and the Switch pill on that page toggles PN ↔ MN.
@@ -194,13 +194,17 @@
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
-    <div class="fcr-spacer"></div>
-    <span class="fcr-welcome" id="fcr-welcome">Welcome, Auditor</span>
-    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
-      <span id="lang-toggle-label">BM</span>
-    </button>
-    <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" data-t="signout">Sign Out</button>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Auditor</span>
+      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+        <span id="lang-toggle-label">BM</span>
+      </button>
+      <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" aria-label="Sign out" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
+      </button>
+    </div>
   </nav>
 
   <div class="content">

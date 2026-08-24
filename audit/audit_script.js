@@ -936,6 +936,13 @@ function init(){
       back.setAttribute('aria-label', 'Choose another nursery');
     }
   }
-  loadRecords();
+  /* ?plot=<code> on top of ?nursery= opens that plot's batch list
+     straight away — the portal's pending-plot circles link here, and
+     landing on the grid would make the auditor find in fifty-two icons
+     the plot they just tapped. After loadRecords(), because the detail
+     is built from the records it fetches. */
+  loadRecords().then(() => {
+    MJMAuditDeepLink.openPlot(NURSERY_PLOTS[activeTab] || [], openPlotDetail);
+  });
 }
 document.addEventListener('DOMContentLoaded',init);

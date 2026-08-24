@@ -16,6 +16,13 @@
    tap away on "Open Nelos →" — the dock is a reminder, not a second
    dashboard.
 
+   "Raise a Case" opens a short form INSIDE the panel and writes the
+   case from there. Somebody notices something wrong halfway through a
+   delivery note or an audit; sending them to another page to report it
+   loses their work, and usually the thought with it. The case records
+   the page it was raised from, so whoever picks it up lands where it
+   was seen.
+
    The circle can be dragged anywhere on the screen and the panel can be
    dragged bigger by its corner grip. Where it sits, how big it is and
    whether it was left open all live in localStorage, so it stays put as
@@ -28,7 +35,9 @@
 
    Optional attributes on that same tag:
 
-     data-source="operation"   only cases raised by one module
+     data-source="operation"   only cases raised by one module, and the
+                               module stamped on cases raised from here
+                               (otherwise taken from the page's folder)
      data-hide-on="/mobile/"   extra path fragment to stay off
 
    WHY THIS DOES NOT USE shared_nelos.js
@@ -409,6 +418,7 @@
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
   .nd-list { overflow-y:auto; flex:1; padding:0 0 4px; -webkit-overflow-scrolling:touch; }
+  .nd-list[hidden] { display:none; }
 
   /* the overdue block, pinned to the top of the scroll */
   .nd-sec { padding:7px 14px 5px; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
@@ -438,12 +448,55 @@
   .nd-over  { color:#b91c1c; font-weight:900; white-space:nowrap; }
   .nd-empty { text-align:center; font-size:11.5px; font-weight:700; color:#94a3b8; padding:34px 16px; line-height:1.7; }
 
+  /* ── raising a case, without leaving the page ── */
+  .nd-form { overflow-y:auto; flex:1; padding:12px 14px 4px; -webkit-overflow-scrolling:touch; }
+  .nd-form[hidden] { display:none; }
+  .nd-lbl { display:block; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+            color:#94a3b8; margin:0 0 4px; }
+  .nd-in  { width:100%; font-family:inherit; font-size:16px; font-weight:600; color:#1e293b;
+            padding:9px 11px; border:1.5px solid #e2e8f0; border-radius:10px; background:#fff; outline:none; }
+  .nd-in:focus { border-color:#c4b5fd; box-shadow:0 0 0 3px rgba(196,181,253,.3); }
+  .nd-in::placeholder { color:#cbd5e1; font-weight:500; }
+  textarea.nd-in { resize:none; line-height:1.45; }
+  select.nd-in { appearance:none; background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),
+                                                  linear-gradient(135deg,#94a3b8 50%,transparent 50%);
+                 background-position:calc(100% - 16px) 19px, calc(100% - 11px) 19px;
+                 background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:30px; }
+  .nd-fld { margin-bottom:11px; }
+  .nd-2   { display:flex; gap:8px; }
+  .nd-2 > * { flex:1; min-width:0; }
+  .nd-pri { display:flex; gap:5px; }
+  .nd-pri button { flex:1; padding:8px 2px; border-radius:9px; border:1.5px solid #e2e8f0; background:#fff;
+                   font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.05em; text-transform:uppercase;
+                   color:#64748b; cursor:pointer; }
+  .nd-pri button:hover { border-color:#cbd5e1; }
+  .nd-pri button.on { color:#fff; border-color:transparent; }
+  .nd-pri button.on[data-p="low"]    { background:#94a3b8; }
+  .nd-pri button.on[data-p="normal"] { background:#0ea5e9; }
+  .nd-pri button.on[data-p="high"]   { background:#f97316; }
+  .nd-pri button.on[data-p="urgent"] { background:#dc2626; }
+  .nd-from { font-size:9.5px; font-weight:700; color:#94a3b8; line-height:1.5; padding:2px 2px 10px; }
+  .nd-from b { color:#64748b; font-weight:900; }
+  .nd-err { font-size:10.5px; font-weight:800; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca;
+            border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.5; }
+  .nd-err[hidden] { display:none; }
+  .nd-done { text-align:center; padding:30px 18px; }
+  .nd-done-t { font-size:13px; font-weight:900; color:#15803d; margin-bottom:4px; }
+  .nd-done-s { font-size:11px; font-weight:700; color:#94a3b8; line-height:1.6; }
+  .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
+  .nd-done a:hover { text-decoration:underline; }
+
   .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; flex-shrink:0; }
+  .nd-foot[hidden] { display:none; }
   .nd-btn  { flex:1; text-align:center; padding:9px 10px; border-radius:10px; text-decoration:none;
              font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
   .nd-btn-a { background:#7c3aed; color:#fff; }  .nd-btn-a:hover { background:#6d28d9; }
   .nd-btn-b { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
   .nd-btn-b:hover { background:#ede9fe; }
+  .nd-btn-c { background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; }
+  .nd-btn-c:hover { background:#f1f5f9; }
+  button.nd-btn { font-family:inherit; cursor:pointer; }
+  button.nd-btn:disabled { opacity:.6; cursor:progress; }
 
   /* ── the resize grip ──
      It sits on whichever corner of the panel is pointing AWAY from the
@@ -515,8 +568,9 @@
            '</a>';
   }
 
-  var dock, fab, badge, panel, listEl, grip;
+  var dock, fab, badge, panel, listEl, formEl, grip;
   var rows = [], open = false;
+  var view = 'list';           // 'list' | 'form' | 'done'
 
   function build() {
     var style = document.createElement('style');
@@ -539,10 +593,46 @@
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
-        '<div class="nd-foot">' +
+        '<div class="nd-form" hidden>' +
+          '<div class="nd-err" hidden></div>' +
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-title">What needs doing?</label>' +
+            '<input class="nd-in" id="nd-f-title" maxlength="300" autocomplete="off" ' +
+                   'placeholder="One line — what is wrong">' +
+          '</div>' +
+          '<div class="nd-fld nd-2">' +
+            '<div>' +
+              '<label class="nd-lbl" for="nd-f-cat">Category</label>' +
+              '<select class="nd-in" id="nd-f-cat"><option value="">— none —</option></select>' +
+            '</div>' +
+            '<div>' +
+              '<label class="nd-lbl" for="nd-f-due">Due</label>' +
+              '<input class="nd-in" id="nd-f-due" type="date">' +
+            '</div>' +
+          '</div>' +
+          '<div class="nd-fld">' +
+            '<span class="nd-lbl">Priority</span>' +
+            '<div class="nd-pri">' +
+              '<button type="button" data-p="low">Low</button>' +
+              '<button type="button" data-p="normal" class="on">Normal</button>' +
+              '<button type="button" data-p="high">High</button>' +
+              '<button type="button" data-p="urgent">Urgent</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-desc">Detail <span style="text-transform:none;letter-spacing:0">(optional)</span></label>' +
+            '<textarea class="nd-in" id="nd-f-desc" rows="3" ' +
+                      'placeholder="Anything the person picking this up will need"></textarea>' +
+          '</div>' +
+          '<div class="nd-from"></div>' +
+        '</div>' +
+        '<div class="nd-foot nd-foot-list">' +
           '<a class="nd-btn nd-btn-b" href="' + esc(homeHref()) + '">Open Nelos →</a>' +
-          '<a class="nd-btn nd-btn-a" href="' + esc(homeHref()) + '?new=1' +
-             (OPT_SOURCE ? '&source=' + encodeURIComponent(OPT_SOURCE) : '') + '">➕ Raise a Case</a>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-new">➕ Raise a Case</button>' +
+        '</div>' +
+        '<div class="nd-foot nd-foot-form" hidden>' +
+          '<button type="button" class="nd-btn nd-btn-c nd-cancel">Cancel</button>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-save">Raise Case</button>' +
         '</div>' +
       '</div>' +
       '<button id="nelos-dock-fab" type="button" title="Nelos — my to-do (drag to move)" ' +
@@ -556,7 +646,9 @@
     badge  = dock.querySelector('#nelos-dock-badge');
     panel  = dock.querySelector('#nelos-dock-panel');
     listEl = dock.querySelector('.nd-list');
+    formEl = dock.querySelector('.nd-form');
     grip   = dock.querySelector('.nd-grip');
+    wireForm();
 
     fab.addEventListener('click', function (e) {
       // A drag that ended on the circle is not a tap.
@@ -565,7 +657,8 @@
     });
     dock.querySelector('.nd-min').addEventListener('click', function () { setOpen(false); });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && open) setOpen(false);
+      if (e.key !== 'Escape' || !open) return;
+      if (view !== 'list') showList(); else setOpen(false);
     });
 
     wireDrag();
@@ -586,7 +679,11 @@
     }
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
     try { localStorage.setItem(LS_OPEN, open ? '1' : '0'); } catch (_) {}
-    if (open) { applyPos(pos); refresh(); }
+    if (open) {
+      if (view === 'done') { rebuildForm(); showList(); }
+      applyPos(pos);
+      refresh();
+    }
   }
 
   /* ── Where the circle is parked ──────────────────────────────────
@@ -805,6 +902,243 @@
     if (restM.length) html += head('', 'Assigned to me · ' + restM.length) + restM.map(rowHtml).join('');
     if (restO.length) html += head('', 'Other pending cases · ' + restO.length) + restO.map(rowHtml).join('');
     listEl.innerHTML = html;
+  }
+
+  /* ── Raising a case, without leaving the page ────────────────────
+     The whole point of a dock: someone notices something wrong while
+     they are in the middle of a delivery note or an audit, and can say
+     so there and then. Sending them to nelos_dashboard.html to do it
+     loses their page, and usually the thought with it.
+
+     The insert mirrors MJMNelos.raise() — same columns, same opening
+     comment in the thread — because a case raised here must be
+     indistinguishable from one raised on the Nelos page itself. Where
+     it lands is not decided here: the nelos_cases_route trigger reads
+     the category and routes the case to a module and a seat. */
+
+  /* Which module this page belongs to, and the link back to it. The
+     source_ref is written as seen from a module folder — it starts
+     '../' — because nelos/nelos_case.html is what follows it. */
+  var MODULE_DIRS = ['operation', 'nursery_ops', 'audit', 'npayroll', 'scan',
+                     'mobile', 'col_booking', 'training', 'nelos'];
+
+  function pageDir() {
+    var parts = (location.pathname || '').split('/').filter(Boolean);
+    parts.pop();                                  // the file itself
+    return parts.length ? parts[parts.length - 1] : '';
+  }
+
+  function sourceModule() {
+    if (OPT_SOURCE) return OPT_SOURCE;
+    var d = pageDir();
+    return MODULE_DIRS.indexOf(d) !== -1 ? d : 'nelos';
+  }
+
+  function sourceRef() {
+    var d = pageDir();
+    var file = (location.pathname || '').split('/').pop() || 'index.html';
+    return '../' + (MODULE_DIRS.indexOf(d) !== -1 ? d + '/' : '') + file + (location.search || '');
+  }
+
+  function pageName() {
+    var t = (document.title || '').trim();
+    if (t) return t.length > 46 ? t.slice(0, 45) + '…' : t;
+    return (location.pathname || '').split('/').pop() || 'this page';
+  }
+
+  var _cats = null;          // [{name, default_priority, default_days}]
+
+  async function loadCategories() {
+    if (_cats) return _cats;
+    var token = await accessToken();
+    if (!token) return (_cats = []);
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_categories' +
+                            '?select=name,default_priority,default_days&active=is.true' +
+                            '&order=sort_order.asc,name.asc', { headers: authHeaders(token) });
+      if (!res.ok) return (_cats = []);
+      var rows = await res.json();
+      return (_cats = Array.isArray(rows) ? rows : []);
+    } catch (_) { return (_cats = []); }
+  }
+
+  function priority() {
+    var on = formEl.querySelector('.nd-pri button.on');
+    return (on && on.getAttribute('data-p')) || 'normal';
+  }
+
+  function setPriority(p) {
+    Array.prototype.forEach.call(formEl.querySelectorAll('.nd-pri button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-p') === p);
+    });
+  }
+
+  function formError(msg) {
+    var box = formEl.querySelector('.nd-err');
+    box.hidden = !msg;
+    box.textContent = msg || '';
+  }
+
+  function showList() {
+    view = 'list';
+    listEl.hidden = false; formEl.hidden = true;
+    panel.querySelector('.nd-foot-list').hidden = false;
+    panel.querySelector('.nd-foot-form').hidden = true;
+    panel.querySelector('.nd-head-t').textContent = 'My To-Do';
+    panel.querySelector('.nd-head-s').textContent = 'Nelos · Pending on me';
+    paint();
+  }
+
+  async function showForm() {
+    view = 'form';
+    listEl.hidden = true; formEl.hidden = false;
+    panel.querySelector('.nd-foot-list').hidden = true;
+    panel.querySelector('.nd-foot-form').hidden = false;
+    panel.querySelector('.nd-head-t').textContent = 'Raise a Case';
+    panel.querySelector('.nd-head-s').textContent = 'Nelos · From where you are';
+    formError('');
+    formEl.querySelector('.nd-from').innerHTML =
+      'Raised from <b>' + esc(pageName()) + '</b> — the case links back here.';
+    formEl.scrollTop = 0;
+    setTimeout(function () { formEl.querySelector('#nd-f-title').focus(); }, 60);
+
+    var cats = await loadCategories();
+    var sel = formEl.querySelector('#nd-f-cat');
+    if (sel.options.length <= 1 && cats.length) {
+      sel.innerHTML = '<option value="">— none —</option>' +
+        cats.map(function (c) { return '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>'; }).join('');
+    }
+  }
+
+  function showDone(c) {
+    view = 'done';
+    listEl.hidden = true; formEl.hidden = false;
+    panel.querySelector('.nd-foot-list').hidden = false;
+    panel.querySelector('.nd-foot-form').hidden = true;
+    formEl.innerHTML =
+      '<div class="nd-done">' +
+        '<div class="nd-done-t">✓ ' + esc(c.case_no || 'Case') + ' raised</div>' +
+        '<div class="nd-done-s">' + esc(c.title || '') + '<br>' +
+          '<a href="' + esc(caseHref(c.id)) + '">Open the case →</a>' +
+        '</div>' +
+      '</div>';
+    // Back to the list on its own, so the dock is ready for the next
+    // thought rather than parked on a receipt.
+    setTimeout(function () { if (view === 'done') { rebuildForm(); showList(); } }, 4000);
+  }
+
+  /* showDone() eats the form markup, so put it back before it is needed. */
+  var FORM_HTML = null;
+  function rebuildForm() {
+    if (FORM_HTML === null) return;
+    formEl.innerHTML = FORM_HTML;
+    wireFormFields();
+  }
+
+  async function submitCase() {
+    var title = formEl.querySelector('#nd-f-title').value.trim();
+    if (!title) { formError('A case needs a title.'); formEl.querySelector('#nd-f-title').focus(); return; }
+
+    var btn = panel.querySelector('.nd-save');
+    btn.disabled = true; btn.textContent = 'Raising…';
+    formError('');
+
+    var token = await accessToken();
+    if (!token) { btn.disabled = false; btn.textContent = 'Raise Case'; return formError('Your session has expired — sign in again.'); }
+
+    var u = me();
+    var row = {
+      title:         title.slice(0, 300),
+      description:   formEl.querySelector('#nd-f-desc').value.trim() || null,
+      category:      formEl.querySelector('#nd-f-cat').value || null,
+      priority:      priority(),
+      status:        'open',
+      source_module: sourceModule(),
+      source_ref:    sourceRef(),
+      due_date:      formEl.querySelector('#nd-f-due').value || null,
+      raised_by:     u.name,
+      raised_by_id:  u.id
+    };
+
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+                               authHeaders(token)),
+        body: JSON.stringify([row])
+      });
+      if (!res.ok) {
+        var detail = '';
+        try { var e = await res.json(); detail = e.message || e.hint || ''; } catch (_) {}
+        throw new Error(detail || ('the server said ' + res.status));
+      }
+      var out = await res.json();
+      var made = Array.isArray(out) ? out[0] : out;
+
+      // The opening detail also lands in the thread, so the case page
+      // reads as one conversation from the first line. Best effort: the
+      // case exists either way.
+      if (made && row.description) {
+        fetch(CFG.url + '/rest/v1/nelos_case_comments', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(token)),
+          body: JSON.stringify([{
+            case_id: made.id, body: row.description, kind: 'comment',
+            author_name: u.name, author_id: u.id
+          }])
+        }).catch(function () {});
+      }
+
+      btn.disabled = false; btn.textContent = 'Raise Case';
+      showDone(made || { title: title });
+      refresh();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Raise Case';
+      formError('Could not raise it — ' + (err && err.message ? err.message : 'try again') + '.');
+    }
+  }
+
+  /* Field-level wiring, re-run whenever the form markup is rebuilt. */
+  function wireFormFields() {
+    formEl.querySelector('.nd-pri').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-p]');
+      if (b) setPriority(b.getAttribute('data-p'));
+    });
+
+    // A category carries its house defaults — the priority it is usually
+    // raised at and the due date it is usually given. Both stay editable;
+    // this only saves typing.
+    formEl.querySelector('#nd-f-cat').addEventListener('change', function () {
+      var picked = this.value;
+      var cat = (_cats || []).filter(function (c) { return c.name === picked; })[0];
+      if (!cat) return;
+      if (cat.default_priority) setPriority(cat.default_priority);
+      var due = formEl.querySelector('#nd-f-due');
+      if (cat.default_days != null && !due.value) {
+        var d = new Date();
+        d.setDate(d.getDate() + Number(cat.default_days));
+        due.value = d.toISOString().slice(0, 10);
+      }
+    });
+
+    formEl.querySelector('#nd-f-title').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitCase(); }
+    });
+    // Typing is an answer to "a case needs a title" — stop shouting.
+    formEl.querySelector('#nd-f-title').addEventListener('input', function () {
+      if (this.value.trim()) formError('');
+    });
+  }
+
+  function wireForm() {
+    FORM_HTML = formEl.innerHTML;
+    wireFormFields();
+    panel.querySelector('.nd-new').addEventListener('click', function () {
+      if (view === 'done') rebuildForm();
+      showForm();
+    });
+    panel.querySelector('.nd-cancel').addEventListener('click', function () { showList(); });
+    panel.querySelector('.nd-save').addEventListener('click', function () { submitCase(); });
   }
 
   /* ── Refresh loop ────────────────────────────────────────────── */
