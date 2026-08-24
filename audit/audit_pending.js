@@ -238,11 +238,15 @@
   }
 
   /* ── THE ANSWER ─────────────────────────────────────────────────
-     Plots in this nursery with at least one piece of work left inside
-     [fromISO, toISO]. Returned in the nursery's own plot order rather
-     than the order the tables happened to arrive in, so the circles
-     read P03 · P07 · P12 and an auditor can find one by eye. */
-  function plots(mod, nursery, fromISO, toISO){
+     Plots in this nursery carrying work. With `ignoreAudits`, every
+     plot that has any required work at all — the size of the job; the
+     figure the progress bar divides by. Without it, only what is still
+     owed inside [fromISO, toISO].
+
+     Returned in the nursery's own plot order rather than the order the
+     tables happened to arrive in, so the circles read P03 · P07 · P12
+     and an auditor can find one by eye. */
+  function _plots(mod, nursery, fromISO, toISO, ignoreAudits){
     if (!loaded) return [];
     const owed = new Set();
 
@@ -250,12 +254,14 @@
       roster.forEach(b => {
         if (b.nursery !== nursery) return;
         if (notRequired(b.plot, b.batch)) return;
-        if (auditedIn(mod, nursery, b.plot, b.batch, fromISO, toISO)) return;
+        if (!ignoreAudits &&
+            auditedIn(mod, nursery, b.plot, b.batch, fromISO, toISO)) return;
         owed.add(b.plot);
       });
     } else if (mod === 'papan') {
       latestPapanPerPlot(nursery).forEach(b => {
-        if (auditedIn('papan', nursery, b.plot, b.batch, fromISO, toISO)) return;
+        if (!ignoreAudits &&
+            auditedIn('papan', nursery, b.plot, b.batch, fromISO, toISO)) return;
         owed.add(b.plot);
       });
     } else {
@@ -269,6 +275,17 @@
        rather than vanishing. */
     const extra = [...owed].filter(p => order.indexOf(p) === -1).sort();
     return ranked.concat(extra);
+  }
+
+  /* Plots still owed inside the window. */
+  function plots(mod, nursery, fromISO, toISO){
+    return _plots(mod, nursery, fromISO, toISO, false);
+  }
+
+  /* Every plot with work, audited or not — one task per plot, which is
+     how the portal counts a day's workload. */
+  function plotsAll(mod, nursery){
+    return _plots(mod, nursery, '', '', true);
   }
 
   /* Is there any basis to judge this module and nursery at all?
@@ -291,6 +308,7 @@
   global.MJMAuditPending = {
     load: load,
     plots: plots,
+    plotsAll: plotsAll,
     covers: covers,
     ready: () => loaded,
     plotList: (n) => (NURSERY_PLOTS[n] || []).slice()
