@@ -6768,6 +6768,13 @@ Thank you.`;
                                               .replace(/^PLOT\s*:?\s*/, '')   // drop a "Plot " prefix
                                               .split(/[\s(,\[]/)[0].replace(/[^0-9A-Z\-]/g, '');
                 const _bt = _normBatchKey(batchId);
+                // Diagnostic: every DO line that contributed to this batch's
+                // sales gets logged. Open DevTools > Console and grep for
+                // [t6:sales] to audit "why does plot X show N sold" — the
+                // list below is every DO/line/qty that added up to that N,
+                // ordered by DO number so you can cross-check against the
+                // DO modal.
+                const _salesTrace = [];
                 ((doRes && doRes.data) || []).forEach(d => {
                     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
                     // How many collection lines does this DO actually carry?
@@ -6778,10 +6785,26 @@ Thank you.`;
                         if (!plotKey) continue;
                         if (_normBatchKey(d[`batch_${i}`]) !== _bt) continue; // this batch only
                         let qty = Number(d[`qty_${i}`] || 0);
-                        if (!qty && filled === 1) qty = Number(d.total_qty || 0); // single-line DO
-                        if (!qty) { console.warn('[t6] DO', d.do_number, 'line', i, 'has no qty — skipped'); continue; }
+                        const fallback = (!qty && filled === 1);
+                        if (fallback) qty = Number(d.total_qty || 0); // single-line DO
+                        if (!qty) { console.warn('[t6:sales] DO', d.do_number, 'line', i, 'has no qty — skipped'); continue; }
                         salesMap[plotKey] = (salesMap[plotKey] || 0) + qty;
+                        _salesTrace.push({
+                            do: d.do_number, line: i, plot: plotKey, qty,
+                            raw_batch: d[`batch_${i}`], status: d.status,
+                            fallback_from_total_qty: fallback
+                        });
                     }
+                });
+                // Group the trace by plot so it reads as "here's what added
+                // up to that plot's number".
+                const _byPlot = {};
+                _salesTrace.forEach(t => { (_byPlot[t.plot] = _byPlot[t.plot] || []).push(t); });
+                Object.keys(_byPlot).forEach(plot => {
+                    const rows = _byPlot[plot];
+                    const total = rows.reduce((s, r) => s + r.qty, 0);
+                    console.log('[t6:sales] batch', batchId, '· plot', plot, '=', total,
+                                '(' + rows.length + ' DO line' + (rows.length===1?'':'s') + ')', rows);
                 });
             }
 
