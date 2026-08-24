@@ -4,14 +4,21 @@
 
    The round Nelos button that follows the user around the portal.
 
-   Every page that loads this file gets a small floating circle in the
-   bottom-right corner with the number of pending Nelos cases on it.
-   Tap it and it expands into a To-Do panel — pending cases, worst
-   first, each one a link straight into nelos/nelos_case.html. Tap the
-   minimise arrow and it shrinks back to the circle. Whether it is open
-   or shut, and which tab it was on, is remembered in localStorage, so
-   it stays the way the user left it as they move from Stock to Audit
-   to Payroll.
+   Every page that loads this file gets a small floating circle with the
+   number of cases waiting on THAT PERSON on it. Tap it and it expands
+   into their To-Do list — overdue pinned at the top, then the rest,
+   each row a link straight into nelos/nelos_case.html. Tap the minus
+   and it shrinks back to the circle.
+
+   The list is deliberately one list, not a set of tabs: what is
+   assigned to me, and what of it is late. Everybody else's cases, every
+   status and every filter live one tap away on "Open Nelos →" — the
+   dock is a reminder, not a second dashboard.
+
+   The circle can be dragged anywhere on the screen and the panel can be
+   dragged bigger by its corner grip. Where it sits, how big it is and
+   whether it was left open all live in localStorage, so it stays put as
+   the user moves from Stock to Audit to Payroll.
 
    Usage — one line, anywhere in the page, no markup and no init call:
 
@@ -68,10 +75,16 @@
   var OPT_HIDE_ON = (THIS_SCRIPT && THIS_SCRIPT.getAttribute('data-hide-on')) || '';
 
   var LS_OPEN = 'mjm_nelos_dock_open';
-  var LS_TAB  = 'mjm_nelos_dock_tab';
+  var LS_POS  = 'mjm_nelos_dock_pos';      // where the user parked the circle
+  var LS_SIZE = 'mjm_nelos_dock_size';     // how big they dragged the panel
 
   var REFRESH_MS = 90000;      // background refresh while the page is open
-  var LIMIT      = 40;
+  var LIMIT      = 60;
+
+  var GAP    = 10;             // circle ↔ panel
+  var EDGE   = 8;              // closest the circle may sit to a screen edge
+  var MIN_W  = 280, MIN_H = 220;
+  var DEF_W  = 370, DEF_H = 0; // 0 = let the content decide, up to the max
 
   /* ── Stand down quietly where the dock does not belong ───────── */
 
@@ -177,13 +190,14 @@
     return _refreshing;
   }
 
-  /* ── Reading the pending cases ───────────────────────────────── */
+  /* ── Reading my pending cases ────────────────────────────────── */
 
   var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
                      'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
   var PRIORITY_LABEL = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
+
   /* Fallback labels for the chip on each line — the same map
      shared_nelos.js carries. The live ones are rows in nelos_modules,
      which the User Setting page can rename; keep these in step. */
@@ -286,9 +300,15 @@
     var token = await accessToken();
     if (!token) return { rows: [], error: 'no-session' };
 
+    var uid = me().id;
+    if (!uid) return { rows: [], error: 'no-session' };
+
+    // Mine only — the dock is this person's To-Do list. Everyone else's
+    // cases are what "Open Nelos →" is for.
     var q = CFG.url + '/rest/v1/nelos_cases' +
             '?select=' + encodeURIComponent(PENDING_COLS) +
             '&status=in.(open,in_progress)' +
+            '&assignee_id=eq.' + encodeURIComponent(uid) +
             '&order=due_date.asc.nullslast,created_at.asc' +
             '&limit=' + LIMIT;
     if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
@@ -318,10 +338,15 @@
   #nelos-dock { position:fixed; right:18px; bottom:18px; z-index:2147483000;
                 display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
   #nelos-dock[hidden] { display:none !important; }
+  /* Parked in the top half → the panel hangs below the circle instead
+     of above it; parked on the left → everything aligns left. */
+  #nelos-dock.nd-below { flex-direction:column-reverse; }
+  #nelos-dock.nd-left  { align-items:flex-start; }
+  #nelos-dock.nd-busy  { user-select:none; -webkit-user-select:none; }
 
   /* ── the round button ── */
   #nelos-dock-fab { position:relative; width:58px; height:58px; border:none; border-radius:50%;
-                    cursor:pointer; padding:0; color:#fff; font-family:inherit;
+                    cursor:grab; padding:0; color:#fff; font-family:inherit; touch-action:none;
                     background:linear-gradient(135deg,#7c3aed 0%,#a855f7 55%,#6d28d9 100%);
                     box-shadow:0 10px 26px rgba(109,40,217,.42), 0 2px 6px rgba(15,23,42,.2);
                     display:flex; align-items:center; justify-content:center;
@@ -329,14 +354,16 @@
   #nelos-dock-fab:hover  { transform:translateY(-2px) scale(1.04);
                            box-shadow:0 14px 32px rgba(109,40,217,.5), 0 3px 8px rgba(15,23,42,.24); }
   #nelos-dock-fab:active { transform:scale(.96); }
+  #nelos-dock.nd-busy #nelos-dock-fab { cursor:grabbing; transform:scale(1.06);
+                                        box-shadow:0 18px 38px rgba(109,40,217,.55); transition:none; }
   #nelos-dock-fab .nd-mark { font-size:15px; font-weight:900; letter-spacing:.06em; line-height:1; }
   #nelos-dock-fab .nd-sub  { font-size:7px; font-weight:900; letter-spacing:.14em; opacity:.82; margin-top:2px; }
-  #nelos-dock-fab .nd-stack { display:flex; flex-direction:column; align-items:center; }
+  #nelos-dock-fab .nd-stack { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
 
   /* the count sitting on the shoulder of the circle */
   #nelos-dock-badge { position:absolute; top:-3px; right:-3px; min-width:23px; height:23px; padding:0 6px;
                       border-radius:999px; background:#dc2626; color:#fff; border:2.5px solid #fff;
-                      font-size:11px; font-weight:900; line-height:1;
+                      font-size:11px; font-weight:900; line-height:1; pointer-events:none;
                       display:flex; align-items:center; justify-content:center; }
   #nelos-dock-badge.zero  { background:#16a34a; }
   #nelos-dock-badge.hot   { animation:nd-pulse 1.9s ease-in-out infinite; }
@@ -347,15 +374,15 @@
   }
 
   /* ── the panel ── */
-  #nelos-dock-panel { width:min(370px, calc(100vw - 30px)); max-height:min(70vh, 560px);
+  #nelos-dock-panel { position:relative; width:370px; max-width:calc(100vw - 24px); max-height:min(70vh,560px);
                       background:#fff; border:1.5px solid #ede9fe; border-radius:18px; overflow:hidden;
-                      box-shadow:0 22px 55px rgba(15,23,42,.22); display:flex; flex-direction:column;
-                      transform-origin:bottom right; animation:nd-in .18s ease-out; }
+                      box-shadow:0 22px 55px rgba(15,23,42,.22); display:flex; flex-direction:column; }
   #nelos-dock-panel[hidden] { display:none; }
+  #nelos-dock-panel.nd-in { animation:nd-in .18s ease-out; }
   @keyframes nd-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 
   .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px;
-             background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; }
+             background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; flex-shrink:0; }
   .nd-head-mark { width:29px; height:29px; border-radius:9px; background:rgba(255,255,255,.2);
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
@@ -366,19 +393,20 @@
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
-  .nd-tabs { display:flex; gap:6px; padding:10px 12px 8px; border-bottom:1px solid #f1f5f9; background:#faf5ff; }
-  .nd-tab { flex:1; padding:6px 4px; border-radius:8px; border:1px solid transparent; cursor:pointer;
-            background:transparent; font-family:inherit; font-size:9.5px; font-weight:900;
-            letter-spacing:.07em; text-transform:uppercase; color:#7e22ce; }
-  .nd-tab:hover    { background:#f3e8ff; }
-  .nd-tab.on       { background:#fff; border-color:#ddd6fe; color:#5b21b6; box-shadow:0 1px 3px rgba(88,28,135,.12); }
-  .nd-tab .nd-tab-n { font-weight:900; opacity:.65; margin-left:3px; }
+  .nd-list { overflow-y:auto; flex:1; padding:0 0 4px; -webkit-overflow-scrolling:touch; }
 
-  .nd-list { overflow-y:auto; flex:1; padding:4px 0; -webkit-overflow-scrolling:touch; }
+  /* the overdue block, pinned to the top of the scroll */
+  .nd-sec { padding:7px 14px 5px; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+            color:#94a3b8; background:#fff; }
+  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
+                 border-bottom:1px solid #fee2e2; padding:7px 14px; }
+
   .nd-row { display:flex; align-items:flex-start; gap:9px; padding:10px 14px;
             border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit; }
   .nd-row:last-child { border-bottom:none; }
   .nd-row:hover { background:#faf5ff; }
+  .nd-row-over { background:#fffbfb; }
+  .nd-row-over:hover { background:#fef2f2; }
   .nd-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
   .nd-p-urgent { background:#dc2626; } .nd-p-high { background:#f97316; }
   .nd-p-normal { background:#0ea5e9; } .nd-p-low  { background:#94a3b8; }
@@ -395,15 +423,28 @@
   .nd-over  { color:#b91c1c; font-weight:900; white-space:nowrap; }
   .nd-empty { text-align:center; font-size:11.5px; font-weight:700; color:#94a3b8; padding:34px 16px; line-height:1.7; }
 
-  .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; }
+  .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; flex-shrink:0; }
   .nd-btn  { flex:1; text-align:center; padding:9px 10px; border-radius:10px; text-decoration:none;
              font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
   .nd-btn-a { background:#7c3aed; color:#fff; }  .nd-btn-a:hover { background:#6d28d9; }
   .nd-btn-b { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
   .nd-btn-b:hover { background:#ede9fe; }
 
+  /* ── the resize grip ──
+     It sits on whichever corner of the panel is pointing AWAY from the
+     circle, so dragging it outward always means bigger. */
+  .nd-grip { position:absolute; width:22px; height:22px; z-index:3; touch-action:none;
+             cursor:nwse-resize; opacity:.55; }
+  .nd-grip:hover { opacity:1; }
+  .nd-grip::after { content:''; position:absolute; inset:5px;
+                    border-top:2px solid currentColor; border-left:2px solid currentColor;
+                    border-radius:3px 0 0 0; }
+  #nelos-dock .nd-grip { top:2px; left:2px; color:#fff; }                                  /* panel above, right-aligned */
+  #nelos-dock.nd-left  .nd-grip { left:auto; right:2px; cursor:nesw-resize; transform:scaleX(-1); }
+  #nelos-dock.nd-below .nd-grip { top:auto; bottom:2px; color:#94a3b8; cursor:nesw-resize; transform:scaleY(-1); }
+  #nelos-dock.nd-below.nd-left .nd-grip { cursor:nwse-resize; transform:scale(-1,-1); }
+
   @media (max-width:640px) {
-    #nelos-dock { right:14px; bottom:14px; }
     #nelos-dock-fab { width:54px; height:54px; }
   }
   @media (prefers-reduced-motion:reduce) {
@@ -442,11 +483,9 @@
     var bits = [
       esc(c.case_no || ''),
       subject && esc(subject),
-      c.assignee_name ? '<span class="nd-nw">→ ' + esc(c.assignee_name) + '</span>'
-                      : '<em>unassigned</em>',
       dueText(c.due_date)
     ].filter(Boolean);
-    return '<a class="nd-row" href="' + esc(caseHref(c.id)) + '">' +
+    return '<a class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') + '" href="' + esc(caseHref(c.id)) + '">' +
              '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
                    'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
              '<span class="nd-main">' +
@@ -459,8 +498,8 @@
            '</a>';
   }
 
-  var dock, fab, badge, panel, listEl, tabsEl;
-  var rows = [], tab = 'all', open = false;
+  var dock, fab, badge, panel, listEl, grip;
+  var rows = [], open = false;
 
   function build() {
     var style = document.createElement('style');
@@ -472,19 +511,15 @@
     dock.id = 'nelos-dock';
     dock.setAttribute('aria-live', 'polite');
     dock.innerHTML =
-      '<div id="nelos-dock-panel" hidden role="dialog" aria-label="Nelos pending cases">' +
+      '<div id="nelos-dock-panel" hidden role="dialog" aria-label="My Nelos to-do list">' +
+        '<div class="nd-grip" title="Drag to resize"></div>' +
         '<div class="nd-head">' +
           '<div class="nd-head-mark">NL</div>' +
           '<div>' +
-            '<div class="nd-head-t">Nelos</div>' +
-            '<div class="nd-head-s">To-Do · Pending Cases</div>' +
+            '<div class="nd-head-t">My To-Do</div>' +
+            '<div class="nd-head-s">Nelos · Assigned to me</div>' +
           '</div>' +
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
-        '</div>' +
-        '<div class="nd-tabs">' +
-          '<button class="nd-tab on" type="button" data-tab="all">All<span class="nd-tab-n"></span></button>' +
-          '<button class="nd-tab" type="button" data-tab="mine">Mine<span class="nd-tab-n"></span></button>' +
-          '<button class="nd-tab" type="button" data-tab="overdue">Overdue<span class="nd-tab-n"></span></button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
         '<div class="nd-foot">' +
@@ -493,7 +528,8 @@
              (OPT_SOURCE ? '&source=' + encodeURIComponent(OPT_SOURCE) : '') + '">➕ Raise a Case</a>' +
         '</div>' +
       '</div>' +
-      '<button id="nelos-dock-fab" type="button" title="Nelos — pending cases" aria-label="Nelos — pending cases">' +
+      '<button id="nelos-dock-fab" type="button" title="Nelos — my to-do (drag to move)" ' +
+              'aria-label="Nelos — my to-do">' +
         '<span class="nd-stack"><span class="nd-mark">NL</span><span class="nd-sub">NELOS</span></span>' +
         '<span id="nelos-dock-badge" hidden>0</span>' +
       '</button>';
@@ -503,67 +539,234 @@
     badge  = dock.querySelector('#nelos-dock-badge');
     panel  = dock.querySelector('#nelos-dock-panel');
     listEl = dock.querySelector('.nd-list');
-    tabsEl = dock.querySelector('.nd-tabs');
+    grip   = dock.querySelector('.nd-grip');
 
-    fab.addEventListener('click', function () { setOpen(!open); });
-    dock.querySelector('.nd-min').addEventListener('click', function () { setOpen(false); });
-    tabsEl.addEventListener('click', function (e) {
-      var b = e.target.closest('.nd-tab');
-      if (!b) return;
-      tab = b.getAttribute('data-tab');
-      try { localStorage.setItem(LS_TAB, tab); } catch (_) {}
-      paint();
+    fab.addEventListener('click', function (e) {
+      // A drag that ended on the circle is not a tap.
+      if (fab.dataset.ndDragged === '1') { fab.dataset.ndDragged = '0'; e.preventDefault(); return; }
+      setOpen(!open);
     });
+    dock.querySelector('.nd-min').addEventListener('click', function () { setOpen(false); });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && open) setOpen(false);
     });
+
+    wireDrag();
+    wireResize();
+    window.addEventListener('resize', function () { applyPos(pos, true); });
   }
 
   /* Expanded or minimised — remembered, so it carries across pages. */
+  var _inTimer = null;
+
   function setOpen(next) {
     open = !!next;
     panel.hidden = !open;
+    if (open) {
+      panel.classList.add('nd-in');
+      clearTimeout(_inTimer);
+      _inTimer = setTimeout(function () { panel.classList.remove('nd-in'); }, 260);
+    }
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
     try { localStorage.setItem(LS_OPEN, open ? '1' : '0'); } catch (_) {}
-    if (open) refresh();
+    if (open) { applyPos(pos); refresh(); }
   }
 
-  function visible() {
-    var mineId = me().id;
-    if (tab === 'mine')    return rows.filter(function (c) { return mineId && c.assignee_id === mineId; });
-    if (tab === 'overdue') return rows.filter(isOverdue);
-    return rows;
+  /* ── Where the circle is parked ──────────────────────────────────
+     Stored as the distance to the two nearest edges, so the dock keeps
+     its corner when the window changes size. nd-below / nd-left then
+     decide which way the panel opens out of it. */
+
+  var pos = null;      // { ex:'right'|'left', x, ey:'bottom'|'top', y }
+
+  function defaultPos() { return { ex: 'right', x: 18, ey: 'bottom', y: 18 }; }
+
+  function loadPos() {
+    try {
+      var p = JSON.parse(localStorage.getItem(LS_POS) || 'null');
+      if (p && (p.ex === 'left' || p.ex === 'right') && (p.ey === 'top' || p.ey === 'bottom') &&
+          isFinite(p.x) && isFinite(p.y)) return p;
+    } catch (_) {}
+    return defaultPos();
   }
 
-  function paint() {
-    var mineId = me().id;
-    var counts = {
-      all: rows.length,
-      mine: rows.filter(function (c) { return mineId && c.assignee_id === mineId; }).length,
-      overdue: rows.filter(isOverdue).length
+  function savePos(p) { try { localStorage.setItem(LS_POS, JSON.stringify(p)); } catch (_) {} }
+
+  /* Keep the circle on screen and give the panel the room that is left. */
+  function applyPos(p, clampOnly) {
+    if (!p) p = defaultPos();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var fw = fab.offsetWidth || 58, fh = fab.offsetHeight || 58;
+
+    p.x = Math.max(EDGE, Math.min(p.x, Math.max(EDGE, vw - fw - EDGE)));
+    p.y = Math.max(EDGE, Math.min(p.y, Math.max(EDGE, vh - fh - EDGE)));
+    pos = p;
+
+    dock.style.left   = p.ex === 'left'   ? p.x + 'px' : 'auto';
+    dock.style.right  = p.ex === 'right'  ? p.x + 'px' : 'auto';
+    dock.style.top    = p.ey === 'top'    ? p.y + 'px' : 'auto';
+    dock.style.bottom = p.ey === 'bottom' ? p.y + 'px' : 'auto';
+    dock.classList.toggle('nd-left',  p.ex === 'left');
+    dock.classList.toggle('nd-below', p.ey === 'top');
+
+    // The panel may only use the space between the circle and the far
+    // side of the screen.
+    var availH = Math.max(MIN_H, vh - p.y - fh - GAP - 12);
+    var availW = Math.max(MIN_W, vw - p.x - 12);
+    panel.style.maxHeight = Math.min(availH, vh - 24) + 'px';
+    panel.style.maxWidth  = Math.min(availW, vw - 24) + 'px';
+
+    if (!clampOnly) savePos(p);
+  }
+
+  /* The corner-to-corner anchor for a circle sitting at this rectangle. */
+  function anchorFor(left, top) {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var fw = fab.offsetWidth || 58, fh = fab.offsetHeight || 58;
+    var cx = left + fw / 2, cy = top + fh / 2;
+    return {
+      ex: cx > vw / 2 ? 'right' : 'left',
+      x:  cx > vw / 2 ? vw - (left + fw) : left,
+      ey: cy > vh / 2 ? 'bottom' : 'top',
+      y:  cy > vh / 2 ? vh - (top + fh) : top
     };
+  }
 
-    // Badge: the pending total, red, and pulsing when something is
-    // overdue or urgent.
-    var hot = counts.overdue > 0 || rows.some(function (c) { return c.priority === 'urgent'; });
-    badge.hidden = false;
-    badge.textContent = counts.all > 99 ? '99+' : String(counts.all);
-    badge.className = (counts.all ? '' : 'zero') + (counts.all && hot ? ' hot' : '');
+  /* ── Dragging the circle ─────────────────────────────────────── */
 
-    Array.prototype.forEach.call(tabsEl.querySelectorAll('.nd-tab'), function (b) {
-      var k = b.getAttribute('data-tab');
-      b.classList.toggle('on', k === tab);
-      b.querySelector('.nd-tab-n').textContent = counts[k] ? '(' + counts[k] + ')' : '';
+  function wireDrag() {
+    var dragging = false, moved = false, grabX = 0, grabY = 0;
+
+    fab.addEventListener('pointerdown', function (e) {
+      if (e.button && e.button !== 0) return;
+      var r = fab.getBoundingClientRect();
+      grabX = e.clientX - r.left;
+      grabY = e.clientY - r.top;
+      dragging = true; moved = false;
+      fab.dataset.ndDragged = '0';
+      try { fab.setPointerCapture(e.pointerId); } catch (_) {}
     });
 
-    var show = visible();
-    listEl.innerHTML = show.length
-      ? show.map(rowHtml).join('')
-      : '<div class="nd-empty">' + (
-          tab === 'mine'    ? 'Nothing assigned to you ✓' :
-          tab === 'overdue' ? 'Nothing overdue ✓' :
-                              'Nothing pending — all clear ✓'
-        ) + '</div>';
+    fab.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      var left = e.clientX - grabX, top = e.clientY - grabY;
+      if (!moved) {
+        // A few pixels of slop, so a tap with a shaky finger still opens
+        // the panel instead of nudging the circle.
+        var r = fab.getBoundingClientRect();
+        if (Math.abs(left - r.left) < 4 && Math.abs(top - r.top) < 4) return;
+        moved = true;
+        dock.classList.add('nd-busy');
+      }
+      e.preventDefault();
+      applyPos(anchorFor(left, top), true);
+    });
+
+    function end(e) {
+      if (!dragging) return;
+      dragging = false;
+      dock.classList.remove('nd-busy');
+      try { fab.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (moved) {
+        fab.dataset.ndDragged = '1';       // swallow the click that follows
+        applyPos(pos);                     // clamp + save where it landed
+      }
+    }
+    fab.addEventListener('pointerup', end);
+    fab.addEventListener('pointercancel', end);
+  }
+
+  /* ── Dragging the panel bigger ───────────────────────────────── */
+
+  var size = null;     // { w, h } once the user has resized it
+
+  function loadSize() {
+    try {
+      var s = JSON.parse(localStorage.getItem(LS_SIZE) || 'null');
+      if (s && isFinite(s.w) && isFinite(s.h) && s.w >= MIN_W && s.h >= MIN_H) return s;
+    } catch (_) {}
+    return null;
+  }
+
+  function applySize(s) {
+    size = s;
+    if (!s) { panel.style.width = DEF_W + 'px'; panel.style.height = ''; return; }
+    panel.style.width  = s.w + 'px';
+    panel.style.height = s.h + 'px';
+  }
+
+  function wireResize() {
+    var sizing = false, sx = 0, sy = 0, sw = 0, sh = 0, signX = -1, signY = -1, live = null;
+
+    grip.addEventListener('pointerdown', function (e) {
+      if (e.button && e.button !== 0) return;
+      var r = panel.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height; live = null;
+      // The grip is on the corner facing away from the circle, so which
+      // way "bigger" runs depends on where the dock is parked.
+      signX = dock.classList.contains('nd-left')  ? 1 : -1;
+      signY = dock.classList.contains('nd-below') ? 1 : -1;
+      sizing = true;
+      dock.classList.add('nd-busy');
+      try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault(); e.stopPropagation();
+    });
+
+    grip.addEventListener('pointermove', function (e) {
+      if (!sizing) return;
+      e.preventDefault();
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var w = sw + signX * (e.clientX - sx);
+      var h = sh + signY * (e.clientY - sy);
+      live = {
+        w: Math.round(Math.max(MIN_W, Math.min(w, vw - 24))),
+        h: Math.round(Math.max(MIN_H, Math.min(h, vh - 24)))
+      };
+      panel.style.width  = live.w + 'px';
+      panel.style.height = live.h + 'px';
+    });
+
+    function end(e) {
+      if (!sizing) return;
+      sizing = false;
+      dock.classList.remove('nd-busy');
+      try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (!live) return;                    // pressed the grip but never moved
+      size = live; live = null;
+      try { localStorage.setItem(LS_SIZE, JSON.stringify(size)); } catch (_) {}
+    }
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+  }
+
+  /* ── The list ────────────────────────────────────────────────── */
+
+  function paint() {
+    var over = rows.filter(isOverdue);
+    var rest = rows.filter(function (c) { return !isOverdue(c); });
+
+    // Badge: how many are on this person's plate, red and pulsing when
+    // any of them is late or urgent.
+    var hot = over.length > 0 || rows.some(function (c) { return c.priority === 'urgent'; });
+    badge.hidden = false;
+    badge.textContent = rows.length > 99 ? '99+' : String(rows.length);
+    badge.className = (rows.length ? '' : 'zero') + (rows.length && hot ? ' hot' : '');
+
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="nd-empty">Nothing assigned to you ✓<br>' +
+                         'Open Nelos to see every case.</div>';
+      return;
+    }
+
+    var html = '';
+    if (over.length) {
+      // Overdue rides at the top of the scroll and stays there.
+      html += '<div class="nd-sec nd-sec-over">⏰ Overdue · ' + over.length + '</div>' +
+              over.map(rowHtml).join('');
+      if (rest.length) html += '<div class="nd-sec">Still on time · ' + rest.length + '</div>';
+    }
+    html += rest.map(rowHtml).join('');
+    listEl.innerHTML = html;
   }
 
   /* ── Refresh loop ────────────────────────────────────────────── */
@@ -623,9 +826,9 @@
 
     build();
 
-    try { tab  = localStorage.getItem(LS_TAB) || 'all'; } catch (_) {}
     try { open = localStorage.getItem(LS_OPEN) === '1'; } catch (_) {}
-    if (['all', 'mine', 'overdue'].indexOf(tab) === -1) tab = 'all';
+    applySize(loadSize());
+    applyPos(loadPos(), true);
     panel.hidden = !open;
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
 
@@ -644,7 +847,15 @@
   window.NelosDock = {
     refresh: function () { if (dock) refresh(); },
     open:    function () { if (dock) setOpen(true); },
-    close:   function () { if (dock) setOpen(false); }
+    close:   function () { if (dock) setOpen(false); },
+    /* Back to the bottom-right corner at its default size, for a circle
+       someone has parked somewhere unhelpful. */
+    reset:   function () {
+      try { localStorage.removeItem(LS_POS); localStorage.removeItem(LS_SIZE); } catch (_) {}
+      if (!dock) return;
+      applySize(null);
+      applyPos(defaultPos());
+    }
   };
 
   if (document.readyState === 'loading') {
