@@ -58,6 +58,12 @@ function setView(v){
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
   const fab=document.getElementById('fab');if(fab)fab.classList.toggle('hidden',v!=='list');
+  /* One back arrow at a time. Sub-views (plot detail, form) each carry
+     their own back button inside .form-view-header, so the outer top-bar
+     one steps aside; on the list view it comes back to be the only way
+     out to the audit home. */
+  const topBack=document.querySelector('.top-bar-back');
+  if(topBack)topBack.style.display=(v==='list')?'':'none';
   window.scrollTo(0,0);
 }
 function selectTab(nursery){
