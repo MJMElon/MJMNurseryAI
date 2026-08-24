@@ -194,6 +194,11 @@ function setView(v){
   activeView=v;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
+  /* One back arrow at a time. Sub-views carry their own back button in
+     the sub-header, so the outer top-bar back steps aside; on the list
+     view it returns as the only way back to audit_home. */
+  const topBack=document.querySelector('.top-bar-back');
+  if(topBack)topBack.style.display=(v==='list')?'':'none';
   window.scrollTo(0,0);
 }
 /* selectTab was the old bottom "To Audit / History" toggle. That bar is
