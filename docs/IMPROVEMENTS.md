@@ -89,13 +89,15 @@ file changes — `audit/*` already does this (`audit_lang.js?v=20260824d`). One
 
 ---
 
-## 3. The Supabase config is copied into 47 files
+## 3. The Supabase config is copied into 24 live files
 
-Three different constant names for the same project — `SUPABASE_URL` (38 pages),
-`SHARED_SUPA_URL` (28), `SUPA_URL` (3) — each with the key pasted beside it.
+Three different constant names for the same project, across 69 `createClient`
+call sites — `SUPABASE_URL` (38), `SHARED_SUPA_URL` (28), `SUPA_URL` (3) — and 24
+live files with the key pasted in beside them. (49 files if you count `legacy/`,
+which is item 8's problem, not this one's.)
 
 The key being public is fine; that is what an anon key is for. The problem is the
-day you rotate it, or point a module at a second project: 47 edits, and the one
+day you rotate it, or point a module at a second project: 24 edits, and the one
 you miss fails silently at runtime.
 
 **Fix:** every page loads `shared/shared_supabase.js` and uses
@@ -115,9 +117,11 @@ const SUPABASE_URL = SHARED_SUPA_URL, SUPABASE_KEY = SHARED_SUPA_KEY;
 markup — the URL into an `src=` attribute — and `operation_inventory_map.html`
 was doing the same with a nursery name. Both now escape.
 
-The wider point stands: there are 221 `innerHTML = \`…\`` templates in the repo
-and only 21 files define an `esc()`. Right now the exposure is small because only
-staff can write those fields, but that is a policy accident, not a defence.
+Five interpolations are still unescaped and all five are harmless — three are a
+filename the user themselves just picked in a file dialog, two are literals. The
+wider point stands though: 220 `innerHTML = \`…\`` templates in the repo, and only
+22 files define an `esc()`. Today's exposure is small because only staff can write
+those fields, but that is a policy accident, not a defence.
 
 **Fix:** move `esc()` into `shared/shared_supabase.js` (or a new
 `shared/shared_dom.js`) so every page has one without declaring it, and use it on
