@@ -35,6 +35,16 @@
    and it means this file can be dropped onto ANY page in the portal
    without caring what else that page loaded.
 
+   WHO SEES WHAT
+   -------------
+   The dock obeys the same visibility rule as MJMNelos.pending(): the
+   memberships on nelos/nelos_user_setting.html decide which modules —
+   and which categories inside them — a person's cases come from. No
+   membership rows anywhere means no restriction, and a Nelos admin
+   always sees everything. Re-implemented here rather than imported for
+   the same reason as the query above; shared_nelos.js scope() is the
+   authority on the rule, so keep the two in step.
+
    Everything fails SOFT, exactly like the To-Do widget: no session, no
    table, no network, migration not run — the dock removes itself and
    the host page never notices. A floating button is not allowed to
@@ -128,10 +138,11 @@
   function me() {
     var s = storedSession();
     var u = s && s.user;
-    if (!u) return { id: null, name: null };
+    if (!u) return { id: null, name: null, email: null };
     return {
       id: u.id || null,
-      name: (u.user_metadata && u.user_metadata.full_name) || u.email || null
+      name: (u.user_metadata && u.user_metadata.full_name) || u.email || null,
+      email: u.email || null
     };
   }
 
@@ -168,15 +179,105 @@
 
   /* ── Reading the pending cases ───────────────────────────────── */
 
-  var PENDING_COLS = 'id,case_no,title,priority,status,source_module,nursery_name,' +
+  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
                      'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
   var PRIORITY_LABEL = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
+  /* Fallback labels for the chip on each line — the same map
+     shared_nelos.js carries. The live ones are rows in nelos_modules,
+     which the User Setting page can rename; keep these in step. */
   var SOURCE_LABEL   = {
-    operation: 'Stock', nursery_ops: 'Nursery Ops', audit: 'Audit',
-    scan: 'FC Portal', npayroll: 'Payroll', nelos: 'Nelos'
+    operation: 'AI Stock System', nursery_ops: 'Nursery Operation',
+    scan: 'FC Portal', mobile: 'Admin Portal', audit: 'Auditor Portal',
+    npayroll: 'Payroll', nelos: 'Nelos'
   };
+
+  function authHeaders(token) {
+    return { 'apikey': CFG.key, 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' };
+  }
+
+  /* ── Who sees which cases ────────────────────────────────────────
+     Mirrors MJMNelos.scope(): memberships set on nelos_user_setting.html
+     narrow a person to certain modules, and optionally to certain
+     categories inside them. No rows at all → no restriction. A Nelos
+     admin → no restriction, so nobody can lock themselves out of their
+     own case log. Any failure yields the unrestricted scope, because a
+     lookup that cannot run must not hide cases from anyone. */
+
+  var _scope = null;
+
+  async function isNelosAdmin(token) {
+    // shared_access.js already knows, on the pages that load it.
+    try {
+      if (window.MJMAccess && window.MJMAccess.isAdminOf &&
+          window.MJMAccess.isAdminOf('nelos')) return true;
+    } catch (_) { /* fall through and ask the database */ }
+
+    var u = me();
+    if (!u.id) return false;
+    try {
+      // self_read_profile lets anyone signed in read their own row.
+      var r = await fetch(CFG.url + '/rest/v1/shared_profiles?select=permissions&id=eq.' +
+                          encodeURIComponent(u.id), { headers: authHeaders(token) });
+      if (!r.ok) return false;
+      var rows = await r.json();
+      var perms = rows && rows[0] && rows[0].permissions;
+      return !!(perms && perms.modules && perms.modules.nelos === 'admin');
+    } catch (_) { return false; }
+  }
+
+  async function loadScope(token) {
+    if (_scope) return _scope;
+    var open = { unrestricted: true, modules: null, cats: null };
+
+    if (await isNelosAdmin(token)) return (_scope = open);
+
+    var u = me();
+    var email = (u.email || '').toLowerCase();
+
+    // Match on user_id and on email both, so someone added before they
+    // ever signed in is still recognised. The or() list is comma
+    // separated, so an address carrying a comma or a bracket would split
+    // the filter into nonsense — those fall back to the user_id match.
+    // Everything else is percent-encoded, so a '+' in an address stays a
+    // '+' rather than arriving as a space.
+    var ors = [];
+    if (u.id) ors.push('user_id.eq.' + encodeURIComponent(u.id));
+    if (email && !/[,()"\\]/.test(email)) ors.push('email.ilike.' + encodeURIComponent(email));
+    if (!ors.length) return (_scope = open);
+
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_module_members' +
+                            '?select=module_key,categories&or=(' + ors.join(',') + ')',
+                            { headers: authHeaders(token) });
+      if (!res.ok) return (_scope = open);
+      var rows = await res.json();
+      if (!Array.isArray(rows) || !rows.length) return (_scope = open);
+
+      var modules = {};                 // module_key → true
+      var cats = {};                    // module_key → { name: true }, or null for all
+      rows.forEach(function (r) {
+        modules[r.module_key] = true;
+        var list = Array.isArray(r.categories) ? r.categories.filter(Boolean) : [];
+        if (!list.length) { cats[r.module_key] = null; return; }   // every category
+        if (cats[r.module_key] === null) return;                   // already unrestricted here
+        cats[r.module_key] = cats[r.module_key] || {};
+        list.forEach(function (c) { cats[r.module_key][c] = true; });
+      });
+      return (_scope = { unrestricted: false, modules: modules, cats: cats });
+    } catch (_) {
+      return (_scope = open);
+    }
+  }
+
+  function inScope(c, sc) {
+    if (!sc || sc.unrestricted) return true;
+    if (!sc.modules[c.source_module]) return false;
+    var allowed = sc.cats[c.source_module];
+    if (allowed === null || allowed === undefined) return true;    // every category
+    return !!c.category && !!allowed[c.category];
+  }
 
   /* Returns { rows, error }. A 404 (table missing, migration not run yet)
      and a 401 (session gone stale) both come back as errors, and an error
@@ -193,13 +294,7 @@
     if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
 
     try {
-      var res = await fetch(q, {
-        headers: {
-          'apikey': CFG.key,
-          'Authorization': 'Bearer ' + token,
-          'Accept': 'application/json'
-        }
-      });
+      var res = await fetch(q, { headers: authHeaders(token) });
       if (!res.ok) return { rows: [], error: 'http-' + res.status };
       var rows = await res.json();
       if (!Array.isArray(rows)) return { rows: [], error: 'shape' };
@@ -207,6 +302,9 @@
       rows.sort(function (a, b) {
         return (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9);
       });
+      // Narrow to what this person is set up to see (User Setting page).
+      var sc = await loadScope(token);
+      if (!sc.unrestricted) rows = rows.filter(function (c) { return inScope(c, sc); });
       return { rows: rows, error: null };
     } catch (e) {
       return { rows: [], error: 'network' };
@@ -289,8 +387,12 @@
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .nd-meta  { font-size:9.5px; font-weight:600; color:#94a3b8; margin-top:3px; line-height:1.5; }
   .nd-chip  { display:inline-block; font-size:8.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-              padding:1px 6px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-right:5px; }
-  .nd-over  { color:#b91c1c; font-weight:900; }
+              padding:1px 6px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-right:5px;
+              max-width:100%; vertical-align:middle; }
+  /* the due date and the owner read as one thing each, so they wrap
+     whole rather than splitting across two lines */
+  .nd-nw    { white-space:nowrap; }
+  .nd-over  { color:#b91c1c; font-weight:900; white-space:nowrap; }
   .nd-empty { text-align:center; font-size:11.5px; font-weight:700; color:#94a3b8; padding:34px 16px; line-height:1.7; }
 
   .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; }
@@ -328,7 +430,7 @@
     } catch (_) { label = d; }
     return d < todayISO()
       ? '<span class="nd-over">⏰ overdue ' + esc(label) + '</span>'
-      : 'due ' + esc(label);
+      : '<span class="nd-nw">due ' + esc(label) + '</span>';
   }
 
   function caseHref(id) { return ROOT + 'nelos/nelos_case.html?id=' + encodeURIComponent(id); }
@@ -340,7 +442,8 @@
     var bits = [
       esc(c.case_no || ''),
       subject && esc(subject),
-      c.assignee_name ? '→ ' + esc(c.assignee_name) : '<em>unassigned</em>',
+      c.assignee_name ? '<span class="nd-nw">→ ' + esc(c.assignee_name) + '</span>'
+                      : '<em>unassigned</em>',
       dueText(c.due_date)
     ].filter(Boolean);
     return '<a class="nd-row" href="' + esc(caseHref(c.id)) + '">' +
