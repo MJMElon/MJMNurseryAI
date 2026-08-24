@@ -1069,6 +1069,11 @@ async function runMovementReport(scope) {
       if (!realRows.has(pk)) realRows.set(pk, new Map());
       if (!realRows.get(pk).has(bk)) realRows.get(pk).set(bk, { place: e.place, batch: e.batch });
     });
+    // Diagnostic trace — every DO line that landed as a Sold event
+    // for the main-nursery view. Open DevTools > Console and grep for
+    // [mv:sales] to audit "which DO lines add up to N sold on plot X
+    // batch Y". Grouped and totalled below the raw list.
+    const _salesTrace = [];
     (dosRes.data || []).forEach(d => {
       if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
       for (let i = 1; i <= 5; i++) {
@@ -1079,7 +1084,23 @@ async function runMovementReport(scope) {
         const hit = (realRows.get(_mvPlotKey(plot)) || new Map()).get(_mvBatchKey(d[`batch_${i}`]));
         if (!hit) { unmatchedSales.push({ plot: plot || '—', batch: d[`batch_${i}`] || '—', qty }); continue; }
         ev.push({ date: d.delivery_date || null, place: hit.place, batch: hit.batch, col: 'sold', qty });
+        _salesTrace.push({
+          do: d.do_number || d.id, line: i,
+          plot: hit.place, batch: hit.batch,
+          raw_plot: plot, raw_batch: d[`batch_${i}`], qty,
+          delivery_date: d.delivery_date, status: d.status
+        });
       }
+    });
+    const _byPB = {};
+    _salesTrace.forEach(t => {
+      const k = t.plot + ' · ' + t.batch;
+      (_byPB[k] = _byPB[k] || []).push(t);
+    });
+    Object.keys(_byPB).sort().forEach(k => {
+      const rows = _byPB[k];
+      const total = rows.reduce((s, r) => s + r.qty, 0);
+      console.log('[mv:sales]', k, '=', total, '(' + rows.length + ' DO line' + (rows.length===1?'':'s') + ')', rows);
     });
   }
 
