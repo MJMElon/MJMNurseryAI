@@ -26,8 +26,9 @@
 --
 -- Module access: permissions.modules.nelos = 'admin'|'normal'|'none',
 -- granted on the main portal's User Access (JSONB — no DDL needed).
--- Per-page access: permissions.nelos_actions.<page>, written by
--- nelos/nelos_user_access.html.
+-- What somebody sees once inside is decided by which linked modules and
+-- categories they are set up for — see migration_nelos_modules.sql and
+-- nelos/nelos_user_setting.html.
 --
 -- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
 -- Safe to re-run: every statement is guarded.

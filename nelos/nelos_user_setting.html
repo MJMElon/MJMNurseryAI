@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nursery Case Log — User Setting</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+
+  /* ── Module block ───────────────────────────────────────────── */
+  .mod { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:14px;
+         box-shadow:0 4px 16px rgba(124,58,237,.06); overflow:hidden; }
+  .mod-head { display:flex; align-items:center; gap:11px; padding:14px 17px; background:#f5f3ff;
+              border-bottom:1.5px solid #ede9fe; flex-wrap:wrap; }
+  .mod-ico { width:36px; height:36px; border-radius:10px; background:#fff; border:1.5px solid #ddd6fe;
+             display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .mod-name { font-size:14.5px; font-weight:900; color:#4c1d95; }
+  .mod-key { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:#a78bfa; }
+  .mod-count { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
+               padding:3px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
+  .mod-open { font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
+              color:#7c3aed; text-decoration:none; }
+  .mod-open:hover { text-decoration:underline; }
+  .mod-body { padding:13px 17px 16px; }
+
+  /* ── Member row ─────────────────────────────────────────────── */
+  .mem { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px dashed #e9e3fb; }
+  .mem:last-of-type { border-bottom:none; }
+  .av { width:32px; height:32px; border-radius:9px; background:#ede9fe; color:#6d28d9; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11.5px; }
+  .av-new { background:#fef3c7; color:#a16207; }
+  .mem-name { font-size:13px; font-weight:800; color:#1e293b; }
+  .mem-mail { font-size:11px; font-weight:600; color:#94a3b8; }
+  .mem-cats { font-size:10.5px; font-weight:700; color:#7c3aed; margin-top:3px; }
+  .mem-cats.all { color:#94a3b8; }
+  .mini { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:4px 10px;
+          border-radius:8px; border:none; cursor:pointer; }
+  .mini-edit { background:#ede9fe; color:#6d28d9; }
+  .mini-del  { background:#fee2e2; color:#b91c1c; }
+
+  /* ── Category chooser ───────────────────────────────────────── */
+  .cats-box { margin:8px 0 4px 42px; padding:11px 13px; background:#faf5ff; border:1.5px solid #ede9fe;
+              border-radius:11px; }
+  .cat-lbl { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:#334155;
+             padding:4px 0; cursor:pointer; }
+  .cat-lbl input { width:15px; height:15px; accent-color:#7c3aed; }
+  .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:0 14px; }
+
+  /* ── Add member ─────────────────────────────────────────────── */
+  .add-row { display:flex; gap:8px; margin-top:11px; padding-top:11px; border-top:1.5px solid #f1f5f9; flex-wrap:wrap; }
+  .inp { flex:1; min-width:180px; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  .btn-add { padding:9px 17px; border-radius:10px; background:#7c3aed; color:#fff; border:none;
+             font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; }
+  .btn-add:hover { background:#6d28d9; }
+  .btn-add:disabled { opacity:.5; cursor:not-allowed; }
+  .none { font-size:12px; font-weight:700; color:#cbd5e1; padding:10px 0; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); max-width:88vw; text-align:center; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
+  <a href="nelos_dashboard.html" class="text-[11px] font-black text-violet-700 uppercase tracking-widest hover:underline">‹ Back to Cases</a>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NL</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[880px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[880px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <h1 class="text-[18px] font-black text-slate-800 mb-1">User Setting</h1>
+  <p class="text-[12.5px] font-semibold text-slate-500 mb-5 leading-relaxed">
+    Nursery Case Log is linked to the modules below. A case raised in a module belongs to that
+    module's block. Add the people who handle each one, then narrow each person to the case
+    categories they should see.
+  </p>
+
+  <div class="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 mb-6">
+    <div class="text-[10px] font-black uppercase tracking-widest text-violet-500 mb-1">How visibility works</div>
+    <p class="text-[12px] font-semibold text-violet-900 leading-relaxed">
+      Somebody who appears in <strong>no block at all</strong> sees every case — so nothing goes dark
+      the day you switch this on. Once they appear in a block, they see only those modules, and only
+      the categories ticked for them. A Nelos <strong>admin</strong> always sees everything.
+    </p>
+  </div>
+
+  <div id="blocks"></div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-8">
+    Whether somebody can open Nelos at all is still set on the main portal's
+    <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">User Access</a>.
+    This page decides what they see once they are in.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+let modules = [];      // nelos_modules rows
+let members = [];      // nelos_module_members rows
+let categories = [];   // nelos_categories names
+let caseCounts = {};   // module key → number of cases
+let me = { name: '' };
+let editing = null;    // member id whose category chooser is open
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3600);
+}
+
+const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+/* ── Render ────────────────────────────────────────────────────── */
+
+function catsSummary(m) {
+  const list = Array.isArray(m.categories) ? m.categories.filter(Boolean) : [];
+  if (!list.length) return '<span class="mem-cats all">All categories</span>';
+  return `<span class="mem-cats">${esc(list.join(' · '))}</span>`;
+}
+
+function memberHtml(m) {
+  // An email with no matching profile is somebody who has not signed in
+  // yet. The row still works — scope() matches on email as well as id —
+  // so say so rather than refusing to add them.
+  const pending = !m.user_id;
+  return `
+    <div class="mem" data-mem="${m.id}">
+      <div class="av ${pending ? 'av-new' : ''}" title="${pending ? 'Has not signed in yet' : ''}">${esc(initials(m.full_name || m.email))}</div>
+      <div class="min-w-0 flex-1">
+        <div class="mem-name">${esc(m.full_name || m.email.split('@')[0])}
+          ${pending ? '<span class="mem-mail">· not signed in yet</span>' : ''}</div>
+        <div class="mem-mail">${esc(m.email)}</div>
+        ${catsSummary(m)}
+      </div>
+      <div class="flex gap-1.5 flex-shrink-0">
+        <button class="mini mini-edit" data-act="cats" data-mem="${m.id}">Categories</button>
+        <button class="mini mini-del"  data-act="del"  data-mem="${m.id}">Remove</button>
+      </div>
+    </div>
+    ${editing === m.id ? catsBoxHtml(m) : ''}`;
+}
+
+function catsBoxHtml(m) {
+  const chosen = new Set(Array.isArray(m.categories) ? m.categories.filter(Boolean) : []);
+  const all = chosen.size === 0;
+  return `
+    <div class="cats-box" data-cats="${m.id}">
+      <label class="cat-lbl" style="font-weight:900;">
+        <input type="checkbox" class="cat-all" ${all ? 'checked' : ''}>
+        All categories
+      </label>
+      <div class="cat-grid" style="${all ? 'opacity:.45;pointer-events:none;' : ''}">
+        ${categories.map(c => `
+          <label class="cat-lbl">
+            <input type="checkbox" class="cat-one" value="${esc(c)}" ${chosen.has(c) ? 'checked' : ''}>
+            ${esc(c)}
+          </label>`).join('')}
+      </div>
+      <div class="flex gap-2 mt-2.5">
+        <button class="btn-add" data-act="save-cats" data-mem="${m.id}">Save</button>
+        <button class="mini mini-edit" data-act="cancel-cats" style="padding:9px 15px;">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function blockHtml(mod) {
+  const mine = members.filter(m => m.module_key === mod.key);
+  const n = caseCounts[mod.key] || 0;
+  const external = /^https?:/.test(mod.href || '');
+  return `
+    <div class="mod">
+      <div class="mod-head">
+        <div class="mod-ico">${esc(mod.icon || '📦')}</div>
+        <div>
+          <div class="mod-name">${esc(mod.label)}</div>
+          <div class="mod-key">${esc(mod.key)}_</div>
+        </div>
+        <span class="mod-count">${n} case${n === 1 ? '' : 's'}</span>
+        ${mod.href ? `<a class="mod-open" href="${esc(mod.href)}"${external ? ' target="_blank" rel="noopener"' : ''}>Open ↗</a>` : ''}
+      </div>
+      <div class="mod-body">
+        ${mine.length ? mine.map(memberHtml).join('')
+                      : '<div class="none">Nobody added yet — everyone with Nelos sees this module\'s cases.</div>'}
+        <div class="add-row">
+          <input class="inp add-mail" data-mod="${esc(mod.key)}" type="email"
+                 placeholder="Add someone by email…" autocomplete="off">
+          <button class="btn-add" data-act="add" data-mod="${esc(mod.key)}">➕ Add</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function render() {
+  $('blocks').innerHTML = modules.length
+    ? modules.map(blockHtml).join('')
+    : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         No linked modules yet.<br>
+         <span class="text-[11px] font-semibold">Run <strong>shared/migration_nelos_modules.sql</strong> in Supabase to seed them.</span>
+       </div>`;
+  wire();
+}
+
+/* ── Events ────────────────────────────────────────────────────── */
+
+function wire() {
+  $('blocks').querySelectorAll('[data-act]').forEach(b => {
+    b.addEventListener('click', () => {
+      const act = b.dataset.act;
+      if (act === 'add')         return addMember(b.dataset.mod);
+      if (act === 'del')         return removeMember(Number(b.dataset.mem));
+      if (act === 'cats')        { editing = editing === Number(b.dataset.mem) ? null : Number(b.dataset.mem); return render(); }
+      if (act === 'cancel-cats') { editing = null; return render(); }
+      if (act === 'save-cats')   return saveCats(Number(b.dataset.mem));
+    });
+  });
+
+  // Enter in the email box is the same as pressing Add.
+  $('blocks').querySelectorAll('.add-mail').forEach(i =>
+    i.addEventListener('keydown', e => { if (e.key === 'Enter') addMember(i.dataset.mod); }));
+
+  // "All categories" greys out the individual ticks rather than hiding
+  // them, so it is obvious what turning it off would offer.
+  const box = $('blocks').querySelector('.cats-box');
+  if (box) {
+    const all = box.querySelector('.cat-all');
+    const grid = box.querySelector('.cat-grid');
+    all.addEventListener('change', () => {
+      grid.style.opacity = all.checked ? '.45' : '';
+      grid.style.pointerEvents = all.checked ? 'none' : '';
+      if (all.checked) grid.querySelectorAll('.cat-one').forEach(c => c.checked = false);
+    });
+  }
+}
+
+async function addMember(modKey) {
+  const input = $('blocks').querySelector(`.add-mail[data-mod="${modKey}"]`);
+  const email = (input.value || '').trim().toLowerCase();
+  if (!email) { input.focus(); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('That does not look like an email address.', false); return; }
+
+  if (members.some(m => m.module_key === modKey && m.email.toLowerCase() === email)) {
+    toast('That person is already on this module.', false);
+    return;
+  }
+
+  // Look the email up so the row carries a real name and user_id where we
+  // can. Not finding one is fine — they simply have not signed in yet.
+  let prof = null;
+  try {
+    const { data } = await _supabase.rpc('nelos_lookup_user', { p_email: email });
+    prof = (data && data[0]) || null;
+  } catch (_) { /* no profile — add by email alone */ }
+
+  const { error } = await _supabase.from('nelos_module_members').insert([{
+    module_key: modKey,
+    email,
+    user_id:   prof ? prof.id : null,
+    full_name: prof ? prof.full_name : null,
+    categories: null,           // all categories until narrowed
+    created_by: me.name
+  }]);
+
+  if (error) {
+    toast(/duplicate|unique/i.test(error.message)
+      ? 'That person is already on this module.'
+      : 'Could not add — ' + error.message, false);
+    return;
+  }
+  input.value = '';
+  toast(prof ? `${prof.full_name || email} added.` : `${email} added — they will be linked when they first sign in.`);
+  await load();
+}
+
+async function removeMember(id) {
+  const m = members.find(x => x.id === id);
+  if (!m) return;
+  if (!confirm(`Remove ${m.full_name || m.email} from this module?`)) return;
+  const { error } = await _supabase.from('nelos_module_members').delete().eq('id', id);
+  if (error) { toast('Could not remove — ' + error.message, false); return; }
+  editing = null;
+  toast('Removed.');
+  await load();
+}
+
+async function saveCats(id) {
+  const box = $('blocks').querySelector(`.cats-box[data-cats="${id}"]`);
+  if (!box) return;
+  const all = box.querySelector('.cat-all').checked;
+  const picked = all ? [] : [...box.querySelectorAll('.cat-one:checked')].map(c => c.value);
+
+  if (!all && !picked.length) {
+    toast('Tick at least one category, or choose All categories.', false);
+    return;
+  }
+  // Empty array and NULL both mean "everything"; store NULL so the intent
+  // reads the same way in the database as it does on screen.
+  const { error } = await _supabase.from('nelos_module_members')
+    .update({ categories: picked.length ? picked : null }).eq('id', id);
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+  editing = null;
+  toast('Categories saved.');
+  await load();
+}
+
+/* ── Loading ───────────────────────────────────────────────────── */
+
+async function load() {
+  const [modRes, memRes, catRes, caseRes] = await Promise.all([
+    _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
+    _supabase.from('nelos_module_members').select('*').order('created_at'),
+    _supabase.from('nelos_categories').select('name').eq('active', true).order('sort_order')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nelos_cases').select('source_module').limit(2000)
+      .then(r => r, () => ({ data: [] }))
+  ]);
+
+  if (modRes.error) {
+    $('blocks').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+      Could not load the linked modules — ${esc(modRes.error.message)}<br>
+      <span class="text-[11px] font-semibold">Run <strong>shared/migration_nelos_modules.sql</strong> in Supabase first.</span></div>`;
+    return;
+  }
+
+  modules = modRes.data || [];
+  members = memRes.data || [];
+  categories = (catRes.data || []).map(c => c.name);
+
+  caseCounts = {};
+  (caseRes.data || []).forEach(r => {
+    if (r.source_module) caseCounts[r.source_module] = (caseCounts[r.source_module] || 0) + 1;
+  });
+
+  render();
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+
+    // Who may change who sees what: a Nelos admin, or a portal admin who
+    // manages users anywhere. Plain Nelos access is not enough.
+    const allowed = MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers();
+    if (!allowed) {
+      alert('Only a Nelos admin can open User Setting.');
+      window.location.href = 'nelos_dashboard.html';
+      return;
+    }
+
+    const u = MJMAccess.user();
+    me = { name: u.full_name || u.email || '' };
+    $('who').textContent = me.name;
+    MJMNelos.init(_supabase, { root: '../' });
+
+    await load();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

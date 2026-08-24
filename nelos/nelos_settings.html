@@ -225,16 +225,9 @@ async function load() {
     $('who').textContent = u.full_name || u.email || '';
     MJMNelos.init(_supabase, { root: '../' });
 
-    try {
-      if (typeof MJMAccess.canDo === 'function') {
-        if (!MJMAccess.canDo('nelos', 'settings', 'view')) {
-          alert('You do not have access to Nelos categories.');
-          window.location.href = 'nelos_dashboard.html';
-          return;
-        }
-        mayManage = MJMAccess.canDo('nelos', 'settings', 'manage');
-      }
-    } catch (_) { /* fail open */ }
+    // Categories are company-wide — everyone picks from them, so everyone
+    // may read them, but only a Nelos admin may change the list.
+    mayManage = MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers();
 
     if (!mayManage) {
       $('add-btn').disabled = true;

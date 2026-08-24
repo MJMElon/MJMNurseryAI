@@ -146,6 +146,11 @@ const esc = MJMNelos.esc;
 const caseId = new URLSearchParams(location.search).get('id');
 let theCase = null;
 let me = { id: null, name: null };
+// Anyone who can see a case can work it. Access is decided by which
+// modules and categories a person is set up for on the User Setting page,
+// not by a per-action grid — so there is nothing further to check here.
+// Kept as flags because renderActions() reads them, and a future rule
+// (say, only the assignee may close) would set them rather than rewrite it.
 let mayEdit = true, mayClose = true;
 
 function toast(msg, ok) {
@@ -372,18 +377,21 @@ async function loadAssignees() {
     $('who').textContent = me.name;
     MJMNelos.init(_supabase, { root: '../' });
 
-    try {
-      const may = (page, act) => typeof MJMAccess.canDo !== 'function' ||
-                                 MJMAccess.canDo('nelos', page, act || 'view');
-      mayEdit  = may('cases', 'edit');
-      mayClose = may('cases', 'close');
-    } catch (_) { /* fail open — a stale helper must not lock people out */ }
-
     if (!caseId) { window.location.href = 'nelos_dashboard.html'; return; }
 
     const { data, error } = await _supabase.from('nelos_cases').select('*').eq('id', caseId).single();
     if (error || !data) {
       $('loading').innerHTML = 'Case not found. <a href="nelos_dashboard.html" class="text-violet-700 underline">Back to all cases</a>';
+      return;
+    }
+
+    // A case outside this person's User Setting scope is not theirs to read,
+    // even with the id pasted straight into the address bar. The list page
+    // filters the same way; this stops the URL being a way round it.
+    if (!MJMNelos.inScope(data, await MJMNelos.scope())) {
+      $('loading').innerHTML =
+        'This case belongs to a module you are not set up for. ' +
+        '<a href="nelos_dashboard.html" class="text-violet-700 underline">Back to your cases</a>';
       return;
     }
     theCase = data;

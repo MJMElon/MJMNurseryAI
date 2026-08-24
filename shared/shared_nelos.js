@@ -11,6 +11,10 @@
      • MJMNelos.pending({…})        the same data, raw, if you want to
                                     render it yourself
      • MJMNelos.countPending({…})   just the number, for a badge
+     • MJMNelos.scope() / applyScope(rows)
+                                    who may see which cases, as set on
+                                    the User Setting page — see the block
+                                    above scope() for the exact rule
 
    Usage in any module page:
 
@@ -38,12 +42,15 @@
     open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed'
   };
 
-  /* Which module a case came from, for the chip on each line. */
+  /* Which module a case came from, for the chip on each line. These are the
+     fallback labels: the live ones are rows in nelos_modules, which the User
+     Setting page renders and can rename. Keep the two in step. */
   const SOURCE_LABEL = {
-    operation:   'Stock',
-    nursery_ops: 'Nursery Ops',
-    audit:       'Audit',
+    operation:   'AI Stock System',
+    nursery_ops: 'Nursery Operation',
     scan:        'FC Portal',
+    mobile:      'Admin Portal',
+    audit:       'Auditor Portal',
     npayroll:    'Payroll',
     nelos:       'Nelos'
   };
@@ -90,9 +97,96 @@
   function currentUser() {
     try {
       const u = global.MJMAccess && global.MJMAccess.user && global.MJMAccess.user();
-      if (!u) return { id: null, name: null };
-      return { id: u.id || null, name: u.full_name || u.email || null };
-    } catch (_) { return { id: null, name: null }; }
+      if (!u) return { id: null, name: null, email: null };
+      return { id: u.id || null, name: u.full_name || u.email || null, email: u.email || null };
+    } catch (_) { return { id: null, name: null, email: null }; }
+  }
+
+  /* ── Who may see which cases ────────────────────────────────────
+     Set on the User Setting page: a person is added to a module's block,
+     and optionally narrowed to certain categories within it.
+
+     The rule, in one place:
+       • no membership rows at all   → sees everything. Turning this on
+         must not blank the case list for the whole company, and it
+         matches how shared_access.js treats an unset permission.
+       • has rows                    → sees those modules only, and within
+         each, only the categories that row lists (empty = all of them).
+       • Nelos admin                 → sees everything regardless, so an
+         admin cannot lock themselves out of their own case log.
+
+     Loaded once per page and cached; call scope({reload:true}) after
+     editing memberships. Any failure yields the unrestricted scope —
+     a lookup that cannot run must not hide cases from anyone. */
+
+  let _scope = null;
+
+  async function scope(opts) {
+    if (_scope && !(opts && opts.reload)) return _scope;
+
+    const open = { unrestricted: true, modules: null, cats: null };
+    const supa = requireClient();
+    if (!supa) return (_scope = open);
+
+    try {
+      if (global.MJMAccess && global.MJMAccess.isAdminOf &&
+          global.MJMAccess.isAdminOf('nelos')) return (_scope = open);
+    } catch (_) { /* fall through to the membership lookup */ }
+
+    const me = currentUser();
+    const email = (me.email || '').toLowerCase();
+    if (!me.id && !email) return (_scope = open);
+
+    try {
+      // Match on user_id when we have it, and on email as well, so a person
+      // added before they ever signed in is still recognised.
+      //
+      // PostgREST's or() takes a comma-separated list, so an email carrying
+      // a comma or bracket would split the filter into nonsense. Those are
+      // legal in a quoted address and never seen here, but the failure would
+      // be silent — so such an address falls back to the user_id match
+      // rather than being pasted into the filter.
+      const ors = [];
+      if (me.id) ors.push('user_id.eq.' + me.id);
+      if (email && !/[,()"\\]/.test(email)) ors.push('email.ilike.' + email);
+      if (!ors.length) return (_scope = open);
+      const { data, error } = await supa
+        .from('nelos_module_members')
+        .select('module_key,categories')
+        .or(ors.join(','));
+
+      if (error || !data || !data.length) return (_scope = open);
+
+      const modules = new Set();
+      const cats = {};   // module_key → Set of allowed categories, or null for all
+      data.forEach(r => {
+        modules.add(r.module_key);
+        const list = Array.isArray(r.categories) ? r.categories.filter(Boolean) : [];
+        if (!list.length) { cats[r.module_key] = null; return; }   // all categories
+        if (cats[r.module_key] === null) return;                   // already unrestricted here
+        cats[r.module_key] = cats[r.module_key] || new Set();
+        list.forEach(c => cats[r.module_key].add(c));
+      });
+      return (_scope = { unrestricted: false, modules, cats });
+    } catch (_) {
+      return (_scope = open);
+    }
+  }
+
+  /* True when this case is inside the given scope. */
+  function inScope(c, sc) {
+    if (!sc || sc.unrestricted) return true;
+    if (!sc.modules.has(c.source_module)) return false;
+    const allowed = sc.cats[c.source_module];
+    if (allowed === null || allowed === undefined) return true;   // all categories
+    return !!c.category && allowed.has(c.category);
+  }
+
+  /* Filter a list of cases by the signed-in user's scope. */
+  async function applyScope(rows) {
+    const sc = await scope();
+    if (sc.unrestricted) return rows;
+    return rows.filter(c => inScope(c, sc));
   }
 
   /* ── Raising a case ─────────────────────────────────────────── */
@@ -223,7 +317,8 @@
       // here rather than in the query.
       const rows = (data || []).slice().sort((a, b) =>
         (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
-      return { data: rows, error: null };
+      // Narrow to what this person is set up to see (User Setting page).
+      return { data: await applyScope(rows), error: null };
     } catch (e) {
       return { data: [], error: e };
     }
@@ -362,6 +457,7 @@
 
   const api = {
     init, raise, pending, countPending, mountTodo,
+    scope, inScope, applyScope,
     homeHref, caseHref,
     PENDING, PRIORITY_LABEL, STATUS_LABEL, SOURCE_LABEL, PRIORITY_RANK,
     esc
