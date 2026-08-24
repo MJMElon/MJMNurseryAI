@@ -235,8 +235,8 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
     if (MJMAccess.canAccess('nelos')) {
       MJMNelos.init(_supabase, { root: '../' });
       MJMNelos.mountTodo('#nelos-todo', {
-        source: 'nursery_ops',
-        title:  'Nelos — Pending Nursery Cases',
+        module: 'nursery_ops',
+        title:  'Nelos — Cases For This Module',
         hideIfEmpty: true
       });
     }

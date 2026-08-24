@@ -16,58 +16,68 @@
   body { background:#faf5ff; margin:0; }
   .hidden { display:none !important; }
 
-  /* ── Module block ───────────────────────────────────────────── */
-  .mod { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:14px;
-         box-shadow:0 4px 16px rgba(124,58,237,.06); overflow:hidden; }
-  .mod-head { display:flex; align-items:center; gap:11px; padding:14px 17px; background:#f5f3ff;
-              border-bottom:1.5px solid #ede9fe; flex-wrap:wrap; }
-  .mod-ico { width:36px; height:36px; border-radius:10px; background:#fff; border:1.5px solid #ddd6fe;
-             display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-  .mod-name { font-size:14.5px; font-weight:900; color:#4c1d95; border-radius:6px; padding:1px 5px;
-              margin-left:-5px; border:1.5px solid transparent; outline:none; cursor:text; }
-  .mod-name:hover { border-color:#ddd6fe; background:#fff; }
-  .mod-name:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
-  .mod-key { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:#a78bfa; }
-  .mod-count { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
-               padding:3px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
-  .mod-open { font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
-              color:#7c3aed; text-decoration:none; }
-  .mod-open:hover { text-decoration:underline; }
-  .mod-body { padding:13px 17px 16px; }
+  .tabs { display:flex; gap:7px; margin-bottom:18px; flex-wrap:wrap; }
+  .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
+         font-size:10.5px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+  .tab.on { background:#7c3aed; color:#fff; border-color:#7c3aed; }
 
-  /* ── Member row ─────────────────────────────────────────────── */
-  .mem { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px dashed #e9e3fb; }
-  .mem:last-of-type { border-bottom:none; }
-  .av { width:32px; height:32px; border-radius:9px; background:#ede9fe; color:#6d28d9; flex-shrink:0;
-        display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11.5px; }
-  .av-new { background:#fef3c7; color:#a16207; }
-  .mem-name { font-size:13px; font-weight:800; color:#1e293b; }
-  .mem-mail { font-size:11px; font-weight:600; color:#94a3b8; }
-  .mem-cats { font-size:10.5px; font-weight:700; color:#7c3aed; margin-top:3px; }
-  .mem-cats.all { color:#94a3b8; }
-  .mini { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:4px 10px;
-          border-radius:8px; border:none; cursor:pointer; }
-  .mini-edit { background:#ede9fe; color:#6d28d9; }
-  .mini-del  { background:#fee2e2; color:#b91c1c; }
+  .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:12px;
+          box-shadow:0 4px 16px rgba(124,58,237,.06); overflow:hidden; }
 
-  /* ── Category chooser ───────────────────────────────────────── */
-  .cats-box { margin:8px 0 4px 42px; padding:11px 13px; background:#faf5ff; border:1.5px solid #ede9fe;
-              border-radius:11px; }
+  /* ── Person row ─────────────────────────────────────────────── */
+  .person { display:flex; align-items:center; gap:11px; padding:13px 16px; cursor:pointer; }
+  .person:hover { background:#faf5ff; }
+  .av { width:36px; height:36px; border-radius:10px; background:#ede9fe; color:#6d28d9; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12.5px; }
+  .av-admin { background:#7c3aed; color:#fff; }
+  .p-name { font-size:13.5px; font-weight:800; color:#1e293b; }
+  .p-mail { font-size:11px; font-weight:600; color:#94a3b8; }
+  .p-pin  { font-size:10.5px; font-weight:900; letter-spacing:.05em; margin-top:3px; }
+  .pin-set   { color:#6d28d9; }
+  .pin-unset { color:#b45309; }
+  .lvl { font-size:8.5px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+         padding:2px 7px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-left:6px; }
+  .lvl-admin { background:#ede9fe; color:#6d28d9; }
+  .chev { margin-left:auto; color:#c4b5fd; font-size:17px; flex-shrink:0; }
+
+  .panel { padding:2px 16px 16px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
+
+  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin:12px 0 6px; }
+  .inp { width:100%; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; box-sizing:border-box; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+
+  .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:0 14px; }
   .cat-lbl { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:#334155;
              padding:4px 0; cursor:pointer; }
   .cat-lbl input { width:15px; height:15px; accent-color:#7c3aed; }
-  .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:0 14px; }
 
-  /* ── Add member ─────────────────────────────────────────────── */
-  .add-row { display:flex; gap:8px; margin-top:11px; padding-top:11px; border-top:1.5px solid #f1f5f9; flex-wrap:wrap; }
-  .inp { flex:1; min-width:180px; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
-         border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; }
-  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
-  .btn-add { padding:9px 17px; border-radius:10px; background:#7c3aed; color:#fff; border:none;
-             font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; }
-  .btn-add:hover { background:#6d28d9; }
-  .btn-add:disabled { opacity:.5; cursor:not-allowed; }
-  .none { font-size:12px; font-weight:700; color:#cbd5e1; padding:10px 0; }
+  .btn { padding:9px 17px; border-radius:10px; border:none; cursor:pointer; font-size:10px;
+         font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+  .btn-save { background:#7c3aed; color:#fff; } .btn-save:hover { background:#6d28d9; }
+  .btn-ghost { background:#ede9fe; color:#6d28d9; }
+
+  /* ── Routing row ────────────────────────────────────────────── */
+  .route { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center;
+           padding:14px 16px; border-bottom:1px dashed #ede9fe; }
+  .route:last-child { border-bottom:none; }
+  @media (max-width:700px) { .route { grid-template-columns:1fr; gap:7px; } .arrow { display:none; } }
+  .r-from { display:flex; align-items:center; gap:9px; }
+  .r-ico { width:32px; height:32px; border-radius:9px; background:#f5f3ff; border:1.5px solid #ddd6fe;
+           display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .r-name { font-size:13px; font-weight:900; color:#4c1d95; }
+  .r-sub { font-size:10px; font-weight:700; color:#a78bfa; }
+  .arrow { color:#c4b5fd; font-size:19px; text-align:center; }
+  .r-to { display:flex; flex-direction:column; gap:5px; }
+  .r-count { font-size:10px; font-weight:700; color:#94a3b8; }
+  .r-count.none { color:#b45309; }
+  .sw { display:flex; align-items:center; gap:7px; font-size:11px; font-weight:800; color:#475569; cursor:pointer; }
+  .sw input { width:16px; height:16px; accent-color:#7c3aed; }
+
+  .note { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; padding:13px 15px; margin-bottom:18px; }
+  .note-h { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; margin-bottom:4px; }
+  .note-p { font-size:12px; font-weight:600; color:#4c1d95; line-height:1.6; }
 
   #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
            padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
@@ -91,30 +101,45 @@
 
 <div id="main" class="max-w-[880px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <h1 class="text-[18px] font-black text-slate-800 mb-1">User Setting</h1>
-  <p class="text-[12.5px] font-semibold text-slate-500 mb-5 leading-relaxed">
-    Nursery Case Log is linked to the modules below. A case raised in a module belongs to that
-    module's block. Add the people who handle each one, then narrow each person to the case
-    categories they should see. <strong>Click a module's name to rename it</strong> — the grey
-    code under it is the module key, which filed cases are matched on and so cannot be edited here.
-  </p>
+  <h1 class="text-[18px] font-black text-slate-800 mb-4">User Setting</h1>
 
-  <div class="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 mb-6">
-    <div class="text-[10px] font-black uppercase tracking-widest text-violet-500 mb-1">How visibility works</div>
-    <p class="text-[12px] font-semibold text-violet-900 leading-relaxed">
-      Somebody who appears in <strong>no block at all</strong> sees every case — so nothing goes dark
-      the day you switch this on. Once they appear in a block, they see only those modules, and only
-      the categories ticked for them. A Nelos <strong>admin</strong> always sees everything.
-    </p>
+  <div class="tabs">
+    <button class="tab on" data-tab="people">👤 Case Handlers</button>
+    <button class="tab"    data-tab="routing">🔀 Case Routing</button>
   </div>
 
-  <div id="blocks"></div>
+  <!-- ── People ──────────────────────────────────────────────── -->
+  <div id="tab-people">
+    <div class="note">
+      <div class="note-h">What pinning does</div>
+      <p class="note-p">
+        Everyone granted Nelos on the main portal's
+        <a href="../user_access.html" class="underline font-black">User Access</a> appears here — there is
+        nothing to add by hand. Pin a person to the module whose cases they handle, and from anywhere
+        in the system they will see <strong>that module's queue</strong> plus <strong>anything assigned
+        to them personally</strong>. So an auditor pinned to Audit Portal still gets their To-Do list on
+        the Seedling Stock system.<br>
+        Somebody not pinned yet sees every case, and a Nelos admin always does.
+      </p>
+    </div>
+    <div id="people"></div>
+  </div>
 
-  <p class="text-[11px] text-slate-400 text-center mt-8">
-    Whether somebody can open Nelos at all is still set on the main portal's
-    <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">User Access</a>.
-    This page decides what they see once they are in.
-  </p>
+  <!-- ── Routing ─────────────────────────────────────────────── -->
+  <div id="tab-routing" class="hidden">
+    <div class="note">
+      <div class="note-h">Where a new case goes</div>
+      <p class="note-p">
+        A case raised in a section is worked by the handlers of whichever section you point it at —
+        an Audit Portal case going to Nursery Operation, an FC Portal case going to Audit. Leave it on
+        <em>itself</em> and the section works its own cases. Untick <strong>Can raise</strong> and that
+        section stops offering the case form at all.<br>
+        This applies when a case is created; moving an existing case is done on the case itself.
+      </p>
+    </div>
+    <div class="card"><div id="routing"></div></div>
+  </div>
+
 </div>
 
 <script>
@@ -122,13 +147,11 @@ const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
 const $ = id => document.getElementById(id);
 const esc = MJMNelos.esc;
 
+let people = [];       // nelos_people() rows
 let modules = [];      // nelos_modules rows
-let members = [];      // nelos_module_members rows
-let categories = [];   // nelos_categories names
-let directory = [];    // everyone in the system, for the add dropdown
-let caseCounts = {};   // module key → number of cases
+let categories = [];   // active category names
+let open = null;       // user_id whose panel is expanded
 let me = { name: '' };
-let editing = null;    // member id whose category chooser is open
 
 function toast(msg, ok) {
   const t = document.createElement('div');
@@ -140,316 +163,242 @@ function toast(msg, ok) {
 }
 
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || '';
+const handlerCount = key => people.filter(p => p.primary_module === key).length;
 
-/* ── Render ────────────────────────────────────────────────────── */
+/* ── People ────────────────────────────────────────────────────── */
 
-function catsSummary(m) {
-  const list = Array.isArray(m.categories) ? m.categories.filter(Boolean) : [];
-  if (!list.length) return '<span class="mem-cats all">All categories</span>';
-  return `<span class="mem-cats">${esc(list.join(' · '))}</span>`;
+function personHtml(p) {
+  const admin = p.nelos_level === 'admin';
+  const pinned = !!p.primary_module;
+  const cats = Array.isArray(p.categories) ? p.categories.filter(Boolean) : [];
+
+  const pin = admin
+    ? '<span class="p-pin pin-set">Nelos admin — sees every case</span>'
+    : pinned
+      ? `<span class="p-pin pin-set">Handles ${esc(labelOf(p.primary_module))}${cats.length ? ' · ' + esc(cats.join(', ')) : ''}</span>`
+      : '<span class="p-pin pin-unset">Not pinned — sees every case</span>';
+
+  return `
+    <div class="card">
+      <div class="person" data-person="${esc(p.id)}">
+        <div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>
+        <div class="min-w-0 flex-1">
+          <div class="p-name">${esc(p.full_name || p.email.split('@')[0])}
+            <span class="lvl ${admin ? 'lvl-admin' : ''}">${esc(p.nelos_level)}</span></div>
+          <div class="p-mail">${esc(p.email)}</div>
+          ${pin}
+        </div>
+        <span class="chev">${open === p.id ? '▾' : '›'}</span>
+      </div>
+      ${open === p.id ? panelHtml(p) : ''}
+    </div>`;
 }
 
-function memberHtml(m) {
-  // An email with no matching profile is somebody who has not signed in
-  // yet. The row still works — scope() matches on email as well as id —
-  // so say so rather than refusing to add them.
-  const pending = !m.user_id;
-  return `
-    <div class="mem" data-mem="${m.id}">
-      <div class="av ${pending ? 'av-new' : ''}" title="${pending ? 'Has not signed in yet' : ''}">${esc(initials(m.full_name || m.email))}</div>
-      <div class="min-w-0 flex-1">
-        <div class="mem-name">${esc(m.full_name || m.email.split('@')[0])}
-          ${pending ? '<span class="mem-mail">· not signed in yet</span>' : ''}</div>
-        <div class="mem-mail">${esc(m.email)}</div>
-        ${catsSummary(m)}
-      </div>
-      <div class="flex gap-1.5 flex-shrink-0">
-        <button class="mini mini-edit" data-act="cats" data-mem="${m.id}">Categories</button>
-        <button class="mini mini-del"  data-act="del"  data-mem="${m.id}">Remove</button>
-      </div>
-    </div>
-    ${editing === m.id ? catsBoxHtml(m) : ''}`;
-}
+function panelHtml(p) {
+  const admin = p.nelos_level === 'admin';
+  const cats = new Set(Array.isArray(p.categories) ? p.categories.filter(Boolean) : []);
+  const all = cats.size === 0;
 
-function catsBoxHtml(m) {
-  const chosen = new Set(Array.isArray(m.categories) ? m.categories.filter(Boolean) : []);
-  const all = chosen.size === 0;
   return `
-    <div class="cats-box" data-cats="${m.id}">
+    <div class="panel" data-panel="${esc(p.id)}">
+      ${admin ? `
+        <p class="text-[12px] font-bold text-violet-700 mt-3">
+          This person is a Nelos admin, so they see every case whatever is set here.
+          A pin still marks which queue they belong to for everyone else's benefit.
+        </p>` : ''}
+
+      <label class="lbl" for="pm-${esc(p.id)}">Main case handler for</label>
+      <select class="inp" id="pm-${esc(p.id)}">
+        <option value="">— not pinned (sees every case) —</option>
+        ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
+      </select>
+
+      <label class="lbl">Only these categories <span class="normal-case tracking-normal font-bold text-slate-400">(applies to their queue — a case assigned to them personally always shows)</span></label>
       <label class="cat-lbl" style="font-weight:900;">
-        <input type="checkbox" class="cat-all" ${all ? 'checked' : ''}>
-        All categories
+        <input type="checkbox" class="cat-all" ${all ? 'checked' : ''}> All categories
       </label>
       <div class="cat-grid" style="${all ? 'opacity:.45;pointer-events:none;' : ''}">
         ${categories.map(c => `
           <label class="cat-lbl">
-            <input type="checkbox" class="cat-one" value="${esc(c)}" ${chosen.has(c) ? 'checked' : ''}>
-            ${esc(c)}
+            <input type="checkbox" class="cat-one" value="${esc(c)}" ${cats.has(c) ? 'checked' : ''}> ${esc(c)}
           </label>`).join('')}
       </div>
-      <div class="flex gap-2 mt-2.5">
-        <button class="btn-add" data-act="save-cats" data-mem="${m.id}">Save</button>
-        <button class="mini mini-edit" data-act="cancel-cats" style="padding:9px 15px;">Cancel</button>
+
+      <div class="flex gap-2 mt-4">
+        <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
+        <button class="btn btn-ghost" data-act="close-person">Cancel</button>
       </div>
     </div>`;
 }
 
-/* Pick a colleague from the list rather than typing an address from
-   memory. People already on this module are left out, so the dropdown only
-   ever offers somebody it makes sense to add.
-
-   The last option drops back to a text box: somebody who has never signed
-   in has no profile row and so is not in the directory, and adding them
-   early is supported on purpose. */
-function addControlHtml(mod, mine) {
-  const taken = new Set(mine.map(m => (m.email || '').toLowerCase()));
-  const free = directory.filter(u => !taken.has((u.email || '').toLowerCase()));
-
-  if (!directory.length) {
-    // Directory unavailable (migration not re-run, or not an admin) — the
-    // typed box still works, so the page does not become unusable.
-    return `<input class="inp add-mail" data-mod="${esc(mod.key)}" type="email"
-                   placeholder="Add someone by email…" autocomplete="off">`;
-  }
-
-  return `
-    <select class="inp add-pick" data-mod="${esc(mod.key)}">
-      <option value="">Choose someone…</option>
-      ${free.map(u => `<option value="${esc(u.email)}">${esc(u.full_name || u.email)} — ${esc(u.email)}</option>`).join('')}
-      <option value="__type__">✏️ Someone not on this list…</option>
-    </select>
-    <input class="inp add-mail hidden" data-mod="${esc(mod.key)}" type="email"
-           placeholder="Type their email…" autocomplete="off">`;
-}
-
-function blockHtml(mod) {
-  const mine = members.filter(m => m.module_key === mod.key);
-  const n = caseCounts[mod.key] || 0;
-  const external = /^https?:/.test(mod.href || '');
-  return `
-    <div class="mod">
-      <div class="mod-head">
-        <div class="mod-ico">${esc(mod.icon || '📦')}</div>
-        <div>
-          <!-- The name is display only, so it is editable in place. The grey
-               chip below is the module's key — an identifier that other
-               pages and every filed case carry a copy of, so it is shown but
-               not editable here. -->
-          <div class="mod-name" contenteditable="true" spellcheck="false"
-               data-label="${esc(mod.key)}" title="Click to rename">${esc(mod.label)}</div>
-          <div class="mod-key" title="Module key — not editable, cases are filed against it">${esc(mod.key)}_</div>
-        </div>
-        <span class="mod-count">${n} case${n === 1 ? '' : 's'}</span>
-        ${mod.href ? `<a class="mod-open" href="${esc(mod.href)}"${external ? ' target="_blank" rel="noopener"' : ''}>Open ↗</a>` : ''}
-      </div>
-      <div class="mod-body">
-        ${mine.length ? mine.map(memberHtml).join('')
-                      : '<div class="none">Nobody added yet — everyone with Nelos sees this module\'s cases.</div>'}
-        <div class="add-row">
-          ${addControlHtml(mod, mine)}
-          <button class="btn-add" data-act="add" data-mod="${esc(mod.key)}">➕ Add</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function render() {
-  $('blocks').innerHTML = modules.length
-    ? modules.map(blockHtml).join('')
+function renderPeople() {
+  $('people').innerHTML = people.length
+    ? people.map(personHtml).join('')
     : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
-         No linked modules yet.<br>
-         <span class="text-[11px] font-semibold">Run <strong>shared/migration_nelos_modules.sql</strong> in Supabase to seed them.</span>
+         Nobody has Nelos access yet.<br>
+         <span class="text-[11px] font-semibold">Grant it on the main portal's User Access and they will appear here.</span>
        </div>`;
-  wire();
+  wirePeople();
 }
 
-/* ── Events ────────────────────────────────────────────────────── */
-
-function wire() {
-  $('blocks').querySelectorAll('[data-act]').forEach(b => {
-    b.addEventListener('click', () => {
-      const act = b.dataset.act;
-      if (act === 'add')         return addMember(b.dataset.mod);
-      if (act === 'del')         return removeMember(Number(b.dataset.mem));
-      if (act === 'cats')        { editing = editing === Number(b.dataset.mem) ? null : Number(b.dataset.mem); return render(); }
-      if (act === 'cancel-cats') { editing = null; return render(); }
-      if (act === 'save-cats')   return saveCats(Number(b.dataset.mem));
-    });
-  });
-
-  // Enter in the email box is the same as pressing Add.
-  $('blocks').querySelectorAll('.add-mail').forEach(i =>
-    i.addEventListener('keydown', e => { if (e.key === 'Enter') addMember(i.dataset.mod); }));
-
-  // "Someone not on this list…" swaps the dropdown for a text box.
-  $('blocks').querySelectorAll('.add-pick').forEach(sel =>
-    sel.addEventListener('change', () => {
-      const box = $('blocks').querySelector(`.add-mail[data-mod="${sel.dataset.mod}"]`);
-      if (!box) return;
-      const typing = sel.value === '__type__';
-      box.classList.toggle('hidden', !typing);
-      if (typing) { box.value = ''; box.focus(); }
+function wirePeople() {
+  $('people').querySelectorAll('.person').forEach(row =>
+    row.addEventListener('click', () => {
+      open = open === row.dataset.person ? null : row.dataset.person;
+      renderPeople();
     }));
 
-  // Renaming a block. Enter commits, Escape abandons, and clicking away
-  // commits too — so a rename cannot be half-typed and silently lost.
-  $('blocks').querySelectorAll('[data-label]').forEach(el => {
-    const original = el.textContent;
-    el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
-      if (e.key === 'Escape') { el.textContent = original; el.blur(); }
-    });
-    el.addEventListener('blur', () => saveLabel(el.dataset.label, el, original));
+  $('people').querySelectorAll('[data-act]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      if (b.dataset.act === 'save-person')  return savePerson(b.dataset.person);
+      if (b.dataset.act === 'close-person') { open = null; renderPeople(); }
+    }));
+
+  // Keep clicks inside the open panel from collapsing it.
+  const panel = $('people').querySelector('.panel');
+  if (!panel) return;
+  panel.addEventListener('click', e => e.stopPropagation());
+
+  const all = panel.querySelector('.cat-all');
+  const grid = panel.querySelector('.cat-grid');
+  all.addEventListener('change', () => {
+    grid.style.opacity = all.checked ? '.45' : '';
+    grid.style.pointerEvents = all.checked ? 'none' : '';
+    if (all.checked) grid.querySelectorAll('.cat-one').forEach(c => c.checked = false);
   });
-
-  // "All categories" greys out the individual ticks rather than hiding
-  // them, so it is obvious what turning it off would offer.
-  const box = $('blocks').querySelector('.cats-box');
-  if (box) {
-    const all = box.querySelector('.cat-all');
-    const grid = box.querySelector('.cat-grid');
-    all.addEventListener('change', () => {
-      grid.style.opacity = all.checked ? '.45' : '';
-      grid.style.pointerEvents = all.checked ? 'none' : '';
-      if (all.checked) grid.querySelectorAll('.cat-one').forEach(c => c.checked = false);
-    });
-  }
 }
 
-async function addMember(modKey) {
-  const pick  = $('blocks').querySelector(`.add-pick[data-mod="${modKey}"]`);
-  const input = $('blocks').querySelector(`.add-mail[data-mod="${modKey}"]`);
+async function savePerson(userId) {
+  const p = people.find(x => x.id === userId);
+  const panel = $('people').querySelector(`.panel[data-panel="${userId}"]`);
+  if (!p || !panel) return;
 
-  // Whichever control is in play: the dropdown, unless it is set to
-  // "someone not on this list", in which case the text box.
-  const typing = !pick || pick.value === '__type__';
-  const email = (typing ? (input && input.value) || '' : pick.value).trim().toLowerCase();
+  const primary = $(`pm-${userId}`).value || null;
+  const all = panel.querySelector('.cat-all').checked;
+  const picked = all ? [] : [...panel.querySelectorAll('.cat-one:checked')].map(c => c.value);
 
-  if (!email) {
-    if (typing && input) input.focus(); else if (pick) pick.focus();
-    toast('Choose somebody, or type their email.', false);
-    return;
-  }
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('That does not look like an email address.', false); return; }
-
-  if (members.some(m => m.module_key === modKey && m.email.toLowerCase() === email)) {
-    toast('That person is already on this module.', false);
+  if (!all && !picked.length) { toast('Tick at least one category, or choose All categories.', false); return; }
+  if (!primary && picked.length) {
+    toast('Categories narrow a queue, so pin them to a module first.', false);
     return;
   }
 
-  // Look the email up so the row carries a real name and user_id where we
-  // can. Not finding one is fine — they simply have not signed in yet.
-  // Somebody chosen from the dropdown is already in `directory`, so that is
-  // checked first and the round-trip skipped.
-  let prof = directory.find(u => (u.email || '').toLowerCase() === email) || null;
-  if (!prof) {
-    try {
-      const { data } = await _supabase.rpc('nelos_lookup_user', { p_email: email });
-      prof = (data && data[0]) || null;
-    } catch (_) { /* no profile — add by email alone */ }
-  }
+  // upsert on user_id: one handler row per person, so re-saving edits it
+  // rather than stacking a second.
+  const { error } = await _supabase.from('nelos_handlers').upsert([{
+    user_id: userId,
+    email: p.email,
+    full_name: p.full_name,
+    primary_module: primary,
+    categories: picked.length ? picked : null,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  }], { onConflict: 'user_id' });
 
-  const { error } = await _supabase.from('nelos_module_members').insert([{
-    module_key: modKey,
-    email,
-    user_id:   prof ? prof.id : null,
-    full_name: prof ? prof.full_name : null,
-    categories: null,           // all categories until narrowed
-    created_by: me.name
-  }]);
-
-  if (error) {
-    toast(/duplicate|unique/i.test(error.message)
-      ? 'That person is already on this module.'
-      : 'Could not add — ' + error.message, false);
-    return;
-  }
-  if (input) { input.value = ''; input.classList.add('hidden'); }
-  if (pick) pick.value = '';
-  toast(prof ? `${prof.full_name || email} added.` : `${email} added — they will be linked when they first sign in.`);
-  await load();
-}
-
-async function saveLabel(key, el, original) {
-  const label = el.textContent.trim().replace(/\s+/g, ' ');
-  if (!label) { el.textContent = original; toast('A module needs a name.', false); return; }
-  if (label === original) return;
-
-  const { error } = await _supabase.from('nelos_modules').update({ label }).eq('key', key);
-  if (error) {
-    el.textContent = original;
-    toast('Could not rename — ' + error.message, false);
-    return;
-  }
-  toast(`Renamed to “${label}”.`);
-  await load();
-}
-
-async function removeMember(id) {
-  const m = members.find(x => x.id === id);
-  if (!m) return;
-  if (!confirm(`Remove ${m.full_name || m.email} from this module?`)) return;
-  const { error } = await _supabase.from('nelos_module_members').delete().eq('id', id);
-  if (error) { toast('Could not remove — ' + error.message, false); return; }
-  editing = null;
-  toast('Removed.');
-  await load();
-}
-
-async function saveCats(id) {
-  const box = $('blocks').querySelector(`.cats-box[data-cats="${id}"]`);
-  if (!box) return;
-  const all = box.querySelector('.cat-all').checked;
-  const picked = all ? [] : [...box.querySelectorAll('.cat-one:checked')].map(c => c.value);
-
-  if (!all && !picked.length) {
-    toast('Tick at least one category, or choose All categories.', false);
-    return;
-  }
-  // Empty array and NULL both mean "everything"; store NULL so the intent
-  // reads the same way in the database as it does on screen.
-  const { error } = await _supabase.from('nelos_module_members')
-    .update({ categories: picked.length ? picked : null }).eq('id', id);
   if (error) { toast('Could not save — ' + error.message, false); return; }
-  editing = null;
-  toast('Categories saved.');
+  toast(primary ? `Pinned to ${labelOf(primary)}.` : 'Pin removed — sees every case.');
+  open = null;
   await load();
 }
+
+/* ── Routing ───────────────────────────────────────────────────── */
+
+function routeHtml(m) {
+  const dest = m.route_to || m.key;
+  const n = handlerCount(dest);
+  return `
+    <div class="route" data-route="${esc(m.key)}">
+      <div class="r-from">
+        <div class="r-ico">${esc(m.icon || '📦')}</div>
+        <div>
+          <div class="r-name">${esc(m.label)}</div>
+          <label class="sw mt-1">
+            <input type="checkbox" class="r-create" ${m.can_create ? 'checked' : ''}>
+            Can raise cases
+          </label>
+        </div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="r-to">
+        <span class="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Worked by</span>
+        <select class="inp r-dest">
+          <option value="" ${!m.route_to ? 'selected' : ''}>${esc(m.label)} itself</option>
+          ${modules.filter(x => x.key !== m.key).map(x =>
+            `<option value="${esc(x.key)}" ${m.route_to === x.key ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+        </select>
+        <span class="r-count ${n ? '' : 'none'}">
+          ${n ? `${n} handler${n === 1 ? '' : 's'} pinned there` : '⚠ nobody pinned there yet — cases will sit unclaimed'}
+        </span>
+      </div>
+    </div>`;
+}
+
+function renderRouting() {
+  $('routing').innerHTML = modules.length
+    ? modules.map(routeHtml).join('')
+    : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         No sections yet — run <strong>shared/migration_nelos_modules.sql</strong>.
+       </div>`;
+
+  $('routing').querySelectorAll('.route').forEach(row => {
+    const key = row.dataset.route;
+    row.querySelector('.r-create').addEventListener('change', e =>
+      saveRoute(key, { can_create: e.target.checked }));
+    row.querySelector('.r-dest').addEventListener('change', e =>
+      saveRoute(key, { route_to: e.target.value || null }));
+  });
+}
+
+async function saveRoute(key, fields) {
+  const { error } = await _supabase.from('nelos_modules').update(fields).eq('key', key);
+  if (error) { toast('Could not save — ' + error.message, false); await load(); return; }
+  toast('Saved.');
+  await load();
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  $('tab-people').classList.toggle('hidden', t.dataset.tab !== 'people');
+  $('tab-routing').classList.toggle('hidden', t.dataset.tab !== 'routing');
+}));
 
 /* ── Loading ───────────────────────────────────────────────────── */
 
 async function load() {
-  const [modRes, memRes, catRes, caseRes, dirRes] = await Promise.all([
+  const [pplRes, modRes, catRes] = await Promise.all([
+    _supabase.rpc('nelos_people').then(r => r, e => ({ error: e, data: [] })),
     _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
-    _supabase.from('nelos_module_members').select('*').order('created_at'),
     _supabase.from('nelos_categories').select('name').eq('active', true).order('sort_order')
-      .then(r => r, () => ({ data: [] })),
-    _supabase.from('nelos_cases').select('source_module').limit(2000)
-      .then(r => r, () => ({ data: [] })),
-    // Everyone in the system, for the add dropdown. Older databases have no
-    // nelos_directory() yet, so this falls back to a typed box rather than
-    // failing the page.
-    _supabase.rpc('nelos_directory').then(r => r, () => ({ data: [] }))
+      .then(r => r, () => ({ data: [] }))
   ]);
 
   if (modRes.error) {
-    $('blocks').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
-      Could not load the linked modules — ${esc(modRes.error.message)}<br>
-      <span class="text-[11px] font-semibold">Run <strong>shared/migration_nelos_modules.sql</strong> in Supabase first.</span></div>`;
+    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+      Could not load sections — ${esc(modRes.error.message)}<br>
+      <span class="text-[11px] font-semibold">Run the Nelos migrations in Supabase first.</span></div>`;
     return;
   }
 
   modules = modRes.data || [];
-  members = memRes.data || [];
   categories = (catRes.data || []).map(c => c.name);
-  directory = dirRes.data || [];
 
-  caseCounts = {};
-  (caseRes.data || []).forEach(r => {
-    if (r.source_module) caseCounts[r.source_module] = (caseCounts[r.source_module] || 0) + 1;
-  });
+  if (pplRes.error || !pplRes.data) {
+    people = [];
+    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+      Could not load the people list.<br>
+      <span class="text-[11px] font-semibold">
+        Run <strong>shared/migration_nelos_routing.sql</strong> in Supabase — it adds nelos_people().</span></div>`;
+    renderRouting();
+    return;
+  }
 
-  render();
+  people = pplRes.data;
+  renderPeople();
+  renderRouting();
 }
 
 (async () => {
@@ -457,8 +406,6 @@ async function load() {
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
 
-    // Who may change who sees what: a Nelos admin, or a portal admin who
-    // manages users anywhere. Plain Nelos access is not enough.
     const allowed = MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers();
     if (!allowed) {
       alert('Only a Nelos admin can open User Setting.');

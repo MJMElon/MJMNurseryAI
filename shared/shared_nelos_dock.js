@@ -179,7 +179,7 @@
 
   /* ── Reading the pending cases ───────────────────────────────── */
 
-  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
+  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,assigned_module,nursery_name,' +
                      'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
@@ -203,12 +203,20 @@
   }
 
   /* ── Who sees which cases ────────────────────────────────────────
-     Mirrors MJMNelos.scope(): memberships set on nelos_user_setting.html
-     narrow a person to certain modules, and optionally to certain
-     categories inside them. No rows at all → no restriction. A Nelos
-     admin → no restriction, so nobody can lock themselves out of their
-     own case log. Any failure yields the unrestricted scope, because a
-     lookup that cannot run must not hide cases from anyone. */
+     Mirrors MJMNelos.scope(). A person is pinned to one home module on
+     nelos_user_setting.html, and from that pin sees their home module's
+     QUEUE (assigned_module) wherever they are, plus anything assigned to
+     them personally in any queue — which is exactly why this dock is
+     worth having on every page. Optional category narrowing applies to
+     the queue, never to a case with your name on it.
+
+     Not pinned → no restriction, so a new grantee is not met by an empty
+     dock. Nelos admin → no restriction, so nobody can lock themselves
+     out. Any failure yields the unrestricted scope, because a lookup
+     that cannot run must not hide cases from anyone.
+
+     This reads over one RPC rather than the two round trips the
+     membership version needed. */
 
   var _scope = null;
 
@@ -234,54 +242,51 @@
 
   async function loadScope(token) {
     if (_scope) return _scope;
-    var open = { unrestricted: true, modules: null, cats: null };
+    var open = { unrestricted: true, home: null, cats: null, userId: null };
 
     if (await isNelosAdmin(token)) return (_scope = open);
 
     var u = me();
-    var email = (u.email || '').toLowerCase();
-
-    // Match on user_id and on email both, so someone added before they
-    // ever signed in is still recognised. The or() list is comma
-    // separated, so an address carrying a comma or a bracket would split
-    // the filter into nonsense — those fall back to the user_id match.
-    // Everything else is percent-encoded, so a '+' in an address stays a
-    // '+' rather than arriving as a space.
-    var ors = [];
-    if (u.id) ors.push('user_id.eq.' + encodeURIComponent(u.id));
-    if (email && !/[,()"\\]/.test(email)) ors.push('email.ilike.' + encodeURIComponent(email));
-    if (!ors.length) return (_scope = open);
+    if (!u.id) return (_scope = open);
 
     try {
-      var res = await fetch(CFG.url + '/rest/v1/nelos_module_members' +
-                            '?select=module_key,categories&or=(' + ors.join(',') + ')',
-                            { headers: authHeaders(token) });
+      // nelos_my_scope() answers only for the caller, so an ordinary user
+      // can read their own pin — nelos_people() is admin-only.
+      var res = await fetch(CFG.url + '/rest/v1/rpc/nelos_my_scope', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(token)),
+        body: '{}'
+      });
       if (!res.ok) return (_scope = open);
       var rows = await res.json();
-      if (!Array.isArray(rows) || !rows.length) return (_scope = open);
+      var row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row) return (_scope = open);
+      if (row.is_admin) return (_scope = open);
+      if (!row.primary_module) return (_scope = open);     // not pinned yet
 
-      var modules = {};                 // module_key → true
-      var cats = {};                    // module_key → { name: true }, or null for all
-      rows.forEach(function (r) {
-        modules[r.module_key] = true;
-        var list = Array.isArray(r.categories) ? r.categories.filter(Boolean) : [];
-        if (!list.length) { cats[r.module_key] = null; return; }   // every category
-        if (cats[r.module_key] === null) return;                   // already unrestricted here
-        cats[r.module_key] = cats[r.module_key] || {};
-        list.forEach(function (c) { cats[r.module_key][c] = true; });
+      var list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
+      var cats = null;
+      if (list.length) { cats = {}; list.forEach(function (c) { cats[c] = true; }); }
+      return (_scope = {
+        unrestricted: false,
+        home: row.primary_module,
+        cats: cats,
+        userId: u.id
       });
-      return (_scope = { unrestricted: false, modules: modules, cats: cats });
     } catch (_) {
       return (_scope = open);
     }
   }
 
+  function queueOf(c) { return c.assigned_module || c.source_module; }
+
   function inScope(c, sc) {
     if (!sc || sc.unrestricted) return true;
-    if (!sc.modules[c.source_module]) return false;
-    var allowed = sc.cats[c.source_module];
-    if (allowed === null || allowed === undefined) return true;    // every category
-    return !!c.category && !!allowed[c.category];
+    // Assigned to me — mine wherever it sits, and never category-filtered.
+    if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
+    if (queueOf(c) !== sc.home) return false;
+    if (!sc.cats) return true;                                     // every category
+    return !!c.category && !!sc.cats[c.category];
   }
 
   /* Returns { rows, error }. A 404 (table missing, migration not run yet)

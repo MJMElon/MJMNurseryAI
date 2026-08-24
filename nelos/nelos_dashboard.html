@@ -228,6 +228,15 @@ function fmtDate(d) {
   return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
 }
 
+/* Where the case is WAITING, shown only when that differs from where it was
+   raised — otherwise every card would carry the same word twice. */
+function queueChip(c) {
+  const queue = c.assigned_module || c.source_module;
+  if (!queue || queue === c.source_module) return '';
+  return `<span class="pill src" style="background:#ecfdf5;color:#047857;">→ ${
+    esc(MJMNelos.SOURCE_LABEL[queue] || queue)}</span>`;
+}
+
 function cardHtml(c) {
   const subject = [
     c.batch_name && 'Batch ' + c.batch_name,
@@ -246,6 +255,7 @@ function cardHtml(c) {
         <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
         <span class="pill st-${esc(c.status)}">${esc(MJMNelos.STATUS_LABEL[c.status] || c.status)}</span>
         <span class="pill src">${esc(MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '')}</span>
+        ${queueChip(c)}
       </div>
       <div class="case-title">${esc(c.title)}</div>
       <div class="case-meta">
@@ -352,8 +362,12 @@ async function loadAssignees() {
 /* The linked modules, for the "Raised from" picker. Nelos itself is always
    an option — a case need not come from another module. */
 async function loadModules() {
+  // Only sections that may raise a case are offered. A section switched off
+  // on the User Setting page stops appearing here rather than raising cases
+  // that route nowhere.
   const { data } = await _supabase.from('nelos_modules').select('key,label')
-    .eq('active', true).order('sort_order').then(r => r, () => ({ data: [] }));
+    .eq('active', true).eq('can_create', true).order('sort_order')
+    .then(r => r, () => ({ data: [] }));
   const mods = data || [];
   if (!mods.length) return;
   $('c-source').innerHTML =

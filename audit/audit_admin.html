@@ -560,8 +560,8 @@ setInterval(function(){
     if (MJMAccess.canAccess('nelos')) {
       MJMNelos.init(supa, { root: '../' });
       MJMNelos.mountTodo('#nelos-todo', {
-        source: 'audit',
-        title:  'Nelos — Pending Audit Cases',
+        module: 'audit',
+        title:  'Nelos — Cases For This Module',
         hideIfEmpty: true
       });
     }
