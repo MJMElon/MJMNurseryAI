@@ -111,6 +111,10 @@
          still gets the To-Do dock on the Stock system, showing Audit's
          queue — that is the whole reason this replaced per-module
          membership.
+       • minus anything routed to a SEAT that is not theirs. A module can
+         hold several roles ("Admin 1", "Admin 2"); a case sent to one of
+         them is not the others' work. A case with no seat is the whole
+         module's to take.
        • plus every case ASSIGNED TO THEM personally, whatever queue it
          sits in. So work handed to you follows you around.
        • optionally narrowed by category inside the home queue. A case
@@ -165,6 +169,7 @@
       return (_scope = {
         unrestricted: false,
         home: row.primary_module,
+        roleId: row.role_id ?? null,
         cats: list.length ? new Set(list) : null,
         userId: me.id
       });
@@ -176,9 +181,12 @@
   /* True when this case is inside the given scope. */
   function inScope(c, sc) {
     if (!sc || sc.unrestricted) return true;
-    // Assigned to me — mine wherever it sits, and never category-filtered.
+    // Assigned to me — mine wherever it sits, past every filter below.
     if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
     if (QUEUE_OF(c) !== sc.home) return false;
+    // Routed to a named seat: only that seat's holders. No seat named on
+    // the case means the whole module may take it.
+    if (c.assigned_role_id && c.assigned_role_id !== sc.roleId) return false;
     if (!sc.cats) return true;                      // every category in my queue
     return !!c.category && sc.cats.has(c.category);
   }
@@ -297,8 +305,8 @@
     try {
       let q = supa.from('nelos_cases')
         .select('id,case_no,title,category,priority,status,source_module,assigned_module,' +
-                'source_ref,nursery_name,plot_name,batch_name,assignee_id,assignee_name,' +
-                'due_date,created_at')
+                'assigned_role_id,source_ref,nursery_name,plot_name,batch_name,' +
+                'assignee_id,assignee_name,due_date,created_at')
         .in('status', PENDING);
 
       // `module` is the QUEUE a case is waiting in — what a module's own

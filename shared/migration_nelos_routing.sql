@@ -90,6 +90,21 @@ UPDATE nelos_cases SET assigned_module = source_module
 
 -- Route on insert, so it does not matter which page raised the case or
 -- whether that page remembered to work the routing out.
+-- ── Superseded by migration_nelos_roles.sql ─────────────────────
+-- That file redefines this trigger to be category-aware and widens both
+-- scope functions with a role column. Postgres will not let CREATE OR
+-- REPLACE change a function's return type, so re-running THIS file after
+-- that one used to fail outright — and, had it succeeded, would have
+-- quietly reverted the newer behaviour. So when nelos_roles exists, the
+-- later migration owns these three objects and this block stands down.
+DO $guard$
+BEGIN
+IF to_regclass('public.nelos_roles') IS NOT NULL THEN
+  RAISE NOTICE 'nelos_roles present — migration_nelos_roles.sql owns the routing trigger and scope functions; leaving them as they are.';
+  RETURN;
+END IF;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_route_case()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -103,8 +118,10 @@ BEGIN
   SELECT route_to INTO dest FROM nelos_modules WHERE key = NEW.source_module;
   NEW.assigned_module := COALESCE(dest, NEW.source_module);
   RETURN NEW;
-END $$;
+END $$
+$fn$;
 
+EXECUTE $fn$
 DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases;
 CREATE TRIGGER nelos_cases_route
   BEFORE INSERT ON nelos_cases
@@ -190,6 +207,9 @@ END $$;
 -- for itself who is asking and answers nobody but a Nelos admin or a
 -- portal user-manager.
 -- ────────────────────────────────────────────────────────────────
+$fn$;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_people()
 RETURNS TABLE (
   id             UUID,
@@ -220,12 +240,17 @@ AS $$
                OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
      )
    ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
-$$;
+$$
+$fn$;
 
+EXECUTE $fn$
 GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated;
 
 -- My own pin, readable by me alone — this is what the To-Do lists ask for
 -- on every page, and it must work for an ordinary user, not just an admin.
+$fn$;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_my_scope()
 RETURNS TABLE (primary_module TEXT, categories TEXT[], is_admin BOOLEAN)
 LANGUAGE sql
@@ -239,9 +264,13 @@ AS $$
     FROM public.shared_profiles p
     LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
    WHERE p.id = auth.uid()
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated
+$fn$;
+END $guard$;
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 5: Check it landed

@@ -37,13 +37,14 @@
 
    WHO SEES WHAT
    -------------
-   The dock obeys the same visibility rule as MJMNelos.pending(): the
-   memberships on nelos/nelos_user_setting.html decide which modules —
-   and which categories inside them — a person's cases come from. No
-   membership rows anywhere means no restriction, and a Nelos admin
-   always sees everything. Re-implemented here rather than imported for
-   the same reason as the query above; shared_nelos.js scope() is the
-   authority on the rule, so keep the two in step.
+   The dock obeys the same visibility rule as MJMNelos.pending(): a
+   person is pinned on nelos/nelos_user_setting.html to a home module and
+   a seat inside it, and sees that module's queue plus anything assigned
+   to them personally, minus anything routed to somebody else's seat.
+   Not pinned means no restriction, and a Nelos admin always sees
+   everything. Re-implemented here rather than imported for the same
+   reason as the query above; shared_nelos.js scope() is the authority on
+   the rule, so keep the two in step.
 
    Everything fails SOFT, exactly like the To-Do widget: no session, no
    table, no network, migration not run — the dock removes itself and
@@ -179,7 +180,8 @@
 
   /* ── Reading the pending cases ───────────────────────────────── */
 
-  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,assigned_module,nursery_name,' +
+  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,assigned_module,'+
+                     'assigned_role_id,nursery_name,' +
                      'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
@@ -207,8 +209,10 @@
      nelos_user_setting.html, and from that pin sees their home module's
      QUEUE (assigned_module) wherever they are, plus anything assigned to
      them personally in any queue — which is exactly why this dock is
-     worth having on every page. Optional category narrowing applies to
-     the queue, never to a case with your name on it.
+     worth having on every page. A case routed to a named SEAT ("Admin 1")
+     is only that seat's; one with no seat is the whole module's. Optional
+     category narrowing applies to the queue, never to a case with your
+     name on it.
 
      Not pinned → no restriction, so a new grantee is not met by an empty
      dock. Nelos admin → no restriction, so nobody can lock themselves
@@ -270,6 +274,7 @@
       return (_scope = {
         unrestricted: false,
         home: row.primary_module,
+        roleId: (row.role_id === undefined ? null : row.role_id),
         cats: cats,
         userId: u.id
       });
@@ -285,6 +290,9 @@
     // Assigned to me — mine wherever it sits, and never category-filtered.
     if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
     if (queueOf(c) !== sc.home) return false;
+    // Routed to a named seat: only that seat's holders. No seat on the
+    // case means the whole module may take it.
+    if (c.assigned_role_id && c.assigned_role_id !== sc.roleId) return false;
     if (!sc.cats) return true;                                     // every category
     return !!c.category && !!sc.cats[c.category];
   }
