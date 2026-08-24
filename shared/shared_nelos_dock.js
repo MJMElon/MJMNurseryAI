@@ -184,12 +184,17 @@
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
   var PRIORITY_LABEL = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
-  /* Fallback labels for the chip on each line — the same map
-     shared_nelos.js carries. The live ones are rows in nelos_modules,
-     which the User Setting page can rename; keep these in step. */
-  var SOURCE_LABEL   = {
-    operation: 'AI Stock System', nursery_ops: 'Nursery Operation',
-    scan: 'FC Portal', mobile: 'Admin Portal', audit: 'Auditor Portal',
+  /* Labels for the chip on each line. The live ones are rows in
+     nelos_modules, which the User Setting page can rename.
+
+     On a page that also loads shared_nelos.js, borrow its map rather than
+     keeping a second copy — two hand-maintained copies had already drifted
+     apart once, leaving the dock saying "AI Stock System" after the block
+     was renamed. The literal below is only for the pages that load the
+     dock alone. */
+  var SOURCE_LABEL = (window.MJMNelos && window.MJMNelos.SOURCE_LABEL) || {
+    operation: 'Seedling Stock System', nursery_ops: 'Nursery Operation',
+    scan: 'FC Portal', mobile: 'Admin Portal', audit: 'Audit Portal',
     npayroll: 'Payroll', nelos: 'Nelos'
   };
 
