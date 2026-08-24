@@ -1,31 +1,31 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-24a */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
-   The audit module used to carry its own login page. Two doors onto
-   one system meant two sessions written two different ways, and the
-   audit door was the only one that stored a usable one — signing in at
-   the portal left every audit page thinking you were a nobody.
+   Every audit page routes unauthenticated visitors to the 555 Auditor
+   Portal (audit_index.html). It is a thin skin over the same Supabase
+   Auth the main MJM AI login uses — the same email/password works, the
+   same mjm_user object and sb-*-auth-token session land in localStorage
+   — so signing in here is interchangeable with signing in at the root.
+   Admin who wants the module hub still has the "Back to Portal" button
+   on audit_admin.html to reach ../index.html.
 
-   There is one login now: the MJM AI System page at the root.
-
-   audit_index.html survives for exactly one job. The portal login needs
-   Supabase Auth, so it cannot sign anyone in without signal, and this
-   module is used on phones in nurseries. When the device is offline and
-   has credentials cached from a previous sign-in, that page can still
-   let an auditor in; nothing else can. So offline falls back to it.
+   The auditor login used to redirect to ../index.html (MJM AI System)
+   as its default, and only fell through to audit_index.html when the
+   device was offline. That meant the field-facing "555 Auditor Portal"
+   rebrand was never the door anyone actually saw — everyone landed on
+   the generic system login. This build flips that: the audit portal is
+   the primary door, and it works online and off the same way.
 
    Loaded in the <head>, above each page's own script, so a page nobody
    is entitled to redirects before it renders rather than flashing.
 ================================================================ */
 (function (global) {
 
+  /* Always the 555 Auditor Portal. Same Supabase session as the main
+     login, so a sign-in here is a sign-in everywhere. */
   function loginUrl() {
-    try {
-      if (!navigator.onLine && localStorage.getItem('mjm_cached_creds'))
-        return 'audit_index.html';
-    } catch (e) {}
-    return '../index.html';
+    return 'audit_index.html';
   }
 
   /* Signed in at all? Sends them to sign in and reports false if not, so a
