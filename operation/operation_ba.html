@@ -324,6 +324,8 @@
         const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        /* Thousands-grouped display for the qty columns on the BA page. */
+        const fmtQty = (n) => Number(n || 0).toLocaleString('en-MY');
         
         let globalALs = []; 
         let globalDOs = []; 
@@ -417,7 +419,7 @@
                 
                 let matchBadge = isMatched ? '<span class="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100 rounded-full">FULLY MATCHED</span>' : '<span class="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 rounded-full">QTY MISMATCH</span>';
                 
-                htmlStr += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors"><td class="p-4 font-black text-yellow-700">${ba.ba_number}</td><td class="p-4 font-bold uppercase text-slate-800">${ba.ba_raw_name}</td><td class="p-4 text-emerald-700 font-semibold text-xs">${doNumbersStr}</td><td class="p-4 flex flex-wrap gap-1">${alNumbersStr}</td><td class="p-4 text-center font-black text-yellow-600 text-lg">${ba.ba_raw_qty}</td><td class="p-4 text-center font-black text-emerald-600 text-lg">${ba.total_do_qty}</td><td class="p-4 text-center">${matchBadge}</td><td class="p-4 text-right"><button onclick="openManageBAModal('${encodeURIComponent(ba.ba_number === '-' ? ba.ba_raw_name : ba.ba_number)}')" class="text-yellow-700 uppercase text-[10px] font-bold px-4 py-2 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors relative z-40">Manage / View</button></td></tr>`;
+                htmlStr += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors"><td class="p-4 font-black text-yellow-700">${ba.ba_number}</td><td class="p-4 font-bold uppercase text-slate-800">${ba.ba_raw_name}</td><td class="p-4 text-emerald-700 font-semibold text-xs">${doNumbersStr}</td><td class="p-4 flex flex-wrap gap-1">${alNumbersStr}</td><td class="p-4 text-center font-black text-yellow-600 text-lg">${fmtQty(ba.ba_raw_qty)}</td><td class="p-4 text-center font-black text-emerald-600 text-lg">${fmtQty(ba.total_do_qty)}</td><td class="p-4 text-center">${matchBadge}</td><td class="p-4 text-right"><button onclick="openManageBAModal('${encodeURIComponent(ba.ba_number === '-' ? ba.ba_raw_name : ba.ba_number)}')" class="text-yellow-700 uppercase text-[10px] font-bold px-4 py-2 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors relative z-40">Manage / View</button></td></tr>`;
             });
             
             tbody.innerHTML = htmlStr || '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">No BA forms have been created yet. Upload some above!</td></tr>';
@@ -468,7 +470,7 @@
                         const isBaMatched = (d.status === 'Verified') || (d.remark && d.remark.includes('[BA MATCHED]')); 
                         baHtml = `<span class="font-black uppercase text-[11px] ${isBaMatched ? 'text-emerald-700' : 'text-amber-800'}">${baKey}</span>`; 
                     }
-                    historyHtml += `<tr class="${rowColor}"><td class="py-3 pl-2">${doNumHtml}</td><td class="py-3 text-slate-500">${displayDate}</td><td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td><td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${d.total_qty || 0}</td><td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${bal}</td><td class="py-3">${baHtml}</td><td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td></tr>`;
+                    historyHtml += `<tr class="${rowColor}"><td class="py-3 pl-2">${doNumHtml}</td><td class="py-3 text-slate-500">${displayDate}</td><td class="py-3 font-bold text-amber-700 text-xs">${sourceText}</td><td class="py-3 text-center font-bold ${dCancelled ? 'text-red-500 line-through' : 'text-emerald-700'}">${fmtQty(d.total_qty)}</td><td class="py-3 text-center font-black ${bal > 0 ? 'text-rose-500' : 'text-emerald-500'}">${fmtQty(bal)}</td><td class="py-3">${baHtml}</td><td class="py-3 text-slate-500 truncate max-w-[150px]">${d.remark || '-'}</td></tr>`;
                 });
                 historyBody.innerHTML = historyHtml;
             }
