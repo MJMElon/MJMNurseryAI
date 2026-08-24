@@ -1158,5 +1158,9 @@
         
         setupDragAndDrop(); _supabase.auth.getSession().then(async ({ data: { session } }) => { if (!session) { window.location.href = 'operation_dashboard.html'; return; } try { await MJMAccess.load(_supabase); } catch(e) { console.warn('[AL] MJMAccess.load failed', e); } fetchData(); });
     </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>
