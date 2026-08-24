@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../shared/shared_access.js"></script>
+    <script src="../shared/shared_nelos.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Outfit', system-ui, sans-serif; }
@@ -142,6 +143,12 @@
     </div>
 
     <div class="max-w-[1400px] mx-auto px-6 py-8 space-y-8">
+
+        <!-- Nelos To-Do: the cases this module raised that are still pending.
+             Rendered by shared/shared_nelos.js; it removes itself if Nelos is
+             unreachable or nothing is outstanding, so this dashboard behaves
+             exactly as it did before Nelos existed. -->
+        <div id="nelos-todo"></div>
 
         <!-- System Modules -->
         <div>
@@ -418,6 +425,16 @@
                 const el = document.querySelector(`[data-card-key="${k}"]`);
                 if (el && !MJMAccess.canOpenOperationPage(k)) el.style.display = 'none';
             });
+            // Pending Nelos cases raised from this module. Only for people who
+            // actually hold Nelos — everyone else never sees the strip.
+            if (MJMAccess.canAccess('nelos')) {
+                MJMNelos.init(_supabase, { root: '../' });
+                MJMNelos.mountTodo('#nelos-todo', {
+                    source: 'operation',
+                    title:  'Nelos — Pending Stock Cases',
+                    hideIfEmpty: false
+                });
+            }
         } catch (e) { /* ignore — cards stay hidden */ }
     }
 

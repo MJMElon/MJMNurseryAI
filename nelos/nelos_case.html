@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nelos — Case</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+
+  .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; padding:18px 20px;
+          box-shadow:0 4px 16px rgba(124,58,237,.06); margin-bottom:14px; }
+  .pill { font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:6px; }
+  .pi-urgent { background:#fee2e2; color:#b91c1c; } .pi-high { background:#ffedd5; color:#c2410c; }
+  .pi-normal { background:#e0f2fe; color:#0369a1; } .pi-low  { background:#f1f5f9; color:#64748b; }
+  .st-open        { background:#fef3c7; color:#a16207; }
+  .st-in_progress { background:#dbeafe; color:#1d4ed8; }
+  .st-resolved    { background:#dcfce7; color:#15803d; }
+  .st-closed      { background:#f1f5f9; color:#64748b; }
+  .src { background:#f5f3ff; color:#6d28d9; }
+
+  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin-bottom:5px; }
+  .val { font-size:13.5px; font-weight:700; color:#1e293b; }
+  .inp { width:100%; font-size:13.5px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; box-sizing:border-box; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  textarea.inp { min-height:76px; resize:vertical; }
+
+  .act { padding:10px 17px; border-radius:11px; border:none; cursor:pointer; font-size:10.5px;
+         font-weight:900; letter-spacing:.09em; text-transform:uppercase; transition:all .13s; }
+  .act:hover { transform:translateY(-1px); }
+  .act:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  .act-start   { background:#dbeafe; color:#1d4ed8; }
+  .act-resolve { background:#16a34a; color:#fff; }
+  .act-close   { background:#475569; color:#fff; }
+  .act-reopen  { background:#fef3c7; color:#a16207; }
+
+  .thread-item { display:flex; gap:11px; padding:11px 0; border-bottom:1px dashed #e9e3fb; }
+  .thread-item:last-child { border-bottom:none; }
+  .av { width:31px; height:31px; border-radius:9px; background:#ede9fe; color:#6d28d9; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11.5px; }
+  .av-sys { background:#f1f5f9; color:#64748b; }
+  .thread-who { font-size:12px; font-weight:900; color:#334155; }
+  .thread-when { font-size:10px; font-weight:600; color:#a5b4c4; }
+  .thread-body { font-size:13.5px; color:#334155; margin-top:3px; white-space:pre-wrap; line-height:1.5; }
+  .thread-body.sys { font-size:12px; font-style:italic; color:#64748b; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
+  <a href="nelos_dashboard.html" class="text-[11px] font-black text-violet-700 uppercase tracking-widest hover:underline">‹ All Cases</a>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NL</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[760px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading case…</div>
+
+<div id="main" class="max-w-[760px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <!-- ── The case ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="flex items-center gap-2 flex-wrap mb-2">
+      <span id="c-no" class="text-[11px] font-black tracking-wider text-violet-700"></span>
+      <span id="c-priority" class="pill"></span>
+      <span id="c-status" class="pill"></span>
+      <span id="c-source" class="pill src"></span>
+    </div>
+    <h1 id="c-title" class="text-[19px] font-black text-slate-800 leading-snug"></h1>
+    <div id="c-subject" class="text-[12px] font-bold text-slate-500 mt-1.5"></div>
+    <a id="c-back-link" class="hidden inline-block mt-2.5 text-[10.5px] font-black uppercase tracking-widest text-violet-600 hover:underline"></a>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-4 border-t border-dashed border-violet-100">
+      <div><span class="lbl">Raised by</span><span class="val" id="c-raised"></span></div>
+      <div><span class="lbl">Raised on</span><span class="val" id="c-created"></span></div>
+      <div><span class="lbl">Category</span><span class="val" id="c-category"></span></div>
+      <div><span class="lbl">Due</span><span class="val" id="c-due"></span></div>
+    </div>
+  </div>
+
+  <!-- ── Ownership ────────────────────────────────────────────── -->
+  <div class="card" id="own-card">
+    <span class="lbl">Assigned to</span>
+    <div class="flex flex-wrap items-center gap-2">
+      <select id="c-assignee" class="inp flex-1 min-w-[170px]"></select>
+      <input id="c-due-edit" type="date" class="inp w-auto">
+      <button id="save-owner" class="act act-start">Save</button>
+    </div>
+    <p class="text-[10.5px] text-slate-400 mt-2">
+      Only people who hold Nelos are listed — a case cannot be given to somebody who could never open it.
+    </p>
+  </div>
+
+  <!-- ── Actions ──────────────────────────────────────────────── -->
+  <div class="card" id="action-card">
+    <span class="lbl">Move this case on</span>
+    <div id="c-actions" class="flex flex-wrap gap-2"></div>
+    <div id="resolve-box" class="hidden mt-3">
+      <label class="lbl" for="c-resolution">What was done?</label>
+      <textarea id="c-resolution" class="inp" placeholder="The fix, in enough detail that somebody reading this in six months understands it."></textarea>
+      <button id="confirm-resolve" class="act act-resolve mt-2.5">Confirm Resolved</button>
+    </div>
+  </div>
+
+  <!-- ── Resolution, once there is one ────────────────────────── -->
+  <div class="card hidden" id="resolution-card" style="border-color:#bbf7d0; background:#f0fdf4;">
+    <span class="lbl" style="color:#15803d;">Resolution</span>
+    <div id="c-resolution-text" class="text-[13.5px] font-semibold text-slate-700 whitespace-pre-wrap"></div>
+    <div id="c-resolved-meta" class="text-[10.5px] font-bold text-emerald-700 mt-2"></div>
+  </div>
+
+  <!-- ── Thread ───────────────────────────────────────────────── -->
+  <div class="card">
+    <span class="lbl">History &amp; Comments</span>
+    <div id="thread"></div>
+    <div class="mt-3 pt-3 border-t border-dashed border-violet-100">
+      <textarea id="new-comment" class="inp" placeholder="Add a comment…"></textarea>
+      <button id="send-comment" class="act act-start mt-2">Post Comment</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+const caseId = new URLSearchParams(location.search).get('id');
+let theCase = null;
+let me = { id: null, name: null };
+let mayEdit = true, mayClose = true;
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '—';
+const fmtStamp = ts => ts ? new Date(ts).toLocaleString('en-MY', { day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+/* ── Render ────────────────────────────────────────────────────── */
+
+function renderCase() {
+  const c = theCase;
+  document.title = `Nelos — ${c.case_no || 'Case'}`;
+
+  $('c-no').textContent = c.case_no || '';
+  $('c-title').textContent = c.title;
+
+  $('c-priority').textContent = MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '';
+  $('c-priority').className = 'pill pi-' + (c.priority || 'normal');
+  $('c-status').textContent = MJMNelos.STATUS_LABEL[c.status] || c.status;
+  $('c-status').className = 'pill st-' + c.status;
+  $('c-source').textContent = MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '';
+
+  const subject = [
+    c.batch_name && 'Batch ' + c.batch_name,
+    c.plot_name  && 'Plot '  + c.plot_name,
+    c.nursery_name
+  ].filter(Boolean).join('  ·  ');
+  $('c-subject').textContent = subject ? '📍 ' + subject : '';
+
+  // The link back to whatever raised this. source_ref is stored as seen from
+  // a module folder (it starts '../'), and this page is in one.
+  if (c.source_ref) {
+    const a = $('c-back-link');
+    a.href = c.source_ref;
+    a.textContent = '↗ Open in ' + (MJMNelos.SOURCE_LABEL[c.source_module] || 'the source module');
+    a.classList.remove('hidden');
+  }
+
+  $('c-raised').textContent   = c.raised_by || '—';
+  $('c-created').textContent  = fmtStamp(c.created_at);
+  $('c-category').textContent = c.category || '—';
+
+  const overdue = c.due_date && c.due_date < new Date().toISOString().slice(0,10)
+                  && (c.status === 'open' || c.status === 'in_progress');
+  $('c-due').textContent = fmtDate(c.due_date);
+  $('c-due').style.color = overdue ? '#b91c1c' : '';
+
+  $('c-assignee').value = c.assignee_id || '';
+  $('c-due-edit').value = c.due_date || '';
+
+  if (c.resolution) {
+    $('resolution-card').classList.remove('hidden');
+    $('c-resolution-text').textContent = c.resolution;
+    $('c-resolved-meta').textContent =
+      `Resolved by ${c.resolved_by || 'unknown'} · ${fmtStamp(c.resolved_at)}` +
+      (c.closed_at ? `  ·  Closed by ${c.closed_by || 'unknown'} · ${fmtStamp(c.closed_at)}` : '');
+  } else {
+    $('resolution-card').classList.add('hidden');
+  }
+
+  renderActions();
+}
+
+/* Which buttons make sense depends on where the case is now. */
+function renderActions() {
+  const s = theCase.status;
+  const box = $('c-actions');
+  const btns = [];
+
+  if (!mayEdit) {
+    box.innerHTML = '<span class="text-[11.5px] font-bold text-slate-400">You have read-only access to cases.</span>';
+    $('own-card').classList.add('hidden');
+    return;
+  }
+
+  if (s === 'open') btns.push(['start', 'act-start', '▶ Start Work']);
+  // Resolving straight from Open is allowed — plenty of cases are dealt with
+  // the moment they are read, and forcing a Start click first is theatre.
+  if (s === 'open' || s === 'in_progress') btns.push(['resolve', 'act-resolve', '✓ Mark Resolved']);
+  if (s === 'resolved' && mayClose) btns.push(['close', 'act-close', '🔒 Close Case']);
+  if (s === 'resolved' || s === 'closed') btns.push(['reopen', 'act-reopen', '↩ Reopen']);
+
+  box.innerHTML = btns.map(([act, cls, label]) =>
+    `<button class="act ${cls}" data-act="${act}">${label}</button>`).join('')
+    || '<span class="text-[11.5px] font-bold text-slate-400">Nothing to do — this case is closed.</span>';
+
+  box.querySelectorAll('button[data-act]').forEach(b =>
+    b.addEventListener('click', () => onAction(b.dataset.act)));
+}
+
+function renderThread(rows) {
+  $('thread').innerHTML = rows.length
+    ? rows.map(r => {
+        const sys = r.kind !== 'comment';
+        return `
+          <div class="thread-item">
+            <div class="av ${sys ? 'av-sys' : ''}">${sys ? '⚙' : esc(initials(r.author_name))}</div>
+            <div class="min-w-0 flex-1">
+              <span class="thread-who">${esc(r.author_name || 'Unknown')}</span>
+              <span class="thread-when"> · ${esc(fmtStamp(r.created_at))}</span>
+              <div class="thread-body ${sys ? 'sys' : ''}">${esc(r.body)}</div>
+            </div>
+          </div>`;
+      }).join('')
+    : '<div class="text-[12px] font-bold text-slate-400 py-3">No comments yet.</div>';
+}
+
+/* ── Writes ────────────────────────────────────────────────────── */
+
+async function note(body, kind) {
+  await _supabase.from('nelos_case_comments').insert([{
+    case_id: theCase.id, body, kind: kind || 'status',
+    author_name: me.name, author_id: me.id
+  }]).then(r => r, () => ({}));
+}
+
+async function patch(fields, noteText) {
+  const { data, error } = await _supabase.from('nelos_cases')
+    .update(Object.assign({ updated_by: me.name, updated_at: new Date().toISOString() }, fields))
+    .eq('id', theCase.id).select().single();
+  if (error) { toast('Could not save — ' + error.message, false); return false; }
+  theCase = data;
+  if (noteText) await note(noteText);
+  renderCase();
+  await loadThread();
+  return true;
+}
+
+async function onAction(act) {
+  const now = new Date().toISOString();
+
+  if (act === 'start') {
+    // Picking a case up with nobody on it makes you the owner — otherwise
+    // "In Progress, unassigned" becomes a place cases go to be forgotten.
+    const claim = theCase.assignee_id ? {} : { assignee_id: me.id, assignee_name: me.name };
+    await patch(Object.assign({ status: 'in_progress' }, claim),
+      `Started work${theCase.assignee_id ? '' : ' and took ownership'} — ${me.name}`);
+    return;
+  }
+  if (act === 'resolve') { $('resolve-box').classList.toggle('hidden'); $('c-resolution').focus(); return; }
+  if (act === 'close') {
+    if (!confirm('Close this case? It leaves everyone\'s To-Do list.')) return;
+    await patch({ status: 'closed', closed_by: me.name, closed_at: now }, `Closed — ${me.name}`);
+    return;
+  }
+  if (act === 'reopen') {
+    await patch({ status: 'open', resolved_at: null, resolved_by: null, closed_at: null, closed_by: null },
+      `Reopened — ${me.name}`);
+    return;
+  }
+}
+
+$('confirm-resolve').addEventListener('click', async () => {
+  const text = $('c-resolution').value.trim();
+  if (!text) { toast('Say what was done before resolving.', false); $('c-resolution').focus(); return; }
+  const ok = await patch({
+    status: 'resolved', resolution: text,
+    resolved_by: me.name, resolved_at: new Date().toISOString()
+  }, `Resolved — ${me.name}`);
+  if (ok) { $('resolve-box').classList.add('hidden'); $('c-resolution').value = ''; toast('Case resolved.'); }
+});
+
+$('save-owner').addEventListener('click', async () => {
+  const sel = $('c-assignee');
+  const id = sel.value || null;
+  const name = id ? sel.options[sel.selectedIndex].text : null;
+  const due = $('c-due-edit').value || null;
+
+  const bits = [];
+  if (id !== (theCase.assignee_id || null)) bits.push(`assigned to ${name || 'nobody'}`);
+  if (due !== (theCase.due_date || null))   bits.push(`due date set to ${due || 'none'}`);
+  if (!bits.length) { toast('Nothing changed.'); return; }
+
+  const ok = await patch({ assignee_id: id, assignee_name: name, due_date: due },
+    `${bits.join(', ')} — by ${me.name}`);
+  if (ok) toast('Saved.');
+});
+
+$('send-comment').addEventListener('click', async () => {
+  const body = $('new-comment').value.trim();
+  if (!body) return;
+  const btn = $('send-comment');
+  btn.disabled = true;
+  await note(body, 'comment');
+  $('new-comment').value = '';
+  btn.disabled = false;
+  await loadThread();
+});
+
+/* ── Loading ───────────────────────────────────────────────────── */
+
+async function loadThread() {
+  const { data } = await _supabase.from('nelos_case_comments').select('*')
+    .eq('case_id', theCase.id).order('created_at', { ascending: true })
+    .then(r => r, () => ({ data: [] }));
+  renderThread(data || []);
+}
+
+async function loadAssignees() {
+  const { data } = await _supabase.rpc('nelos_assignable_users').then(r => r, () => ({ data: [] }));
+  $('c-assignee').innerHTML = '<option value="">— unassigned —</option>' +
+    (data || []).map(u => `<option value="${esc(u.id)}">${esc(u.full_name || u.email)}</option>`).join('');
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nelos')) {
+      alert('You do not have access to Nelos.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    me = { id: u.id, name: u.full_name || u.email || '' };
+    $('who').textContent = me.name;
+    MJMNelos.init(_supabase, { root: '../' });
+
+    try {
+      const may = (page, act) => typeof MJMAccess.canDo !== 'function' ||
+                                 MJMAccess.canDo('nelos', page, act || 'view');
+      mayEdit  = may('cases', 'edit');
+      mayClose = may('cases', 'close');
+    } catch (_) { /* fail open — a stale helper must not lock people out */ }
+
+    if (!caseId) { window.location.href = 'nelos_dashboard.html'; return; }
+
+    const { data, error } = await _supabase.from('nelos_cases').select('*').eq('id', caseId).single();
+    if (error || !data) {
+      $('loading').innerHTML = 'Case not found. <a href="nelos_dashboard.html" class="text-violet-700 underline">Back to all cases</a>';
+      return;
+    }
+    theCase = data;
+
+    await loadAssignees();
+    renderCase();
+    await loadThread();
+
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

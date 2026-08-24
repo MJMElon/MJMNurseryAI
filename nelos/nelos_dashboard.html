@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nelos — Nursery Carlos</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #ddd6fe; color:#6d28d9; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s;
+              box-shadow:0 3px 10px rgba(124,58,237,.10); cursor:pointer; }
+  .tool-btn:hover { background:#ede9fe; transform:translateY(-1px); }
+  .tool-btn-primary { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+  .tool-btn-primary:hover { background:#6d28d9; }
+  .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
+  .tool-btn-access:hover { background:#ffe4e6; }
+
+  /* ── Stat tiles ─────────────────────────────────────────────── */
+  .stat { background:#fff; border:1.5px solid #ede9fe; border-radius:14px; padding:13px 15px;
+          box-shadow:0 3px 12px rgba(124,58,237,.06); cursor:pointer; transition:all .15s; text-align:left; }
+  .stat:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(124,58,237,.13); }
+  .stat.on { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.13); }
+  .stat-n { font-size:26px; font-weight:900; line-height:1; }
+  .stat-l { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8; margin-top:5px; }
+
+  /* ── Case list ──────────────────────────────────────────────── */
+  .case-card { display:block; background:#fff; border:1.5px solid #e9e3fb; border-left-width:5px; border-radius:12px;
+               padding:13px 15px; margin-bottom:9px; text-decoration:none; color:inherit; transition:all .13s; }
+  .case-card:hover { transform:translateX(3px); box-shadow:0 6px 18px rgba(124,58,237,.12); }
+  .bl-urgent { border-left-color:#dc2626; } .bl-high { border-left-color:#f97316; }
+  .bl-normal { border-left-color:#0ea5e9; } .bl-low  { border-left-color:#cbd5e1; }
+  .case-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .case-no { font-size:10px; font-weight:900; letter-spacing:.06em; color:#7c3aed; }
+  .case-title { font-size:14.5px; font-weight:700; color:#1e293b; margin-top:3px; line-height:1.35; }
+  .case-meta { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:5px; display:flex; flex-wrap:wrap; gap:4px 10px; }
+  .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
+  .pi-urgent { background:#fee2e2; color:#b91c1c; } .pi-high { background:#ffedd5; color:#c2410c; }
+  .pi-normal { background:#e0f2fe; color:#0369a1; } .pi-low  { background:#f1f5f9; color:#64748b; }
+  .st-open        { background:#fef3c7; color:#a16207; }
+  .st-in_progress { background:#dbeafe; color:#1d4ed8; }
+  .st-resolved    { background:#dcfce7; color:#15803d; }
+  .st-closed      { background:#f1f5f9; color:#64748b; }
+  .src { background:#f5f3ff; color:#6d28d9; }
+  .overdue { color:#b91c1c; font-weight:900; }
+
+  .empty { text-align:center; padding:56px 16px; color:#a5b4c4; font-weight:700; font-size:13px; }
+
+  /* ── Filters ────────────────────────────────────────────────── */
+  .f-sel { font-size:11px; font-weight:700; color:#475569; background:#fff; border:1.5px solid #e2e8f0;
+           border-radius:9px; padding:7px 11px; outline:none; }
+  .f-sel:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+
+  /* ── New-case drawer ────────────────────────────────────────── */
+  .scrim { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:60; display:flex;
+           align-items:flex-end; justify-content:center; }
+  @media (min-width:768px) { .scrim { align-items:center; } }
+  .sheet { background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:560px; max-height:92vh;
+           overflow-y:auto; padding:22px; box-shadow:0 -10px 40px rgba(0,0,0,.25); }
+  @media (min-width:768px) { .sheet { border-radius:20px; } }
+  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin-bottom:5px; }
+  .inp { width:100%; font-size:13.5px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; outline:none; box-sizing:border-box; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  textarea.inp { min-height:88px; resize:vertical; }
+  .save-btn { width:100%; padding:13px; border-radius:12px; background:#7c3aed; color:#fff; border:none;
+              font-size:12px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; }
+  .save-btn:hover { background:#6d28d9; }
+  .save-btn:disabled { opacity:.55; cursor:not-allowed; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+
+<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
+  <div>
+    <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nelos</span>
+    <span class="text-[10px] font-bold text-slate-400 ml-2 hidden sm:inline">Nursery Carlos · Case Log</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NL</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <!-- Tools -->
+  <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+    <button class="tool-btn tool-btn-primary" id="new-case-btn">➕ Raise a Case</button>
+    <a class="tool-btn" data-page="settings" href="nelos_settings.html">⚙️ Categories</a>
+    <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nelos_user_access.html">🔐 User Access</a>
+  </div>
+
+  <!-- Stat tiles double as filters: click one to narrow the list -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <button class="stat" data-quick="pending"><div class="stat-n text-amber-600" id="n-pending">–</div><div class="stat-l">Pending</div></button>
+    <button class="stat" data-quick="overdue"><div class="stat-n text-red-600"   id="n-overdue">–</div><div class="stat-l">Overdue</div></button>
+    <button class="stat" data-quick="mine">   <div class="stat-n text-violet-600" id="n-mine">–</div><div class="stat-l">Assigned to Me</div></button>
+    <button class="stat" data-quick="all">    <div class="stat-n text-slate-700" id="n-all">–</div><div class="stat-l">All Cases</div></button>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <select id="f-status" class="f-sel">
+      <option value="pending">Pending (open + in progress)</option>
+      <option value="open">Open</option>
+      <option value="in_progress">In Progress</option>
+      <option value="resolved">Resolved</option>
+      <option value="closed">Closed</option>
+      <option value="">Any status</option>
+    </select>
+    <select id="f-source" class="f-sel"><option value="">Any module</option></select>
+    <select id="f-priority" class="f-sel">
+      <option value="">Any priority</option>
+      <option value="urgent">Urgent</option><option value="high">High</option>
+      <option value="normal">Normal</option><option value="low">Low</option>
+    </select>
+    <select id="f-mine" class="f-sel">
+      <option value="">Anyone</option>
+      <option value="mine">Assigned to me</option>
+      <option value="unassigned">Unassigned</option>
+    </select>
+    <input id="f-q" class="f-sel flex-1 min-w-[150px]" placeholder="Search title, batch, plot…">
+  </div>
+
+  <div id="list"></div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-8">
+    Cases can be raised from Nelos, Nursery Seedling Stock, Nursery Operation, Audit and the FC Portal.
+    Module access is granted per user on the main portal's
+    <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">User Access</a>.
+  </p>
+</div>
+
+<!-- ── New case drawer ─────────────────────────────────────────── -->
+<div id="new-scrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="flex items-center justify-between mb-4">
+      <span class="font-black text-slate-800 uppercase tracking-widest text-xs">Raise a Case</span>
+      <button id="new-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none font-bold">&times;</button>
+    </div>
+
+    <div class="mb-3"><label class="lbl" for="c-title">Title *</label>
+      <input id="c-title" class="inp" placeholder="What is wrong, in one line" maxlength="300"></div>
+
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div><label class="lbl" for="c-category">Category</label><select id="c-category" class="inp"></select></div>
+      <div><label class="lbl" for="c-priority">Priority</label>
+        <select id="c-priority" class="inp">
+          <option value="low">Low</option><option value="normal" selected>Normal</option>
+          <option value="high">High</option><option value="urgent">Urgent</option>
+        </select></div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3 mb-3">
+      <div><label class="lbl" for="c-nursery">Nursery</label><input id="c-nursery" class="inp" placeholder="optional"></div>
+      <div><label class="lbl" for="c-plot">Plot</label><input id="c-plot" class="inp" placeholder="optional"></div>
+      <div><label class="lbl" for="c-batch">Batch</label><input id="c-batch" class="inp" placeholder="optional"></div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div><label class="lbl" for="c-assignee">Assign to</label><select id="c-assignee" class="inp"></select></div>
+      <div><label class="lbl" for="c-due">Due date</label><input id="c-due" type="date" class="inp"></div>
+    </div>
+
+    <div class="mb-3"><label class="lbl" for="c-desc">Detail</label>
+      <textarea id="c-desc" class="inp" placeholder="What happened, what needs doing, anything the assignee needs to know."></textarea></div>
+
+    <div class="mb-4"><label class="lbl" for="c-source">Raised from</label>
+      <select id="c-source" class="inp">
+        <option value="nelos">Nelos</option>
+        <option value="operation">Nursery Seedling Stock</option>
+        <option value="nursery_ops">Nursery Operation</option>
+        <option value="audit">Nursery Audit</option>
+        <option value="scan">FC Portal</option>
+      </select></div>
+
+    <button id="c-save" class="save-btn">Create Case</button>
+  </div>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+let allCases = [];      // everything we are allowed to see, loaded once
+let categories = [];
+let quick = 'pending';  // which stat tile is active
+let me = { id: null, name: null };
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const isPending = c => c.status === 'open' || c.status === 'in_progress';
+const isOverdue = c => isPending(c) && c.due_date && c.due_date < todayISO();
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ── Rendering ─────────────────────────────────────────────────── */
+
+function fmtDate(d) {
+  return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
+}
+
+function cardHtml(c) {
+  const subject = [
+    c.batch_name && 'Batch ' + c.batch_name,
+    c.plot_name, c.nursery_name
+  ].filter(Boolean).join(' · ');
+
+  const due = c.due_date
+    ? (isOverdue(c) ? `<span class="overdue">⏰ Overdue — was due ${esc(fmtDate(c.due_date))}</span>`
+                    : `Due ${esc(fmtDate(c.due_date))}`)
+    : '';
+
+  return `
+    <a class="case-card bl-${esc(c.priority || 'normal')}" href="nelos_case.html?id=${encodeURIComponent(c.id)}">
+      <div class="case-top">
+        <span class="case-no">${esc(c.case_no || '')}</span>
+        <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
+        <span class="pill st-${esc(c.status)}">${esc(MJMNelos.STATUS_LABEL[c.status] || c.status)}</span>
+        <span class="pill src">${esc(MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '')}</span>
+      </div>
+      <div class="case-title">${esc(c.title)}</div>
+      <div class="case-meta">
+        ${c.category ? `<span>🏷️ ${esc(c.category)}</span>` : ''}
+        ${subject ? `<span>📍 ${esc(subject)}</span>` : ''}
+        <span>${c.assignee_name ? '👤 ' + esc(c.assignee_name) : '👤 <em>unassigned</em>'}</span>
+        ${due ? `<span>${due}</span>` : ''}
+        <span>🕑 ${esc(new Date(c.created_at).toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}</span>
+      </div>
+    </a>`;
+}
+
+function visibleCases() {
+  const status   = $('f-status').value;
+  const source   = $('f-source').value;
+  const priority = $('f-priority').value;
+  const who      = $('f-mine').value;
+  const q        = $('f-q').value.trim().toLowerCase();
+
+  return allCases.filter(c => {
+    // The stat tiles are a coarser filter that sits on top of the dropdowns.
+    if (quick === 'pending' && !isPending(c)) return false;
+    if (quick === 'overdue' && !isOverdue(c)) return false;
+    if (quick === 'mine'    && c.assignee_id !== me.id) return false;
+
+    if (status === 'pending') { if (!isPending(c)) return false; }
+    else if (status && c.status !== status) return false;
+
+    if (source && c.source_module !== source) return false;
+    if (priority && c.priority !== priority) return false;
+    if (who === 'mine' && c.assignee_id !== me.id) return false;
+    if (who === 'unassigned' && c.assignee_id) return false;
+
+    if (q) {
+      const hay = [c.title, c.case_no, c.category, c.batch_name, c.plot_name,
+                   c.nursery_name, c.assignee_name, c.description]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function render() {
+  document.querySelectorAll('.stat').forEach(b =>
+    b.classList.toggle('on', b.dataset.quick === quick));
+
+  const rows = visibleCases();
+  $('list').innerHTML = rows.length
+    ? rows.map(cardHtml).join('')
+    : `<div class="empty">No cases match this filter.<br>
+         <span class="text-[11px] font-semibold text-slate-400">
+           ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “Raise a Case”.'}
+         </span></div>`;
+}
+
+function renderStats() {
+  $('n-pending').textContent = allCases.filter(isPending).length;
+  $('n-overdue').textContent = allCases.filter(isOverdue).length;
+  $('n-mine').textContent    = allCases.filter(c => isPending(c) && c.assignee_id === me.id).length;
+  $('n-all').textContent     = allCases.length;
+}
+
+/* ── Loading ───────────────────────────────────────────────────── */
+
+async function loadCases() {
+  const { data, error } = await _supabase.from('nelos_cases').select('*')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  if (error) {
+    $('list').innerHTML = `<div class="empty">Could not load cases — ${esc(error.message)}
+      <br><span class="text-[11px] font-semibold text-slate-400">
+        If Nelos is new, run <strong>shared/migration_nelos.sql</strong> in Supabase first.</span></div>`;
+    return;
+  }
+  // Worst priority first inside each status, since priority is a word in
+  // the database and cannot be ordered there.
+  allCases = (data || []).sort((a, b) =>
+    (MJMNelos.PRIORITY_RANK[a.priority] ?? 9) - (MJMNelos.PRIORITY_RANK[b.priority] ?? 9));
+  renderStats();
+  render();
+}
+
+async function loadCategories() {
+  const { data } = await _supabase.from('nelos_categories').select('*')
+    .eq('active', true).order('sort_order').then(r => r, () => ({ data: [] }));
+  categories = data || [];
+  $('c-category').innerHTML = '<option value="">— none —</option>' +
+    categories.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+}
+
+async function loadAssignees() {
+  // nelos_assignable_users() — a SECURITY DEFINER function, because normal
+  // users may not select from shared_profiles (see migration_nelos.sql).
+  const { data } = await _supabase.rpc('nelos_assignable_users').then(r => r, () => ({ data: [] }));
+  const users = data || [];
+  $('c-assignee').innerHTML = '<option value="">— unassigned —</option>' +
+    users.map(u => `<option value="${esc(u.id)}">${esc(u.full_name || u.email)}</option>`).join('');
+}
+
+function loadSourceFilter() {
+  const seen = [...new Set(allCases.map(c => c.source_module).filter(Boolean))];
+  $('f-source').innerHTML = '<option value="">Any module</option>' +
+    seen.map(s => `<option value="${esc(s)}">${esc(MJMNelos.SOURCE_LABEL[s] || s)}</option>`).join('');
+}
+
+/* ── New case ──────────────────────────────────────────────────── */
+
+function openNew(prefill) {
+  $('new-scrim').classList.remove('hidden');
+  if (prefill) {
+    if (prefill.source) $('c-source').value = prefill.source;
+    if (prefill.batch)  $('c-batch').value  = prefill.batch;
+    if (prefill.plot)   $('c-plot').value   = prefill.plot;
+    if (prefill.nursery) $('c-nursery').value = prefill.nursery;
+    if (prefill.title)  $('c-title').value  = prefill.title;
+  }
+  setTimeout(() => $('c-title').focus(), 60);
+}
+function closeNew() { $('new-scrim').classList.add('hidden'); }
+
+/* Choosing a category fills in its house defaults — the priority it is
+   usually raised at, and the due date it is usually given. Both stay
+   editable; this only saves typing. */
+$('c-category').addEventListener('change', () => {
+  const cat = categories.find(c => c.name === $('c-category').value);
+  if (!cat) return;
+  if (cat.default_priority) $('c-priority').value = cat.default_priority;
+  if (cat.default_days != null && !$('c-due').value) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(cat.default_days));
+    $('c-due').value = d.toISOString().slice(0, 10);
+  }
+});
+
+$('c-save').addEventListener('click', async () => {
+  const title = $('c-title').value.trim();
+  if (!title) { toast('A case needs a title.', false); $('c-title').focus(); return; }
+
+  const btn = $('c-save');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  const sel = $('c-assignee');
+  const { data, error } = await MJMNelos.raise({
+    title,
+    description: $('c-desc').value.trim() || null,
+    category:    $('c-category').value || null,
+    priority:    $('c-priority').value,
+    source:      $('c-source').value,
+    nursery:     $('c-nursery').value.trim() || null,
+    plot:        $('c-plot').value.trim() || null,
+    batch:       $('c-batch').value.trim() || null,
+    assigneeId:  sel.value || null,
+    assigneeName: sel.value ? sel.options[sel.selectedIndex].text : null,
+    dueDate:     $('c-due').value || null
+  });
+
+  btn.disabled = false; btn.textContent = 'Create Case';
+  if (error) { toast('Could not create the case — ' + error.message, false); return; }
+
+  toast('Case ' + (data.case_no || '') + ' created.');
+  closeNew();
+  ['c-title','c-desc','c-nursery','c-plot','c-batch','c-due'].forEach(id => $(id).value = '');
+  $('c-priority').value = 'normal'; $('c-category').value = ''; $('c-assignee').value = '';
+  await loadCases();
+  loadSourceFilter();
+});
+
+/* ── Wiring ────────────────────────────────────────────────────── */
+
+$('new-case-btn').addEventListener('click', () => openNew());
+$('new-close').addEventListener('click', closeNew);
+$('new-scrim').addEventListener('click', e => { if (e.target === $('new-scrim')) closeNew(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNew(); });
+
+document.querySelectorAll('.stat').forEach(b => b.addEventListener('click', () => {
+  quick = b.dataset.quick;
+  // The tiles and the status dropdown would otherwise fight each other.
+  if (quick === 'all') $('f-status').value = '';
+  if (quick === 'pending' || quick === 'overdue' || quick === 'mine') $('f-status').value = 'pending';
+  render();
+}));
+
+['f-status','f-source','f-priority','f-mine'].forEach(id =>
+  $(id).addEventListener('change', () => { quick = 'all'; render(); }));
+$('f-q').addEventListener('input', render);
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nelos')) {
+      alert('You do not have access to Nelos.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    me = { id: u.id, name: u.full_name || u.email || '' };
+    $('who').textContent = me.name;
+    MJMNelos.init(_supabase, { root: '../' });
+
+    // Per-page access, set on this module's own User Access. Fails OPEN if
+    // shared_access.js is an older cached copy without canDo — a stale
+    // script must not hide the module from people entitled to it.
+    try {
+      const may = (page, act) => typeof MJMAccess.canDo !== 'function' ||
+                                 MJMAccess.canDo('nelos', page, act || 'view');
+      document.querySelectorAll('.tool-btn[data-page]').forEach(a => {
+        if (!may(a.dataset.page)) a.style.display = 'none';
+      });
+      if (!may('cases', 'create')) $('new-case-btn').style.display = 'none';
+      if (MJMAccess.canManageUsers()) $('user-access-btn').classList.remove('hidden');
+    } catch (_) { /* keep the dashboard usable */ }
+
+    await Promise.all([loadCases(), loadCategories(), loadAssignees()]);
+    loadSourceFilter();
+
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+
+    // Deep link from another module's To-Do widget:
+    //   nelos_dashboard.html?new=1&source=operation&batch=264
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('new')) {
+      openNew({
+        source:  qs.get('source'), batch: qs.get('batch'),
+        plot:    qs.get('plot'),   nursery: qs.get('nursery'),
+        title:   qs.get('title')
+      });
+    }
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

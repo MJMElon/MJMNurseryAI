@@ -50,7 +50,7 @@
   // adding a new module (e.g. reports, audit_trail) doesn't require a
   // helper redeploy.
   const DEFAULT_PERMS = {
-    modules: { operation: 'none', nursery_ops: 'none', npayroll: 'none', reports: 'none', audit_trail: 'none', salesweb: 'none', audit: 'none', mobile: 'none' },
+    modules: { operation: 'none', nursery_ops: 'none', nelos: 'none', npayroll: 'none', reports: 'none', audit_trail: 'none', salesweb: 'none', audit: 'none', mobile: 'none' },
     manage_users: false,
     can_verify_operation: false
   };

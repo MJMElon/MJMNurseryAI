@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -96,6 +97,12 @@
     <!-- Shown only to users who may change other people's access. -->
     <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html">🔐 User Access</a>
   </div>
+
+  <!-- Nelos To-Do: cases raised against nursery operations that are still
+       open. shared_nelos.js removes the strip if Nelos is unreachable or
+       nothing is pending, so the chalkboard below is never pushed down for
+       an empty widget. -->
+  <div id="nelos-todo" class="mb-6"></div>
 
   <!-- Live chalkboard: the month's work schedule -->
   <div class="board-frame">
@@ -221,6 +228,18 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
       }
       if (MJMAccess.canManageUsers()) document.getElementById('user-access-btn').classList.remove('hidden');
     } catch (_) { /* keep the dashboard usable */ }
+
+    // Pending Nelos cases for this module. Only for people who hold Nelos;
+    // hideIfEmpty so a clear board shows nothing at all rather than an
+    // "all clear" strip above the chalkboard.
+    if (MJMAccess.canAccess('nelos')) {
+      MJMNelos.init(_supabase, { root: '../' });
+      MJMNelos.mountTodo('#nelos-todo', {
+        source: 'nursery_ops',
+        title:  'Nelos — Pending Nursery Cases',
+        hideIfEmpty: true
+      });
+    }
     const now = new Date();
     boardMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     await loadBoard();

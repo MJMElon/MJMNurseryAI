@@ -218,6 +218,13 @@
         </div>
         <div class="flex items-center justify-between gap-4">
           <div>
+            <div class="font-black text-slate-800 text-sm">Nelos</div>
+            <div class="text-[11px] text-slate-500">Nursery Carlos — the case log every module raises into</div>
+          </div>
+          <select id="d-mod-nelos" class="lvl-select"></select>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <div>
             <div class="font-black text-slate-800 text-sm">Mobile</div>
             <div class="text-[11px] text-slate-500">Booking app for customers/drivers</div>
           </div>
@@ -296,7 +303,7 @@
 const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
 // Top-level modules only — page access INSIDE a module (batch record,
 // stock, reports…) is managed from that module's own User Access page.
-const MODULES = ['operation', 'nursery_ops', 'npayroll', 'salesweb', 'audit', 'mobile', 'training', 'scan'];
+const MODULES = ['operation', 'nursery_ops', 'nelos', 'npayroll', 'salesweb', 'audit', 'mobile', 'training', 'scan'];
 const LEVELS  = ['admin', 'normal', 'none'];
 const LEVEL_LABEL = { admin:'Admin', normal:'Normal', none:'None' };
 

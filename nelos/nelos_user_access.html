@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Access — Nelos</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_module_access.js?v=1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+<script>
+MJMModuleAccess.init({
+  module: 'nelos',
+  title:  'Nelos — Nursery Carlos',
+  moduleLabel: 'Nelos',
+  icon:   '📋',
+  accent: 'violet',
+  back:   { href: 'nelos_dashboard.html', label: 'Back to Main Page' },
+  pages: [
+    { key:'cases', label:'Case Log', desc:'The case list, the To-Do board and every case page',
+      actions:[
+        { key:'create', label:'Raise a case', desc:'Open a new case, from Nelos or from any other module' },
+        { key:'edit',   label:'Work a case', desc:'Assign it, set a due date, comment, start work and mark it resolved' },
+        { key:'close',  label:'Close a case', desc:'Sign off a resolved case for good — it leaves everyone’s To-Do list',
+          highlight:true, chip:'Sign-off' }
+      ]},
+    { key:'settings', label:'Categories', desc:'The kinds of case there are, and the priority and due date each one is normally raised at',
+      actions:[
+        { key:'manage', label:'Add, edit & retire categories', desc:'Change the case categories the whole company picks from',
+          adminOnly:true, highlight:true, chip:'Nelos Setting' }
+      ]}
+  ]
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nelos — Case Categories</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+  .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; padding:18px 20px;
+          box-shadow:0 4px 16px rgba(124,58,237,.06); }
+  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin-bottom:5px; }
+  .inp { width:100%; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:9px; padding:8px 11px; outline:none; box-sizing:border-box; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  .act { padding:8px 15px; border-radius:10px; border:none; cursor:pointer; font-size:10px;
+         font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+  .act-add  { background:#7c3aed; color:#fff; }
+  .act-add:hover { background:#6d28d9; }
+  .act-del  { background:#fee2e2; color:#b91c1c; }
+  .act-off  { background:#f1f5f9; color:#64748b; }
+  .row { display:grid; grid-template-columns:1fr 110px 92px 110px auto; gap:9px; align-items:center;
+         padding:9px 0; border-bottom:1px dashed #e9e3fb; }
+  .row:last-child { border-bottom:none; }
+  .row.off { opacity:.5; }
+  @media (max-width:720px) { .row { grid-template-columns:1fr 1fr; } }
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
+  <a href="nelos_dashboard.html" class="text-[11px] font-black text-violet-700 uppercase tracking-widest hover:underline">‹ Back to Cases</a>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NL</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[820px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[820px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <h1 class="text-[17px] font-black text-slate-800 mb-1">Case Categories</h1>
+  <p class="text-[12px] font-semibold text-slate-500 mb-5">
+    The kinds of case the whole company picks from. Each one carries the priority it is normally
+    raised at and how many days it usually gets — picking the category on a new case fills both in,
+    and both stay editable on the case itself.
+  </p>
+
+  <div class="card mb-4">
+    <span class="lbl">Add a category</span>
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_auto] gap-2 items-end">
+      <div><label class="lbl" for="n-name">Name</label><input id="n-name" class="inp" placeholder="e.g. Irrigation Fault"></div>
+      <div><label class="lbl" for="n-priority">Priority</label>
+        <select id="n-priority" class="inp">
+          <option value="low">Low</option><option value="normal" selected>Normal</option>
+          <option value="high">High</option><option value="urgent">Urgent</option>
+        </select></div>
+      <div><label class="lbl" for="n-days">Due in (days)</label><input id="n-days" type="number" min="0" class="inp" placeholder="—"></div>
+      <button id="add-btn" class="act act-add h-[36px]">➕ Add</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row text-[9.5px] font-black uppercase tracking-widest text-slate-400" style="border-bottom:1.5px solid #ede9fe;">
+      <span>Category</span><span>Priority</span><span>Due (days)</span><span>In use</span><span></span>
+    </div>
+    <div id="rows"></div>
+  </div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-7">
+    Retiring a category hides it from new cases but leaves every case already filed under it untouched —
+    Nelos stores the category by name for exactly this reason.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+let cats = [];
+let counts = {};      // category name → how many cases use it
+let mayManage = true;
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function rowHtml(c) {
+  const used = counts[c.name] || 0;
+  return `
+    <div class="row ${c.active ? '' : 'off'}" data-id="${c.id}">
+      <input class="inp f-name" value="${esc(c.name)}" ${mayManage ? '' : 'disabled'}>
+      <select class="inp f-priority" ${mayManage ? '' : 'disabled'}>
+        ${['low','normal','high','urgent'].map(p =>
+          `<option value="${p}" ${c.default_priority === p ? 'selected' : ''}>${MJMNelos.PRIORITY_LABEL[p]}</option>`).join('')}
+      </select>
+      <input class="inp f-days" type="number" min="0" value="${c.default_days ?? ''}" placeholder="—" ${mayManage ? '' : 'disabled'}>
+      <span class="text-[11.5px] font-bold text-slate-500">${used} case${used === 1 ? '' : 's'}</span>
+      <span class="flex gap-1.5 justify-end">
+        ${mayManage ? `
+          <button class="act act-add f-save">Save</button>
+          <button class="act act-off f-toggle">${c.active ? 'Retire' : 'Restore'}</button>
+          ${used === 0 ? '<button class="act act-del f-del">Delete</button>' : ''}` : ''}
+      </span>
+    </div>`;
+}
+
+function render() {
+  $('rows').innerHTML = cats.length
+    ? cats.map(rowHtml).join('')
+    : '<div class="text-center text-[12px] font-bold text-slate-400 py-8">No categories yet.</div>';
+
+  if (!mayManage) return;
+  $('rows').querySelectorAll('.row').forEach(row => {
+    const id = Number(row.dataset.id);
+    row.querySelector('.f-save')  ?.addEventListener('click', () => saveRow(id, row));
+    row.querySelector('.f-toggle')?.addEventListener('click', () => toggleRow(id));
+    row.querySelector('.f-del')   ?.addEventListener('click', () => deleteRow(id));
+  });
+}
+
+async function saveRow(id, row) {
+  const name = row.querySelector('.f-name').value.trim();
+  if (!name) { toast('A category needs a name.', false); return; }
+  const days = row.querySelector('.f-days').value;
+  const { error } = await _supabase.from('nelos_categories').update({
+    name,
+    default_priority: row.querySelector('.f-priority').value,
+    default_days: days === '' ? null : Number(days)
+  }).eq('id', id);
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+  toast('Saved.');
+  await load();
+}
+
+async function toggleRow(id) {
+  const cat = cats.find(c => c.id === id);
+  const { error } = await _supabase.from('nelos_categories').update({ active: !cat.active }).eq('id', id);
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+  toast(cat.active ? 'Retired.' : 'Restored.');
+  await load();
+}
+
+async function deleteRow(id) {
+  const cat = cats.find(c => c.id === id);
+  // Guarded twice: the Delete button only renders at zero cases, and the
+  // count is re-checked here in case somebody filed one in the meantime.
+  if ((counts[cat.name] || 0) > 0) { toast('That category is in use — retire it instead.', false); return; }
+  if (!confirm(`Delete the category “${cat.name}”?`)) return;
+  const { error } = await _supabase.from('nelos_categories').delete().eq('id', id);
+  if (error) { toast('Could not delete — ' + error.message, false); return; }
+  toast('Deleted.');
+  await load();
+}
+
+$('add-btn').addEventListener('click', async () => {
+  const name = $('n-name').value.trim();
+  if (!name) { toast('Give the category a name.', false); $('n-name').focus(); return; }
+  const days = $('n-days').value;
+  const { error } = await _supabase.from('nelos_categories').insert([{
+    name,
+    default_priority: $('n-priority').value,
+    default_days: days === '' ? null : Number(days),
+    sort_order: (cats.reduce((m, c) => Math.max(m, c.sort_order || 0), 0)) + 10
+  }]);
+  if (error) {
+    toast(/duplicate|unique/i.test(error.message)
+      ? 'There is already a category with that name.' : 'Could not add — ' + error.message, false);
+    return;
+  }
+  $('n-name').value = ''; $('n-days').value = ''; $('n-priority').value = 'normal';
+  toast('Category added.');
+  await load();
+});
+
+async function load() {
+  const [catRes, caseRes] = await Promise.all([
+    _supabase.from('nelos_categories').select('*').order('sort_order').order('name'),
+    _supabase.from('nelos_cases').select('category').limit(2000).then(r => r, () => ({ data: [] }))
+  ]);
+  if (catRes.error) {
+    $('rows').innerHTML = `<div class="text-center text-[12px] font-bold text-slate-400 py-8">
+      Could not load categories — ${esc(catRes.error.message)}<br>
+      If Nelos is new, run <strong>shared/migration_nelos.sql</strong> in Supabase first.</div>`;
+    return;
+  }
+  cats = catRes.data || [];
+  counts = {};
+  (caseRes.data || []).forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
+  render();
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nelos')) {
+      alert('You do not have access to Nelos.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    $('who').textContent = u.full_name || u.email || '';
+    MJMNelos.init(_supabase, { root: '../' });
+
+    try {
+      if (typeof MJMAccess.canDo === 'function') {
+        if (!MJMAccess.canDo('nelos', 'settings', 'view')) {
+          alert('You do not have access to Nelos categories.');
+          window.location.href = 'nelos_dashboard.html';
+          return;
+        }
+        mayManage = MJMAccess.canDo('nelos', 'settings', 'manage');
+      }
+    } catch (_) { /* fail open */ }
+
+    if (!mayManage) {
+      $('add-btn').disabled = true;
+      document.querySelector('.card').style.opacity = '.5';
+    }
+
+    await load();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

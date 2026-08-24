@@ -274,6 +274,12 @@
       </div>
     </div>
 
+    <!-- Nelos To-Do: audit cases still open. This sits on the back end and
+         NOT on audit_home.html on purpose — the auditor view was stripped of
+         MJMAccess and the Supabase CDN so it loads on nursery signal, and
+         Nelos is not worth putting that back. -->
+    <div id="nelos-todo" class="alert-wrap"></div>
+
     <div class="section-head">Administration</div>
     <div class="cards">
 
@@ -323,6 +329,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
 
 <script>
 /* The guard already ran in the head; this only reveals the page it let
@@ -547,6 +554,16 @@ setInterval(function(){
     await MJMAccess.load(supa);
     if (MJMAccess.user() && MJMAccess.canManageUsers()) {
       document.getElementById('card-user-access').style.display = 'flex';
+    }
+    // Open audit cases, for people who hold Nelos. hideIfEmpty so a clean
+    // month leaves the alerts above sitting where they always did.
+    if (MJMAccess.canAccess('nelos')) {
+      MJMNelos.init(supa, { root: '../' });
+      MJMNelos.mountTodo('#nelos-todo', {
+        source: 'audit',
+        title:  'Nelos — Pending Audit Cases',
+        hideIfEmpty: true
+      });
     }
   } catch (e) { /* no portal session — card stays hidden */ }
 })();
