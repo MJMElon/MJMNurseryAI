@@ -458,6 +458,11 @@ async function loadAll(){
       audits:           audits.length
     });
     renderLists();
+    /* Arrived from a pending-plot circle on the portal — bring that
+       plot's task into view. Only here, in the loader: doing it in the
+       filter and tab handlers would yank the page back to it on every
+       tap for as long as the parameter stayed in the URL. */
+    MJMAuditDeepLink.reveal();
     updateStats();
   }catch(e){
     showToast('⚠ Failed to load');console.error(e);
@@ -567,7 +572,7 @@ function makeTaskCard(t, audit){
   // it as a slightly smaller subtitle. Nursery tag was removed per
   // feedback — the auditor already picked the nursery on the bottom
   // tab bar so it's redundant on every card.
-  return `<div class="task-card ${status}">
+  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}">
     <div class="task-card-top">
       <span class="task-status-badge ${badgeClass}">${badgeLabel}</span>
     </div>
