@@ -171,6 +171,23 @@ CREATE INDEX IF NOT EXISTS nelos_cases_role_idx ON nelos_cases (assigned_role_id
 -- Routing, now category-aware. Replaces the version in
 -- migration_nelos_routing.sql; that file's trigger is redefined here rather
 -- than duplicated, so running the migrations in order leaves one rule.
+-- ── Superseded by migration_nelos_seats.sql ─────────────────────
+-- That file replaces named roles with a number inside each system, and
+-- redefines this trigger and both scope functions to match. Re-running
+-- THIS file afterwards would drop the newer functions and put the
+-- role-shaped ones back, silently reverting the change — so when
+-- nelos_handlers.seat_no exists, the later migration owns these objects
+-- and this block stands down.
+DO $guard$
+BEGIN
+IF EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='nelos_handlers'
+              AND column_name='seat_no') THEN
+  RAISE NOTICE 'nelos_handlers.seat_no present — migration_nelos_seats.sql owns the routing trigger and scope functions; leaving them as they are.';
+  RETURN;
+END IF;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_route_case()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -202,22 +219,25 @@ BEGIN
   END IF;
 
   RETURN NEW;
-END $$;
+END $$
+$fn$;
 
+EXECUTE $fn$
 DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases;
 CREATE TRIGGER nelos_cases_route
   BEFORE INSERT ON nelos_cases
-  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case();
+  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case()
+$fn$;
 
--- ────────────────────────────────────────────────────────────────
--- PART 6: Scope now carries the seat
--- ────────────────────────────────────────────────────────────────
--- Both functions gain a column, and Postgres will not let CREATE OR REPLACE
--- change a function's return type — it has to be dropped first. Safe: they
--- are only ever called by name from the app, so nothing depends on them.
-DROP FUNCTION IF EXISTS public.nelos_my_scope();
-DROP FUNCTION IF EXISTS public.nelos_people();
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_my_scope()
+$fn$;
 
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_people()
+$fn$;
+
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_my_scope()
 RETURNS TABLE (primary_module TEXT, role_id BIGINT, categories TEXT[], is_admin BOOLEAN)
 LANGUAGE sql
@@ -232,10 +252,14 @@ AS $$
     FROM public.shared_profiles p
     LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
    WHERE p.id = auth.uid()
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated
+$fn$;
 
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_people()
 RETURNS TABLE (
   id             UUID,
@@ -268,9 +292,13 @@ AS $$
                OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
      )
    ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated
+$fn$;
+END $guard$;
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 7: Check it landed

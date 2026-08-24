@@ -40,6 +40,21 @@
   .lvl-admin { background:#ede9fe; color:#6d28d9; }
   .chev { margin-left:auto; color:#c4b5fd; font-size:17px; flex-shrink:0; }
 
+  /* ── System group ───────────────────────────────────────────── */
+  .grp-head { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+              margin:20px 2px 8px; padding-bottom:6px; border-bottom:2px solid #ede9fe; }
+  .grp-head:first-child { margin-top:2px; }
+  .grp-title { font-size:12.5px; font-weight:900; color:#4c1d95; letter-spacing:.02em; }
+  .grp-sub { font-size:10.5px; font-weight:700; color:#a78bfa; }
+  .grp-n { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em;
+           padding:2px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
+  .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:6px 4px 10px; }
+
+  /* The handler's number, standing in for the avatar once they have one. */
+  .seat-no { width:36px; height:36px; border-radius:10px; background:#7c3aed; color:#fff;
+             flex-shrink:0; display:flex; align-items:center; justify-content:center;
+             font-weight:900; font-size:15px; }
+
   .panel { padding:2px 16px 16px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
 
   .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
@@ -105,41 +120,25 @@
 
   <div class="tabs">
     <button class="tab on" data-tab="people">👤 Case Handlers</button>
-    <button class="tab"    data-tab="roles">🏷️ Roles</button>
     <button class="tab"    data-tab="routing">🔀 Case Routing</button>
   </div>
 
   <!-- ── People ──────────────────────────────────────────────── -->
   <div id="tab-people">
     <div class="note">
-      <div class="note-h">What pinning does</div>
+      <div class="note-h">What a tag does</div>
       <p class="note-p">
         Everyone granted Nelos on the main portal's
-        <a href="../user_access.html" class="underline font-black">User Access</a> appears here — there is
-        nothing to add by hand. Pin a person to the module whose cases they handle, and from anywhere
-        in the system they will see <strong>that module's queue</strong> plus <strong>anything assigned
-        to them personally</strong>. So an auditor pinned to Audit Portal still gets their To-Do list on
-        the Seedling Stock system.<br>
-        Somebody not pinned yet sees every case, and a Nelos admin always does.
+        <a href="../user_access.html" class="underline font-black">User Access</a> appears below —
+        nothing to add by hand. Tag a person with the system they answer for and they are numbered
+        inside it: first person on the Admin Portal is <strong>Admin 1</strong>, the next is
+        <strong>Admin 2</strong>. That number is the name Case Routing uses, so one kind of case can
+        go to Admin 1 and another to Admin 2.<br>
+        A tagged person sees their system's queue from anywhere in the portal, plus anything with
+        their own name on it. Untagged sees every case; a Nelos admin always does.
       </p>
     </div>
     <div id="people"></div>
-  </div>
-
-  <!-- ── Roles ───────────────────────────────────────────────── -->
-  <div id="tab-roles" class="hidden">
-    <div class="note">
-      <div class="note-h">Seats inside a system</div>
-      <p class="note-p">
-        A system can hold more than one handler doing different work — the Admin Portal with an
-        <strong>Admin 1</strong> and an <strong>Admin 2</strong>, say. Name those seats here, pin each
-        person to one on the Case Handlers tab, and Case Routing can then send a particular kind of
-        case to a particular seat instead of to the whole system.<br>
-        Leave a system with no seats and it behaves exactly as before: every case goes to everyone
-        pinned there.
-      </p>
-    </div>
-    <div id="roles"></div>
   </div>
 
   <!-- ── Routing ─────────────────────────────────────────────── -->
@@ -167,7 +166,6 @@ const esc = MJMNelos.esc;
 let people = [];       // nelos_people() rows
 let modules = [];      // nelos_modules rows
 let categories = [];   // active category names
-let roles = [];        // nelos_roles rows
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
 let openRoute = null;  // module key whose category rules are expanded
@@ -185,8 +183,18 @@ function toast(msg, ok) {
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || '';
 const handlerCount = key => people.filter(p => p.primary_module === key).length;
-const rolesOf = key => roles.filter(r => r.module_key === key);
-const roleName = id => (roles.find(r => r.id === id) || {}).name || '';
+/* What one handler in a system is called, e.g. 'Admin' — always shown with
+   their number after it, so "Admin 1". */
+const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
+const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
+/* The numbers already taken in a system, so the picker never offers a clash. */
+const seatsUsed = (key, exceptUserId) => new Set(
+  people.filter(p => p.primary_module === key && p.seat_no && p.id !== exceptUserId)
+        .map(p => p.seat_no));
+/* Everyone tagged to a system, in number order — the shape the list uses. */
+const peopleIn = key => people
+  .filter(p => p.primary_module === key)
+  .sort((a, b) => (a.seat_no || 99) - (b.seat_no || 99));
 /* The rule for one (section, category), or the section default when that
    category has none of its own — the same order the database trigger uses. */
 const routeFor = (mod, cat) =>
@@ -197,29 +205,49 @@ const routeFor = (mod, cat) =>
 
 function personHtml(p) {
   const admin = p.nelos_level === 'admin';
-  const pinned = !!p.primary_module;
   const cats = Array.isArray(p.categories) ? p.categories.filter(Boolean) : [];
+  const tagged = !!p.primary_module;
 
-  const pin = admin
+  const sub = admin
     ? '<span class="p-pin pin-set">Nelos admin — sees every case</span>'
-    : pinned
-      ? `<span class="p-pin pin-set">Handles ${esc(labelOf(p.primary_module))}${cats.length ? ' · ' + esc(cats.join(', ')) : ''}</span>`
-      : '<span class="p-pin pin-unset">Not pinned — sees every case</span>';
+    : tagged
+      ? `<span class="p-pin pin-set">${esc(seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module))}${
+            cats.length ? ' · ' + esc(cats.join(', ')) : ''}</span>`
+      : '<span class="p-pin pin-unset">No system tag — sees every case</span>';
 
   return `
     <div class="card">
       <div class="person" data-person="${esc(p.id)}">
-        <div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>
+        ${tagged && p.seat_no
+          ? `<div class="seat-no">${p.seat_no}</div>`
+          : `<div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>`}
         <div class="min-w-0 flex-1">
           <div class="p-name">${esc(p.full_name || p.email.split('@')[0])}
             <span class="lvl ${admin ? 'lvl-admin' : ''}">${esc(p.nelos_level)}</span></div>
           <div class="p-mail">${esc(p.email)}</div>
-          ${pin}
+          ${sub}
         </div>
         <span class="chev">${open === p.id ? '▾' : '›'}</span>
       </div>
       ${open === p.id ? panelHtml(p) : ''}
     </div>`;
+}
+
+/* The numbers on offer in a system: those already free, plus this person's
+   own so it stays selected, plus the next one up so a new handler can
+   always be added without renumbering anybody. */
+function seatOptions(p, moduleKey) {
+  const key = moduleKey !== undefined ? moduleKey : p.primary_module;
+  if (!key) return '<option value="">— tag a system first —</option>';
+
+  const used = seatsUsed(key, p.id);
+  const highest = Math.max(0, ...people.filter(x => x.primary_module === key).map(x => x.seat_no || 0));
+  const opts = [];
+  for (let n = 1; n <= highest + 1; n++) {
+    if (used.has(n) && n !== p.seat_no) continue;          // taken by somebody else
+    opts.push(`<option value="${n}" ${p.seat_no === n ? 'selected' : ''}>${esc(handlerLabel(key))} ${n}</option>`);
+  }
+  return '<option value="">— no number (shares the whole system) —</option>' + opts.join('');
 }
 
 function panelHtml(p) {
@@ -232,22 +260,22 @@ function panelHtml(p) {
       ${admin ? `
         <p class="text-[12px] font-bold text-violet-700 mt-3">
           This person is a Nelos admin, so they see every case whatever is set here.
-          A pin still marks which queue they belong to for everyone else's benefit.
+          A tag still says which system they answer for, for everyone else's benefit.
         </p>` : ''}
 
-      <label class="lbl" for="pm-${esc(p.id)}">Main case handler for</label>
+      <label class="lbl" for="pm-${esc(p.id)}">Responsible for this system</label>
       <select class="inp" id="pm-${esc(p.id)}">
-        <option value="">— not pinned (sees every case) —</option>
+        <option value="">— no system tag (sees every case) —</option>
         ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
       </select>
 
-      <label class="lbl" for="rl-${esc(p.id)}">Seat in that system</label>
+      <label class="lbl" for="rl-${esc(p.id)}">Their number in it</label>
       <select class="inp" id="rl-${esc(p.id)}">
         ${seatOptions(p)}
       </select>
       <p class="text-[10.5px] font-semibold text-slate-400 mt-1.5">
-        Only seats belonging to the pinned system are offered. Change the system above and this
-        list follows. With no seat, they take anything sent to that system as a whole.
+        This is the name Case Routing uses. Without a number they take anything sent to the
+        system as a whole, but no rule can single them out.
       </p>
 
       <label class="lbl">Only these categories <span class="normal-case tracking-normal font-bold text-slate-400">(applies to their queue — a case assigned to them personally always shows)</span></label>
@@ -268,23 +296,44 @@ function panelHtml(p) {
     </div>`;
 }
 
-/* Seats belong to one system, so this list follows the pin above it. */
-function seatOptions(p, moduleKey) {
-  const key = moduleKey !== undefined ? moduleKey : p.primary_module;
-  const list = key ? rolesOf(key) : [];
-  if (!key) return '<option value="">— pin a system first —</option>';
-  if (!list.length) return '<option value="">— no seats defined for this system —</option>';
-  return '<option value="">— any seat (whole system) —</option>' +
-    list.map(r => `<option value="${r.id}" ${p.role_id === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
-}
-
+/* One list, grouped by system and numbered inside it, with whoever has no
+   tag yet gathered at the bottom rather than scattered through. */
 function renderPeople() {
-  $('people').innerHTML = people.length
-    ? people.map(personHtml).join('')
-    : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+  if (!people.length) {
+    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
          Nobody has Nelos access yet.<br>
          <span class="text-[11px] font-semibold">Grant it on the main portal's User Access and they will appear here.</span>
        </div>`;
+    return;
+  }
+
+  const groups = modules.map(m => ({
+    key: m.key,
+    title: `${m.icon || '📦'} ${m.label}`,
+    sub: `numbered as “${handlerLabel(m.key)} 1”, “${handlerLabel(m.key)} 2”…`,
+    rows: peopleIn(m.key)
+  }));
+
+  const untagged = people.filter(p => !p.primary_module);
+  if (untagged.length) {
+    groups.push({
+      key: null,
+      title: '❓ No system tag yet',
+      sub: 'these people see every case until they are tagged',
+      rows: untagged
+    });
+  }
+
+  $('people').innerHTML = groups.map(g => `
+    <div class="grp-head">
+      <span class="grp-title">${esc(g.title)}</span>
+      <span class="grp-sub">${g.rows.length ? esc(g.sub) : 'nobody tagged here yet'}</span>
+      <span class="grp-n">${g.rows.length}</span>
+    </div>
+    ${g.rows.length ? g.rows.map(personHtml).join('')
+                    : '<div class="grp-empty">— nobody —</div>'}
+  `).join('');
+
   wirePeople();
 }
 
@@ -313,8 +362,10 @@ function wirePeople() {
   const rl = panel.parentElement.querySelector('select[id^="rl-"]');
   if (pm && rl) {
     pm.addEventListener('change', () => {
-      const p = people.find(x => x.id === pm.id.slice(3));
-      rl.innerHTML = seatOptions({ role_id: null }, pm.value || null);
+      const person = people.find(x => x.id === pm.id.slice(3)) || {};
+      // A number belongs to one system, so moving somebody re-offers the
+      // numbers free in the system they are moving to.
+      rl.innerHTML = seatOptions({ id: person.id, seat_no: null }, pm.value || null);
     });
   }
 
@@ -334,7 +385,7 @@ async function savePerson(userId) {
 
   const primary = $(`pm-${userId}`).value || null;
   const seatEl = $(`rl-${userId}`);
-  const roleId = primary && seatEl && seatEl.value ? Number(seatEl.value) : null;
+  const seatNo = primary && seatEl && seatEl.value ? Number(seatEl.value) : null;
   const all = panel.querySelector('.cat-all').checked;
   const picked = all ? [] : [...panel.querySelectorAll('.cat-one:checked')].map(c => c.value);
 
@@ -351,7 +402,7 @@ async function savePerson(userId) {
     email: p.email,
     full_name: p.full_name,
     primary_module: primary,
-    role_id: roleId,
+    seat_no: seatNo,
     categories: picked.length ? picked : null,
     updated_at: new Date().toISOString(),
     updated_by: me.name
@@ -359,89 +410,9 @@ async function savePerson(userId) {
 
   if (error) { toast('Could not save — ' + error.message, false); return; }
   toast(primary
-    ? `Pinned to ${labelOf(primary)}${roleId ? ' · ' + roleName(roleId) : ''}.`
-    : 'Pin removed — sees every case.');
+    ? `Tagged ${seatNo ? seatName(primary, seatNo) : labelOf(primary)}.`
+    : 'Tag removed — sees every case.');
   open = null;
-  await load();
-}
-
-/* ── Roles ─────────────────────────────────────────────────────── */
-
-function rolesBlockHtml(m) {
-  const list = rolesOf(m.key);
-  return `
-    <div class="card">
-      <div class="mod-head" style="display:flex;align-items:center;gap:11px;padding:13px 16px;background:#f5f3ff;border-bottom:1.5px solid #ede9fe;">
-        <div class="r-ico">${esc(m.icon || '📦')}</div>
-        <div class="r-name">${esc(m.label)}</div>
-        <span class="r-count" style="margin-left:auto;">${list.length} seat${list.length === 1 ? '' : 's'}</span>
-      </div>
-      <div style="padding:11px 16px 14px;">
-        ${list.length ? list.map(r => `
-          <div class="flex items-center gap-2 py-1.5" style="border-bottom:1px dashed #ede9fe;">
-            <span class="text-[13px] font-bold text-slate-700 flex-1">${esc(r.name)}</span>
-            <span class="r-count">${people.filter(p => p.role_id === r.id).length} pinned</span>
-            <button class="btn btn-ghost" data-act="del-role" data-role="${r.id}"
-                    style="background:#fee2e2;color:#b91c1c;">Remove</button>
-          </div>`).join('')
-          : '<div class="text-[12px] font-bold text-slate-400 py-2">No seats — cases go to everyone pinned to this system.</div>'}
-        <div class="flex gap-2 mt-3">
-          <input class="inp new-role" data-mod="${esc(m.key)}" placeholder="Add a seat, e.g. Admin 1">
-          <button class="btn btn-save" data-act="add-role" data-mod="${esc(m.key)}">Add</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function renderRoles() {
-  $('roles').innerHTML = modules.length
-    ? modules.map(rolesBlockHtml).join('')
-    : '<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">No sections yet.</div>';
-
-  $('roles').querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
-    if (b.dataset.act === 'add-role') return addRole(b.dataset.mod);
-    if (b.dataset.act === 'del-role') return delRole(Number(b.dataset.role));
-  }));
-  $('roles').querySelectorAll('.new-role').forEach(i =>
-    i.addEventListener('keydown', e => { if (e.key === 'Enter') addRole(i.dataset.mod); }));
-}
-
-async function addRole(modKey) {
-  const input = $('roles').querySelector(`.new-role[data-mod="${modKey}"]`);
-  const name = (input.value || '').trim().replace(/\s+/g, ' ');
-  if (!name) { input.focus(); return; }
-
-  const { error } = await _supabase.from('nelos_roles').insert([{
-    module_key: modKey, name,
-    sort_order: (rolesOf(modKey).reduce((m, r) => Math.max(m, r.sort_order || 0), 0)) + 10
-  }]);
-  if (error) {
-    toast(/duplicate|unique/i.test(error.message)
-      ? 'That system already has a seat by that name.'
-      : 'Could not add — ' + error.message, false);
-    return;
-  }
-  input.value = '';
-  toast(`Seat "${name}" added.`);
-  await load();
-}
-
-async function delRole(id) {
-  const r = roles.find(x => x.id === id);
-  if (!r) return;
-  const pinned = people.filter(p => p.role_id === id).length;
-  const routed = routes.filter(x => x.to_role_id === id).length;
-  if (!confirm(
-    `Remove the seat "${r.name}"?` +
-    (pinned ? `\n\n${pinned} person(s) pinned to it will fall back to the whole system.` : '') +
-    (routed ? `\n${routed} routing rule(s) will fall back to the whole system.` : '')
-  )) return;
-
-  // Both foreign keys are ON DELETE SET NULL, so nobody loses their pin and
-  // no rule disappears — each just widens back to the whole system.
-  const { error } = await _supabase.from('nelos_roles').delete().eq('id', id);
-  if (error) { toast('Could not remove — ' + error.message, false); return; }
-  toast('Seat removed.');
   await load();
 }
 
@@ -452,8 +423,8 @@ async function delRole(id) {
 function destCellHtml(mod, cat, rule, isDefault) {
   const inherited = !isDefault && !routes.some(r => r.source_module === mod && r.category === cat);
   const toModule = rule ? rule.to_module : mod;
-  const toRole = rule && !inherited ? rule.to_role_id : null;
-  const seats = rolesOf(toModule);
+  const toSeat = rule && !inherited ? rule.to_seat_no : null;
+  const seats = peopleIn(toModule).filter(p => p.seat_no);
   const n = handlerCount(toModule);
 
   return `
@@ -463,9 +434,10 @@ function destCellHtml(mod, cat, rule, isDefault) {
           ${modules.map(x =>
             `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(x.label)}${x.key === mod ? ' (itself)' : ''}</option>`).join('')}
         </select>
-        <select class="inp r-seat" style="flex:1;min-width:140px;" ${seats.length ? '' : 'disabled'}>
-          <option value="">${seats.length ? 'Any seat' : 'No seats defined'}</option>
-          ${seats.map(r => `<option value="${r.id}" ${toRole === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+        <select class="inp r-seat" style="flex:1;min-width:150px;" ${seats.length ? '' : 'disabled'}>
+          <option value="">${seats.length ? 'Anyone in that system' : 'Nobody tagged there yet'}</option>
+          ${seats.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
+            esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
         </select>
         ${!isDefault && !inherited
           ? `<button class="btn btn-ghost r-clear" title="Drop this rule and follow the section default">✕</button>`
@@ -562,13 +534,13 @@ async function saveModule(key, fields) {
 /* One rule per (section, category); the default row is category NULL.
    Upsert would need a unique constraint PostgREST can name, and the
    default's uniqueness is a partial index, so this reads then writes. */
-async function saveRule(mod, cat, toModule, toRoleId) {
+async function saveRule(mod, cat, toModule, toSeatNo) {
   const existing = routes.find(r => r.source_module === mod && r.category === cat);
   const row = {
     source_module: mod,
     category: cat,
     to_module: toModule,
-    to_role_id: toRoleId ? Number(toRoleId) : null,
+    to_seat_no: toSeatNo ? Number(toSeatNo) : null,
     updated_at: new Date().toISOString(),
     updated_by: me.name
   };
@@ -577,7 +549,9 @@ async function saveRule(mod, cat, toModule, toRoleId) {
     : await _supabase.from('nelos_routes').insert([row]);
 
   if (error) { toast('Could not save — ' + error.message, false); }
-  else toast(cat ? `${cat} → ${labelOf(toModule)}${toRoleId ? ' · ' + roleName(Number(toRoleId)) : ''}` : 'Default saved.');
+  else toast(cat
+    ? `${cat} → ${labelOf(toModule)}${toSeatNo ? ' · ' + seatName(toModule, Number(toSeatNo)) : ''}`
+    : 'Default saved.');
   await load();
 }
 
@@ -594,23 +568,20 @@ async function clearRule(mod, cat) {
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
-  ['people', 'roles', 'routing'].forEach(name =>
+  ['people', 'routing'].forEach(name =>
     $('tab-' + name).classList.toggle('hidden', t.dataset.tab !== name));
 }));
 
 /* ── Loading ───────────────────────────────────────────────────── */
 
 async function load() {
-  const [pplRes, modRes, catRes, roleRes, routeRes] = await Promise.all([
+  const [pplRes, modRes, catRes, routeRes] = await Promise.all([
     _supabase.rpc('nelos_people').then(r => r, e => ({ error: e, data: [] })),
     _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
     _supabase.from('nelos_categories').select('name').eq('active', true).order('sort_order')
       .then(r => r, () => ({ data: [] })),
-    // Roles and routes arrive with the roles migration. On a database that
-    // has not run it yet these come back empty and the page still works —
-    // every rule simply targets a whole module, as it did before.
-    _supabase.from('nelos_roles').select('*').order('module_key').order('sort_order')
-      .then(r => r, () => ({ data: [] })),
+    // Routes arrive with the routing migration. On a database that has not
+    // run it yet this comes back empty and the page still works.
     _supabase.from('nelos_routes').select('*')
       .then(r => r, () => ({ data: [] }))
   ]);
@@ -624,7 +595,6 @@ async function load() {
 
   modules = modRes.data || [];
   categories = (catRes.data || []).map(c => c.name);
-  roles = roleRes.data || [];
   routes = routeRes.data || [];
 
   if (pplRes.error || !pplRes.data) {
@@ -633,14 +603,12 @@ async function load() {
       Could not load the people list.<br>
       <span class="text-[11px] font-semibold">
         Run <strong>shared/migration_nelos_routing.sql</strong> in Supabase — it adds nelos_people().</span></div>`;
-    renderRoles();
     renderRouting();
     return;
   }
 
   people = pplRes.data;
   renderPeople();
-  renderRoles();
   renderRouting();
 }
 
