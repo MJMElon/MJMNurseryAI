@@ -46,11 +46,11 @@
      fallback labels: the live ones are rows in nelos_modules, which the User
      Setting page renders and can rename. Keep the two in step. */
   const SOURCE_LABEL = {
-    operation:   'AI Stock System',
+    operation:   'Seedling Stock System',
     nursery_ops: 'Nursery Operation',
     scan:        'FC Portal',
     mobile:      'Admin Portal',
-    audit:       'Auditor Portal',
+    audit:       'Audit Portal',
     npayroll:    'Payroll',
     nelos:       'Nelos'
   };

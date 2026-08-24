@@ -23,7 +23,10 @@
               border-bottom:1.5px solid #ede9fe; flex-wrap:wrap; }
   .mod-ico { width:36px; height:36px; border-radius:10px; background:#fff; border:1.5px solid #ddd6fe;
              display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-  .mod-name { font-size:14.5px; font-weight:900; color:#4c1d95; }
+  .mod-name { font-size:14.5px; font-weight:900; color:#4c1d95; border-radius:6px; padding:1px 5px;
+              margin-left:-5px; border:1.5px solid transparent; outline:none; cursor:text; }
+  .mod-name:hover { border-color:#ddd6fe; background:#fff; }
+  .mod-name:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
   .mod-key { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:#a78bfa; }
   .mod-count { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
                padding:3px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
@@ -92,7 +95,8 @@
   <p class="text-[12.5px] font-semibold text-slate-500 mb-5 leading-relaxed">
     Nursery Case Log is linked to the modules below. A case raised in a module belongs to that
     module's block. Add the people who handle each one, then narrow each person to the case
-    categories they should see.
+    categories they should see. <strong>Click a module's name to rename it</strong> — the grey
+    code under it is the module key, which filed cases are matched on and so cannot be edited here.
   </p>
 
   <div class="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 mb-6">
@@ -121,6 +125,7 @@ const esc = MJMNelos.esc;
 let modules = [];      // nelos_modules rows
 let members = [];      // nelos_module_members rows
 let categories = [];   // nelos_categories names
+let directory = [];    // everyone in the system, for the add dropdown
 let caseCounts = {};   // module key → number of cases
 let me = { name: '' };
 let editing = null;    // member id whose category chooser is open
@@ -189,6 +194,34 @@ function catsBoxHtml(m) {
     </div>`;
 }
 
+/* Pick a colleague from the list rather than typing an address from
+   memory. People already on this module are left out, so the dropdown only
+   ever offers somebody it makes sense to add.
+
+   The last option drops back to a text box: somebody who has never signed
+   in has no profile row and so is not in the directory, and adding them
+   early is supported on purpose. */
+function addControlHtml(mod, mine) {
+  const taken = new Set(mine.map(m => (m.email || '').toLowerCase()));
+  const free = directory.filter(u => !taken.has((u.email || '').toLowerCase()));
+
+  if (!directory.length) {
+    // Directory unavailable (migration not re-run, or not an admin) — the
+    // typed box still works, so the page does not become unusable.
+    return `<input class="inp add-mail" data-mod="${esc(mod.key)}" type="email"
+                   placeholder="Add someone by email…" autocomplete="off">`;
+  }
+
+  return `
+    <select class="inp add-pick" data-mod="${esc(mod.key)}">
+      <option value="">Choose someone…</option>
+      ${free.map(u => `<option value="${esc(u.email)}">${esc(u.full_name || u.email)} — ${esc(u.email)}</option>`).join('')}
+      <option value="__type__">✏️ Someone not on this list…</option>
+    </select>
+    <input class="inp add-mail hidden" data-mod="${esc(mod.key)}" type="email"
+           placeholder="Type their email…" autocomplete="off">`;
+}
+
 function blockHtml(mod) {
   const mine = members.filter(m => m.module_key === mod.key);
   const n = caseCounts[mod.key] || 0;
@@ -198,8 +231,13 @@ function blockHtml(mod) {
       <div class="mod-head">
         <div class="mod-ico">${esc(mod.icon || '📦')}</div>
         <div>
-          <div class="mod-name">${esc(mod.label)}</div>
-          <div class="mod-key">${esc(mod.key)}_</div>
+          <!-- The name is display only, so it is editable in place. The grey
+               chip below is the module's key — an identifier that other
+               pages and every filed case carry a copy of, so it is shown but
+               not editable here. -->
+          <div class="mod-name" contenteditable="true" spellcheck="false"
+               data-label="${esc(mod.key)}" title="Click to rename">${esc(mod.label)}</div>
+          <div class="mod-key" title="Module key — not editable, cases are filed against it">${esc(mod.key)}_</div>
         </div>
         <span class="mod-count">${n} case${n === 1 ? '' : 's'}</span>
         ${mod.href ? `<a class="mod-open" href="${esc(mod.href)}"${external ? ' target="_blank" rel="noopener"' : ''}>Open ↗</a>` : ''}
@@ -208,8 +246,7 @@ function blockHtml(mod) {
         ${mine.length ? mine.map(memberHtml).join('')
                       : '<div class="none">Nobody added yet — everyone with Nelos sees this module\'s cases.</div>'}
         <div class="add-row">
-          <input class="inp add-mail" data-mod="${esc(mod.key)}" type="email"
-                 placeholder="Add someone by email…" autocomplete="off">
+          ${addControlHtml(mod, mine)}
           <button class="btn-add" data-act="add" data-mod="${esc(mod.key)}">➕ Add</button>
         </div>
       </div>
@@ -244,6 +281,27 @@ function wire() {
   $('blocks').querySelectorAll('.add-mail').forEach(i =>
     i.addEventListener('keydown', e => { if (e.key === 'Enter') addMember(i.dataset.mod); }));
 
+  // "Someone not on this list…" swaps the dropdown for a text box.
+  $('blocks').querySelectorAll('.add-pick').forEach(sel =>
+    sel.addEventListener('change', () => {
+      const box = $('blocks').querySelector(`.add-mail[data-mod="${sel.dataset.mod}"]`);
+      if (!box) return;
+      const typing = sel.value === '__type__';
+      box.classList.toggle('hidden', !typing);
+      if (typing) { box.value = ''; box.focus(); }
+    }));
+
+  // Renaming a block. Enter commits, Escape abandons, and clicking away
+  // commits too — so a rename cannot be half-typed and silently lost.
+  $('blocks').querySelectorAll('[data-label]').forEach(el => {
+    const original = el.textContent;
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      if (e.key === 'Escape') { el.textContent = original; el.blur(); }
+    });
+    el.addEventListener('blur', () => saveLabel(el.dataset.label, el, original));
+  });
+
   // "All categories" greys out the individual ticks rather than hiding
   // them, so it is obvious what turning it off would offer.
   const box = $('blocks').querySelector('.cats-box');
@@ -259,9 +317,19 @@ function wire() {
 }
 
 async function addMember(modKey) {
+  const pick  = $('blocks').querySelector(`.add-pick[data-mod="${modKey}"]`);
   const input = $('blocks').querySelector(`.add-mail[data-mod="${modKey}"]`);
-  const email = (input.value || '').trim().toLowerCase();
-  if (!email) { input.focus(); return; }
+
+  // Whichever control is in play: the dropdown, unless it is set to
+  // "someone not on this list", in which case the text box.
+  const typing = !pick || pick.value === '__type__';
+  const email = (typing ? (input && input.value) || '' : pick.value).trim().toLowerCase();
+
+  if (!email) {
+    if (typing && input) input.focus(); else if (pick) pick.focus();
+    toast('Choose somebody, or type their email.', false);
+    return;
+  }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('That does not look like an email address.', false); return; }
 
   if (members.some(m => m.module_key === modKey && m.email.toLowerCase() === email)) {
@@ -271,11 +339,15 @@ async function addMember(modKey) {
 
   // Look the email up so the row carries a real name and user_id where we
   // can. Not finding one is fine — they simply have not signed in yet.
-  let prof = null;
-  try {
-    const { data } = await _supabase.rpc('nelos_lookup_user', { p_email: email });
-    prof = (data && data[0]) || null;
-  } catch (_) { /* no profile — add by email alone */ }
+  // Somebody chosen from the dropdown is already in `directory`, so that is
+  // checked first and the round-trip skipped.
+  let prof = directory.find(u => (u.email || '').toLowerCase() === email) || null;
+  if (!prof) {
+    try {
+      const { data } = await _supabase.rpc('nelos_lookup_user', { p_email: email });
+      prof = (data && data[0]) || null;
+    } catch (_) { /* no profile — add by email alone */ }
+  }
 
   const { error } = await _supabase.from('nelos_module_members').insert([{
     module_key: modKey,
@@ -292,8 +364,24 @@ async function addMember(modKey) {
       : 'Could not add — ' + error.message, false);
     return;
   }
-  input.value = '';
+  if (input) { input.value = ''; input.classList.add('hidden'); }
+  if (pick) pick.value = '';
   toast(prof ? `${prof.full_name || email} added.` : `${email} added — they will be linked when they first sign in.`);
+  await load();
+}
+
+async function saveLabel(key, el, original) {
+  const label = el.textContent.trim().replace(/\s+/g, ' ');
+  if (!label) { el.textContent = original; toast('A module needs a name.', false); return; }
+  if (label === original) return;
+
+  const { error } = await _supabase.from('nelos_modules').update({ label }).eq('key', key);
+  if (error) {
+    el.textContent = original;
+    toast('Could not rename — ' + error.message, false);
+    return;
+  }
+  toast(`Renamed to “${label}”.`);
   await load();
 }
 
@@ -331,13 +419,17 @@ async function saveCats(id) {
 /* ── Loading ───────────────────────────────────────────────────── */
 
 async function load() {
-  const [modRes, memRes, catRes, caseRes] = await Promise.all([
+  const [modRes, memRes, catRes, caseRes, dirRes] = await Promise.all([
     _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
     _supabase.from('nelos_module_members').select('*').order('created_at'),
     _supabase.from('nelos_categories').select('name').eq('active', true).order('sort_order')
       .then(r => r, () => ({ data: [] })),
     _supabase.from('nelos_cases').select('source_module').limit(2000)
-      .then(r => r, () => ({ data: [] }))
+      .then(r => r, () => ({ data: [] })),
+    // Everyone in the system, for the add dropdown. Older databases have no
+    // nelos_directory() yet, so this falls back to a typed box rather than
+    // failing the page.
+    _supabase.rpc('nelos_directory').then(r => r, () => ({ data: [] }))
   ]);
 
   if (modRes.error) {
@@ -350,6 +442,7 @@ async function load() {
   modules = modRes.data || [];
   members = memRes.data || [];
   categories = (catRes.data || []).map(c => c.name);
+  directory = dirRes.data || [];
 
   caseCounts = {};
   (caseRes.data || []).forEach(r => {

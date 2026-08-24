@@ -91,6 +91,45 @@ INSERT INTO nelos_modules (key, label, icon, href, sort_order) VALUES
   ('audit',       'Auditor Portal',     '📋', '../audit/audit_home.html',                  50)
 ON CONFLICT (key) DO NOTHING;
 
+-- Label corrections, applied only where the row still carries the label this
+-- file originally seeded. A label somebody has since edited on the User
+-- Setting page is left alone — this fixes the default, it does not stomp a
+-- decision.
+UPDATE nelos_modules SET label = 'Seedling Stock System'
+ WHERE key = 'operation' AND label = 'AI Stock System';
+UPDATE nelos_modules SET label = 'Audit Portal'
+ WHERE key = 'audit'     AND label = 'Auditor Portal';
+
+-- ── Renaming a module KEY (read before you try it) ──────────────
+-- `label` is display only — rename it freely, on this page or here.
+-- `key` is an identifier, and three other things carry a copy of it:
+--
+--   1. nelos_cases.source_module   — every case already filed
+--   2. nelos_module_members.module_key — handled by ON UPDATE CASCADE below
+--   3. four hardcoded call sites that raise or filter cases:
+--        operation/operation_batch_detail.html   source: 'operation'
+--        operation/operation_dashboard.html      source: 'operation'
+--        nursery_ops/nursery_ops_dashboard.html  source: 'nursery_ops'
+--        audit/audit_admin.html                  source: 'audit'
+--      plus the SOURCE_LABEL fallback map in shared/shared_nelos.js
+--
+-- So a key rename is a code change AND a data change, and doing only one
+-- of them silently orphans cases: they keep the old source_module, stop
+-- matching any block, and vanish from the To-Do lists. To rename a key,
+-- change the call sites first, then run BOTH statements together:
+--
+--   UPDATE nelos_modules SET key = 'new_key' WHERE key = 'old_key';
+--   UPDATE nelos_cases SET source_module = 'new_key' WHERE source_module = 'old_key';
+--
+-- The member rows follow on their own.
+--
+-- The keys shipped here deliberately match the table prefixes the rest of
+-- the portal already uses (operation_, nops_, audit_…), which is what the
+-- grey chip under each block name is showing.
+
+-- (The constraint that makes a key rename carry its member rows is set up
+--  in PART 2, once nelos_module_members exists.)
+
 -- ────────────────────────────────────────────────────────────────
 -- PART 2: Who handles each module's cases
 -- ────────────────────────────────────────────────────────────────
@@ -122,6 +161,29 @@ CREATE INDEX IF NOT EXISTS nelos_module_members_user_idx
   ON nelos_module_members (user_id);
 CREATE INDEX IF NOT EXISTS nelos_module_members_email_idx
   ON nelos_module_members (lower(email));
+
+-- Let a key rename carry its member rows with it, instead of failing on the
+-- foreign key. The table above may have been created by an earlier run of
+-- this file, when the constraint was still ON DELETE only, so this upgrades
+-- it in place. Guarded on confupdtype so re-running does not churn it.
+DO $$
+DECLARE c TEXT;
+BEGIN
+  SELECT conname INTO c
+    FROM pg_constraint
+   WHERE conrelid  = 'public.nelos_module_members'::regclass
+     AND contype   = 'f'
+     AND confrelid = 'public.nelos_modules'::regclass
+     AND confupdtype <> 'c';          -- 'c' = already ON UPDATE CASCADE
+  IF c IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE nelos_module_members DROP CONSTRAINT %I', c);
+    ALTER TABLE nelos_module_members
+      ADD CONSTRAINT nelos_module_members_module_key_fkey
+      FOREIGN KEY (module_key) REFERENCES nelos_modules(key)
+      ON UPDATE CASCADE ON DELETE CASCADE;
+    RAISE NOTICE 'nelos_module_members.module_key now cascades on rename.';
+  END IF;
+END $$;
 
 ALTER TABLE nelos_module_members ENABLE ROW LEVEL SECURITY;
 
@@ -168,6 +230,37 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.nelos_lookup_user(TEXT) TO authenticated;
+
+-- Everybody in the system, for the "add someone" dropdown on the User
+-- Setting page — so an admin picks a colleague instead of typing an address
+-- from memory and mistyping it.
+--
+-- SECURITY DEFINER reads past the shared_profiles policy, so this checks
+-- for itself who is asking and returns NOTHING to anybody who is not a
+-- Nelos admin or a portal user-manager. That is the same test the User
+-- Setting page gates on, so the function cannot become a way for an
+-- ordinary account to enumerate everyone's email address.
+CREATE OR REPLACE FUNCTION public.nelos_directory()
+RETURNS TABLE (id UUID, full_name TEXT, email TEXT)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id, p.full_name, p.email
+    FROM public.shared_profiles p
+   WHERE p.email IS NOT NULL
+     AND p.email <> ''
+     AND EXISTS (
+       SELECT 1 FROM public.shared_profiles me
+        WHERE me.id = auth.uid()
+          AND (COALESCE((me.permissions->>'manage_users')::boolean, false)
+               OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
+     )
+   ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_directory() TO authenticated;
 
 -- Back-fill user_id on any member row added before that person signed up.
 -- Cheap, and it means an admin never has to re-add somebody.
