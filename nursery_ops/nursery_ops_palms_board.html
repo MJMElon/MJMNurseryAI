@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PALMS Monitoring Board — Nursery Operation Management</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f0fdfa; margin:0; }
+  .card { background:white; border:1px solid #ccfbf1; border-radius:20px; box-shadow:0 4px 16px rgba(13,148,136,.07); }
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #99f6e4; color:#0f766e; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s; }
+  .tool-btn:hover { background:#ccfbf1; }
+  .pick { appearance:none; -webkit-appearance:none; padding:9px 34px 9px 14px; border-radius:12px; border:1.5px solid #99f6e4;
+          background:white; color:#0f766e; font-weight:900; font-size:12px; cursor:pointer; outline:none;
+          background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%230f766e' d='M5 6L0 0h10z'/></svg>");
+          background-repeat:no-repeat; background-position:right 12px center; background-size:10px; }
+  .stat { border-radius:16px; padding:14px 16px; border:1.5px solid; }
+  .stat-n { font-size:26px; font-weight:900; line-height:1; }
+  .stat-l { font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; margin-top:5px; }
+  .s-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
+  .s-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .s-idle { background:#f8fafc; border-color:#e2e8f0; color:#475569; }
+  th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
+       padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
+  td { padding:11px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; vertical-align:top; }
+  .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+          border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
+  .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
+  .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
+  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">PALMS — Monitoring Board</span>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <a class="tool-btn" href="nursery_ops_dashboard.html">← Back to Module</a>
+    <div class="flex items-center gap-2">
+      <a class="tool-btn" href="nursery_ops_palms_motion.html">⏱️ Motion Study</a>
+      <select id="f-nursery" class="pick"></select>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-5">
+    <div class="flex items-baseline justify-between gap-3 flex-wrap mb-1">
+      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">What every plot is on today</h1>
+      <span id="asof" class="text-[11px] font-bold text-slate-400"></span>
+    </div>
+    <p class="text-[12px] text-slate-500 leading-relaxed">
+      Recorded in the field on the <strong>555 FC Portal</strong> and read here — the office does not key plot status in.
+      A plot is <strong>late</strong> once it has been on an activity longer than that activity is meant to take.
+    </p>
+    <div class="grid grid-cols-3 gap-3 mt-4">
+      <div class="stat s-late"><div class="stat-n" id="n-late">—</div><div class="stat-l">Late</div></div>
+      <div class="stat s-ok"><div class="stat-n" id="n-ok">—</div><div class="stat-l">On schedule</div></div>
+      <div class="stat s-idle"><div class="stat-n" id="n-idle">—</div><div class="stat-l">Nothing running</div></div>
+    </div>
+  </div>
+
+  <div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th>Plot</th><th>Activity now</th><th>Started</th><th>Due</th>
+            <th class="text-right">Days</th><th>Recorded by</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="hidden px-6 py-14 text-center">
+      <div class="text-3xl mb-3">🪴</div>
+      <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plot activity on the server yet</p>
+      <p class="text-[12px] text-slate-500 mt-2 max-w-[440px] mx-auto leading-relaxed">
+        Plot status is recorded on the 555 FC Portal and reaches this page when a Field Conductor
+        opens PALMS or saves a day. If nothing appears, the tables may not have been created —
+        run <code class="bg-slate-100 px-1.5 py-0.5 rounded">shared/create_palms_tables.sql</code>.
+      </p>
+    </div>
+  </div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-7">
+    Page access is granted on this module's
+    <a href="nursery_ops_user_access.html" class="text-teal-700 font-bold underline underline-offset-2">User Access</a>.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let LOGS = {};
+let SCOPE = 'all';   // 'all', or a nursery key, or a list of keys the user may see
+
+/* Worst first. A board is read to find what needs chasing, so the most
+   overdue plot is the first line and the idle ones sink to the bottom. */
+function boardRows() {
+  const rank = { overdue: 0, ontrack: 1, none: 2 };
+  return MJMPalms.unitsOf(LOGS, SCOPE)
+    .map((key) => ({ key: key, st: MJMPalms.computeStatus(LOGS, key),
+                     open: MJMPalms.openActivities(LOGS, key),
+                     entries: MJMPalms.currentEntries(LOGS, key) }))
+    .sort((a, b) => (rank[a.st.state] - rank[b.st.state])
+                 || ((a.st.left == null ? 1e9 : a.st.left) - (b.st.left == null ? 1e9 : b.st.left))
+                 || String(a.key).localeCompare(String(b.key)));
+}
+
+function render() {
+  const rows = boardRows();
+  const late = rows.filter((r) => r.st.state === 'overdue').length;
+  const idle = rows.filter((r) => r.st.state === 'none').length;
+  $('n-late').textContent = late;
+  $('n-ok').textContent = rows.length - late - idle;
+  $('n-idle').textContent = idle;
+
+  $('empty').classList.toggle('hidden', rows.length > 0);
+  $('rows').innerHTML = rows.map(function (r) {
+    if (r.st.state === 'none') {
+      return '<tr><td class="font-black text-slate-800">' + esc(MJMPalms.keyLabel(r.key)) + '</td>' +
+             '<td colspan="4"><span class="pill p-idle">Nothing running</span></td><td>—</td></tr>';
+    }
+    // Two activities can run at once; both are named, because "what is this
+    // plot on" has two answers and showing one of them hides work.
+    const names = r.open.map(function (a) { return esc(a.name); }).join('<br>');
+    const isLate = r.st.state === 'overdue';
+    const days = isLate ? (-r.st.left) + 'd over' : r.st.left + 'd left';
+    const by = r.entries.map(function (e) { return e.by; }).filter(Boolean);
+    return '<tr>' +
+      '<td class="font-black text-slate-800">' + esc(MJMPalms.keyLabel(r.key)) + '</td>' +
+      '<td>' + names + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.st.start)) + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.st.due)) + '</td>' +
+      '<td class="text-right"><span class="pill ' + (isLate ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
+      '<td class="text-slate-500">' + esc(by.length ? by[0] : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nursery_ops')) {
+      alert('You do not have access to Nursery Operation Management.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    $('who').textContent = u.full_name || u.email || '';
+
+    /* The dashboard hides the button, but a URL is typeable and a bookmark
+       outlives a permission. Fails OPEN when shared_access.js is an older
+       cached copy without canOpenPage: a stale script must not lock somebody
+       out of a page they are entitled to. */
+    if (typeof MJMAccess.canOpenPage === 'function' &&
+        !MJMAccess.canOpenPage('nursery_ops', 'palms_board')) {
+      alert('You do not have access to this page. Ask an admin to grant it in User Access.');
+      window.location.href = 'nursery_ops_dashboard.html';
+      return;
+    }
+
+    /* The same nursery scope the field app obeys, from the main portal's
+       User Access. Someone narrowed to BNN must not read UNN's board here
+       just because the office page is a different screen. */
+    const perms = MJMAccess.permissions() || {};
+    const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
+    const KEYS = ['BNN', 'UNN1', 'UNN2'];
+    const visible = allowed
+      ? KEYS.filter((k) => allowed.some((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase() === k))
+      : KEYS;
+    SCOPE = allowed ? visible : 'all';
+    $('f-nursery').innerHTML =
+      '<option value="__all">All nurseries</option>' +
+      visible.map((k) => '<option value="' + k + '">' + k + '</option>').join('');
+    $('f-nursery').addEventListener('change', (e) => {
+      SCOPE = e.target.value === '__all' ? (allowed ? visible : 'all') : e.target.value;
+      render();
+    });
+
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    $('asof').textContent = 'as at ' + new Date().toLocaleString('en-MY',
+      { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    render();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    // The tables may simply not exist yet. That is a message, not a bounce —
+    // sending an admin back to the module selection tells them nothing.
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+    $('empty').classList.remove('hidden');
+    $('rows').innerHTML = '';
+  }
+})();
+</script>
+</body>
+</html>
