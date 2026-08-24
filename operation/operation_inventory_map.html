@@ -125,7 +125,7 @@
                 const btn = document.createElement('button');
                 btn.className = `tab-btn flex-1 hover:bg-blue-50 hover:text-blue-600 transition-all ${activeNurseryName === n.name ? 'active-nursery' : ''}`;
                 btn.id = `tab-${n.name.replace(/\s+/g, '-')}`;
-                btn.innerHTML = `🏠 ${n.name}`;
+                btn.textContent = `🏠 ${n.name}`;      // a name is text, not markup
                 btn.onclick = () => switchNursery(n.name);
                 container.appendChild(btn);
             });
