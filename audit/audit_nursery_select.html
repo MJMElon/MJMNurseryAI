@@ -17,7 +17,25 @@
 
   <script src="audit_lang.js?v=20260823o"></script>
   <script src="audit_login_guard.js?v=20260824a"></script>
-  <script>MJMAuditLogin.requireSignIn();</script>
+  <!-- The nursery chooser was cancelled: sign-in now lands straight on
+       the to-do list, and the Switch pill on that page toggles PN ↔ MN.
+       This page stays on disk so old bookmarks and PWA start_urls that
+       still point at it do not 404 — they are forwarded on instead.
+       Decided in the head so the redirect happens before the page
+       renders, rather than flashing the chooser for a beat first. -->
+  <script>
+    (function(){
+      var here = location.pathname.split('/').pop();
+      /* Only forward if the browser actually asked for this page. Guards
+         against a future include mistake pulling this script into a
+         different document. */
+      if (here === 'audit_nursery_select.html') {
+        location.replace('audit_home.html');
+      } else {
+        MJMAuditLogin.requireSignIn();
+      }
+    })();
+  </script>
   <style>body{opacity:0;transition:opacity .2s ease}</style>
 
   <style>
