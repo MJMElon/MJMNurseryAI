@@ -29,8 +29,12 @@ stranger just made can read every worker's rate — and `FOR ALL` with
 `WITH CHECK (true)` means it can write them too.
 
 It reaches: `mjmnpayroll_*` (6 tables), `nops_maint_*` (10), `fcportal_palms_*`
-(5), `nops_*` operations and plot status (7), `nelos_*` (8), and
-`shared_batch_customer_allocations`.
+(5), `nops_*` operations and plot status (7), and
+`shared_batch_customer_allocations`. The `nelos_*` tables had it too — someone
+else found the same thing from the Nelos side while this was being written, and
+`shared/migration_nelos_rls.sql` closes those properly (read and write for
+whoever holds Nelos, config tables admin-only, delete admin-only). **Run that
+one as well.**
 
 The May 2026 hardening (`shared/migration_rls_hardening.sql`) fixed exactly this
 for salesweb, operation, audit and `shared_profiles`. Every module built since
@@ -48,10 +52,18 @@ Two contributing bugs, both **[done]**:
   writes when somebody is given a job here, and which a self-signed-up account
   cannot have.
 
+The two do not overlap: section 6 of the hardening file deliberately does
+nothing and points at `migration_nelos_rls.sql` instead. That matters more than
+it sounds — permissive RLS policies are **OR'd** together, so a second, looser
+"any staff" policy laid on top of the Nelos ones would have quietly widened what
+they narrow, with no error to notice.
+
 **What you do tomorrow:** open that file and run **section 0 first, on its own**.
 It lists every account with no module granted. Anyone in that list who really
 works here needs their module set in `user_access.html` *before* you run the
 rest, or you will lock them out of their own screens. Then run sections 1–8.
+
+Then run `shared/migration_nelos_rls.sql` for the Nelos side.
 
 It was tested end to end against a real PostgreSQL 16 with your policy shapes:
 before, a no-module account reads payroll and inserts a row; after, it reads 0

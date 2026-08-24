@@ -49,7 +49,7 @@
 --   3. Maintenance    (nops_maint_*)
 --   4. FC Portal      (fcportal_palms_*)
 --   5. Nursery ops    (nops_* other than maint)
---   6. Nelos          (nelos_*)
+--   6. Nelos          — skipped, see migration_nelos_rls.sql
 --   7. Allocations    (shared_batch_customer_allocations)
 --   8. Verify
 --
@@ -226,47 +226,18 @@ END $$;
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 6. NELOS — the case log. Raised from every module, so it is gated on
---    being staff at all rather than on holding the nelos module.
+-- 6. NELOS — not here. Run shared/migration_nelos_rls.sql instead.
+--
+--    That file closes the nelos_* tables properly: read for anyone holding
+--    the Nelos module, write for the same, config tables (modules, routes,
+--    roles, categories, handlers) writable by Nelos admins only, and delete
+--    admin-only because a case is a record.
+--
+--    Do NOT also close them from here. Permissive policies are OR'd
+--    together, so adding a second, looser "any staff" policy on top of
+--    those would widen the very thing that file narrows — the two would
+--    not conflict loudly, they would quietly cancel out.
 -- ────────────────────────────────────────────────────────────────────────────
-DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'nelos_cases', 'nelos_case_comments', 'nelos_categories',
-    'nelos_modules', 'nelos_module_members', 'nelos_handlers',
-    'nelos_roles', 'nelos_routes'
-  ] LOOP
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = t) THEN
-      EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
-      -- the open pair, under each name migration_nelos*.sql used
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos cases" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos cases" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos comments" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos comments" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos categories" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos categories" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos modules" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos modules" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos members" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos members" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos handlers" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos handlers" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos roles" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos roles" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated read nelos routes" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "Authenticated write nelos routes" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "staff read nelos" ON %I', t);
-      EXECUTE format('DROP POLICY IF EXISTS "staff write nelos" ON %I', t);
-
-      EXECUTE format('CREATE POLICY "staff read nelos" ON %I
-                      FOR SELECT TO authenticated USING (public._mjm_is_internal())', t);
-      EXECUTE format('CREATE POLICY "staff write nelos" ON %I
-                      FOR ALL TO authenticated
-                      USING (public._mjm_is_internal()) WITH CHECK (public._mjm_is_internal())', t);
-    END IF;
-  END LOOP;
-END $$;
 
 
 -- ────────────────────────────────────────────────────────────────────────────
