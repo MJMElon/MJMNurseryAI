@@ -623,11 +623,36 @@
     .tl-item{position:relative;margin-bottom:10px}
     .tl-item::before{content:'';position:absolute;left:-23px;top:17px;width:11px;height:11px;
                      border-radius:50%;background:#fff;border:2.5px solid var(--tone,#c3ced6)}
-    .tl-card{border-radius:13px;background:var(--tint,#f4f7fa);
+    .tl-card{display:block;border-radius:13px;background:var(--tint,#f4f7fa);
              border-left:4px solid var(--tone,#c3ced6);overflow:hidden;
-             transition:transform .14s,box-shadow .14s}
-    .tl-card:hover{transform:translateX(2px);box-shadow:0 4px 14px rgba(16,40,60,.08)}
+             text-decoration:none;color:inherit;cursor:pointer;
+             transition:transform .14s,box-shadow .14s,filter .14s,opacity .14s;
+             -webkit-tap-highlight-color:transparent}
+    .tl-card:hover:not(.disabled){transform:translateX(2px);box-shadow:0 4px 14px rgba(16,40,60,.08)}
+    .tl-card:active:not(.disabled){transform:scale(.99)}
+    /* Upcoming rows (start date still in the future) render but do not
+       navigate — the auditor cannot record work that has not started
+       yet, and a live tap on a card that opens a "you can't record
+       this yet" screen would just be a dead end. Cursor + muted look
+       tell them to wait; pointer-events prevents the anchor firing. */
+    .tl-card.disabled{cursor:not-allowed;opacity:.55;filter:grayscale(.25);
+                      pointer-events:none}
     .tl-item.overdue .tl-card{border-left-width:6px}
+    /* Overdue rows: icon pulses so the auditor sees the backlog even
+       when scrolling past. Colour also tips toward red so the module
+       tint does not soften the alarm. */
+    @keyframes tl-shine{
+      0%,100% {box-shadow:0 0 0 0 rgba(220,38,38,.55)}
+      50%     {box-shadow:0 0 0 10px rgba(220,38,38,0)}
+    }
+    .tl-item.overdue .tl-ico{
+      background:#fee2e2 !important;
+      animation:tl-shine 1.8s ease-in-out infinite;
+    }
+    .tl-item.overdue .tl-ico svg{stroke:#dc2626 !important}
+    @media (prefers-reduced-motion:reduce){
+      .tl-item.overdue .tl-ico{animation:none}
+    }
     /* Card head row: icon on the left, title + meta stacked on the
        right. Renamed away from .tl-head (which was already taken by
        the ANYTIME section heading and inherits tiny uppercase text). */
@@ -1592,20 +1617,46 @@ function loadAuditTodo(){
     if (active.size)     list = list.filter(o =>
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
+    /* Sort so overdue rides at the top, then due, then soon, then
+       upcoming. Ties keep their occurrence order (JS Array.sort is
+       stable per spec). Overdue-first is the whole point of a
+       backlog banner: what should already have been done should be
+       what the eye lands on. */
+    const _ORDER = { overdue: 0, due: 1, soon: 2, upcoming: 3 };
+    list.sort((a, b) => {
+      const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
+      const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
+      return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+    });
+
     let html = list.map((o, idx) => {
       const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
       const k  = occStatus(o, oy, om);
       const st = STATUS[k], c = TONE[o.mod];
       const nurseries = nurseryState(o, oy, om);
-      // Show only the nurseries that STILL need an audit. Done ones
-      // drop off entirely — the row's "3 nurseries to audit" summary
-      // was removed at the auditor's request, so we no longer need
-      // the ✓ chips to spell out which are finished.
       const pending = nurseries.filter(x => !x.done);
-      // Chips render inline (no expand/collapse) so the auditor can
-      // tap through without an extra tap first.
+
+      /* A row is "live" the moment the window opens (due) or has
+         blown past (overdue). Anything with a start date still in
+         the future (soon / upcoming) renders but does not
+         navigate — the audit form itself would have nothing yet to
+         record. Done rows are already filtered out above. */
+      const live = (k === 'due' || k === 'overdue') && pending.length > 0;
+      const goTo = live
+        ? `${o.href}?nursery=${pending[0].nursery}&from=home`
+        : null;
+
+      /* Whole card is the tap target — the small nursery chips that
+         used to sit under it are gone. On MN scope with several
+         pending nurseries the card lands on the first one; the audit
+         page's own nursery tabs cover the rest. */
+      const openTag = goTo
+        ? `<a class="tl-card" href="${goTo}" style="--tint:${c.tint};--tone:${c.tone}">`
+        : `<div class="tl-card disabled" style="--tint:${c.tint};--tone:${c.tone}" aria-disabled="true">`;
+      const closeTag = goTo ? '</a>' : '</div>';
+
       return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
-        <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
+        ${openTag}
           <div class="tl-row-head">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
@@ -1620,17 +1671,7 @@ function loadAuditTodo(){
               </div>
             </div>
           </div>
-          <div class="tl-nurs-wrap">
-            <div class="tl-nurs">${
-              pending.length
-                ? pending.map(x =>
-                    `<a class="nchip" href="${o.href}?nursery=${x.nursery}&from=home">${
-                       NURSERY_LABELS[x.nursery] || x.nursery}</a>`
-                  ).join('')
-                : `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`
-            }</div>
-          </div>
-        </div>
+        ${closeTag}
       </div>`;
     }).join('');
 
