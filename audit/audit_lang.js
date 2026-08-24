@@ -118,6 +118,12 @@ const TRANSLATIONS = {
     all_audited:             'all audited',
     pending_word:            'pending',
     no_audit_required_a11y:  'no audit required',
+    /* Caption under the 555 wordmark on the shared top ribbon. The
+       markup has carried data-t="auditor_portal" since the ribbon
+       was written, but the key was never added here — so the bar
+       rendered the key itself, as AUDITOR_PORTAL, on every page
+       except the back end (whose caption has no data-t). */
+    auditor_portal:          'Auditor Portal',
     signout:                 'Sign Out',
     signout_msg:             'You will be returned to the login page.',
     stay:                    'Stay',
@@ -497,6 +503,7 @@ const TRANSLATIONS = {
     all_audited:             'semua diaudit',
     pending_word:            'belum audit',
     no_audit_required_a11y:  'audit tidak diperlukan',
+    auditor_portal:          'Portal Juruaudit',
     signout:                 'Log Keluar',
     signout_msg:             'Anda akan dikembalikan ke halaman log masuk.',
     stay:                    'Kekal',

@@ -811,6 +811,10 @@ function init(){
       back.setAttribute('aria-label', 'Choose another nursery');
     }
   }
-  loadRecords();
+  /* ?plot=<code> opens that plot's batches directly — same deep link
+     the portal's pending-plot circles use for Plot Condition. */
+  loadRecords().then(() => {
+    MJMAuditDeepLink.openPlot(NURSERY_PLOTS[activeTab] || [], openPlotDetail);
+  });
 }
-document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded', init);
