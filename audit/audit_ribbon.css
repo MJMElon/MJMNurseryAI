@@ -60,11 +60,18 @@
   stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
 }
 
-/* Wordmark. "555" is the loud line, "AUDITOR PORTAL" the quiet green
-   caption — same rhythm as the FC portal it borrows from. */
+/* Wordmark, three lines. "MJM Nursery" names the company, "555" is the
+   loud line the brand is actually known by, "AUDITOR PORTAL" the quiet
+   green caption saying which of its surfaces this is. The company line
+   is deliberately the smallest and softest of the three — it is context
+   for the 555 below it, not competition for it. */
 .fcr-brand{min-width:0;line-height:1.05;justify-self:center;text-align:center}
+.fcr-brand-top{
+  font-size:10px;font-weight:700;color:#8298a6;letter-spacing:.6px;
+  margin-bottom:1px;white-space:nowrap;
+}
 .fcr-brand-name{
-  font-size:19px;font-weight:900;color:#16323f;letter-spacing:.2px;
+  font-size:26px;font-weight:900;color:#16323f;letter-spacing:.4px;
 }
 .fcr-brand-sub{
   font-size:10px;font-weight:800;color:#22a34a;
@@ -141,7 +148,8 @@
   .fcr-right{gap:8px}
   .fcr-welcome{display:none}
   .fcr-signout-label{display:none}
-  .fcr-brand-name{font-size:16px}
+  .fcr-brand-top{font-size:9px;letter-spacing:.4px}
+  .fcr-brand-name{font-size:21px}
   .fcr-brand-sub{font-size:9px;letter-spacing:1.4px;margin-top:2px}
   .fcr-lang,.fcr-signout{height:32px;padding:0 11px;font-size:9.5px;letter-spacing:1px}
 }

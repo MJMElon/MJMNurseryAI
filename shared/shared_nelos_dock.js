@@ -102,6 +102,17 @@
   //   • Nelos' own pages already ARE the case log.
   //   • Anything the host page marks off with window.NELOS_DOCK_OFF.
   //   • Whatever data-hide-on names (customer-facing pages, kiosks…).
+  /* The dock is not allowed to break a host page, so every failure ends
+     in it quietly removing itself. Quietly is right for the user and
+     miserable for whoever has to work out where it went — so each
+     stand-down leaves exactly one line in the console. */
+  var _warned = {};
+  function warn(msg) {
+    if (_warned[msg]) return;
+    _warned[msg] = true;
+    try { console.warn('[NelosDock] ' + msg); } catch (_) {}
+  }
+
   function unwanted() {
     if (window.NELOS_DOCK_OFF) return true;
     var p = location.pathname || '';
@@ -203,9 +214,21 @@
 
   /* ── Reading my pending cases ────────────────────────────────── */
 
-  var PENDING_COLS = 'id,case_no,title,category,priority,status,source_module,assigned_module,'+
-                     'assigned_seat_no,nursery_name,' +
-                     'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
+  /* Two column sets, because the dock ships ahead of the SQL.
+
+     BASE_COLS is everything migration_nelos.sql created — the columns
+     every database with a case log has. ROUTED_COLS adds what the later
+     routing and seat migrations bring. Asking for a column the database
+     does not have is not a soft failure in PostgREST: the whole select
+     comes back 400 and nothing renders. So the dock asks for the routed
+     set, and drops to the base set for the rest of the session the first
+     time a database says it has never heard of those columns. A portal
+     that has not run the migrations yet still gets its To-Do list; it
+     simply does not get queue routing until the SQL is run. */
+  var BASE_COLS   = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
+                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
+  var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
+  var _cols = ROUTED_COLS;      // narrowed to BASE_COLS on the first 400
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
   var PRIORITY_LABEL = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
@@ -330,15 +353,29 @@
 
     if (!me().id) return { rows: [], error: 'no-session' };
 
-    var q = CFG.url + '/rest/v1/nelos_cases' +
-            '?select=' + encodeURIComponent(PENDING_COLS) +
-            '&status=in.(open,in_progress)' +
-            '&order=due_date.asc.nullslast,created_at.asc' +
-            '&limit=' + LIMIT;
-    if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
+    var query = function (cols) {
+      var q = CFG.url + '/rest/v1/nelos_cases' +
+              '?select=' + encodeURIComponent(cols) +
+              '&status=in.(open,in_progress)' +
+              '&order=due_date.asc.nullslast,created_at.asc' +
+              '&limit=' + LIMIT;
+      if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
+      return fetch(q, { headers: authHeaders(token) });
+    };
 
     try {
-      var res = await fetch(q, { headers: authHeaders(token) });
+      var res = await query(_cols);
+
+      // 400 with the routed columns = this database has not run the
+      // routing/seat migrations. Ask again for what it does have, once,
+      // and stay on the base set from here on.
+      if (res.status === 400 && _cols === ROUTED_COLS) {
+        _cols = BASE_COLS;
+        warn('nelos_cases has no routing columns yet — run shared/migration_nelos_routing.sql ' +
+             'and shared/migration_nelos_seats.sql for queue routing. Showing the list without it.');
+        res = await query(_cols);
+      }
+
       if (!res.ok) return { rows: [], error: 'http-' + res.status };
       var rows = await res.json();
       if (!Array.isArray(rows)) return { rows: [], error: 'shape' };
@@ -1157,6 +1194,9 @@
         // be sending them to the login anyway.)
         if (out.error === 'no-session' || out.error === 'http-401' ||
             out.error === 'http-403'   || out.error === 'http-404') {
+          warn(out.error === 'http-404'
+            ? 'no nelos_cases table — run shared/migration_nelos.sql. Standing down.'
+            : 'no usable session (' + out.error + '). Standing down.');
           dock.hidden = true;
           stopTimer();
           return;
@@ -1166,7 +1206,10 @@
         // all rather than one that opens onto "loading…" forever. The
         // timer keeps running, so it appears by itself once the network
         // comes back.
-        if (!loaded) dock.hidden = true;
+        if (!loaded) {
+          warn('could not read the case list (' + out.error + '). Hiding until it answers.');
+          dock.hidden = true;
+        }
         return;
       }
       loaded = true;
@@ -1193,8 +1236,8 @@
     if (unwanted()) return;
 
     CFG = await loadConfig();
-    if (!CFG) return;                       // no config anywhere — nothing to read
-    if (!storedSession()) return;           // signed out: login pages get no dock
+    if (!CFG) { warn('no Supabase config on this page and shared_supabase.js would not load.'); return; }
+    if (!storedSession()) return;           // signed out: login pages get no dock, and say nothing
 
     build();
 
