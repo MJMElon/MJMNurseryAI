@@ -405,6 +405,10 @@ async function loadAll(){
     renderPapanAlerts();
     renderBatchTable();
     updateStats();
+    /* Arrived from a pending-plot circle on the portal? This page is a
+       list rather than a grid, so there is no plot screen to open —
+       scroll its row into view and flash it instead. */
+    MJMAuditDeepLink.reveal();
   }catch(e){
     showToast('⚠ Failed to load');console.error(e);
   }
@@ -539,7 +543,7 @@ function renderAuditList(){
       ${b.dateTransplant ? `<span class="check-chip cc-na">Transplant: ${fmtDate(b.dateTransplant)}</span>` : ''}
       ${b.dateMature     ? `<span class="check-chip cc-na">Mature: ${fmtDate(b.dateMature)}</span>` : ''}
     </div>`;
-    return `<div class="audit-item status-${status}">
+    return `<div class="audit-item status-${status}" data-plot="${_canonicalPlot(b.plot||'')}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
         ${sourceChip}
@@ -591,7 +595,7 @@ function renderBatchTable(){
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const isLatest=latestUids.has(b.uid);
-    return `<div class="audit-item status-${status}">
+    return `<div class="audit-item status-${status}" data-plot="${_canonicalPlot(b.plot||'')}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
         ${isLatest&&status==='pending'?'<span class="audit-status-badge badge-pending">Latest · Pending</span>':''}

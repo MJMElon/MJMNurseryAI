@@ -12,15 +12,34 @@
   <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
        arrow, language, sign-out. Also loaded by audit_home.html and
        audit_nursery_select.html so the three surfaces read as one. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824c"/>
 
-  <!-- Admin only, decided in the head so the page never renders for anyone
-       else. Not signed in goes to the one MJM AI login; signed in without
-       admin goes straight to the nursery chooser, since this page is what
-       the portal's Nursery Audit tile opens for everybody. -->
+  <!-- Signed in is enough to open this page now. It used to be admin
+       only, but it has become the desktop half of the audit app: the
+       four module cards live here, because the auditor portal is built
+       for a phone in a nursery and this is what somebody at a desk
+       opens. An auditor turned away at the door could not reach a
+       module outside its scheduled window at all.
+
+       What is genuinely administrative — the cross-nursery alerts, the
+       monthly report and User Access — is marked .admin-only and hidden
+       from everyone else. The class goes on <html> in the head, before
+       any of it paints, so a non-admin never sees it flash. Which
+       people may see which module card is coming as a setting on this
+       page; until it exists every signed-in auditor sees all four. -->
   <script src="audit_login_guard.js?v=20260824a"></script>
-  <script>MJMAuditLogin.requireAdmin('audit_home.html');</script>
-  <style>body{opacity:0;transition:opacity .2s ease}</style>
+  <script>
+    MJMAuditLogin.requireSignIn();
+    if (MJMAuditLogin.isAdmin())
+      document.documentElement.classList.add('is-audit-admin');
+  </script>
+  <style>
+    body{opacity:0;transition:opacity .2s ease}
+    /* Not marked admin → the admin-only blocks are not in the page's
+       layout at all. !important because the blocks carry their own
+       display (grid, flex) that would otherwise win. */
+    html:not(.is-audit-admin) .admin-only{display:none!important}
+  </style>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -243,13 +262,17 @@
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-sub">Auditor Portal</div>
     </div>
-    <div class="fcr-spacer"></div>
-    <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
-    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
-      <span id="lang-toggle-label">BM</span>
-    </button>
-    <button class="fcr-signout" onclick="signOut()">Sign Out</button>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
+      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+        <span id="lang-toggle-label">BM</span>
+      </button>
+      <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="fcr-signout-label">Sign Out</span>
+      </button>
+    </div>
   </nav>
 
   <div class="content">
@@ -265,9 +288,68 @@
     </a>
 
 
+    <!-- ── AUDIT MODULES ──
+         Moved here from audit_home.html. On the phone the portal's
+         to-do list is the way into a module — it names the plots that
+         still owe work — so a second row of cards underneath it only
+         repeated the same four destinations without saying anything
+         about what was due. On a desktop there is no such list, so
+         this is where the four modules are reachable directly. -->
+    <div class="section-head" data-t="home_modules_title">Audit Modules</div>
+    <div class="cards" style="margin-bottom:26px">
+
+      <a class="fc-card" href="audit_plot_audit.html">
+        <div class="fc-ico" style="background:#e8f5e9">
+          <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#2d7a2d" data-t="home_plot">Plot Condition Audit</div>
+        <div class="fc-desc">Pest, animal damage, disease and leaf colour, recorded batch by batch across every plot.</div>
+        <div class="fc-enter" style="color:#2d7a2d">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_height_index.html">
+        <div class="fc-ico" style="background:#e0f2fe">
+          <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#0369a1" data-t="home_height">Seedling Height Audit</div>
+        <div class="fc-desc">Three sample heights per batch and the average they give, plot by plot.</div>
+        <div class="fc-enter" style="color:#0369a1">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_papan_index.html">
+        <div class="fc-ico" style="background:#fff1e6">
+          <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#c2410c" data-t="home_papan">Papan Tanda Audit</div>
+        <div class="fc-desc">Whether each batch sign is there, carries the right information and is still standing properly.</div>
+        <div class="fc-enter" style="color:#c2410c">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_maintenance_index.html">
+        <div class="fc-ico" style="background:#e8eefc">
+          <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#1e3a8a" data-t="home_maintenance">Maintenance Audit</div>
+        <div class="fc-desc">Manuring, weeding and interrow spraying checked against what the field recorded.</div>
+        <div class="fc-enter" style="color:#1e3a8a">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+    </div>
+
     <!-- No section heading here: every group already announces itself as
          "Alerts — <nursery>", and stacking the two just repeated the word. -->
-    <div class="alert-wrap">
+    <div class="alert-wrap admin-only">
       <div class="alert-month" id="alert-month">Checking this month's audits…</div>
       <div id="alert-section">
         <div class="alert-loading">Checking the latest audit data…</div>
@@ -278,10 +360,10 @@
          NOT on audit_home.html on purpose — the auditor view was stripped of
          MJMAccess and the Supabase CDN so it loads on nursery signal, and
          Nelos is not worth putting that back. -->
-    <div id="nelos-todo" class="alert-wrap"></div>
+    <div id="nelos-todo" class="alert-wrap admin-only"></div>
 
-    <div class="section-head">Administration</div>
-    <div class="cards">
+    <div class="section-head admin-only">Administration</div>
+    <div class="cards admin-only">
 
       <a class="fc-card" href="audit_report.html">
         <div class="fc-ico" style="background:#e7f6e7">
@@ -311,7 +393,8 @@
       </a>
     </div>
 
-    <div class="note">Auditors go straight to the auditor portal — the report and user access are not shown to them.</div>
+    <div class="note admin-only">The alerts, the monthly report and User Access are shown to audit admins only.
+         Every signed-in auditor sees the module cards above and can open the auditor portal.</div>
   </div>
 </div>
 
@@ -319,7 +402,7 @@
 <!-- Language store + welcome-name fill for the shared FC ribbon. Admin
      has nothing to translate here, but persisting the toggle means the
      rest of the audit pages honour whatever was picked. -->
-<script src="audit_lang.js?v=20260823o"></script>
+<script src="audit_lang.js?v=20260824e"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
 
 <!-- The portal permission layer, for the User Access card only. An admin who
@@ -539,6 +622,12 @@ function notifyAlerts(kinds){
   } catch (e) {}
 }
 
+/* Everything below feeds the .admin-only region. A non-admin auditor
+   has none of it on screen, so running it would be a handful of
+   cross-nursery queries answering nobody — and the RLS policies would
+   filter most of them to nothing anyway. */
+if (MJMAuditLogin.isAdmin()) {
+
 loadAlerts();
 /* Long shifts leave this page open, so it refreshes — but only while
    somebody is actually looking at it. A tab left open on a back-office
@@ -567,6 +656,8 @@ setInterval(function(){
     }
   } catch (e) { /* no portal session — card stays hidden */ }
 })();
+
+}
 </script>
 </body>
 </html>

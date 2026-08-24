@@ -25,7 +25,7 @@
        audit_nursery_select). Replaces the audit-specific header band
        that used to sit under the standardised #mjm-ribbon; the two
        were doing overlapping work. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260824c"/>
 
   <!-- Anti-flicker auth guard -->
   <script src="audit_login_guard.js?v=20260824a"></script>
@@ -623,6 +623,44 @@
     .tl-item{position:relative;margin-bottom:10px}
     .tl-item::before{content:'';position:absolute;left:-23px;top:17px;width:11px;height:11px;
                      border-radius:50%;background:#fff;border:2.5px solid var(--tone,#c3ced6)}
+    /* ── Pending plot circles ──
+       The plots a to-do row is actually asking for, under the row that
+       asks for them. Only what is still outstanding is drawn: a plot
+       finished inside the window leaves the row, so the strip empties
+       out as the day goes and an auditor can see the end of it.
+
+       They sit OUTSIDE the row's <a>, because each circle is its own
+       link into that plot and a link cannot contain another link —
+       nested anchors get unnested by the parser and the row stops
+       working. */
+    .tl-plots{display:flex;flex-wrap:wrap;gap:7px;
+              padding:10px 12px 12px 64px;margin-top:-4px}
+    .tl-plot{width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+             display:flex;align-items:center;justify-content:center;
+             background:#fff;border:1.5px solid var(--tone,#2d7a2d);
+             color:var(--tone,#2d7a2d);
+             font-size:11px;font-weight:800;letter-spacing:.2px;
+             text-decoration:none;line-height:1;
+             -webkit-tap-highlight-color:transparent;
+             transition:background .14s,color .14s,transform .14s}
+    .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
+    .tl-plot:active{transform:scale(.94)}
+    /* Overdue rows tint their circles too — an overdue plot is the one
+       thing on this screen that should catch the eye first. */
+    .tl-item.overdue .tl-plot{border-color:#b91c1c;color:#b91c1c;
+                              background:#fef2f2}
+    .tl-item.overdue .tl-plot:hover{background:#b91c1c;color:#fff}
+    /* Main nursery runs three nurseries at once and the plot codes
+       already carry their nursery (B / U / N), so they share one flat
+       strip rather than three labelled groups. When the strip is long
+       it says how many rather than running down the screen. */
+    .tl-plots-more{align-self:center;font-size:11px;font-weight:700;
+                   color:var(--fc-ink3);padding:0 2px}
+    @media (max-width:640px){
+      .tl-plots{padding:8px 10px 10px 12px;gap:6px}
+      .tl-plot{width:34px;height:34px;font-size:10px}
+    }
+
     .tl-card{display:block;border-radius:13px;background:var(--tint,#f4f7fa);
              border-left:4px solid var(--tone,#c3ced6);overflow:hidden;
              text-decoration:none;color:inherit;cursor:pointer;
@@ -777,13 +815,17 @@
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
-    <div class="fcr-spacer"></div>
-    <span class="fcr-welcome" id="fcr-welcome">Welcome</span>
-    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
-      <span id="lang-toggle-label">BM</span>
-    </button>
-    <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" data-t="signout">Sign Out</button>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome</span>
+      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+        <span id="lang-toggle-label">BM</span>
+      </button>
+      <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" aria-label="Sign out" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
+      </button>
+    </div>
   </nav>
 
   <!-- MAIN CONTENT -->
@@ -794,14 +836,18 @@
          used to sit beside "Audit To-Do" was easy to miss, and reading the
          wrong nursery's schedule is the one mistake this page can cause. -->
     <div class="ribbon fade-in" id="ribbon">
-      <!-- Switch is a direct PN ↔ MN toggle now: no chooser page to walk
-           through, and the account still lands wherever it was last. -->
-      <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-        <span>Switch</span>
-      </button>
-      <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
       <div class="ribbon-spacer"></div>
+      <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
+      <!-- Switch is a direct PN ↔ MN toggle: no chooser page to walk
+           through, and the account still lands wherever it was last.
+           It sits at the trailing edge pointing forward, because the
+           same move is now also a left-swipe across this bar and the
+           to-do list under it — an arrow on the left pointing back
+           described the opposite gesture. -->
+      <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
+        <span>Switch</span>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
 
     <!-- ── THE AUDIT SCHEDULE BOARD ──
@@ -856,46 +902,14 @@
       </div>
     </div>
 
-    <!-- AUDIT MODULES -->
-    <div class="section-head fade-in"><span data-t="home_modules_title">Audit Modules</span></div>
-    <div class="audit-cards">
-      <a class="fc-card fade-in" href="audit_plot_audit.html">
-        <div class="fc-ico" style="background:#e8f5e9">
-          <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl" data-t="home_plot">Plot Condition Audit</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MODULE 1</div>
-        </div>
-      </a>
-      <a class="fc-card fade-in" href="audit_height_index.html">
-        <div class="fc-ico" style="background:#e0f2fe">
-          <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl" data-t="home_height">Seedling Height Audit</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MODULE 2</div>
-        </div>
-      </a>
-      <a class="fc-card fade-in" href="audit_papan_index.html">
-        <div class="fc-ico" style="background:#fff1e6">
-          <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl" data-t="home_papan">Papan Tanda Audit</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MODULE 3</div>
-        </div>
-      </a>
-      <a class="fc-card fade-in" href="audit_maintenance_index.html">
-        <div class="fc-ico" style="background:#e8eefc">
-          <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-        </div>
-        <div class="fc-body">
-          <div class="fc-ttl" data-t="home_maintenance">Maintenance Audit</div>
-          <div class="fc-sub"><span class="fc-dot"></span>MODULE 4</div>
-        </div>
-      </a>
-    </div><!-- /audit-cards -->
+    <!-- The Audit Modules card row that used to sit here has moved to
+         audit_admin.html. It listed the same four destinations the
+         to-do list above already links to, but without saying which of
+         them was due or which plots still owed work — so on the one
+         screen an auditor actually uses in the field it was four taps
+         that repeated what was already on the page. The back end has
+         no to-do list, so that is where opening a module directly
+         still earns its place. -->
 
     <!-- The MJM Nursery — Miri, Sarawak · PN · BNN · UNN 1 · UNN 2
          info strip that used to sit here was purely decorative — every
@@ -944,9 +958,12 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260824d"></script>
+<script src="audit_lang.js?v=20260824e"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
+<!-- Works out which plots still owe work, for the circles under each
+     to-do row. Needs sb.select from audit_supabase.js above it. -->
+<script src="audit_pending.js?v=20260824a"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
@@ -1096,20 +1113,89 @@ function loadAuditTodo(){
   paintRibbon();
   document.addEventListener('mjm-lang-changed', paintRibbon);
 
-  /* Switch pill click: flip the stored scope PN ↔ MN and reload. A
-     reload rather than a live re-render because half a dozen queries
-     were run against the previous scope on first paint, and untangling
-     them mid-session is more surface than one refresh saves. Exposed
-     on window so the inline onclick on .ribbon-btn can reach it. */
-  window.toggleScope = function () {
-    if (allowed.length < 2) return;   /* nothing to toggle to */
-    const next = scope === 'PN' ? 'MN' : 'PN';
+  /* Go to a named scope and reload. A reload rather than a live
+     re-render because half a dozen queries were run against the
+     previous scope on first paint, and untangling them mid-session is
+     more surface than one refresh saves. */
+  function gotoScope(next) {
+    if (allowed.length < 2) return;   /* nothing to switch to */
+    if (next === scope) return;       /* already there — no reload */
     MJMAuditLogin.setScope(next);
     /* Only navigate if the write stuck — same guard the old chooser
        relied on. A blocked or full localStorage would otherwise leave
        the tab reloading against the previous scope forever. */
     if (MJMAuditLogin.scope() === next) window.location.reload();
+  }
+
+  /* Switch pill click: flip PN ↔ MN. Exposed on window so the inline
+     onclick on .ribbon-btn can reach it. */
+  window.toggleScope = function () {
+    gotoScope(scope === 'PN' ? 'MN' : 'PN');
   };
+
+  /* ── SWIPE PN ↔ MN ────────────────────────────────────────────────
+     The two nurseries behave like two tabs, so they answer to the
+     gesture tabs answer to. Left goes to the main nursery, right comes
+     back to pre — a fixed order, not a toggle, so a swipe the wrong way
+     on the end tab does nothing instead of bouncing the auditor to the
+     nursery they just left.
+
+     Only the nursery bar and the to-do list listen. The month strip
+     above the list scrolls sideways under the same finger, and the
+     history and module cards below are not part of what the gesture
+     is switching, so neither is wired.
+
+     Nothing calls preventDefault: the page still scrolls normally and
+     a swipe is only claimed once the finger has clearly gone sideways
+     (60px across, and half again as far across as down). A touch that
+     starts inside something with its own sideways scroll is left
+     alone — that content owns the axis. */
+  (function wireScopeSwipe(){
+    if (allowed.length < 2) return;
+    const ZONES = ['ribbon', 'todo-section'];
+    const MIN_X = 60, X_OVER_Y = 1.5;
+
+    /* Does the touch start inside something that scrolls sideways? */
+    function ownsAxis(el){
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        if (n.scrollWidth > n.clientWidth + 4) {
+          const ox = getComputedStyle(n).overflowX;
+          if (ox === 'auto' || ox === 'scroll') return true;
+        }
+      }
+      return false;
+    }
+
+    ZONES.forEach(id => {
+      const zone = document.getElementById(id);
+      if (!zone) return;
+      let x0 = 0, y0 = 0, live = false;
+
+      zone.addEventListener('touchstart', e => {
+        /* Pinch or two-finger gestures are not this. */
+        live = e.touches.length === 1 && !ownsAxis(e.target);
+        if (!live) return;
+        x0 = e.touches[0].clientX;
+        y0 = e.touches[0].clientY;
+      }, { passive: true });
+
+      zone.addEventListener('touchend', e => {
+        if (!live) return;
+        live = false;
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - x0, dy = t.clientY - y0;
+        if (Math.abs(dx) < MIN_X) return;
+        if (Math.abs(dx) < Math.abs(dy) * X_OVER_Y) return;   /* a scroll */
+        gotoScope(dx < 0 ? 'MN' : 'PN');
+      }, { passive: true });
+
+      /* A finger leaving the element mid-gesture ends it rather than
+         leaving `live` set for the next unrelated touch. */
+      zone.addEventListener('touchcancel', () => { live = false; },
+                            { passive: true });
+    });
+  })();
 
   /* ── The month being looked at. Starts on this one. ── */
   /* Today is selected from the start: the question this screen answers is
@@ -1323,7 +1409,7 @@ function loadAuditTodo(){
       diag.fRows = (fRows||[]).length;
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
       diag.audited = audited.size;
-      const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set}
+      const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
       const push = (id, workDateISO, workType, plotRaw) => {
         if (workType === 'pd')                     { diag.skippedPd++; return; }
         if (audited.has(String(id)))               { diag.skippedAudited++; return; }
@@ -1337,8 +1423,17 @@ function loadAuditTodo(){
         if (!n)                                    { diag.skippedNoPlot++; return; }
         if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
         const k = y + '-' + m + '-' + d;
-        if (!buckets.has(k)) buckets.set(k, { y, m, d, nurseries: new Set() });
-        buckets.get(k).nurseries.add(n);
+        if (!buckets.has(k))
+          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map() });
+        const bucket = buckets.get(k);
+        bucket.nurseries.add(n);
+        /* Same walk also collects WHICH plots are pending, per nursery,
+           so the circles under a maintenance row come out of the pass
+           that already decided the row exists. Maintenance is the one
+           module audit_pending.js does not answer for, because this is
+           where the answer already is. */
+        if (!bucket.plots.has(n)) bucket.plots.set(n, new Set());
+        bucket.plots.get(n).add(plot);
         diag.kept++;
         if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
       };
@@ -1368,7 +1463,26 @@ function loadAuditTodo(){
         done: !o._maintNurseries.has(n)             // pending? then not done
       }));
     }
+    const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
     return SCOPE_NURSERIES.map(n => {
+      /* A window is finished when no plot in it is still owed.
+
+         It used to be finished as soon as ONE record landed anywhere
+         inside it — the nursery was not tracked per plot, so a single
+         audit closed the row for the whole month. That was a fair
+         approximation while the row said nothing about plots. It stops
+         being one the moment the row lists them: auditing the first of
+         fifty-two plots would strike the row out and take the other
+         fifty-one circles off the screen with it.
+
+         Only when the batch roster actually answered for this nursery.
+         If it did not — offline, or the tables refused — fall back to
+         the old date rule rather than reading "no plots known" as "no
+         work left". */
+      if (window.MJMAuditPending && MJMAuditPending.covers(o.mod, n))
+        return { nursery: n,
+                 done: MJMAuditPending.plots(o.mod, n, fromISO, toISO).length === 0 };
+
       let ok = false;
       if (done && done[o.mod])
         for (let d = o.start; d <= o.end && !ok; d++)
@@ -1415,7 +1529,8 @@ function loadAuditTodo(){
         href: 'audit_maintenance_index.html',
         start: mo.d,
         end:   mo.d,
-        _maintNurseries: mo.nurseries
+        _maintNurseries: mo.nurseries,
+        _maintPlots: mo.plots
       });
     });
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
@@ -1603,6 +1718,82 @@ function loadAuditTodo(){
     }</div>`;
   }
 
+  /* ── The plots a live row still owes ──
+     A strip of circles under the row, one per plot with work left
+     inside that row's own window. Which plots, and whether a plot is
+     finished, is settled the same way the row above decides it is due:
+     both ask about the window's dates, so a row can never sit at "due"
+     over an empty strip, or read "done" above plots still waiting.
+
+     Main nursery puts BNN, UNN 1 and UNN 2 in one flat strip. The plot
+     codes carry their own nursery (B / U / N), so grouping them under
+     three headings would cost a lot of height to repeat what the codes
+     already say. Per-nursery filtering is coming with user access;
+     until then everyone in scope sees the lot.
+
+     Long strips are cut at PLOT_CAP and say how many were left off —
+     PN plot condition can owe fifty-two at the start of a window, and
+     seven rows of circles under one card buries the three modules
+     below it. The remainder is a link, not a footnote: it opens the
+     module, which lists all of them. */
+  const PLOT_CAP = 12;
+  function _plotsHtml(o, oy, om, pending){
+    if (!pending.length) return '';
+    const fromISO = iso(oy, om, o.start);
+    const toISO   = iso(oy, om, o.end);
+
+    const byNursery = pending.map(x => {
+      let list = [];
+      if (o.mod === 'maint') {
+        /* Already worked out while the timeline was built. */
+        const set = o._maintPlots && o._maintPlots.get(x.nursery);
+        list = set ? [...set].sort() : [];
+      } else if (window.MJMAuditPending) {
+        list = MJMAuditPending.plots(o.mod, x.nursery, fromISO, toISO);
+      }
+      return list.map(pl => ({ nursery: x.nursery, plot: pl }));
+    });
+
+    const total = byNursery.reduce((n, l) => n + l.length, 0);
+    if (!total) return '';
+
+    /* Take one from each nursery in turn rather than draining the first.
+       On main nursery a whole window opens owing all fifty-two plots,
+       and BNN's fourteen alone would fill the twelve on show — leaving
+       somebody working UNN 2 looking at a strip with nothing of theirs
+       in it. Round-robin puts every nursery in the visible dozen. */
+    const shown = [];
+    for (let i = 0; shown.length < PLOT_CAP; i++) {
+      let took = false;
+      for (const list of byNursery) {
+        if (i >= list.length) continue;
+        shown.push(list[i]);
+        took = true;
+        if (shown.length === PLOT_CAP) break;
+      }
+      if (!took) break;
+    }
+    const rest = total - shown.length;
+    const label = t(o.title);
+
+    const circles = shown.map(e => {
+      const nur = NURSERY_LABELS[e.nursery] || e.nursery;
+      return `<a class="tl-plot"
+                 href="${o.href}?nursery=${encodeURIComponent(e.nursery)}` +
+             `&plot=${encodeURIComponent(e.plot)}&from=home"
+                 title="${nur} ${e.plot}"
+                 aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
+    }).join('');
+
+    const more = rest > 0
+      ? `<a class="tl-plots-more"
+             href="${o.href}?nursery=${encodeURIComponent(pending[0].nursery)}&from=home"
+             aria-label="${label} — ${fmtNum(rest)} more plots">+${fmtNum(rest)}</a>`
+      : '';
+
+    return `<div class="tl-plots">${circles}${more}</div>`;
+  }
+
   function renderTimeline(occ){
     let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
     /* Today's view answers "what do I owe", so overdue belongs in it —
@@ -1655,6 +1846,11 @@ function loadAuditTodo(){
         : `<div class="tl-card disabled" style="--tint:${c.tint};--tone:${c.tone}" aria-disabled="true">`;
       const closeTag = goTo ? '</a>' : '</div>';
 
+      /* Only live rows get circles. A row whose window has not opened
+         renders greyed and does not navigate, so plot shortcuts into
+         it would be links to a screen with nothing to record. */
+      const plotsHtml = live ? _plotsHtml(o, oy, om, pending) : '';
+
       return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
         ${openTag}
           <div class="tl-row-head">
@@ -1672,6 +1868,7 @@ function loadAuditTodo(){
             </div>
           </div>
         ${closeTag}
+        ${plotsHtml}
       </div>`;
     }).join('');
 
@@ -1866,6 +2063,14 @@ function loadAuditTodo(){
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
   loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
+  /* Which plots each row still owes. Slowest of the three — it reads
+     the batch roster and the balance view — so it lands last and the
+     circles appear under rows that are already on screen, rather than
+     holding the whole board back for them. A failure here leaves the
+     rows exactly as they were before circles existed. */
+  MJMAuditPending.load(SCOPE_NURSERIES).then(renderAll).catch(e => {
+    console.warn('[audit-home] pending plots unavailable:', e);
+  });
 }
 
 loadAuditTodo();
