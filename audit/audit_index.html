@@ -3,516 +3,569 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0f2e0f" />
+  <meta name="theme-color" content="#2b241d" />
   <title>555 Auditor Portal</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2712%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3E555%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
 
   <style>
+    /* ══════════════════════════════════════════════════════════════════
+       THE 555 AUDIT BOOK
+
+       Every auditor in the nursery already carries one of these: the little
+       red 555 book, ruled pages, written in by hand at the end of a round.
+       So the login page is one — red cover spine down the left, gold 555 on
+       it, a taped title label, and the sign-in written on the lines.
+
+       The Scan portal is a different book on purpose (kraft cover, graph
+       paper, top spiral) so nobody opens the wrong one by muscle memory.
+       ══════════════════════════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --g900: #0a1f0a;
-      --g800: #1a4d1a;
-      --g700: #236023;
-      --g600: #2d7a2d;
-      --g500: #3d9c3d;
-      --g400: #5aab5a;
-      --g300: #81c784;
-      --g200: #b5dfb5;
-      --g100: #e0f2e0;
-      --g50:  #f2faf2;
+      --ink:      #1d3557;   /* pen */
+      --ink-soft: #5a7391;
+      --rule:     rgba(58,102,143,.23);
+      --paper:    #fffdf4;
+      --paper-2:  #f7f2e2;
+      --red:      #c1121f;
+      --red-dark: #8d0d18;
+      --gold:     #e9c46a;
+      --stamp:    #1a4d1a;
+      --pitch:    34px;      /* one ruled line */
+      --hand:     'Caveat', 'Bradley Hand', 'Segoe Script', 'Comic Sans MS', cursive;
+      --ruling:   repeating-linear-gradient(to bottom,
+                    transparent 0 calc(var(--pitch) - 1px),
+                    var(--rule) calc(var(--pitch) - 1px) var(--pitch));
     }
 
     html, body {
-      height: 100%;
+      min-height: 100%;
       font-family: 'DM Sans', sans-serif;
-      background: var(--g900);
-      color: #fff;
+      background: #2b241d;
+      color: var(--ink);
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Background pattern ── */
+    /* ── The desk the book is lying on ── */
     body::before {
       content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        radial-gradient(circle at 20% 20%, rgba(45,122,45,0.25) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(26,77,26,0.3) 0%, transparent 50%),
-        radial-gradient(circle at 60% 10%, rgba(61,156,61,0.1) 0%, transparent 40%);
-      pointer-events: none;
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 35%, #3b3227 0%, #241e18 62%, #17130f 100%);
       z-index: 0;
     }
 
-    /* subtle grid texture */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ── Page shell ── */
     .page {
-      position: relative;
-      z-index: 1;
+      position: relative; z-index: 1;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1.25rem;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 26px 14px 22px;
     }
 
-    /* ── Logo / brand ── */
-    .brand {
-      text-align: center;
-      margin-bottom: 2.5rem;
-      animation: fadeDown 0.6s ease both;
-    }
-    .brand-icon {
-      width: 72px;
-      height: 72px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
+    /* ── The book ── */
+    .book {
+      width: 100%; max-width: 430px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 16px;
+      border-radius: 3px 16px 16px 3px;
+      overflow: hidden;
+      transform: rotate(-0.35deg);
+      box-shadow:
+        0 26px 60px rgba(0,0,0,.55),
+        0 3px 0 #e6dfcd,
+        0 6px 0 #cfc7b2;
+      animation: bookIn .5s ease both;
     }
-    .brand-icon svg {
-      width: 38px;
-      height: 38px;
-      stroke: var(--g300);
-      fill: none;
-      stroke-width: 1.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+
+    /* red cover, seen edge-on */
+    .spine {
+      flex: 0 0 40px;
+      background:
+        linear-gradient(90deg, var(--red-dark) 0%, var(--red) 42%, #a9101c 78%, #6f0b14 100%);
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      padding: 14px 0;
+    }
+    /* the black gummed tape down the fold */
+    .spine::after {
+      content: '';
+      position: absolute; top: 0; bottom: 0; right: 0;
+      width: 7px;
+      background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.18));
+    }
+    .spine-num {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-weight: 900;
+      font-size: 21px;
+      letter-spacing: .22em;
+      color: var(--gold);
+      text-shadow: 0 1px 0 rgba(0,0,0,.35);
+    }
+    .spine-word {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 8px; font-weight: 700;
+      letter-spacing: .34em;
+      text-transform: uppercase;
+      color: rgba(255,235,210,.55);
+      margin-top: 14px;
+    }
+
+    /* ── The page ── */
+    .paper {
+      flex: 1; min-width: 0;
+      background: var(--paper);
+      padding: 22px 20px 0 30px;
+      position: relative;
+    }
+    /* margin rule, drawn twice the way a printed exercise book does */
+    .paper::before {
+      content: '';
+      position: absolute; left: 19px; top: 0; bottom: 0;
+      width: 4px;
+      border-left: 1.5px solid rgba(193,18,31,.30);
+      border-right: 1px solid rgba(193,18,31,.16);
+    }
+
+    /* the 555 seal, inked on by hand */
+    .seal {
+      position: absolute; top: 16px; right: 14px;
+      width: 62px; height: 44px;
+      border: 2px solid rgba(193,18,31,.42);
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transform: rotate(9deg);
+      color: rgba(193,18,31,.5);
+      opacity: .9;
+    }
+    .seal b { font-size: 13px; font-weight: 900; letter-spacing: .08em; line-height: 1; }
+    .seal i { font-style: normal; font-size: 6px; font-weight: 700; letter-spacing: .18em; margin-top: 2px; }
+
+    /* ── Title block, above the first line ── */
+    .brand {
+      padding-right: 74px;
+      padding-bottom: 10px;
+      background-image: var(--ruling);
+      background-position: left bottom;
+    }
+    .tape {
+      display: inline-block;
+      background: var(--paper-2);
+      border: 1.5px solid #d9cfb4;
+      box-shadow: 0 0 0 3px var(--paper), 1px 2px 0 rgba(0,0,0,.06);
+      padding: 5px 12px 4px;
+      transform: rotate(-1.4deg);
+      margin-bottom: 12px;
+    }
+    .tape span {
+      display: block;
+      font-size: 9.5px; font-weight: 900;
+      letter-spacing: .3em; text-transform: uppercase;
+      color: #6b5b3e;
+    }
+    .tape em {
+      display: block;
+      font-style: normal;
+      font-size: 8px; font-weight: 700;
+      letter-spacing: .22em; text-transform: uppercase;
+      color: #a08f6c; margin-top: 2px;
     }
     .brand-name {
-      font-family: 'DM Serif Display', serif;
-      font-size: 28px;
-      font-weight: 400;
-      color: #fff;
-      letter-spacing: 0.3px;
-      line-height: 1.1;
-      margin-bottom: 6px;
+      font-family: var(--hand);
+      font-size: 34px; line-height: .95;
+      white-space: nowrap;
+      color: var(--ink);
     }
-    .brand-name span { color: var(--g300); }
+    .brand-name span { color: var(--red); }
     .brand-sub {
-      font-size: 13px;
-      color: rgba(255,255,255,0.45);
-      font-weight: 400;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    /* ── Login card ── */
-    .login-card {
-      width: 100%;
-      max-width: 400px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
-      padding: 2rem 1.75rem;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      animation: fadeUp 0.6s 0.1s ease both;
+      font-size: 9.5px; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-top: 4px; white-space: nowrap;
     }
 
     .login-heading {
-      font-size: 18px;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 4px;
+      font-family: var(--hand);
+      font-size: 25px; color: var(--ink);
+      margin-top: 12px;
     }
     .login-sub {
-      font-size: 13px;
-      color: rgba(255,255,255,0.45);
-      margin-bottom: 1.75rem;
+      font-size: 11.5px; color: var(--ink-soft);
+      margin-top: 1px;
     }
 
-    /* ── Form fields ── */
-    .field { margin-bottom: 1rem; }
+    /* ── Ruled writing area ────────────────────────────────────────────
+       The ruling and the fields share one rhythm (--pitch), so a field's
+       bottom edge lands exactly on a printed line and the value is written
+       ON the line rather than in a box floating over it. ── */
+    .sheet {
+      background-image: var(--ruling);
+      background-position: left top;
+      padding-top: var(--pitch);        /* one clear line under the title */
+    }
+
+    .field { height: calc(var(--pitch) * 2); }
     .field-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.6);
-      margin-bottom: 7px;
       display: block;
-      letter-spacing: 0.3px;
-      text-transform: uppercase;
+      height: var(--pitch);
+      line-height: calc(var(--pitch) - 4px);
+      font-size: 10px; font-weight: 900;
+      letter-spacing: .16em; text-transform: uppercase;
+      color: var(--ink-soft);
     }
-    .field-input-wrap { position: relative; }
-    .field-icon {
-      position: absolute;
-      left: 13px;
-      top: 50%;
-      transform: translateY(-50%);
-      pointer-events: none;
-    }
-    .field-icon svg {
-      width: 16px;
-      height: 16px;
-      stroke: rgba(255,255,255,0.35);
-      fill: none;
-      stroke-width: 1.8;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
+    .field-input-wrap { position: relative; height: var(--pitch); }
     .field-input {
-      width: 100%;
-      height: 46px;
-      padding: 0 42px 0 40px;
-      font-size: 14px;
-      font-family: 'DM Sans', sans-serif;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      color: #fff;
-      outline: none;
-      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      width: 100%; height: var(--pitch);
+      padding: 0 34px 4px 2px;
+      border: 0; background: transparent; outline: none;
+      font-family: var(--hand);
+      font-size: 22px; color: var(--ink);
       -webkit-appearance: none;
+      border-radius: 0;
     }
-    .field-input::placeholder { color: rgba(255,255,255,0.25); }
-    .field-input:focus {
-      border-color: var(--g400);
-      background: rgba(255,255,255,0.1);
-      box-shadow: 0 0 0 3px rgba(90,171,90,0.2);
+    .field-input::placeholder {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px; color: #b9b3a2;
+    }
+    /* focus marks the line being written on — no glowing box */
+    .field-input:focus { background: linear-gradient(rgba(233,196,106,.11), rgba(233,196,106,.11)); }
+    .field-input:focus + .pw-toggle svg,
+    .field-input-wrap:focus-within .rule-strong { opacity: 1; }
+    .rule-strong {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+      background: var(--ink); opacity: 0; transition: opacity .15s;
     }
 
-    /* password toggle */
     .pw-toggle {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      padding: 4px;
-      cursor: pointer;
+      position: absolute; right: 2px; bottom: 5px;
+      background: none; border: none; padding: 4px; cursor: pointer;
     }
     .pw-toggle svg {
-      width: 16px;
-      height: 16px;
-      stroke: rgba(255,255,255,0.3);
-      fill: none;
-      stroke-width: 1.8;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      transition: stroke 0.15s;
+      width: 17px; height: 17px;
+      stroke: #a9a293; fill: none; stroke-width: 1.7;
+      stroke-linecap: round; stroke-linejoin: round;
+      transition: stroke .15s;
     }
-    .pw-toggle:hover svg { stroke: rgba(255,255,255,0.65); }
+    .pw-toggle:hover svg { stroke: var(--ink); }
 
-    /* ── Error message ── */
+    /* ── Marked in red pen ── */
     .error-msg {
       display: none;
-      background: rgba(185,28,28,0.2);
-      border: 1px solid rgba(252,165,165,0.3);
-      border-radius: 8px;
-      padding: 10px 13px;
-      font-size: 13px;
-      color: #fca5a5;
-      margin-bottom: 1rem;
-      animation: shake 0.35s ease;
+      font-family: var(--hand);
+      font-size: 19px; line-height: 1.15;
+      color: #b3261e;
+      padding: 4px 2px 6px;
+      border-bottom: 2px solid rgba(179,38,30,.4);
+      margin-bottom: 8px;
+      animation: shake .35s ease;
     }
     .error-msg.show { display: block; }
-
     @keyframes shake {
       0%,100% { transform: translateX(0); }
-      20%      { transform: translateX(-6px); }
-      40%      { transform: translateX(6px); }
-      60%      { transform: translateX(-4px); }
-      80%      { transform: translateX(4px); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
     }
 
-    /* ── Login button ── */
+    /* ── Rubber stamp ── */
     .btn-login {
-      width: 100%;
-      height: 48px;
-      border-radius: 12px;
-      background: var(--g600);
-      border: none;
-      color: #fff;
-      font-size: 15px;
-      font-weight: 700;
+      width: 100%; height: calc(var(--pitch) * 1.5);
+      margin-top: calc(var(--pitch) / 2);
+      background: var(--stamp);
+      color: #fdf8e9;
+      border: 2px solid #0e2b0e;
+      /* uneven radii: drawn, not printed */
+      border-radius: 11px 8px 13px 7px / 8px 13px 7px 11px;
+      box-shadow: 3px 3px 0 rgba(14,43,14,.32);
+      transform: rotate(-.7deg);
       font-family: 'DM Sans', sans-serif;
-      letter-spacing: 0.3px;
+      font-size: 13px; font-weight: 900;
+      letter-spacing: .18em; text-transform: uppercase;
       cursor: pointer;
-      transition: all 0.18s;
-      box-shadow: 0 4px 16px rgba(45,122,45,0.4);
-      margin-top: 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      transition: box-shadow .12s, transform .12s, background .15s;
     }
-    .btn-login:hover { background: var(--g500); box-shadow: 0 6px 20px rgba(45,122,45,0.5); }
-    .btn-login:active { transform: scale(0.98); }
+    .btn-login:hover { background: #236023; }
+    .btn-login:active {
+      transform: rotate(-.7deg) translate(3px, 3px);
+      box-shadow: 0 0 0 rgba(14,43,14,.32);
+    }
     .btn-login svg {
-      width: 17px;
-      height: 17px;
-      stroke: #fff;
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      width: 16px; height: 16px;
+      stroke: #fdf8e9; fill: none; stroke-width: 2;
+      stroke-linecap: round; stroke-linejoin: round;
     }
-
-    /* loading spinner inside button */
-    .btn-login.loading { pointer-events: none; opacity: 0.8; }
+    .btn-login.loading { pointer-events: none; opacity: .85; }
     .spinner {
       display: none;
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255,255,255,0.3);
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.35);
       border-top-color: #fff;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: spin .7s linear infinite;
     }
     .btn-login.loading .spinner { display: block; }
-    .btn-login.loading .btn-text { display: none; }
+    .btn-login.loading .btn-text,
     .btn-login.loading .btn-icon { display: none; }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Demo hint ── */
-    .demo-hint {
-      margin-top: 1.25rem;
-      text-align: center;
-      font-size: 12px;
-      color: rgba(255,255,255,0.28);
-    }
-    .demo-hint strong { color: rgba(255,255,255,0.45); }
-
-
-    /* ── Auth switch links ── */
+    /* ── Pencilled notes at the foot of the page ── */
     .auth-links {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 1rem;
-      font-size: 12px;
+      display: flex; justify-content: space-between;
+      align-items: baseline;
+      height: var(--pitch);
+      margin-top: calc(var(--pitch) / 2);
+      background-image: var(--ruling);
     }
     .auth-link {
-      color: var(--g300);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 12px;
-      text-decoration: underline;
-      padding: 0;
+      font-family: var(--hand);
+      font-size: 18px;
+      color: var(--ink);
+      background: none; border: none;
+      border-bottom: 1.5px dashed rgba(29,53,87,.45);
+      padding: 0 1px; cursor: pointer;
+      text-decoration: none;
     }
-    .auth-link:hover { color: #fff; }
+    .auth-link:hover { color: var(--red); border-bottom-color: rgba(193,18,31,.6); }
 
-    /* ── Modal overlay ── */
+    /* Lines carry on to the foot of the page — a ruled book does not stop
+       ruling where the writing stops. */
+    .tail {
+      height: calc(var(--pitch) * 2);
+      background-image: var(--ruling);
+    }
+
+    .demo-hint { display: none; }
+
+    /* ── Slips torn out of the book (modals) ── */
     .modal-bg {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(20,15,10,.72);
       z-index: 100;
       display: flex; align-items: flex-end; justify-content: center;
       opacity: 0; pointer-events: none;
-      transition: opacity 0.25s;
+      transition: opacity .25s;
     }
     .modal-bg.show { opacity: 1; pointer-events: all; }
     .modal-sheet {
-      background: #fff;
-      color: #182018;
-      border-radius: 20px 20px 0 0;
-      padding: 24px 20px 40px;
-      width: 100%; max-width: 480px;
-      transform: translateY(20px);
-      transition: transform 0.25s;
+      width: 100%; max-width: 460px;
+      background: var(--paper);
+      color: var(--ink);
+      border-top: 5px solid var(--red);
+      border-radius: 14px 14px 0 0;
+      padding: 22px 20px 34px 26px;
+      position: relative;
+      transform: translateY(22px);
+      transition: transform .25s;
+      max-height: 92vh; overflow-y: auto;
     }
     .modal-bg.show .modal-sheet { transform: translateY(0); }
+    .modal-sheet::before {
+      content: '';
+      position: absolute; left: 13px; top: 0; bottom: 0;
+      width: 4px;
+      border-left: 1.5px solid rgba(193,18,31,.28);
+      border-right: 1px solid rgba(193,18,31,.14);
+    }
     .modal-title {
-      font-size: 18px; font-weight: 700;
-      color: #182018; margin-bottom: 6px;
+      font-family: var(--hand);
+      font-size: 27px; color: var(--ink); margin-bottom: 2px;
     }
     .modal-sub {
-      font-size: 13px; color: #6b8a6b;
-      margin-bottom: 20px; line-height: 1.5;
+      font-size: 11.5px; color: var(--ink-soft);
+      margin-bottom: 16px; line-height: 1.5;
     }
-    .modal-field { margin-bottom: 14px; }
+    .modal-field { margin-bottom: 6px; }
     .modal-label {
-      font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      color: #3d5c3d; margin-bottom: 6px; display: block;
+      display: block;
+      font-size: 9.5px; font-weight: 900;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-bottom: 2px;
     }
     .modal-input {
-      width: 100%; height: 46px;
-      padding: 0 14px;
-      font-size: 14px; font-family: 'DM Sans', sans-serif;
-      border: 1.5px solid #c4d8c4;
-      border-radius: 10px;
-      background: #f4f6f4; color: #182018;
-      outline: none;
+      width: 100%; height: var(--pitch);
+      padding: 0 2px 4px;
+      border: 0; border-bottom: 1.5px solid var(--rule);
+      background: transparent; outline: none;
+      font-family: var(--hand);
+      font-size: 21px; color: var(--ink);
+      border-radius: 0; -webkit-appearance: none;
     }
-    .modal-input:focus { border-color: #3d9c3d; background: #fff; }
+    .modal-input::placeholder {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px; color: #bdb7a6;
+    }
+    .modal-input:focus { border-bottom-color: var(--ink); }
     .modal-btn {
-      width: 100%; height: 46px;
-      border-radius: 12px;
-      background: #1a4d1a; color: #fff;
-      font-size: 14px; font-weight: 700;
+      width: 100%; height: 48px; margin-top: 16px;
+      background: var(--stamp); color: #fdf8e9;
+      border: 2px solid #0e2b0e;
+      border-radius: 11px 8px 13px 7px / 8px 13px 7px 11px;
+      box-shadow: 3px 3px 0 rgba(14,43,14,.3);
+      transform: rotate(-.6deg);
       font-family: 'DM Sans', sans-serif;
-      border: none; cursor: pointer;
-      margin-top: 4px;
+      font-size: 12px; font-weight: 900;
+      letter-spacing: .16em; text-transform: uppercase;
+      cursor: pointer;
     }
-    .modal-btn:hover { background: #2d7a2d; }
-    .modal-btn.loading { opacity: 0.6; pointer-events: none; }
+    .modal-btn:hover { background: #236023; }
+    .modal-btn.loading { opacity: .6; pointer-events: none; }
     .modal-cancel {
-      width: 100%; height: 44px;
-      border-radius: 12px;
-      background: #f4f6f4; color: #6b8a6b;
-      font-size: 14px; font-weight: 600;
-      font-family: 'DM Sans', sans-serif;
-      border: 1px solid #dde8dd; cursor: pointer;
-      margin-top: 8px;
+      width: 100%; height: 40px; margin-top: 10px;
+      background: none; border: none;
+      font-family: var(--hand);
+      font-size: 18px; color: var(--ink-soft);
+      cursor: pointer;
     }
-    .modal-error {
-      background: #fff1f1; color: #b91c1c;
-      border: 1px solid #fca5a5;
-      border-radius: 8px; padding: 10px 12px;
-      font-size: 12px; margin-bottom: 12px;
+    .modal-cancel:hover { color: var(--ink); }
+    .modal-error, .modal-success {
       display: none;
+      font-family: var(--hand);
+      font-size: 18px; line-height: 1.2;
+      padding: 4px 2px 6px; margin-bottom: 8px;
+      border-bottom: 2px solid;
     }
-    .modal-error.show { display: block; }
-    .modal-success {
-      background: #ecfdf5; color: #065f46;
-      border: 1px solid #6ee7b7;
-      border-radius: 8px; padding: 10px 12px;
-      font-size: 12px; margin-bottom: 12px;
-      display: none;
-    }
-    .modal-success.show { display: block; }
+    .modal-error   { color: #b3261e; border-bottom-color: rgba(179,38,30,.4); }
+    .modal-success { color: #1a4d1a; border-bottom-color: rgba(26,77,26,.4); }
+    .modal-error.show, .modal-success.show { display: block; }
 
-    /* ── Footer ── */
+    /* ── Foot of the desk ── */
     .login-footer {
-      margin-top: 2rem;
-      font-size: 11px;
-      color: rgba(255,255,255,0.2);
+      margin-top: 22px;
+      font-family: var(--hand);
+      font-size: 15px;
+      color: rgba(255,248,231,.32);
       text-align: center;
-      animation: fadeUp 0.6s 0.3s ease both;
+      animation: fadeUp .6s .25s ease both;
     }
 
-    /* ── Animations ── */
-    @keyframes fadeDown {
-      from { opacity: 0; transform: translateY(-16px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes bookIn {
+      from { opacity: 0; transform: rotate(-2.4deg) translateY(16px) scale(.985); }
+      to   { opacity: 1; transform: rotate(-.35deg) translateY(0) scale(1); }
     }
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
+      from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-  
-    /* ── DESKTOP RESPONSIVE ── */
-    @media (min-width: 768px) {
-      body { background: #0f2e10; }
-      #app { max-width: 720px; margin: 0 auto; box-shadow: 0 0 40px rgba(0,0,0,.4); }
+
+    /* ── Small phones: keep the page from feeling cramped ── */
+    @media (max-width: 360px) {
+      .spine { flex-basis: 32px; }
+      .paper { padding-left: 26px; padding-right: 16px; }
+      .brand-name { font-size: 33px; }
+      .seal { width: 54px; height: 40px; }
+      .brand { padding-right: 62px; }
     }
-</style>
+    @media (min-height: 780px) {
+      .page { padding-top: 40px; padding-bottom: 34px; }
+    }
+  </style>
 </head>
 <body>
 
 <div class="page">
 
-  <!-- Brand — 555 Auditor Portal (nickname of the audit surface,
-       inspired by the 555 Note Book that field auditors carry). The
-       login backend is unchanged Supabase Auth, so the credentials
-       are the same as the MJM AI system. -->
-  <div class="brand">
-    <div class="brand-icon" style="background:linear-gradient(135deg,#1a4d1a,#2d7a2d);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-weight:900;letter-spacing:-1px;font-size:26px">
-      555
-    </div>
-    <div class="brand-name">555 <span>Auditor Portal</span></div>
-    <div class="brand-sub">MJM Nursery · Mega Jutamas Sdn Bhd</div>
-  </div>
+  <!-- ══ The 555 audit book ══ -->
+  <div class="book">
 
-  <!-- Card -->
-  <div class="login-card">
-    <div class="login-heading" data-t="login_welcome">Welcome back</div>
-    <div class="login-sub" data-t="login_sub">Sign in to the 555 Auditor Portal</div>
-
-    <div class="error-msg" id="error-msg">
-      Incorrect username or password. Please try again.
-    </div>
-
-    <!-- Username -->
-    <div class="field">
-      <label class="field-label" for="username">Username</label>
-      <div class="field-input-wrap">
-        <div class="field-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-        </div>
-        <input
-          class="field-input"
-          id="email"
-          type="text"
-          placeholder="Enter your email"
-          autocomplete="email" type="email"
-          autocapitalize="none"
-          onkeydown="if(event.key==='Enter') document.getElementById('password').focus()"
-        />
+    <!-- red cover, seen down the fold -->
+    <div class="spine">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <span class="spine-num">555</span>
+        <span class="spine-word">Audit</span>
       </div>
     </div>
 
-    <!-- Password -->
-    <div class="field">
-      <label class="field-label" for="password">Password</label>
-      <div class="field-input-wrap">
-        <div class="field-icon">
-          <svg viewBox="0 0 24 24">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0110 0v4"/>
-          </svg>
+    <div class="paper">
+
+      <!-- inked seal -->
+      <div class="seal"><b>MJM</b><i>NURSERY</i></div>
+
+      <div class="brand">
+        <div class="tape">
+          <span>555</span>
+          <em>Buku Audit</em>
         </div>
-        <input
-          class="field-input"
-          id="password"
-          type="password"
-          placeholder="Enter your password"
-          autocomplete="current-password"
-          onkeydown="if(event.key==='Enter') doLogin()"
-        />
-        <button class="pw-toggle" type="button" onclick="togglePw()" title="Show / hide password">
-          <svg id="pw-icon" viewBox="0 0 24 24">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+        <div class="brand-name">Auditor <span>Portal</span></div>
+        <div class="brand-sub">MJM Nursery · Mega Jutamas Sdn Bhd</div>
+        <div class="login-heading" data-t="login_welcome">Welcome back</div>
+        <div class="login-sub" data-t="login_sub">Sign in to the 555 Auditor Portal</div>
       </div>
+
+      <div class="error-msg" id="error-msg">
+        Incorrect username or password. Please try again.
+      </div>
+
+      <!-- written on the lines -->
+      <div class="sheet">
+
+        <div class="field">
+          <label class="field-label" for="email" data-t="email_label">Email</label>
+          <div class="field-input-wrap">
+            <input
+              class="field-input"
+              id="email"
+              type="email"
+              placeholder="your@email.com"
+              autocomplete="email"
+              autocapitalize="none"
+              onkeydown="if(event.key==='Enter') document.getElementById('password').focus()"
+            />
+            <div class="rule-strong"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="password" data-t="password_label">Password</label>
+          <div class="field-input-wrap">
+            <input
+              class="field-input"
+              id="password"
+              type="password"
+              placeholder="••••••"
+              autocomplete="current-password"
+              onkeydown="if(event.key==='Enter') doLogin()"
+            />
+            <button class="pw-toggle" type="button" onclick="togglePw()" title="Show / hide password">
+              <svg id="pw-icon" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+            <div class="rule-strong"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <button class="btn-login" id="btn-login" onclick="doLogin()">
+        <div class="spinner"></div>
+        <svg class="btn-icon" viewBox="0 0 24 24">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+          <polyline points="10 17 15 12 10 7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        <span class="btn-text" data-t="login_btn">Sign In</span>
+      </button>
+
+      <div class="auth-links">
+        <button class="auth-link" onclick="showForgotPassword()" data-t="forgot_password">Forgot Password?</button>
+        <button class="auth-link" onclick="showSignUp()" data-t="sign_up">Sign Up</button>
+      </div>
+
+      <div class="tail"></div>
+
     </div>
-
-    <button class="btn-login" id="btn-login" onclick="doLogin()">
-      <div class="spinner"></div>
-      <svg class="btn-icon" viewBox="0 0 24 24">
-        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
-        <polyline points="10 17 15 12 10 7"/>
-        <line x1="15" y1="12" x2="3" y2="12"/>
-      </svg>
-      <span class="btn-text" data-t="login_btn">Sign In</span>
-    </button>
-
-    <div class="auth-links">
-      <button class="auth-link" onclick="showForgotPassword()" data-t="forgot_password">Forgot Password?</button>
-      <button class="auth-link" onclick="showSignUp()" data-t="sign_up">Sign Up</button>
-    </div>
-
   </div>
 
-  <!-- FORGOT PASSWORD MODAL -->
+  <!-- FORGOT PASSWORD — a slip torn out of the book -->
   <div class="modal-bg" id="forgot-modal" onclick="if(event.target===this)hideForgotPassword()">
     <div class="modal-sheet">
       <div class="modal-title" data-t="forgot_title">Reset Password</div>
@@ -528,7 +581,7 @@
     </div>
   </div>
 
-  <!-- SIGN UP MODAL -->
+  <!-- SIGN UP -->
   <div class="modal-bg" id="signup-modal" onclick="if(event.target===this)hideSignUp()">
     <div class="modal-sheet">
       <div class="modal-title" data-t="signup_title">Create Account</div>
@@ -810,8 +863,8 @@
 
 </script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
-<div style="position:fixed;top:16px;right:16px;z-index:100">
-  <button class="lang-toggle-btn" onclick="toggleLang()" style="height:32px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer">BM</button>
+<div style="position:fixed;top:14px;right:14px;z-index:100">
+  <button class="lang-toggle-btn" onclick="toggleLang()" style="height:30px;padding:0 14px;border-radius:4px 4px 10px 10px;background:#f6efdd;border:1.5px solid #d9cfb4;color:#6b5b3e;font-size:11px;font-weight:900;letter-spacing:.14em;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.35);transform:rotate(1.2deg)">BM</button>
 </div>
 </body>
 </html>
