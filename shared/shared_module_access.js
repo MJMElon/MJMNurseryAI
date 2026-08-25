@@ -81,6 +81,10 @@
        been. */
     const PAGE_LABEL = cfg.pageLabel || 'User Access';
     const TABS       = cfg.tabs || [];
+    /* Per-user settings beyond the access ticks — the Audit module uses
+       this for the portal an auditor lands on. Stored on the same
+       permissions object, under the key each field names. */
+    const FIELDS     = cfg.userFields || [];
 
     document.title = PAGE_LABEL + ' — ' + cfg.title;
     document.head.insertAdjacentHTML('beforeend', styleTag(A));
@@ -315,6 +319,7 @@
       $('d-level').innerHTML =
         `<span class="chip chip-${lvl === 'admin' ? 'admin' : 'normal'}">Module level · ${LEVEL_LABEL[lvl] || lvl}</span>
          <span class="chip chip-info">set on main portal</span>`;
+      $('d-fields').innerHTML = FIELDS.map(f => userFieldHtml(f, editingPerms[f.key])).join('');
       $('d-pages').innerHTML = PAGES.map(d => pageCardHtml(d, effectiveActions(editingPerms, d))).join('')
                              + SCOPES.map(s => scopeCardHtml(s, editingPerms)).join('');
       SCOPES.forEach(s => syncScopeCard(s.key));
@@ -359,6 +364,16 @@
         (d.actions || []).forEach(a => { acts[a.key] = view && $(`d-act-${d.key}-${a.key}`).checked; });
         next[ACT_KEY][d.key] = acts;
         next[PG_KEY][d.key]  = view ? 'normal' : 'none';
+      });
+
+      FIELDS.forEach(f => {
+        const el = $('d-field-' + f.key);
+        if (!el) return;
+        const v = el.value;
+        // An empty choice is the field's own default, and defaults are
+        // written by absence so a later change of default reaches everyone
+        // who never chose.
+        if (v === '') delete next[f.key]; else next[f.key] = v;
       });
 
       SCOPES.forEach(sc => {
@@ -523,6 +538,23 @@
 </style>`;
   }
 
+  /* One extra per-user setting. Only a select for now — the one thing
+     asked for is a choice from a short list, and a text box would invite
+     values nothing can honour. */
+  function userFieldHtml(f, value) {
+    const v = value == null ? '' : String(value);
+    return `
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div class="font-black text-slate-800 text-sm">${esc(f.label)}</div>
+      ${f.help ? `<p class="text-[11px] text-slate-600 mt-1 leading-relaxed">${f.help}</p>` : ''}
+      <select id="d-field-${esc(f.key)}"
+              class="mt-3 w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold outline-none">
+        ${(f.options || []).map(o =>
+          `<option value="${esc(o.value)}"${o.value === v ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+
   function pageHtml(cfg, A, BACK, PAGE_LABEL, TABS) {
     const note = cfg.note ||
       `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
@@ -610,6 +642,7 @@
         switching it off locks every function on that page.
       </p>
       <div id="d-pages" class="space-y-3"></div>
+      <div id="d-fields" class="mt-5 space-y-3"></div>
 
       <div class="mt-5 pt-4 border-t border-dashed border-slate-200">
         <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Quick Set — applies to all pages</div>

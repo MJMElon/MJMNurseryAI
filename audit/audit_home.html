@@ -1016,6 +1016,9 @@
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
 <script src="audit_pending.js?v=20260824a"></script>
+<!-- Rounds, maintenance windows and the ages being audited. Defaults to
+     what used to be hardcoded below, so this cannot break the board. -->
+<script src="audit_settings.js?v=1"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
@@ -1139,7 +1142,12 @@ function loadAuditTodo(){
      PN ↔ MN in place, so the choice is never a one-way door. */
   let scope = MJMAuditLogin.scope();
   if (!scope) {
-    const pref = (user.audit_scope || user.default_nursery || '').toUpperCase();
+    /* permissions.audit_landing is the portal an admin set for this auditor
+       on Settings → User Access. It leads, because it is the answer someone
+       gave deliberately; the older profile fields stay behind it so nothing
+       already relying on them breaks. */
+    const pref = ((user.permissions && user.permissions.audit_landing)
+                  || user.audit_scope || user.default_nursery || '').toUpperCase();
     const preferred = (pref === 'PN' || pref === 'MN') ? pref
                     : (mayPN ? 'PN' : (mayMN ? 'MN' : 'PN'));
     MJMAuditLogin.setScope(preferred);
@@ -1276,27 +1284,27 @@ function loadAuditTodo(){
      so a BM switch flips them without re-declaring the array. Same keys
      the Audit Modules row uses so the wording stays in step across the
      page. */
-  const MN_SET = [
-    {mod:'plot',   title:'home_plot',   href:'audit_plot_audit.html',
-     windows:[[10,10],[20,20],[30,30]]},
-    {mod:'height', title:'home_height', href:'audit_height_index.html',
-     windows:[[1,5],[15,20]]},
-    // Papan Tanda has to be closed inside the calendar month — auditors
-    // have the whole month to walk it. Window covers day 1 to 31 and
-    // occurrences() clamps to the actual last day of the month, so
-    // February and 30-day months don't leak a day.
-    {mod:'papan',  title:'home_papan',  href:'audit_papan_index.html',
-     windows:[[1,31]]}
-  ];
-  const PN_SET = [
-    {mod:'plot',   title:'home_plot',   href:'audit_plot_audit.html',
-     windows:[[20,25]]},
-    {mod:'height', title:'home_height', href:'audit_height_index.html',
-     windows:[[20,25]]},
-    // Papan on PN gets the whole-month window too, same as MN.
-    {mod:'papan',  title:'home_papan',  href:'audit_papan_index.html',
-     windows:[[1,31]]}
-  ];
+  /* The rounds are a setting now — Settings → System Setting writes them
+     and audit_settings.js reads them back, with the sets that used to be
+     written out here as its defaults. So a database that has never been to
+     that screen still schedules exactly as it always did.
+
+     A module with no rounds left drops out of the list entirely, which is
+     how "we are not running that audit here" is said.
+
+     Windows are day-of-month ranges. Which set applies is settled by the
+     nursery chosen on the way in; Papan's 1–31 is clamped by occurrences()
+     to the real last day, so February does not leak a day. */
+  const MOD_META = {
+    plot:   { title:'home_plot',   href:'audit_plot_audit.html' },
+    height: { title:'home_height', href:'audit_height_index.html' },
+    papan:  { title:'home_papan',  href:'audit_papan_index.html' }
+  };
+  const setFor = (scope) => Object.keys(MOD_META)
+    .map(mod => Object.assign({ mod }, MOD_META[mod], { windows: MJMAuditSettings.windows(scope, mod) }))
+    .filter(sc => sc.windows.length);
+  let MN_SET = setFor('MN');
+  let PN_SET = setFor('PN');
   /* ANYTIME used to hold event-driven audits (maintenance + papan on PN).
      Both are now dated occurrences on the main timeline — maintenance
      via MAINT_OCCURRENCES + loadMaintTimeline, papan via the whole-month
@@ -1304,7 +1312,16 @@ function loadAuditTodo(){
      downstream renderers can still safely check .length on. */
   const ANYTIME = [];
 
-  const SET = showMN ? MN_SET : showPN ? PN_SET : [];
+  let SET = showMN ? MN_SET : showPN ? PN_SET : [];
+  /* The board draws immediately from whatever settings this device already
+     has — the defaults, or the copy cached from the last visit — and is
+     rebuilt when the live ones land. Waiting for the network first would
+     leave an auditor with no signal looking at an empty screen. */
+  function refreshSchedule(){
+    MN_SET = setFor('MN');
+    PN_SET = setFor('PN');
+    SET    = showMN ? MN_SET : showPN ? PN_SET : [];
+  }
 
   const ICONS = {
     plot:   '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/>',
@@ -1421,8 +1438,11 @@ function loadAuditTodo(){
     'Merumput':                             'weeding',
     'Membaja':                              'manuring'
   };
-  const WT_WINDOW = { manuring:3, weeding:3, interrow:5 };   // days
-  const _wtWinFor = wt => WT_WINDOW[wt] || 3;
+  /* Days an auditor has after the work was done, per work type — also a
+     setting now. 0 means that work type raises no audit at all, which is
+     how P & D has always behaved (it is looked at in the plot condition
+     audit) and is now how any work type can be told to behave. */
+  const _wtWinFor = wt => MJMAuditSettings.maintDays(wt);
   function _canonPlot(raw){
     const s = String(raw||'').trim().toUpperCase();
     const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
@@ -1463,7 +1483,7 @@ function loadAuditTodo(){
       diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
       const push = (id, workDateISO, workType, plotRaw) => {
-        if (workType === 'pd')                     { diag.skippedPd++; return; }
+        if (_wtWinFor(workType) <= 0)              { diag.skippedPd++; return; }
         if (audited.has(String(id)))               { diag.skippedAudited++; return; }
         if (!workDateISO)                          { diag.skippedNoDate++; return; }
         const [Y,M,D] = workDateISO.split('-').map(Number);
@@ -2237,6 +2257,14 @@ function loadAuditTodo(){
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
   loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
+  /* Settings last: the rounds and the maintenance windows both come from
+     them, so when they land the board is rebuilt and the maintenance walk
+     is redone with the real day counts. */
+  MJMAuditSettings.load().then(() => {
+    refreshSchedule();
+    renderAll();
+    loadMaintTimeline().then(renderAll);
+  }).catch(e => console.warn('[audit-home] settings:', e));
   /* Which plots each row still owes. Slowest of the three — it reads
      the batch roster and the balance view — so it lands last and the
      circles appear under rows that are already on screen, rather than
