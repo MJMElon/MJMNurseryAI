@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings · Status Stages — Nursery Operation Manage</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f0fdfa; margin:0; }
+  .card { background:white; border:1px solid #ccfbf1; border-radius:20px; box-shadow:0 4px 16px rgba(13,148,136,.08); }
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; font-size:11px;
+         font-weight:900; letter-spacing:.08em; text-transform:uppercase; border:none; cursor:pointer; transition:all .15s; }
+  .btn-teal  { background:linear-gradient(135deg,#14b8a6,#0d9488); color:white; box-shadow:0 6px 14px -4px rgba(13,148,136,.4); }
+  .btn-teal:hover { transform:translateY(-1px); }
+  .btn-ghost { background:white; color:#475569; border:1.5px solid #e2e8f0; }
+  .btn-ghost:hover { background:#f8fafc; }
+  .btn-danger { background:white; color:#be123c; border:1.5px solid #fecdd3; }
+  .btn-danger:hover { background:#fff1f2; }
+  .btn-mini { padding:6px 9px; border-radius:9px; font-size:12px; }
+  .inp { width:100%; background:white; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px;
+         font-size:15px; font-weight:600; outline:none; }
+  .inp:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  .lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+         color:#64748b; margin-bottom:5px; }
+
+  /* # · Stage · Ideal days · Remark · actions */
+  .st-grid { display:grid; grid-template-columns:40px minmax(190px,1.2fr) 120px minmax(160px,1fr) 150px; gap:12px; align-items:center; }
+  .st-head { padding:0 18px 8px; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:#94a3b8; }
+  .st-row { padding:13px 18px; border:1px solid #e2e8f0; border-radius:16px; background:white; }
+  .st-row.editing { border-color:#5eead4; box-shadow:0 0 0 3px rgba(20,184,166,.12); }
+  .st-num { width:36px; height:36px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
+            color:#0f766e; font-weight:900; font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .st-name { font-weight:900; color:#0f172a; font-size:16px; }
+  .st-days { font-weight:900; color:#0f766e; font-size:16px; }
+  .st-remark { font-weight:600; color:#64748b; font-size:14px; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div id="loading" class="max-w-[1000px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
+
+<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-8 hidden palms-frame">
+
+  <aside id="palms-nav" data-page="settings" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body space-y-6">
+
+  <div class="card p-5 md:p-7">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <h2 class="font-black text-slate-800 uppercase tracking-widest text-base">🚦 PALMS — Status Stages</h2>
+      <button id="add-btn" class="btn btn-teal shrink-0">+ Add Stage</button>
+    </div>
+    <p class="text-[12px] text-slate-500 leading-relaxed max-w-[720px]">
+      The stages a plot moves through, in order, and how many days each is meant to take. This is the list
+      the Field Conductor picks from on the <strong>555 FC Portal</strong>, and the ideal days are what the
+      Monitoring Board calls a plot late by and what the Motion Study measures against.
+    </p>
+
+    <div class="overflow-x-auto -mx-2 px-2">
+      <div class="min-w-[720px]">
+        <div class="st-grid st-head mt-5">
+          <div>#</div><div>Stage</div><div>Ideal days</div><div>Remark</div><div class="text-right pr-1">&nbsp;</div>
+        </div>
+        <div id="list" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <p class="text-[11px] text-slate-400 mt-4 leading-relaxed">
+      Renaming a stage does <strong>not</strong> rewrite history — a plot log keeps the stage number it was
+      recorded against. Moving a stage changes what that number MEANS, so past records are re-read against the
+      new order; that is right for "where is this plot now" and worth a moment's thought before reordering.
+    </p>
+  </div>
+
+</div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 hidden z-[80] px-5 py-3 rounded-xl font-bold text-sm shadow-lg"></div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+let stages = [];
+let isAdmin = false;
+let editingId = null;   // the id being edited, 'new' for the add row, or null
+
+function showToast(msg, kind) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-6 right-6 z-[80] px-5 py-3 rounded-xl font-bold text-sm shadow-lg ' +
+    (kind === 'err' ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200');
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 2600);
+}
+
+/* The number shown is the POSITION, not the database id — that is what the
+   plot log stores as act_n and what makes "stage 1 comes before stage 2"
+   true. Reordering renumbers, which is why it is a deliberate action. */
+function displayRow(s, i) {
+  return `
+    <div class="st-row st-grid" data-id="${s.id}">
+      <div class="st-num">${i + 1}</div>
+      <div class="st-name">${esc(s.name)}</div>
+      <div class="st-days">${s.ideal_days == null ? '<span class="text-slate-300">—</span>' : esc(s.ideal_days) + 'd'}</div>
+      <div class="st-remark">${s.remark ? esc(s.remark) : '<span class="text-slate-300">—</span>'}</div>
+      <div class="flex items-center justify-end gap-1.5">
+        ${isAdmin ? `
+          <button class="btn btn-ghost btn-mini" data-up="${s.id}" ${i === 0 ? 'disabled style="opacity:.3"' : ''}>↑</button>
+          <button class="btn btn-ghost btn-mini" data-down="${s.id}" ${i === stages.length - 1 ? 'disabled style="opacity:.3"' : ''}>↓</button>
+          <button class="btn btn-ghost btn-mini" data-edit="${s.id}">✏️</button>
+          <button class="btn btn-danger btn-mini" data-del="${s.id}">🗑</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function editRow(s, i) {
+  const isNew = !s;
+  return `
+    <div class="st-row st-grid editing" data-id="${isNew ? 'new' : s.id}">
+      <div class="st-num">${isNew ? stages.length + 1 : i + 1}</div>
+      <div><input id="f-name" class="inp" placeholder="e.g. Saringan Anak Bibit" value="${isNew ? '' : esc(s.name)}"></div>
+      <div><input id="f-days" class="inp" type="number" min="0" step="1" placeholder="days"
+                  value="${isNew || s.ideal_days == null ? '' : esc(s.ideal_days)}"></div>
+      <div><input id="f-remark" class="inp" placeholder="optional" value="${isNew || !s.remark ? '' : esc(s.remark)}"></div>
+      <div class="flex items-center justify-end gap-1.5">
+        <button class="btn btn-teal btn-mini" data-save="1">Save</button>
+        <button class="btn btn-ghost btn-mini" data-cancel="1">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function render() {
+  const rows = stages.map((s, i) => (String(editingId) === String(s.id) ? editRow(s, i) : displayRow(s, i)));
+  if (editingId === 'new') rows.push(editRow(null, -1));
+  $('list').innerHTML = rows.join('') ||
+    '<div class="text-center text-slate-400 text-sm py-10">No stages yet. Add the first one.</div>';
+  $('add-btn').classList.toggle('hidden', !isAdmin || editingId !== null);
+}
+
+async function load() {
+  const { data, error } = await _supabase
+    .from('nops_plot_status_stages').select('*').order('sort_order').order('name');
+  if (error) { showToast('Could not read the stages.', 'err'); return; }
+  stages = data || [];
+  render();
+}
+
+async function save() {
+  const name = $('f-name').value.trim();
+  if (!name) { showToast('A stage needs a name.', 'err'); return; }
+  const daysRaw = $('f-days').value;
+  const payload = {
+    name: name,
+    ideal_days: daysRaw === '' ? null : Number(daysRaw),
+    remark: $('f-remark').value.trim() || null,
+  };
+  let error;
+  if (editingId === 'new') {
+    payload.sort_order = stages.length ? Math.max.apply(null, stages.map((s) => s.sort_order || 0)) + 1 : 1;
+    ({ error } = await _supabase.from('nops_plot_status_stages').insert([payload]));
+  } else {
+    ({ error } = await _supabase.from('nops_plot_status_stages').update(payload).eq('id', editingId));
+  }
+  if (error) { showToast(error.message || 'Could not save.', 'err'); return; }
+  editingId = null;
+  await load();
+  showToast('Saved.');
+}
+
+async function remove(id) {
+  const s = stages.find((x) => String(x.id) === String(id));
+  if (!s) return;
+  if (!confirm('Delete "' + s.name + '"?\n\nPast plot records keep the stage NUMBER they were recorded ' +
+               'against, so deleting shifts what every later number means. Renaming is usually what is wanted.')) return;
+  const { error } = await _supabase.from('nops_plot_status_stages').delete().eq('id', id);
+  if (error) { showToast(error.message || 'Could not delete.', 'err'); return; }
+  await load();
+  showToast('Deleted.');
+}
+
+/* Moving a stage rewrites sort_order for the whole list rather than swapping
+   two rows: a list that has ever been edited by hand can have gaps or
+   duplicates in sort_order, and a swap would preserve them. */
+async function move(id, dir) {
+  const i = stages.findIndex((x) => String(x.id) === String(id));
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= stages.length) return;
+  const next = stages.slice();
+  next.splice(j, 0, next.splice(i, 1)[0]);
+  const writes = next
+    .map((s, idx) => (s.sort_order === idx + 1
+      ? null
+      : _supabase.from('nops_plot_status_stages').update({ sort_order: idx + 1 }).eq('id', s.id)))
+    .filter(Boolean);
+  stages = next;
+  render();
+  const results = await Promise.all(writes);
+  if (results.some((r) => r && r.error)) showToast('Could not save the new order.', 'err');
+  await load();
+}
+
+$('list').addEventListener('click', (e) => {
+  const t = (a) => { const b = e.target.closest('[data-' + a + ']'); return b ? b.dataset[a] : null; };
+  if (t('save') !== null) return void save();
+  if (t('cancel') !== null) { editingId = null; return void render(); }
+  const ed = t('edit'); if (ed) { editingId = ed; return void render(); }
+  const dl = t('del'); if (dl) return void remove(dl);
+  const up = t('up'); if (up) return void move(up, -1);
+  const dn = t('down'); if (dn) return void move(dn, 1);
+});
+
+$('add-btn').addEventListener('click', () => { editingId = 'new'; render(); });
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nursery_ops')) {
+      alert('You do not have access to Nursery Operation Manage.');
+      window.location.href = '../index.html';
+      return;
+    }
+    /* Reading the list is for anyone in the module — the board and the motion
+       study are read against it, so seeing it explains them. Changing it is
+       admin only: these numbers decide what "late" means everywhere. */
+    isAdmin = MJMAccess.isAdminOf('nursery_ops') || MJMAccess.canManageUsers();
+    await load();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+    $('list').innerHTML = '<div class="text-center text-slate-400 text-sm py-10">Could not load the stages.</div>';
+  }
+})();
+</script>
+</body>
+</html>

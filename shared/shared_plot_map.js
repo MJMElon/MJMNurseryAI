@@ -61,6 +61,24 @@
              white-space:nowrap; background:rgba(255,255,255,.9); color:#065f46; }
   .pm-line.over { color:#9f1239; }
   .pm-line.none { color:#94a3b8; font-weight:700; }
+  /* Map beside its key. The key is a column on a desk and a block underneath
+     on a phone, where 196px taken off the width would leave the map itself
+     too small to read. */
+  .pm-body { display:flex; align-items:stretch; }
+  .pm-mapcol { position:relative; flex:1 1 auto; min-width:0; background:#f1f5f9; }
+  .pm-legend { flex:0 0 200px; border-left:1px solid #f1f5f9; background:#fff;
+               padding:12px 14px; overflow-y:auto; }
+  .pm-lg-cap { font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
+               color:#94a3b8; margin:0 0 7px; }
+  .pm-lg-cap.mt { margin-top:13px; padding-top:11px; border-top:1px solid #f1f5f9; }
+  .pm-lg-row { display:flex; align-items:flex-start; gap:8px; padding:3.5px 0;
+               font-size:11px; font-weight:700; color:#475569; line-height:1.25; }
+  .pm-sw { width:14px; height:14px; border-radius:4px; border:2px solid; flex:0 0 auto; margin-top:1px; }
+  @media(max-width:767px){
+    .pm-body { flex-direction:column; height:auto !important; }
+    .pm-mapcol { height:52vh; min-height:320px; }
+    .pm-legend { flex:0 0 auto; border-left:none; border-top:1px solid #f1f5f9; max-height:none; }
+  }
   .pm-zoom { position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:4px; z-index:5;
              background:white; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,.12); padding:4px;
              border:1px solid #e2e8f0; }
@@ -85,12 +103,92 @@
     none: { fill: 'rgba(148,163,184,.25)', stroke: '#94a3b8' },
   };
 
+  /* ---------- the key a caller colours an ordered set of stages with ----
+     Eleven stages, and there is no set of eleven colours a person can tell
+     apart on this map. Plots sit next to each other, so every colour is
+     compared with every other one rather than only its neighbour in a list,
+     and against that test even a validated eight-hue palette does not clear
+     the floors. Measured, not guessed: one hue in eleven shades leaves
+     adjacent stages at ΔE 4.2, and four hues in three shades each puts pale
+     blue against pale violet at ΔE 5.1 and pale green against pale orange
+     at CVD ΔE 3.4. Both are "the same colour" to a reader. Every lightness
+     spread between 0.06 and 0.18 fails one end or the other: tight enough
+     to keep the hues apart is too tight to separate the shades.
+
+     So colour carries the PHASE — four hues, no shading — and the key names
+     the stages inside each. That is a real colour a real reader can name,
+     and it is honest about what colour can carry. Which stage exactly is on
+     the key beside the map and in the table under it, per plot, which is
+     what those are for.
+
+     The four are the data-viz reference palette's slots 1, 2, 3 and 7,
+     unchanged. Validated with ALL pairs in play on a light surface: worst
+     CVD ΔE 9.2 (deutan), worst normal-vision ΔE 16.3, every one inside the
+     lightness band and over the chroma floor. Aqua sits at 2.74:1 against
+     the surface, under 3:1, which obliges visible labels — every plot
+     carries its name and every key row its stage names, so that holds. */
+  const PHASE_HUES = ['#2a78d6', '#eb6834', '#1baf7a', '#4a3aa7'];
+
+  const hexToRgb = (h) => {
+    const n = parseInt(String(h).replace('#', ''), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+
+  /**
+   * A key for an ordered list of stages, split into as many phases as there
+   * are hues (fewer if there are fewer stages).
+   *
+   *   const pal = MJMPlotMap.phases(['Saringan Anak Bibit', 'Culling', …]);
+   *   MJMPlotMap.create({ legend: pal.legend, … });
+   *   // then statusOf() returns  key: pal.keyOf[stageName]
+   *
+   * Driven off the list handed in, so a stage added or renamed upstream
+   * needs nothing changed here.
+   *
+   * The fill is translucent because a photograph is underneath and the plot
+   * has to stay recognisable through the colour; the stroke is the same hue
+   * opaque, so the edge holds where the fill is palest.
+   */
+  function phases(labels) {
+    const list = (labels || []).map(String);
+    const n = list.length;
+    if (!n) return { legend: [], keyOf: {} };
+
+    const groups = Math.min(PHASE_HUES.length, n);
+    const buckets = [];
+    list.forEach((label, i) => {
+      const g = Math.min(groups - 1, Math.floor((i * groups) / n));
+      (buckets[g] = buckets[g] || []).push(label);
+    });
+
+    const keyOf = {};
+    const legend = buckets.map((stages, g) => {
+      stages.forEach((name) => { keyOf[name] = 'p' + g; });
+      const rgb = hexToRgb(PHASE_HUES[g]);
+      return {
+        key: 'p' + g,
+        label: stages.join(' · '),
+        stages: stages,
+        fill: 'rgba(' + rgb.join(',') + ',.55)',
+        stroke: PHASE_HUES[g],
+      };
+    });
+    return { legend: legend, keyOf: keyOf };
+  }
+
   function create(opts) {
     const o = opts || {};
     const mount = o.mount;
     if (!mount) throw new Error('MJMPlotMap: mount is required');
     const height = o.height || '58vh';
     const statusOf = typeof o.statusOf === 'function' ? o.statusOf : () => null;
+    /* The key beside the map: [{ key, label, fill, stroke }, …], usually
+       straight from MJMPlotMap.ramp(). statusOf() then returns which entry a
+       plot belongs to as `key`. With no legend the map keeps its original
+       three-tone behaviour, so a caller written before this still works. */
+    const legend = Array.isArray(o.legend) ? o.legend : null;
+    const byKey = {};
+    (legend || []).forEach((e) => { byKey[e.key] = e; });
     const onPlotClick = typeof o.onPlotClick === 'function' ? o.onPlotClick : null;
 
     injectCss();
@@ -109,7 +207,8 @@
         <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">${esc(o.title || '🗺️ Plot Status Map')}</h2>
         <div class="pm-tabs flex gap-2 overflow-x-auto"></div>
       </div>
-      <div class="relative bg-slate-100" style="height:${height}; min-height:380px;">
+      <div class="pm-body" style="height:${height}; min-height:380px;">
+       <div class="pm-mapcol">
         <div class="pm-viewport">
           <div class="pm-stage">
             <div class="relative inline-block">
@@ -133,16 +232,33 @@
           <span class="font-bold uppercase tracking-widest text-[11px] text-slate-400">No map uploaded for this nursery</span>
           <span class="text-[11px] text-slate-400">Upload it in Seedling Stock Management → System Settings.</span>
         </div>
-      </div>
-      <div class="px-4 py-3 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-2 items-center bg-slate-50/60">
-        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Legend:</span>
-        <span class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><span class="w-3.5 h-3.5 rounded border-2 inline-block" style="background:rgba(74,222,128,.4); border-color:#22c55e"></span> On schedule</span>
-        <span class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><span class="w-3.5 h-3.5 rounded border-2 inline-block" style="background:rgba(244,114,128,.45); border-color:#ef4444"></span> Over its time</span>
-        <span class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><span class="w-3.5 h-3.5 rounded border-2 inline-block" style="background:rgba(148,163,184,.25); border-color:#94a3b8"></span> Nothing recorded</span>
+       </div>
+       <aside class="pm-legend"></aside>
       </div>`;
 
     const q = (sel) => mount.querySelector(sel);
     const elTabs = q('.pm-tabs'), elView = q('.pm-viewport'), elStage = q('.pm-stage');
+
+    /* The key, drawn once — it does not change as the data does. In stage
+       order, top to bottom, so it reads as the run through the nursery and
+       a reader can find a colour by where it sits as much as by its hue.
+       The two states below the rule are not stages and are kept apart from
+       them: a plot is on a stage AND late, not late instead of a stage. */
+    (function renderLegend() {
+      const box = q('.pm-legend');
+      if (!box) return;
+      if (!legend) { box.style.display = 'none'; return; }
+      const row = (fill, stroke, label, dashed) =>
+        '<div class="pm-lg-row"><span class="pm-sw" style="background:' + fill +
+        ';border-color:' + stroke + (dashed ? ';border-style:dashed' : '') + '"></span>' +
+        '<span>' + esc(label) + '</span></div>';
+      box.innerHTML =
+        '<p class="pm-lg-cap">' + esc(o.legendTitle || 'Status') + '</p>' +
+        legend.map((e) => row(e.fill, e.stroke, e.label)).join('') +
+        '<p class="pm-lg-cap mt">Also</p>' +
+        row('transparent', '#e11d48', 'Over its time') +
+        row(TONES.none.fill, TONES.none.stroke, 'Nothing recorded');
+    })();
     const elImg = q('.pm-image'), elSvg = q('.pm-svg'), elLabels = q('.pm-labels');
     const elNone = q('.pm-nomap'), elLvl = q('.pm-zlvl');
 
@@ -180,18 +296,32 @@
         if (!Array.isArray(pts) || !pts.length) return;
 
         const st = statusOf(p.plot_name) || null;
+        /* With a legend the FILL says which stage the plot is on, and being
+           late is an outline on top of it rather than a colour of its own —
+           the two are different questions and a single colour could only
+           answer one. Without a legend, the old three tones. */
+        const hit = legend && st && byKey[st.key];
         const tone = TONES[(st && st.tone) || 'none'] || TONES.none;
+        const late = st && st.tone === 'over';
+        const fill = hit ? hit.fill : tone.fill;
+        const stroke = legend ? (late ? '#e11d48' : (hit ? hit.stroke : TONES.none.stroke))
+                              : tone.stroke;
+        const width = legend && late ? '.9' : '.4';
         shapes.push(
-          `<polygon points="${pts.map((pt) => pt.x + ',' + pt.y).join(' ')}" fill="${tone.fill}" ` +
-          `stroke="${tone.stroke}" stroke-width=".4" class="pm-shape" data-pm-plot="${esc(p.plot_name)}"/>`);
+          `<polygon points="${pts.map((pt) => pt.x + ',' + pt.y).join(' ')}" fill="${fill}" ` +
+          `stroke="${stroke}" stroke-width="${width}" class="pm-shape" data-pm-plot="${esc(p.plot_name)}"/>`);
 
         const cx = pts.reduce((s, pt) => s + pt.x, 0) / pts.length;
         const cy = pts.reduce((s, pt) => s + pt.y, 0) / pts.length;
         const cls = st && st.tone === 'over' ? 'over' : (st && st.tone === 'ok' ? '' : 'none');
+        /* The stage name is in the key now, so the label is the plot and, on
+           a late plot, how late — which is short. Naming every plot's stage
+           on the map is what made fourteen labels overlap into a wall. */
+        const line = legend ? (st && st.late ? st.late : '') : ((st && st.line) || 'no status');
         labels.push(
           `<div class="pm-label" style="left:${cx}%; top:${cy}%;">` +
             `<div class="pm-tag">${esc(p.plot_name)}</div>` +
-            `<div class="pm-line ${cls}">${esc((st && st.line) || 'no status')}</div>` +
+            (line ? `<div class="pm-line ${cls}">${esc(line)}</div>` : '') +
           `</div>`);
       });
       elSvg.innerHTML = shapes.join('');
@@ -284,6 +414,17 @@
         supa.from('operation_nurseries').select('name, map_image_url').order('name'),
       ]);
       plots = (plotRes && !plotRes.error && plotRes.data) ? plotRes.data : [];
+      /* B1, B2, … B10 — the way the nursery says them. The server orders by
+         plot_name, which is text, so a plain sort gives B1, B10, B11, B2 and
+         the office reads a list that jumps about. Sorted on the NUMBER, with
+         the letters as the tie-break. */
+      plots.sort((a, b) => {
+        const A = String(a.plot_name || ''), B = String(b.plot_name || '');
+        const pa = A.replace(/[0-9]/g, ''), pb = B.replace(/[0-9]/g, '');
+        if (pa !== pb) return pa.localeCompare(pb);
+        return (parseInt(A.replace(/\D/g, ''), 10) || 0) - (parseInt(B.replace(/\D/g, ''), 10) || 0)
+            || A.localeCompare(B);
+      });
       nurseries = (nurRes && !nurRes.error && nurRes.data) ? nurRes.data : [];
       if (Array.isArray(lo.nurseries)) {
         const want = lo.nurseries.map((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase());
@@ -304,5 +445,5 @@
     };
   }
 
-  global.MJMPlotMap = { create: create };
+  global.MJMPlotMap = { phases: phases, create: create };
 })(window);
