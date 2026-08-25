@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Audit Back End — MJM Nursery</title>
+  <title>555 Auditor Portal — Back End</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
   <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
        arrow, language, sign-out. Also loaded by audit_home.html and
@@ -315,9 +315,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </a>
     <div class="fcr-brand">
-      <div class="fcr-brand-top">MJM Nursery</div>
       <div class="fcr-brand-name">555</div>
-      <div class="fcr-brand-sub">Auditor Portal</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
     <div class="fcr-right">
       <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
@@ -327,7 +327,7 @@
       </button>
       <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span class="fcr-signout-label">Sign Out</span>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
       </button>
     </div>
   </nav>
@@ -737,9 +737,12 @@ setInterval(function(){
          when there is nothing to do cannot be trusted to be absent for
          that reason. Empty, it reads "clear". */
       MJMNelos.mountTodo('#nelos-todo', {
-        module: 'audit',
-        title:  'Nelos — Cases For This Module',
-        hideIfEmpty: false
+        module:       'audit',
+        title:        'Auditor NELOS',
+        newCase:      'top',        /* own row under the heading */
+        newCaseLabel: '+ Case',
+        openLink:     false,        /* was "Open Nelos →" */
+        hideIfEmpty:  false
       });
     }
   } catch (e) { /* no portal session — card stays hidden */ }

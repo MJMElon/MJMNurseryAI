@@ -50,6 +50,7 @@
        <div id="mjm-ribbon"
             data-brand="MJM Nursery"     left-hand wordmark
             data-center="NELOS"          centred module title, optional
+            data-sub="Nursery Case Log"   line under it, optional
             data-logo="off"></div>       drop the square badge
 
      With no attributes it renders exactly as it always did. */
@@ -57,6 +58,7 @@
     var d = (host && host.dataset) || {};
     var brand  = d.brand  || 'MJM Nursery AI';
     var centre = d.center || '';
+    var sub    = d.sub    || '';
     var logo   = d.logo !== 'off';
 
     var left =
@@ -74,9 +76,16 @@
     // Centred by being its own flex child between two flex:1 siblings, so it
     // stays put whatever the wordmark and the buttons are doing either side.
     var middle = centre
-      ? '<div class="mjm-rb-centre" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
-                   'letter-spacing:.28em;font-size:15px;white-space:nowrap;padding:0 12px;">' +
-          _esc(centre) + '</div>'
+      ? '<div class="mjm-rb-centre" style="text-align:center;padding:0 12px;min-width:0;">' +
+          '<div class="mjm-rb-title" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
+                     'letter-spacing:.3em;font-size:23px;line-height:1.05;white-space:nowrap;">' +
+            _esc(centre) + '</div>' +
+          (sub
+            ? '<div class="mjm-rb-sub" style="font-size:10.5px;font-weight:700;color:#94a3b8;' +
+                         'letter-spacing:.08em;white-space:nowrap;margin-top:3px;">' +
+                _esc(sub) + '</div>'
+            : '') +
+        '</div>'
       : '';
 
     return '' +
@@ -101,7 +110,9 @@
       '#mjm-ribbon a#portal-link:hover{background:#ecfdf5;color:#059669;border-color:#a7f3d0;}' +
       '#mjm-ribbon button#logout-btn:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}' +
       '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
-                              '#mjm-ribbon .mjm-rb-centre{letter-spacing:.16em;font-size:13px;padding:0 6px;}}' +
+                              '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
+                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:16px;}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:9px;}}' +
     '</style>';
   }
 
