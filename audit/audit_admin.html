@@ -139,18 +139,23 @@
     /* ── ENTER THE PORTAL ──
        Sits under the name, the way the store button does on the portal:
        a solid block, icon in front, arrow marking that it leads away. */
-    .portal-btn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;
-                padding:11px 17px;border-radius:9px;text-decoration:none;
-                background:#2d7a2d;color:#fff;
-                font-size:12px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
-                box-shadow:0 3px 10px rgba(45,122,45,.28);
-                transition:background .15s,transform .12s,box-shadow .15s}
-    .portal-btn:hover{background:#256725;box-shadow:0 5px 14px rgba(45,122,45,.34)}
+    /* The way through to the auditor view. Same shape as the FC Manage
+       page's own portal button — full width, 18px radius, the gradient
+       and the icon-label-arrow row — so the two manage pages read as
+       one family. Only the hue differs: green is the auditor portal's,
+       violet is the FC portal's. */
+    .portal-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+                padding:18px 22px;border-radius:18px;text-decoration:none;
+                background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;
+                font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+                box-shadow:0 10px 26px -6px rgba(27,107,50,.5);transition:all .15s}
+    .portal-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px -6px rgba(27,107,50,.55)}
     .portal-btn:active{transform:translateY(1px)}
-    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.1;
+    /* Sized here, not only by a class: same reason the FC page pins its own. */
+    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.2;
                     stroke-linecap:round;stroke-linejoin:round}
-    .portal-btn .pb-home{width:16px;height:16px}
-    .portal-btn .pb-out{width:13px;height:13px;opacity:.85}
+    .portal-btn .pb-home{width:20px;height:20px;flex-shrink:0}
+    .portal-btn .pb-out{width:15px;height:15px;opacity:.85;flex-shrink:0}
 
     /* ── ADMIN CARDS ──
        Scaled up to match the module cards on the other dashboards: room to
@@ -163,19 +168,26 @@
        once the boxes are equal. */
     .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
            grid-auto-rows:1fr;gap:16px}
+    /* Compact tiles, not full-height cards. Four fixed doors do not need a
+       paragraph each: the name is the whole message, and shrinking them
+       puts all four on one screen instead of four scrolls. The
+       descriptions are dropped rather than hidden — see .fc-desc. */
     .fc-card{position:relative;display:flex;flex-direction:column;background:var(--card);
-             border:1px solid var(--line);border-radius:18px;padding:24px 24px 22px;
+             border:1px solid var(--line);border-radius:16px;padding:14px 14px 13px;
              text-decoration:none;box-shadow:0 1px 3px rgba(16,40,60,.05);
-             transition:box-shadow .18s,transform .18s;min-height:210px}
+             transition:box-shadow .18s,transform .18s;min-height:0}
     .fc-card:hover{box-shadow:0 10px 26px rgba(16,40,60,.10);transform:translateY(-2px)}
-    .fc-ico{width:52px;height:52px;border-radius:14px;flex-shrink:0;margin-bottom:18px;
+    .fc-ico{width:38px;height:38px;border-radius:11px;flex-shrink:0;margin-bottom:10px;
             display:flex;align-items:center;justify-content:center}
-    .fc-ico svg{width:25px;height:25px;fill:none;stroke-width:1.9;
+    .fc-ico svg{width:19px;height:19px;fill:none;stroke-width:1.9;
                 stroke-linecap:round;stroke-linejoin:round}
-    .fc-ttl{font-size:21px;font-weight:800;letter-spacing:.3px;line-height:1.15;
+    .fc-ttl{font-size:13px;font-weight:900;letter-spacing:.06em;line-height:1.25;
             text-transform:uppercase}
-    .fc-desc{font-size:13px;font-weight:600;color:#64748b;margin-top:12px;line-height:1.5;flex:1}
-    .fc-enter{display:inline-flex;align-items:center;gap:7px;margin-top:18px;
+    /* Kept as a rule rather than deleted from the markup: the same four
+       lines are the module descriptions elsewhere, and a tile is not the
+       place for them. */
+    .fc-desc{display:none}
+    .fc-enter{display:inline-flex;align-items:center;gap:5px;margin-top:9px;
               font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase}
     .fc-enter svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
                   stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
@@ -240,6 +252,34 @@
        a section label. Solid red, and it is the control that collapses the
        group, so the whole bar is the hit target. */
     .alert-wrap{margin-bottom:28px}
+
+    /* ── the scheduled-work dashboard ── */
+    .wk-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .wk-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+              color:#64748b}
+    .wk-month{font-size:10px;font-weight:700;color:#94a3b8;margin-left:auto}
+    .wk-grid{display:grid;gap:12px}
+    @media(min-width:720px){.wk-grid{grid-template-columns:1fr 1fr}}
+
+    .wk-card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+             padding:14px 15px 13px;box-shadow:0 1px 3px rgba(16,40,60,.05)}
+    .wk-card-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+    .wk-name{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .wk-pct{margin-left:auto;font-size:16px;font-weight:900;font-variant-numeric:tabular-nums}
+    .wk-track{height:7px;border-radius:999px;background:#e8eef0;overflow:hidden;margin-bottom:12px}
+    .wk-fill{height:100%;border-radius:999px;transition:width .4s ease}
+
+    .wk-row{display:flex;align-items:center;gap:8px;padding:7px 0;
+            border-top:1px dashed #eef2f4;font-size:11.5px}
+    .wk-row:first-of-type{border-top:none}
+    .wk-mod{font-weight:800;color:#334155;min-width:0;flex:1;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .wk-when{font-size:9.5px;font-weight:700;color:#94a3b8;white-space:nowrap}
+    .wk-plots{font-size:10.5px;font-weight:800;color:#475569;
+              font-variant-numeric:tabular-nums;white-space:nowrap}
+    .wk-chip{font-size:8.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+             padding:2px 6px;border-radius:5px;white-space:nowrap}
+    .wk-note{font-size:10px;font-weight:600;color:#94a3b8;margin-top:9px;line-height:1.5}
     .alert-month{font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:12px;
                  padding-left:2px;letter-spacing:.3px}
     .alert-group{margin-bottom:14px;border-radius:14px;overflow:hidden;
@@ -311,15 +351,25 @@
        arrow-plus-wordmark row is the standard way back on every module
        page this style is used on. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
-    <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-    </a>
+    <!-- The left cell stays empty on purpose: it is what balances the
+         right-hand cluster and keeps the mark on the bar's centre line.
+         The way back moved into that cluster, where the FC Manage page
+         keeps its own — one place for "leave this page" on both. -->
+    <span class="fcr-spacer" aria-hidden="true"></span>
     <div class="fcr-brand">
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-org">MJM Nursery</div>
-      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
+      <!-- data-t stays on the portal name alone: the language file has a
+           key for that and not for the page, so BM swaps the half it
+           knows and leaves "Manage" standing. Reads the same way as the
+           FC page's "FC Portal Manage". -->
+      <div class="fcr-brand-sub"><span data-t="auditor_portal">Auditor Portal</span> Manage</div>
     </div>
     <div class="fcr-right">
+      <a class="fcr-portal" href="../index.html" aria-label="Back to portal" title="Back to portal">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span class="fcr-portal-label">Portal</span>
+      </a>
       <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
       <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
         <span class="fcr-globe" aria-hidden="true">🌐</span>
@@ -338,9 +388,9 @@
          — the nursery chooser was cancelled, and the auditor view
          defaults to whichever nursery was last chosen (or PN on a fresh
          session), with a Switch pill on the ribbon to flip PN ↔ MN. -->
-    <a class="portal-btn" href="audit_home.html" style="margin-bottom:22px">
+    <a class="portal-btn" href="audit_home.html" style="margin-bottom:24px">
       <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
-      <span>Visit Auditor Portal</span>
+      <span>Visit 555 Auditor Portal</span>
       <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
     </a>
 
@@ -358,11 +408,24 @@
 
     <!-- No section heading here: every group already announces itself as
          "Alerts — <nursery>", and stacking the two just repeated the word. -->
+    <!-- ── SCHEDULED WORK ──
+         What the auditors are supposed to have done this month and how far
+         through it they are, pre nursery and main nursery side by side.
+         This replaced a bare "Showing August 2026 only" label over a list
+         that said nothing at all on a good month: "All Clear" is the answer
+         to a different question than "is the month's work being done".
+
+         The alert cards still render underneath, but only when something
+         is actually flagged — the month is named up here now. -->
     <div class="alert-wrap admin-only">
-      <div class="alert-month" id="alert-month">Checking this month's audits…</div>
-      <div id="alert-section">
-        <div class="alert-loading">Checking the latest audit data…</div>
+      <div class="wk-head">
+        <div class="wk-title">Scheduled Audit Work</div>
+        <div class="wk-month" id="alert-month">…</div>
       </div>
+      <div id="work-dash">
+        <div class="alert-loading">Working out this month's schedule…</div>
+      </div>
+      <div id="alert-section"></div>
     </div>
 
 
@@ -483,6 +546,9 @@
 </div>
 
 <script src="audit_supabase.js"></script>
+<!-- Which plots still owe work — the same helper the auditor to-do uses,
+     so this page and that one count progress the same way. -->
+<script src="audit_pending.js?v=20260825a"></script>
 <!-- Language store + welcome-name fill for the shared FC ribbon. Admin
      has nothing to translate here, but persisting the toggle means the
      rest of the audit pages honour whatever was picked. -->
@@ -575,6 +641,130 @@ function latestPerPlot(rows){
   return Object.values(seen);
 }
 
+/* ══ SCHEDULED WORK ═══════════════════════════════════════════════
+   How much of this month's audit routine is done, pre nursery and main
+   nursery side by side.
+
+   The schedule is the same one audit_home.html shows an auditor, copied
+   rather than imported — that file builds it inside loadAuditTodo(),
+   wired to the one scope the auditor chose on the way in, and this page
+   needs both at once. The windows below and the SET arrays there are
+   the same routine and MUST be kept in step; if a window moves, it
+   moves in both.
+
+   Progress is counted in PLOTS, not in rounds. A round is not half done
+   because one of fifty-two plots was walked, and an admin asking "are we
+   getting through it" is asking about the plots. MJMAuditPending answers
+   which plots still owe work inside a window — the same helper, and the
+   same answer, as the circles under the auditor's own to-do rows.
+   ═══════════════════════════════════════════════════════════════════ */
+const WORK_GROUPS = [
+  { key:'PN', name:'Pre Nursery',  tone:'#1f7a3d', nurseries:['PN'] },
+  { key:'MN', name:'Main Nursery', tone:'#1558a8', nurseries:['BNN','UNN1','UNN2'] }
+];
+
+/* Day-of-month windows. Mirrors PN_SET / MN_SET in audit_home.html. */
+const WORK_SCHEDULE = {
+  PN: [
+    { mod:'plot',   name:'Plot Condition',  windows:[[20,25]] },
+    { mod:'height', name:'Seedling Height', windows:[[20,25]] },
+    { mod:'papan',  name:'Papan Tanda',     windows:[[1,31]] }
+  ],
+  MN: [
+    { mod:'plot',   name:'Plot Condition',  windows:[[10,10],[20,20],[30,30]] },
+    { mod:'height', name:'Seedling Height', windows:[[1,5],[15,20]] },
+    { mod:'papan',  name:'Papan Tanda',     windows:[[1,31]] }
+  ]
+};
+
+const WORK_CHIP = {
+  done:     { label:'Done',     bg:'#dcfce7', fg:'#15803d' },
+  due:      { label:'Due now',  bg:'#fee2e2', fg:'#991b1b' },
+  overdue:  { label:'Overdue',  bg:'#fee2e2', fg:'#7f1d1d' },
+  soon:     { label:'Soon',     bg:'#fef9c3', fg:'#854d0e' },
+  upcoming: { label:'Upcoming', bg:'#e0f2fe', fg:'#075985' }
+};
+
+async function loadWorkDashboard(){
+  const host = document.getElementById('work-dash');
+  if (!host) return;
+
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), today = now.getDate();
+  const last = new Date(y, m + 1, 0).getDate();
+  const iso = d => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  /* Every nursery at once — this page is the both-sides view. */
+  try {
+    await MJMAuditPending.load(['PN','BNN','UNN1','UNN2']);
+  } catch (e) {
+    console.warn('[work-dash] roster load failed:', e);
+  }
+
+  const cards = WORK_GROUPS.map(g => {
+    let gTotal = 0, gDone = 0, anyBasis = false;
+
+    const rows = WORK_SCHEDULE[g.key].map(sc => {
+      return sc.windows.map((w, i) => {
+        const start = Math.min(w[0], last), end = Math.min(w[1], last);
+        let total = 0, owed = 0, basis = false;
+
+        g.nurseries.forEach(n => {
+          if (!MJMAuditPending.covers(sc.mod, n)) return;
+          basis = true;
+          total += MJMAuditPending.plotsAll(sc.mod, n).length;
+          owed  += MJMAuditPending.plots(sc.mod, n, iso(start), iso(end)).length;
+        });
+        const done = Math.max(0, total - owed);
+        if (basis) { anyBasis = true; gTotal += total; gDone += done; }
+
+        /* Where the window stands. A finished window is finished whatever
+           the date; an unfinished one that has closed is overdue. */
+        let state;
+        if (basis && total > 0 && owed === 0) state = 'done';
+        else if (today > end) state = 'overdue';
+        else if (today >= start) state = 'due';
+        else state = (start - today) <= 3 ? 'soon' : 'upcoming';
+
+        const chip = WORK_CHIP[state];
+        const when = start === end
+          ? start + ' ' + MONTHS[m]
+          : (start === 1 && end === last ? 'All month' : start + '–' + end + ' ' + MONTHS[m]);
+        const round = sc.windows.length > 1 ? ' ' + (i + 1) : '';
+
+        return '<div class="wk-row">' +
+                 '<span class="wk-mod">' + sc.name + round + '</span>' +
+                 '<span class="wk-when">' + when + '</span>' +
+                 (basis && total
+                   ? '<span class="wk-plots">' + done + '/' + total + '</span>'
+                   : '') +
+                 '<span class="wk-chip" style="background:' + chip.bg + ';color:' + chip.fg + '">' +
+                   chip.label + '</span>' +
+               '</div>';
+      }).join('');
+    }).join('');
+
+    const pct = gTotal ? Math.round(gDone / gTotal * 100) : 0;
+    return '<div class="wk-card">' +
+             '<div class="wk-card-head">' +
+               '<span class="wk-name" style="color:' + g.tone + '">' + g.name + '</span>' +
+               '<span class="wk-pct" style="color:' + g.tone + '">' +
+                 (anyBasis ? pct + '%' : '—') + '</span>' +
+             '</div>' +
+             '<div class="wk-track"><div class="wk-fill" style="width:' +
+               (anyBasis ? pct : 0) + '%;background:' + g.tone + '"></div></div>' +
+             rows +
+             (anyBasis
+               ? '<div class="wk-note">' + gDone + ' of ' + gTotal + ' plot audits done this month.</div>'
+               : '<div class="wk-note">No plot roster could be read for this nursery, so ' +
+                 'progress is not being guessed at.</div>') +
+           '</div>';
+  }).join('');
+
+  host.innerHTML = '<div class="wk-grid">' + cards + '</div>';
+}
+
 async function loadAlerts(){
   const section = document.getElementById('alert-section');
   if (!section) return;
@@ -590,7 +780,7 @@ async function loadAlerts(){
     ]);
 
     const monthEl = document.getElementById('alert-month');
-    if (monthEl) monthEl.textContent = 'Showing ' + label + ' only';
+    if (monthEl) monthEl.textContent = label;
 
     const plots = latestPerPlot(plotRows || []);
     const papan = latestPerPlot(papanRows || []);
@@ -624,14 +814,11 @@ async function loadAlerts(){
     localStorage.setItem(ALERT_KEY, fingerprint);
 
     if (total === 0) {
-      section.innerHTML =
-        '<div class="all-clear">' +
-          '<div class="all-clear-ico"><svg viewBox="0 0 24 24">' +
-            '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>' +
-            '<polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
-          '<div><div class="all-clear-ttl">All Clear</div>' +
-          '<div class="all-clear-sub">Nothing flagged in any nursery for ' + label + '</div>' +
-        '</div></div>';
+      /* Nothing to say. The old "All Clear" card answered "is anything
+         flagged"; the dashboard above answers "is the work being done",
+         which is the question this page is for. An empty list is not
+         worth a card of its own under it. */
+      section.innerHTML = '';
       return;
     }
 
@@ -712,12 +899,13 @@ function notifyAlerts(kinds){
    filter most of them to nothing anyway. */
 if (MJMAuditLogin.isAdmin()) {
 
+loadWorkDashboard();
 loadAlerts();
 /* Long shifts leave this page open, so it refreshes — but only while
    somebody is actually looking at it. A tab left open on a back-office
    machine for a week would otherwise keep querying all week for nobody. */
 setInterval(function(){
-  if (document.visibilityState === 'visible') loadAlerts();
+  if (document.visibilityState === 'visible') { loadWorkDashboard(); loadAlerts(); }
 }, 5 * 60 * 1000);
 
 /* User Access needs the portal's own permission, not just audit admin. */

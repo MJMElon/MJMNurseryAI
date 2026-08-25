@@ -56,13 +56,20 @@
      With no attributes it renders exactly as it always did. */
   function ribbonHtml(host) {
     var d = (host && host.dataset) || {};
-    var brand  = d.brand  || 'MJM Nursery AI';
+    /* An explicitly empty data-brand means "no wordmark here" — the FC
+       Portal's own pages set it that way so the left cell is the bare
+       spacer their centred mark is measured against. `||` treated that
+       as absent and printed the default, which the old flex bar hid by
+       squeezing the cell to nothing; the moment the cell was allowed its
+       own width the words came back. Present-but-empty and absent are
+       different answers, so they are read differently. */
+    var brand  = ('brand' in d) ? d.brand : 'MJM Nursery AI';
     var centre = d.center || '';
     var sub    = d.sub    || '';
     var logo   = d.logo !== 'off';
 
     var left =
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
+      '<div class="mjm-rb-left" style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
         (logo
           ? '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
                         'display:flex;align-items:center;justify-content:center;color:#fff;' +
@@ -104,12 +111,13 @@
       : 'display:flex;justify-content:space-between;align-items:center;';
 
     return '' +
-    '<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
+    '<div class="mjm-rb-bar' + (centre ? ' mjm-rb-has-centre' : '') + '" ' +
+        'style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
               barLayout + 'position:sticky;' +
               'top:0;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.06);' +
               'font-family:Outfit,system-ui,-apple-system,sans-serif;">' +
       left + middle +
-      '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex:1;justify-content:flex-end;">' +
+      '<div class="mjm-rb-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex:1;justify-content:flex-end;">' +
         '<span id="welcome-text" style="font-size:12px;font-weight:700;color:#94a3b8;white-space:nowrap;" class="mjm-rb-hide-sm"></span>' +
         '<a id="portal-link" href="' + PORTAL + '" ' +
            'style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.15em;' +
@@ -127,7 +135,34 @@
       '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
                               '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
                               '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:21px;}' +
-                              '#mjm-ribbon .mjm-rb-sub{font-size:11.5px;}}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:11.5px;}' +
+      /* The centred mark takes its own row on a phone. Three columns of
+         1fr auto 1fr can only hold the mark on the bar's centre line
+         while BOTH side columns fit the same width — and the button
+         cluster is far wider than the empty left spacer, so on a phone
+         the spacer gave way, the cluster did not, and the mark was
+         pushed off centre and then clipped. Measured on FC Manage at
+         412px: the mark sat 107px left of the bar's centre and its
+         widest line was cut to 126px.
+
+         Two rows instead: the back slot and the buttons on the first,
+         the mark centred across the full width on the second. The
+         auditor bar (audit/audit_ribbon.css) stacks identically — the
+         two are the same bar wearing different captions and must not
+         drift. Only pages with a centred mark stack; every other page
+         keeps the one-row bar it always had. */
+      /* !important throughout: the bar and its three cells carry inline
+         styles — this file writes them that way so the ribbon renders
+         the same on pages with Tailwind and without — and an inline
+         declaration outranks a stylesheet one. Without it grid-area
+         lands (it is not set inline) while the columns and padding do
+         not, which stacks the rows against a three-column track and
+         leaves the mark off centre anyway. */
+                              '#mjm-ribbon .mjm-rb-has-centre{padding:8px 12px !important;row-gap:6px;' +
+                                'grid-template-columns:auto 1fr !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-left{grid-area:1/1;flex:0 0 auto !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-right{grid-area:1/2;flex:0 0 auto !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-centre{grid-area:2/1/3/3;padding:0 !important;}}' +
     '</style>';
   }
 
