@@ -246,7 +246,8 @@
      that has not run the migrations yet still gets its To-Do list; it
      simply does not get queue routing until the SQL is run. */
   var BASE_COLS   = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
-                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
+                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at,' +
+                    'resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
   var _cols = ROUTED_COLS;      // narrowed to BASE_COLS on the first 400
 
@@ -313,11 +314,10 @@
 
   async function loadScope(token) {
     if (_scope) return _scope;
-    var open = { unrestricted: true, home: null, cats: null, userId: null };
+    var u = me();
+    var open = { unrestricted: true, home: null, cats: null, userId: u.id || null };
 
     if (await isNelosAdmin(token)) return (_scope = open);
-
-    var u = me();
     if (!u.id) return (_scope = open);
 
     try {
@@ -353,22 +353,42 @@
 
   function queueOf(c) { return c.assigned_module || c.source_module; }
 
-  function inScope(c, sc) {
-    if (!sc || sc.unrestricted) return true;
-    // Assigned to me — mine wherever it sits, and never category-filtered.
-    if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
+  /* ── IS THIS MINE? ───────────────────────────────────────────────
+     The dock is one person's to-do list, not their module's queue.
+     That distinction only started mattering when the panel gained a
+     Solve button: a list you can act on has to be a list of work that
+     is actually yours, or the first thing it invites you to do is
+     close somebody else's case.
+
+     Two ways a case is yours:
+       • it is assigned to you by name; or
+       • nobody has taken it and it is routed to your seat, in your
+         module, in a category you handle.
+
+     A case assigned to somebody ELSE is never yours, however it is
+     routed. And "sees everything" — a Nelos admin, an HQ system — is a
+     permission, not a workload: it makes every case visible on the
+     Nelos page, and none of them personally owed. Without that last
+     rule an admin's to-do list is the whole company's. */
+  function isMine(c, sc) {
+    var uid = sc && sc.userId;
+    if (c.assignee_id) return !!uid && String(c.assignee_id) === String(uid);
+    if (!sc || sc.unrestricted) return false;
     if (queueOf(c) !== sc.home) return false;
-    // Routed to one numbered handler: only that person. No number on the
-    // case means anyone in the system may take it.
-    if (c.assigned_seat_no && c.assigned_seat_no !== sc.seatNo) return false;
-    if (!sc.cats) return true;                                     // every category
+    if (c.assigned_seat_no != null && c.assigned_seat_no !== sc.seatNo) return false;
+    if (!sc.cats) return true;
     return !!c.category && !!sc.cats[c.category];
   }
 
   /* Returns { rows, error }. A 404 (table missing, migration not run yet)
      and a 401 (session gone stale) both come back as errors, and an error
      means the dock hides rather than shouting at the user. */
-  async function fetchPending() {
+  /* statusIn: which statuses to ask for. The to-do list wants what is
+     still owed; the history view wants what this person solved and
+     nobody has closed yet. Everything else about the read — the column
+     fallback, the priority sort, whose cases these are — is identical,
+     so it is one function with one argument rather than two that drift. */
+  async function fetchCases(statusIn, order) {
     var token = await accessToken();
     if (!token) return { rows: [], error: 'no-session' };
 
@@ -377,8 +397,8 @@
     var query = function (cols) {
       var q = CFG.url + '/rest/v1/nelos_cases' +
               '?select=' + encodeURIComponent(cols) +
-              '&status=in.(open,in_progress)' +
-              '&order=due_date.asc.nullslast,created_at.asc' +
+              '&status=in.(' + statusIn + ')' +
+              '&order=' + (order || 'due_date.asc.nullslast,created_at.asc') +
               '&limit=' + LIMIT;
       if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
       return fetch(q, { headers: authHeaders(token) });
@@ -406,12 +426,17 @@
       });
       // Narrow to what this person is set up to see (User Setting page).
       var sc = await loadScope(token);
-      if (!sc.unrestricted) rows = rows.filter(function (c) { return inScope(c, sc); });
+      rows = rows.filter(function (c) { return isMine(c, sc); });
       return { rows: rows, error: null };
     } catch (e) {
       return { rows: [], error: 'network' };
     }
   }
+
+  function fetchPending()  { return fetchCases('open,in_progress'); }
+  /* Solved most recently first — the useful order for "did mine land?",
+     where the oldest resolved case is the least interesting row. */
+  function fetchResolved() { return fetchCases('resolved', 'resolved_at.desc.nullslast'); }
 
   /* ── Look ────────────────────────────────────────────────────── */
 
@@ -546,6 +571,52 @@
   .nd-done-s { font-size:11px; font-weight:700; color:#94a3b8; line-height:1.6; }
   .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
   .nd-done a:hover { text-decoration:underline; }
+
+  .nd-hist { width:26px; height:26px; margin-left:auto; margin-right:2px; padding:0;
+             border:none; border-radius:8px; background:rgba(255,255,255,.16); color:#fff;
+             cursor:pointer; display:flex; align-items:center; justify-content:center;
+             flex-shrink:0; }
+  .nd-hist:hover { background:rgba(255,255,255,.28); }
+  .nd-hist svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.1;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .nd-hist.on { background:#fff; color:#6d28d9; }
+
+  /* ── The solve block ──
+     Under the case, not beside it: read what is being asked, then do
+     it. A photo and a line of remark is the whole of what the field
+     can add, and both are optional except the remark — a resolution
+     nobody described is one nobody can check. */
+  .nd-solve { margin-top:16px; border-top:1px solid #e9e3fb; padding-top:13px; }
+  .nd-solve-h { font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+                color:#6d28d9; margin-bottom:9px; }
+  .nd-shot { display:flex; gap:8px; align-items:stretch; }
+  .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
+                   justify-content:center; gap:3px; min-height:64px; cursor:pointer;
+                   border:1.5px dashed #ddd6fe; border-radius:11px; background:#faf8ff;
+                   color:#7c3aed; font-size:11px; font-weight:800; }
+  .nd-shot label:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  .nd-shot input[type=file] { display:none; }
+  .nd-shot svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.9;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .nd-shot-prev { position:relative; flex:1; min-height:64px; border-radius:11px;
+                  overflow:hidden; background:#f1f5f9; }
+  .nd-shot-prev img { width:100%; height:100%; object-fit:cover; display:block; }
+  .nd-shot-x { position:absolute; top:4px; right:4px; width:22px; height:22px; border:none;
+               border-radius:50%; background:rgba(15,23,42,.62); color:#fff; cursor:pointer;
+               font-size:13px; line-height:1; display:flex; align-items:center;
+               justify-content:center; }
+  .nd-solve textarea { width:100%; margin-top:9px; border:1px solid #e2e8f0; border-radius:10px;
+                       padding:9px 10px; font-family:inherit; font-size:12.5px; color:#0f172a;
+                       resize:vertical; min-height:64px; }
+  .nd-solve textarea:focus { outline:none; border-color:#c4b5fd; box-shadow:0 0 0 3px #ede9fe; }
+  .nd-solved-card { margin-top:14px; border:1px solid #bbf7d0; background:#f0fdf4;
+                    border-radius:11px; padding:11px 12px; }
+  .nd-solved-h { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+                 color:#15803d; }
+  .nd-solved-b { font-size:12.5px; font-weight:600; color:#334155; margin-top:5px;
+                 white-space:pre-wrap; }
+  .nd-solved-m { font-size:10.5px; font-weight:700; color:#15803d; margin-top:6px; }
+  .nd-solved-card img { width:100%; border-radius:8px; margin-top:8px; display:block; }
 
   .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
   .nd-detail[hidden] { display:none; }
@@ -686,6 +757,12 @@
            for one idea, in a panel that is mostly list. */
         '<div class="nd-head">' +
           '<div class="nd-head-t">My To Do Nelos</div>' +
+          '<button class="nd-hist" type="button" title="Solved, not yet closed" ' +
+                  'aria-label="Solved, not yet closed">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+              '<path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/>' +
+              '<polyline points="12 7 12 12 15 14"/></svg>' +
+          '</button>' +
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
@@ -735,7 +812,8 @@
           '<button type="button" class="nd-btn nd-btn-a nd-save">Raise Case</button>' +
         '</div>' +
         '<div class="nd-foot nd-foot-detail" hidden>' +
-          '<button type="button" class="nd-btn nd-btn-c nd-back">&#8592; Back</button>' +
+          '<button type="button" class="nd-btn nd-btn-c nd-btn-narrow nd-back">&#8592; Back</button>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-btn-wide nd-solve-go">Save &amp; Solve</button>' +
         '</div>' +
       '</div>' +
       '<button id="nelos-dock-fab" type="button" title="Nelos — my to-do (drag to move)" ' +
@@ -1098,6 +1176,7 @@
     view = 'list';
     showPane('list');
     panel.querySelector('.nd-head-t').textContent = 'My To Do Nelos';
+    panel.querySelector('.nd-hist').classList.remove('on');
     paint();
   }
 
@@ -1157,27 +1236,184 @@
           ? '<div class="nd-d-none">No further detail was written.</div>'
           : '<div class="nd-d-none">Loading detail…</div>';
 
+    var solved = (full && full.status === 'resolved') || c.status === 'resolved';
     return '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
            '<div class="nd-d-chips">' + chips + '</div>' +
            body +
            (rowsOut.length ? '<div class="nd-d-grid">' + rowsOut.join('') + '</div>' : '') +
-           '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>';
+           '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>' +
+           (solved ? solvedCardHtml(full || c) : solveBlockHtml());
+  }
+
+  /* ── SOLVING ─────────────────────────────────────────────────────
+     Upload first, then patch. That order matters: a failed upload
+     leaves the case exactly as it was, whereas patching first would
+     mark work solved and then lose the picture of it. */
+  var _shot = null;                    // the File chosen for this case
+
+  async function uploadShot(caseId, file) {
+    var token = await accessToken();
+    if (!token) return null;
+    var ext  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var path = 'solve/' + caseId + '-' + Date.now() + '.' + (ext || 'jpg');
+    try {
+      var res = await fetch(CFG.url + '/storage/v1/object/nelos-photos/' + path, {
+        method: 'POST',
+        headers: { apikey: CFG.key, Authorization: 'Bearer ' + token,
+                   'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      });
+      if (!res.ok) return null;
+      return CFG.url + '/storage/v1/object/public/nelos-photos/' + path;
+    } catch (_) { return null; }
+  }
+
+  async function patchCase(id, body) {
+    var token = await accessToken();
+    if (!token) return { ok: false, status: 0 };
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?id=eq.' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                               authHeaders(token)),
+        body: JSON.stringify(body)
+      });
+      return { ok: res.ok, status: res.status };
+    } catch (_) { return { ok: false, status: 0 }; }
+  }
+
+  var _solving = false;
+  async function solveCase(id) {
+    if (_solving) return;
+    var note = detailEl.querySelector('.nd-solve-note');
+    var text = note ? note.value.trim() : '';
+    if (!text) {
+      if (note) { note.focus(); note.style.borderColor = '#fca5a5'; }
+      return;
+    }
+    var btn = panel.querySelector('.nd-solve-go');
+    _solving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    var url = _shot ? await uploadShot(id, _shot) : null;
+    var body = {
+      status: 'resolved',
+      resolution: text,
+      resolved_by: me().name || me().email || 'unknown',
+      resolved_at: new Date().toISOString()
+    };
+    if (url) body.resolution_photo_url = url;
+
+    var out = await patchCase(id, body);
+    /* 400 = this database has not run migration_nelos_solve_photo.sql.
+       The remark and the status matter more than the picture, so save
+       them rather than failing the whole thing. */
+    if (!out.ok && out.status === 400 && url) {
+      warn('nelos_cases has no resolution_photo_url — run ' +
+           'shared/migration_nelos_solve_photo.sql. Saving the remark without the photo.');
+      delete body.resolution_photo_url;
+      out = await patchCase(id, body);
+    }
+
+    _solving = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Save & Solve'; }
+    if (!out.ok) {
+      if (note) note.style.borderColor = '#fca5a5';
+      warn('could not save the resolution (http-' + out.status + ').');
+      return;
+    }
+    _shot = null;
+    delete _detailCache[id];
+    showList();
+    refresh();
+  }
+
+  function solveBlockHtml() {
+    return '<div class="nd-solve">' +
+             '<div class="nd-solve-h">Solve</div>' +
+             '<div class="nd-shot">' +
+               '<label>' +
+                 '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+                 '<span>Add photo</span>' +
+                 '<input type="file" accept="image/*" capture="environment" class="nd-shot-in">' +
+               '</label>' +
+             '</div>' +
+             '<textarea class="nd-solve-note" maxlength="2000" ' +
+                       'placeholder="What did you do? — this is what the person closing it reads"></textarea>' +
+           '</div>';
+  }
+
+  function solvedCardHtml(c) {
+    return '<div class="nd-solved-card">' +
+             '<div class="nd-solved-h">&#10003; Solved</div>' +
+             '<div class="nd-solved-b">' + esc(c.resolution || '') + '</div>' +
+             (c.resolution_photo_url
+               ? '<img src="' + esc(c.resolution_photo_url) + '" alt="Photo of the fix">' : '') +
+             '<div class="nd-solved-m">' + esc(c.resolved_by || 'unknown') +
+               (c.resolved_at ? ' · ' + esc(String(c.resolved_at).slice(0, 10)) : '') +
+               ' · waiting to be closed</div>' +
+           '</div>';
+  }
+
+  var openCaseId = null;
+
+  function syncSolveBtn(c) {
+    var btn = panel.querySelector('.nd-solve-go');
+    if (!btn) return;
+    /* Already solved → there is nothing to save; the card explains it. */
+    btn.hidden = (c.status === 'resolved' || c.status === 'closed');
+    panel.querySelector('.nd-back').classList.toggle('nd-btn-narrow', !btn.hidden);
   }
 
   async function showDetail(id) {
-    var c = rows.filter(function (r) { return String(r.id) === String(id); })[0];
+    var c = (rows.concat(doneRows)).filter(function (r) {
+      return String(r.id) === String(id);
+    })[0];
     if (!c) return;
     view = 'detail';
+    openCaseId = String(id);
+    _shot = null;
     showPane('detail');
     panel.querySelector('.nd-head-t').textContent = c.case_no || 'Case';
     detailEl.innerHTML = detailHtml(c, undefined);
     detailEl.scrollTop = 0;
+    syncSolveBtn(c);
 
     var full = await fetchCase(id);
     /* They may have gone back, or into another case, while that was in
        flight — only paint if this is still the case on screen. */
-    if (view === 'detail' && panel.querySelector('.nd-head-t').textContent === (c.case_no || 'Case'))
-      detailEl.innerHTML = detailHtml(c, full);
+    if (view !== 'detail' || openCaseId !== String(id)) return;
+    detailEl.innerHTML = detailHtml(c, full);
+    syncSolveBtn(full || c);
+  }
+
+  /* ── SOLVED, NOT YET CLOSED ──────────────────────────────────────
+     Where a solved case goes. It leaves the to-do list the moment it
+     is saved, and without this it would simply vanish — which reads as
+     "did that save?" rather than "that is done and waiting on
+     somebody". Closing is still the Nelos page's job. */
+  var doneRows = [];
+  var doneBusy = false;
+  var _cameFromHistory = false;
+
+  async function showHistory() {
+    view = 'done-list';
+    showPane('list');
+    panel.querySelector('.nd-foot-list').hidden = false;
+    panel.querySelector('.nd-head-t').textContent = 'Solved';
+    panel.querySelector('.nd-hist').classList.add('on');
+    listEl.innerHTML = '<div class="nd-empty">loading…</div>';
+    if (doneBusy) return;
+    doneBusy = true;
+    var out = await fetchResolved();
+    doneBusy = false;
+    if (view !== 'done-list') return;
+    doneRows = out.error ? [] : out.rows;
+    listEl.innerHTML = doneRows.length
+      ? doneRows.map(rowHtml).join('')
+      : '<div class="nd-empty">' + (out.error
+          ? 'Could not read the solved cases.'
+          : 'Nothing solved and waiting to be closed.') + '</div>';
   }
 
   async function showForm() {
@@ -1328,11 +1564,45 @@
       showForm();
     });
     panel.querySelector('.nd-cancel').addEventListener('click', function () { showList(); });
-    panel.querySelector('.nd-back').addEventListener('click', function () { showList(); });
+    panel.querySelector('.nd-back').addEventListener('click', function () {
+      /* Back from a case reached through history goes back to history,
+         not to the to-do list it is deliberately not on. */
+      if (_cameFromHistory) { _cameFromHistory = false; showHistory(); }
+      else showList();
+    });
+    panel.querySelector('.nd-solve-go').addEventListener('click', function () {
+      if (openCaseId) solveCase(openCaseId);
+    });
+    panel.querySelector('.nd-hist').addEventListener('click', function () {
+      if (view === 'done-list') showList(); else showHistory();
+    });
+
+    /* Photo picking and clearing live in the detail pane, which is
+       rebuilt on every open — so both are delegated. */
+    detailEl.addEventListener('change', function (e) {
+      var inp = e.target.closest('.nd-shot-in');
+      if (!inp || !inp.files || !inp.files[0]) return;
+      _shot = inp.files[0];
+      var wrap = detailEl.querySelector('.nd-shot');
+      if (!wrap) return;
+      var url = URL.createObjectURL(_shot);
+      wrap.innerHTML = '<div class="nd-shot-prev"><img alt="Photo of the fix" src="' + url + '">' +
+                       '<button type="button" class="nd-shot-x" aria-label="Remove photo">&times;</button></div>';
+    });
+    detailEl.addEventListener('click', function (e) {
+      if (!e.target.closest('.nd-shot-x')) return;
+      _shot = null;
+      var wrap = detailEl.querySelector('.nd-shot');
+      if (wrap) wrap.innerHTML =
+        '<label><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+        '<span>Add photo</span><input type="file" accept="image/*" capture="environment" class="nd-shot-in"></label>';
+    });
     /* Delegated: the list is repainted on every refresh. */
     listEl.addEventListener('click', function (e) {
       var row = e.target.closest('.nd-row');
-      if (row && row.dataset.case) showDetail(row.dataset.case);
+      if (!row || !row.dataset.case) return;
+      _cameFromHistory = (view === 'done-list');
+      showDetail(row.dataset.case);
     });
     panel.querySelector('.nd-save').addEventListener('click', function () { submitCase(); });
   }
