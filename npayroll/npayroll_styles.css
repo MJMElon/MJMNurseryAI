@@ -151,6 +151,23 @@ tfoot td.l { text-align: left; }
 .wsec-body { background: var(--white); border: 1.5px solid var(--border); border-radius: 0 0 var(--r-md) var(--r-md);
              box-shadow: var(--shadow-sm); overflow: hidden; }
 
+/* Every section prints the same column widths (see the <colgroup> in
+   renderWorkers), so Role, PIN and Status line up down the whole page
+   instead of each section placing them wherever its longest name ends. */
+.wsec-table { table-layout: fixed; min-width: 760px; }
+.wsec-table td.l, .wsec-table th.l { overflow-wrap: anywhere; }
+
+/* The PIN a worker will sign in to the worker portal with. */
+.pin-in { width: 96px; height: 32px; padding: 0 8px; text-align: center;
+          font-family: inherit; font-size: 14px; font-weight: 800; letter-spacing: .18em;
+          color: var(--text-head); background: var(--white);
+          border: 1.5px solid var(--border); border-radius: var(--r-sm);
+          outline: none; transition: border-color .15s, box-shadow .15s, background .3s; }
+.pin-in::placeholder { letter-spacing: .1em; color: var(--text-faint); font-weight: 600; }
+.pin-in:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+.pin-in:disabled { background: #f8fafc; color: var(--text-faint); cursor: not-allowed; }
+.pin-in.pin-saved { background: var(--green-bg); border-color: #86efac; }
+
 /* Marks a worker the Work Maintenance tick sheets give a column to. */
 .maint-chip { display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 800;
               letter-spacing: .03em; color: #166534; background: var(--green-bg);
