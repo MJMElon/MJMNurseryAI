@@ -170,8 +170,8 @@ tfoot td.l { text-align: left; }
 .wsec-table td.l, .wsec-table th.l { overflow-wrap: anywhere; }
 
 /* The PIN a worker will sign in to the worker portal with. */
-.pin-in { width: 96px; height: 32px; padding: 0 8px; text-align: center;
-          font-family: inherit; font-size: 14px; font-weight: 800; letter-spacing: .18em;
+.pin-in { width: 100%; height: 32px; padding: 0 8px; text-align: center;
+          font-family: inherit; font-size: 14px; font-weight: 800; letter-spacing: .12em;
           color: var(--text-head); background: var(--white);
           border: 1.5px solid var(--border); border-radius: var(--r-sm);
           outline: none; transition: border-color .15s, box-shadow .15s, background .3s; }
