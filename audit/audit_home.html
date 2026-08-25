@@ -19,7 +19,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=Montserrat:ital,wght@0,600..900;1,700..900&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
   <!-- Shared FC-style top ribbon (same file used by audit_admin +
        audit_nursery_select). Replaces the audit-specific header band
@@ -658,9 +658,26 @@
     .tl-item.overdue .tl-plot{border-color:#b91c1c;color:#b91c1c;
                               background:#fef2f2}
     .tl-item.overdue .tl-plot:hover{background:#b91c1c;color:#fff}
+    /* Opens the rest of the strip. Shaped like the circles it stands in
+       for, but filled with the row's tone rather than outlined in it, so
+       it reads as the odd one out — it is not a plot. */
+    .tl-plots-toggle{display:inline-flex;align-items:center;gap:3px;
+                     height:38px;min-width:38px;padding:0 9px;border-radius:19px;
+                     flex:0 0 auto;cursor:pointer;
+                     background:var(--tone,#2d7a2d);border:1.5px solid var(--tone,#2d7a2d);
+                     color:#fff;font-family:inherit;
+                     font-size:11px;font-weight:800;letter-spacing:.2px;
+                     -webkit-tap-highlight-color:transparent;
+                     transition:filter .14s,transform .14s}
+    .tl-plots-toggle:hover{filter:brightness(1.12)}
+    .tl-plots-toggle:active{transform:scale(.94)}
+    .tl-plots-toggle svg{width:13px;height:13px;stroke:currentColor;fill:none;
+                         stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .tl-item.overdue .tl-plots-toggle{background:#b91c1c;border-color:#b91c1c}
     @media (max-width:640px){
       .tl-plots{padding:8px 10px 10px 12px;gap:6px}
       .tl-plot{width:34px;height:34px;font-size:10px}
+      .tl-plots-toggle{height:34px;min-width:34px;padding:0 8px;font-size:10px}
     }
 
     .tl-card{display:block;border-radius:13px;background:var(--tint,#f4f7fa);
@@ -1742,11 +1759,17 @@ function loadAuditTodo(){
      codes carry their own nursery, so the grouping needs no headings
      to be legible.
 
-     Nothing is capped. An earlier version showed twelve and counted
-     the rest, which read fine on pre nursery but meant a main-nursery
-     auditor could never see past BNN into their own nursery's plots —
-     which is precisely what the grouping is for. The strip is as long
-     as the work is; that is the honest length for a to-do list. */
+     Ten are shown, and the rest fold into a toggle carrying the count
+     of what is hidden. A whole main-nursery window opens owing fifty-two
+     plots across four modules, which is six rows of circles per module
+     and a page nobody can scroll past — but the count keeps the size of
+     the job visible, and one tap opens the lot. Expanding is remembered
+     per row while the page is open, so a redraw (a month change, the
+     completions arriving) does not fold a row the auditor just opened. */
+  const PLOT_PREVIEW = 10;
+  const expandedPlots = new Set();
+  const _plotKey = (o, oy, om) =>
+    [o.mod, oy, om, o.start, o.end, o.round || 0].join('|');
   function _plotsHtml(o, oy, om, pending){
     if (!pending.length) return '';
     const fromISO = iso(oy, om, o.start);
@@ -1770,7 +1793,12 @@ function loadAuditTodo(){
     if (!shown.length) return '';
     const label = t(o.title);
 
-    const circles = shown.map(e => {
+    const key    = _plotKey(o, oy, om);
+    const open   = expandedPlots.has(key);
+    const visible = open ? shown : shown.slice(0, PLOT_PREVIEW);
+    const hidden  = shown.length - visible.length;
+
+    const circles = visible.map(e => {
       const nur = NURSERY_LABELS[e.nursery] || e.nursery;
       return `<a class="tl-plot"
                  href="${o.href}?nursery=${encodeURIComponent(e.nursery)}` +
@@ -1779,8 +1807,38 @@ function loadAuditTodo(){
                  aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
     }).join('');
 
-    return `<div class="tl-plots">${circles}</div>`;
+    /* Chevrons out to open, in to close — the count rides on the closed
+       state, where it is the only thing saying how much more there is. */
+    const OUT = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="9 6 4 12 9 18"/><polyline points="15 6 20 12 15 18"/></svg>';
+    const IN  = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="4 6 9 12 4 18"/><polyline points="20 6 15 12 20 18"/></svg>';
+
+    const toggle = shown.length > PLOT_PREVIEW
+      ? `<button type="button" class="tl-plots-toggle" data-plotkey="${key}"
+                 aria-expanded="${open}"
+                 title="${open ? 'Show fewer' : 'Show all ' + fmtNum(shown.length) + ' pending plots'}"
+                 aria-label="${label} — ${open
+                    ? 'show fewer plots'
+                    : 'show ' + fmtNum(hidden) + ' more pending plots'}">${
+          open ? IN : OUT + '<span>' + fmtNum(hidden) + '</span>'}</button>`
+      : '';
+
+    return `<div class="tl-plots">${circles}${toggle}</div>`;
   }
+
+  /* One delegated listener rather than a handler per button: the
+     timeline is rebuilt from scratch on every redraw, so anything bound
+     to a button dies with it. */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.tl-plots-toggle');
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.plotkey;
+    if (expandedPlots.has(key)) expandedPlots.delete(key);
+    else expandedPlots.add(key);
+    renderAll();
+  });
 
   function renderTimeline(occ){
     let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
@@ -2024,8 +2082,11 @@ function loadAuditTodo(){
           ? `<div class="today-congrats">🎉 ${t('today_congrats')}</div>`
         : todayN === 0
           ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅`
-          : `${t('hi_greeting')} 😊, ${t('you_have')} <span class="count-big">${fmtNum(todayN)} ${t('audit_word')}</span> ` +
-            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')}`)
+          /* Was "Hi 😊, you have 47 audit tasks today". The greeting cost a
+             line every time the screen was opened and said nothing the
+             auditor did not know; the number and what it counts is the
+             whole message. */
+          : `<span class="count-big">${fmtNum(todayN)}</span> ${t('pending_word')}`)
       : (monthOcc.length === 0
           ? (beforeStart(viewY, viewM)
               ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
