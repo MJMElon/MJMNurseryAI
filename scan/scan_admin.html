@@ -55,31 +55,14 @@
 
 <div id="main" class="max-w-[860px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <a class="text-[11px] font-black text-violet-700 uppercase tracking-widest no-underline" href="../index.html">← Module Selection</a>
-
   <!-- The way in to the field app itself. -->
-  <a class="portal-btn mt-5" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
+  <a class="portal-btn" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
     <svg viewBox="0 0 24 24" class="pb-phone"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/></svg>
     <span>Visit 555 FC Portal</span>
     <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
   </a>
-  <p class="text-[11px] text-slate-400 text-center mt-2.5">
-    The phone app — Scan Barcode Counter, Issue Collection DO, Maintenance, PALMS and the Culling Calculator.
-  </p>
 
-  <!-- What this page is for. -->
-  <div class="card p-5 mt-7">
-    <h1 class="text-base font-black text-slate-800 uppercase tracking-widest mb-1.5">Setting up the portal</h1>
-    <p class="text-[12.5px] text-slate-500 leading-relaxed">
-      The field app is built for a phone in a plot, so setting it up is done here on a screen where the whole
-      picture fits. Whether somebody can open the 555 FC Portal at all is decided on the
-      <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">main User Access</a>;
-      everything below that — which pages they see, what they may do on each, and which nurseries they are shown —
-      is set here.
-    </p>
-  </div>
-
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+  <div class="mt-6">
     <a class="tool" id="tool-access" href="scan_user_access.html">
       <span class="tool-ico bg-rose-100">🔐</span>
       <span class="min-w-0">
@@ -89,44 +72,7 @@
         </span>
       </span>
     </a>
-
-    <!-- PALMS is recorded here and read in the office; the two office screens
-         for it live in Nursery Operation Management, so this points at them
-         rather than growing a third copy. -->
-    <a class="tool" href="../nursery_ops/nursery_ops_palms_board.html">
-      <span class="tool-ico bg-teal-100">🪴</span>
-      <span class="min-w-0">
-        <span class="block text-[13px] font-black text-slate-800">PALMS Monitoring Board</span>
-        <span class="block text-[11px] text-slate-500 leading-snug">
-          What every plot is on today, and what is running late
-        </span>
-      </span>
-    </a>
-
-    <a class="tool" href="../nursery_ops/nursery_ops_plot_life.html">
-      <span class="tool-ico bg-emerald-100">🚦</span>
-      <span class="min-w-0">
-        <span class="block text-[13px] font-black text-slate-800">Plot Status Stages</span>
-        <span class="block text-[11px] text-slate-500 leading-snug">
-          The statuses PALMS lets a Field Conductor choose from — on Life of Plot
-        </span>
-      </span>
-    </a>
-
-    <a class="tool" href="../operation/operation_dashboard.html">
-      <span class="tool-ico bg-amber-100">🌱</span>
-      <span class="min-w-0">
-        <span class="block text-[13px] font-black text-slate-800">Plots</span>
-        <span class="block text-[11px] text-slate-500 leading-snug">
-          Which plots exist — kept in Seedling Stock Management
-        </span>
-      </span>
-    </a>
   </div>
-
-  <p class="text-[11px] text-slate-400 text-center mt-8 leading-relaxed">
-    Field Conductors go straight to the phone app from the module selection — they never see this page.
-  </p>
 </div>
 
 <script>
