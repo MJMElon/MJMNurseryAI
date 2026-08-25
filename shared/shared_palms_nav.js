@@ -38,7 +38,11 @@
     { key: 'board',    label: 'Monitoring Board', icon: '🪴', href: 'nursery_ops_palms_board.html' },
     { key: 'life',     label: 'Life of Plot',     icon: '🌱', href: 'nursery_ops_plot_life.html' },
     { key: 'motion',   label: 'Motion Study',     icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
-    { key: 'settings', label: 'Settings',         icon: '⚙️', href: 'nursery_ops_settings.html' },
+    /* nursery_ops_settings.html is the MAINTENANCE module's work types
+       (P&D, Manuring, Weeding, Interrow) and is read by the monthly
+       schedule — it is not PALMS and must not be reached from this strip.
+       PALMS's own setting is the stage list a plot moves through. */
+    { key: 'settings', label: 'Settings',         icon: '⚙️', href: 'nursery_ops_palms_stages.html' },
   ];
 
   /* The two-column frame lives here, not in the host page's Tailwind.

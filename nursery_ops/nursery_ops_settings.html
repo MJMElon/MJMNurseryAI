@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Settings · Motion Study — Nursery Operation Manage</title>
+<title>Maintenance Work Types — Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -47,12 +47,19 @@
 
 <div id="loading" class="max-w-[1000px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
 
-<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-8 hidden palms-frame">
+<div id="main" class="max-w-[1000px] mx-auto px-4 md:px-6 py-8 hidden">
 
-  <aside id="palms-nav" data-page="settings" class="mb-5 md:mb-0"></aside>
-  <script src="../shared/shared_palms_nav.js"></script>
+  <!-- Not a PALMS page. These are the MAINTENANCE work types — P&D,
+       Manuring, Weeding, Interrow — read by the monthly schedule and by
+       Life of Plot's work rows. It briefly wore the PALMS tab strip, which
+       put Maintenance's list behind a PALMS door and left PALMS's own
+       setting (the stage list) with no door at all. PALMS Settings is
+       nursery_ops_palms_stages.html. -->
+  <div class="mb-5">
+    <a class="btn btn-ghost" href="nursery_ops_dashboard.html">← Back to Module</a>
+  </div>
 
-  <div class="palms-body space-y-6">
+  <div class="space-y-6">
 
 
   <div class="card p-5 md:p-7">
