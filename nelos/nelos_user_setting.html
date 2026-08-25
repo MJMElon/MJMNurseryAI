@@ -281,8 +281,11 @@ let hasAccessCol = false;
 let openRoute = null;  // which system's routing block is open
 let me = { name: '' };
 
-/* Pending Allocation's search. The directory is everybody in the company —
-   fetched once, then filtered here, so typing does not hit the network. */
+/* The search on User Access. nelos_directory() is the staff list — every
+   account that is not a Salesweb customer, the same population the main
+   portal's own User Access screen shows (migration_nelos_directory_staff
+   .sql). Fetched once, then filtered here, so typing does not hit the
+   network. */
 let directory = null;  // null until the first search asks for it
 let findQ = '';
 
@@ -607,7 +610,7 @@ function renderAccess() {
       </div>
       <div class="find">
         <input class="inp" id="find" type="search" autocomplete="off"
-               placeholder="Search name or email…" value="${esc(findQ)}">
+               placeholder="Search staff by name or email…" value="${esc(findQ)}">
         <div id="find-res"></div>
       </div>
     </div>`;
