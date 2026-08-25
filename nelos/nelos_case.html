@@ -15,10 +15,13 @@
   * { font-family:'Outfit', system-ui, sans-serif; }
   body { background:#faf5ff; margin:0; }
   .hidden { display:none !important; }
-  .backbar { max-width:980px; margin:0 auto; padding:14px 20px 0; }
-  .backbar a { font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-               color:#7c3aed; text-decoration:none; }
-  .backbar a:hover { text-decoration:underline; }
+  /* The same button, worded the same way, as on User Setting. */
+  .backbar { max-width:980px; margin:0 auto; padding:16px 20px 0; }
+  .backbar a { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:999px;
+               border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9; font-size:10.5px;
+               font-weight:900; letter-spacing:.08em; text-transform:uppercase; text-decoration:none;
+               box-shadow:0 3px 10px rgba(124,58,237,.10); }
+  .backbar a:hover { background:#ede9fe; }
 
   .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; padding:18px 20px;
           box-shadow:0 4px 16px rgba(124,58,237,.06); margin-bottom:14px; }
@@ -69,7 +72,7 @@
 <script src="../shared/shared_ribbon.js"></script>
 
 <div class="backbar">
-  <a href="nelos_dashboard.html">&lsaquo; All Cases</a>
+  <a href="nelos_dashboard.html">&lsaquo; Back to Nelos Main Page</a>
 </div>
 
 

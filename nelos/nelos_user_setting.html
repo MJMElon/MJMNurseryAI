@@ -15,10 +15,14 @@
   * { font-family:'Outfit', system-ui, sans-serif; }
   body { background:#faf5ff; margin:0; }
   .hidden { display:none !important; }
-  .page-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
-  .backlink { margin-left:auto; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-              color:#7c3aed; text-decoration:none; }
-  .backlink:hover { text-decoration:underline; }
+  /* The way out sits above the title, as a button rather than a link — it
+     is pressed as often as anything else on the page. */
+  .backlink { display:inline-flex; align-items:center; gap:7px; margin-bottom:14px;
+              padding:9px 16px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff;
+              color:#6d28d9; font-size:10.5px; font-weight:900; letter-spacing:.08em;
+              text-transform:uppercase; text-decoration:none;
+              box-shadow:0 3px 10px rgba(124,58,237,.10); }
+  .backlink:hover { background:#ede9fe; }
 
   .tabs { display:flex; gap:7px; margin-bottom:18px; flex-wrap:wrap; }
   .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
@@ -204,11 +208,10 @@
 
 <div id="main" class="max-w-[880px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <!-- The way back sits on the title's own row, at the far end of it. -->
-  <div class="page-head">
-    <h1 class="text-[18px] font-black text-slate-800">User Setting</h1>
-    <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Cases</a>
-  </div>
+  <!-- The way back leads, above the title. -->
+  <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Nelos Main Page</a>
+
+  <h1 class="text-[18px] font-black text-slate-800 mb-4">User Setting</h1>
 
   <div class="tabs">
     <button class="tab on" data-tab="people">👤 Case Handlers</button>
