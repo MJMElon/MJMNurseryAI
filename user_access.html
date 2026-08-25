@@ -71,7 +71,7 @@
 
 <!-- Page title band below the ribbon -->
 <div class="bg-white border-b border-slate-200 px-6 py-3 flex justify-center items-center">
-  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">User Access Setting</span>
+  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">User Access</span>
 </div>
 
 <div id="loading" class="max-w-[900px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading user list…</div>
@@ -91,10 +91,16 @@
   <div class="card p-6 space-y-4">
     <div class="flex items-center gap-3">
       <span class="text-2xl">👥</span>
-      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">User Access Setting</h1>
+      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">User Access</h1>
     </div>
     <p class="text-[13px] text-slate-600 leading-relaxed">
-      This is the main access management for the whole AI System — it decides which module cards each user sees on the module-selection page, and at what level. Only staff who signed up through the AI System appear below; Salesweb customers are kept out of this list to keep it clean.
+      This page answers one question, for the whole AI System: <strong>which modules may this person open?</strong>
+      Find them in the list below and open them — every module is shown, set to <strong>None</strong> until somebody
+      here turns it on, and what is turned on is exactly what they see on the module-selection page.
+      <br><br>
+      What a person can do <em>inside</em> a module — which pages, which buttons, which nurseries — is that module's
+      own question, and is set on that module's own User Access, linked below. Only staff who signed up through the
+      AI System appear here; Salesweb customers are kept out of the list to keep it clean.
     </p>
     <ul class="text-[12px] text-slate-700 leading-relaxed space-y-1.5 pl-4 list-disc marker:text-slate-300">
       <li><strong>Edit Access</strong> on a row — set each module's level and toggle <em>Manage Users</em>. Finer settings (which pages inside a module, batch verifier…) are managed inside each module's own User Access page.</li>
@@ -132,15 +138,15 @@
   <div class="card p-6 space-y-3">
     <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Inside Each Module</div>
     <p class="text-[12px] text-slate-500 leading-relaxed">
-      This page decides which modules a person may open. To set what they can do <strong>inside</strong> one —
-      which pages appear, and which buttons work — open that module's own User Access:
+      Everything below the module switch lives in the module. Open its own User Access to set which pages a person
+      sees, which buttons work, and — for the 555 FC Portal — which nurseries they are shown:
     </p>
     <div class="flex flex-wrap gap-2">
       <a href="operation/operation_user_access.html"     class="mod-access-link">🌱 Nursery Seedling Stock</a>
       <a href="nursery_ops/nursery_ops_user_access.html" class="mod-access-link">🌿 Nursery Operation</a>
       <a href="audit/audit_user_access.html"             class="mod-access-link">📋 555 Audit Portal</a>
       <a href="npayroll/npayroll_user_access.html"       class="mod-access-link">💵 Nursery Payroll</a>
-      <a href="scan/scan_user_access.html"               class="mod-access-link">🔖 555 FC Portal</a>
+      <a href="scan/scan_user_access.html"               class="mod-access-link">🔖 555 FC Portal <span class="text-[10px] text-slate-400">(incl. nurseries)</span></a>
     </div>
   </div>
 
@@ -243,16 +249,6 @@
             <div class="text-[11px] text-slate-500">Barcode scanner, seal counting &amp; plot status for FC</div>
           </div>
           <select id="d-mod-scan" class="lvl-select"></select>
-        </div>
-
-        <!-- FC Portal · nursery scope — which nurseries this user can see -->
-        <div id="fc-nursery-panel" class="ml-3 pl-4 border-l-2 border-slate-100 hidden">
-          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">555 FC Portal — Nursery Access</div>
-          <label class="flex items-center gap-2 text-[13px] font-bold text-slate-700 py-1 cursor-pointer">
-            <input type="checkbox" id="d-psn-all" class="w-4 h-4 accent-emerald-600"> All nurseries
-          </label>
-          <div id="d-psn-list" class="grid grid-cols-2 gap-x-3"></div>
-          <p class="text-[10px] text-slate-400 mt-1.5">Controls which nurseries this user sees in <strong>Maintenance</strong> and <strong>PALMS</strong> on the 555 FC Portal. Scan Barcode Counter and Issue Collection DO are not limited by nursery.</p>
         </div>
       </div>
 
@@ -452,7 +448,6 @@ function openDrawer(uid) {
   document.getElementById('d-email').textContent = p.email || '—';
   MODULES.forEach(m => rebuildDropdown('d-mod-' + m, pending.modules[m] || 'none'));
   document.getElementById('d-manage-users').checked = !!pending.manage_users;
-  renderNurseryPanel();
 
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawer-backdrop').classList.add('open');
@@ -478,38 +473,14 @@ function applyPresetToPending(level) {
   });
 }
 
-// ── FC Portal · nursery checklist ─────────────────────────────
-let allNurseries = []; // distinct nursery names from shared_plots
+/* The FC Portal's nursery scope used to be a panel here. It moved to the
+   module that owns it — 555 FC Portal → User Access — along with every other
+   per-module setting. This page decides which modules a person may OPEN;
+   what they can do inside one is the module's own question.
 
-function renderNurseryPanel() {
-  const panel = document.getElementById('fc-nursery-panel');
-  const scanLvl = document.getElementById('d-mod-scan').value;
-  panel.classList.toggle('hidden', !pending || scanLvl === 'none' || !allNurseries.length);
-  if (!pending) return;
-  const restricted = Array.isArray(pending.plot_status_nurseries);
-  const chosen = new Set(restricted ? pending.plot_status_nurseries : allNurseries);
-  document.getElementById('d-psn-all').checked = !restricted;
-  document.getElementById('d-psn-list').innerHTML = allNurseries.map(n => `
-    <label class="flex items-center gap-2 text-[13px] font-semibold py-1 cursor-pointer ${restricted ? 'text-slate-700' : 'text-slate-400'}">
-      <input type="checkbox" class="w-4 h-4 accent-emerald-600" data-psn="${n.replace(/"/g,'&quot;')}"
-             ${chosen.has(n) ? 'checked' : ''} ${restricted ? '' : 'disabled'}>
-      ${n.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
-    </label>`).join('');
-}
-
-document.getElementById('d-psn-all').addEventListener('change', () => {
-  if (!pending) return;
-  if (document.getElementById('d-psn-all').checked) delete pending.plot_status_nurseries;
-  else pending.plot_status_nurseries = allNurseries.slice(); // start from all ticked, untick to restrict
-  renderNurseryPanel();
-});
-document.addEventListener('change', (e) => {
-  if (e.target.matches('[data-psn]') && pending) {
-    pending.plot_status_nurseries = [...document.querySelectorAll('[data-psn]')]
-      .filter(cb => cb.checked).map(cb => cb.dataset.psn);
-  }
-  if (e.target.id === 'd-mod-scan') renderNurseryPanel();
-});
+   plot_status_nurseries is still cleared below when the Scan module is closed,
+   because that is this page's act: taking the module away should not leave a
+   nursery restriction behind for whoever re-opens it later. */
 
 async function saveDrawer() {
   if (!editingUid || !pending) return;
@@ -700,13 +671,6 @@ async function bootstrap() {
     document.getElementById('forbidden').classList.remove('hidden');
     return;
   }
-
-  // Nursery list for the FC Portal plot-status checklist (best effort —
-  // panel simply hides if plots can't be read).
-  try {
-    const { data: pl } = await _supabase.from('shared_plots').select('nursery_name');
-    allNurseries = [...new Set((pl || []).map(r => r.nursery_name).filter(Boolean))].sort();
-  } catch (e) { allNurseries = []; }
 
   const { data, error } = await _supabase
     .from('shared_profiles')

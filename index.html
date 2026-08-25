@@ -447,8 +447,7 @@
         <div class="module-tag">mjmnpayroll_</div>
       </a>
 
-      <a class="module-card" data-card="scan" data-module="scan" href="https://scan.mjmnursery.com" target="_blank" rel="noopener"
-         onclick="this.href='https://scan.mjmnursery.com/?cb=' + Date.now();"
+      <a class="module-card" data-card="scan" data-module="scan" href="scan/scan_admin.html"
          style="--accent:#8b5cf6;--glow:rgba(139,92,246,.25);--glow-strong:rgba(139,92,246,.35);--icon-bg:rgba(139,92,246,.12);">
         <div class="card-corner card-tl"></div><div class="card-corner card-tr"></div>
         <div class="card-corner card-bl"></div><div class="card-corner card-br"></div>
@@ -642,6 +641,28 @@
           : 'audit/audit_home.html'
       );
     }
+    /* The FC Portal tile is split the same way the audit one is: an admin
+       lands on the back-office page (User Access, and the button through to
+       the phone app); everyone else goes straight to the phone app, which is
+       where they were going anyway. scan_admin.html bounces non-admins over
+       there itself, so a typed URL behaves the same — this only saves them
+       the extra page load. Falls back to the back office when permissions
+       have not been fetched, exactly as the audit card does; its own guard
+       redirects if that guess turns out wrong. */
+    const scanCard = document.querySelector('.module-card[data-module="scan"]');
+    if (scanCard) {
+      const scanLvl = mods ? String(mods.scan || '').toLowerCase() : null;
+      const admin = scanLvl === 'admin' || !perms;
+      scanCard.setAttribute('href', admin ? 'scan/scan_admin.html' : 'https://scan.mjmnursery.com');
+      // The phone app is a PWA on another domain: a cached shell naming chunks
+      // that no longer exist is how it comes up broken after a deploy.
+      scanCard.onclick = admin ? null : function () {
+        this.href = 'https://scan.mjmnursery.com/?cb=' + Date.now();
+      };
+      if (admin) { scanCard.removeAttribute('target'); scanCard.removeAttribute('rel'); }
+      else { scanCard.setAttribute('target', '_blank'); scanCard.setAttribute('rel', 'noopener'); }
+    }
+
     const ua = document.getElementById('hub-user-access');
     if (ua) ua.style.display = (perms && perms.manage_users) ? '' : 'none';
   }

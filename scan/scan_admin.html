@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>555 FC Portal — Manage</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%238b5cf6%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2713%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EFC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .card { background:white; border:1px solid #ede9fe; border-radius:20px; box-shadow:0 4px 16px rgba(139,92,246,.08); }
+
+  /* The way through to the phone app. Deliberately the biggest thing on the
+     page: for most people this page is a doorway, not a destination. */
+  .portal-btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+                padding:18px 22px; border-radius:18px; text-decoration:none;
+                background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:white;
+                font-weight:900; font-size:14px; letter-spacing:.1em; text-transform:uppercase;
+                box-shadow:0 10px 26px -6px rgba(109,40,217,.5); transition:all .15s; }
+  .portal-btn:hover { transform:translateY(-1px); box-shadow:0 14px 30px -6px rgba(109,40,217,.55); }
+  /* Sized here, not only by a Tailwind class: the CDN is a third-party
+     script, and a page whose icons are 300px until it lands is a broken page.
+     Same reason the auditor's portal button pins its own. */
+  .portal-btn svg { fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  .portal-btn .pb-phone { width:20px; height:20px; flex-shrink:0; }
+  .portal-btn .pb-out   { width:15px; height:15px; opacity:.85; flex-shrink:0; }
+
+  .tool { display:flex; align-items:center; gap:14px; padding:16px 18px; border-radius:18px;
+          background:white; border:1.5px solid #ede9fe; text-decoration:none; transition:all .15s; }
+  .tool:hover { border-color:#c4b5fd; transform:translateY(-1px); box-shadow:0 8px 20px -6px rgba(139,92,246,.25); }
+  .tool-ico { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; font-size:20px; flex-shrink:0; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
+  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">555 FC Portal — Manage</span>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-[11px]">FC</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[860px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[860px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <a class="text-[11px] font-black text-violet-700 uppercase tracking-widest no-underline" href="../index.html">← Module Selection</a>
+
+  <!-- The way in to the field app itself. -->
+  <a class="portal-btn mt-5" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" class="pb-phone"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/></svg>
+    <span>Visit 555 FC Portal</span>
+    <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+  </a>
+  <p class="text-[11px] text-slate-400 text-center mt-2.5">
+    The phone app — Scan Barcode Counter, Issue Collection DO, Maintenance, PALMS and the Culling Calculator.
+  </p>
+
+  <!-- What this page is for. -->
+  <div class="card p-5 mt-7">
+    <h1 class="text-base font-black text-slate-800 uppercase tracking-widest mb-1.5">Setting up the portal</h1>
+    <p class="text-[12.5px] text-slate-500 leading-relaxed">
+      The field app is built for a phone in a plot, so setting it up is done here on a screen where the whole
+      picture fits. Whether somebody can open the 555 FC Portal at all is decided on the
+      <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">main User Access</a>;
+      everything below that — which pages they see, what they may do on each, and which nurseries they are shown —
+      is set here.
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+    <a class="tool" id="tool-access" href="scan_user_access.html">
+      <span class="tool-ico bg-rose-100">🔐</span>
+      <span class="min-w-0">
+        <span class="block text-[13px] font-black text-slate-800">User Access</span>
+        <span class="block text-[11px] text-slate-500 leading-snug">
+          Which pages each person opens, what they may do inside, and which nurseries they see
+        </span>
+      </span>
+    </a>
+
+    <!-- PALMS is recorded here and read in the office; the two office screens
+         for it live in Nursery Operation Management, so this points at them
+         rather than growing a third copy. -->
+    <a class="tool" href="../nursery_ops/nursery_ops_palms_board.html">
+      <span class="tool-ico bg-teal-100">🪴</span>
+      <span class="min-w-0">
+        <span class="block text-[13px] font-black text-slate-800">PALMS Monitoring Board</span>
+        <span class="block text-[11px] text-slate-500 leading-snug">
+          What every plot is on today, and what is running late
+        </span>
+      </span>
+    </a>
+
+    <a class="tool" href="../nursery_ops/nursery_ops_plot_life.html">
+      <span class="tool-ico bg-emerald-100">🚦</span>
+      <span class="min-w-0">
+        <span class="block text-[13px] font-black text-slate-800">Plot Status Stages</span>
+        <span class="block text-[11px] text-slate-500 leading-snug">
+          The statuses PALMS lets a Field Conductor choose from — on Life of Plot
+        </span>
+      </span>
+    </a>
+
+    <a class="tool" href="../operation/operation_dashboard.html">
+      <span class="tool-ico bg-amber-100">🌱</span>
+      <span class="min-w-0">
+        <span class="block text-[13px] font-black text-slate-800">Plots</span>
+        <span class="block text-[11px] text-slate-500 leading-snug">
+          Which plots exist — kept in Seedling Stock Management
+        </span>
+      </span>
+    </a>
+  </div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-8 leading-relaxed">
+    Field Conductors go straight to the phone app from the module selection — they never see this page.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+
+/* The phone app is a different site, so a fresh URL each time — the portal is
+   a PWA and a cached shell that names chunks which no longer exist is how it
+   comes up broken after a deploy. Same trick the module card uses. */
+$('portal-link').addEventListener('click', (e) => {
+  e.currentTarget.href = 'https://scan.mjmnursery.com/?cb=' + Date.now();
+});
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('scan')) {
+      alert('You do not have access to the 555 FC Portal.');
+      window.location.href = '../index.html';
+      return;
+    }
+
+    /* This is the back office, not the field. Anyone who is not an admin of
+       the module is sent where they were going anyway — the phone app — rather
+       than being shown a page of settings they cannot use. The module card on
+       the hub already routes them past it; this is for a typed URL or an old
+       bookmark. */
+    if (!MJMAccess.isAdminOf('scan')) {
+      window.location.replace('https://scan.mjmnursery.com/?cb=' + Date.now());
+      return;
+    }
+
+    const u = MJMAccess.user();
+    $('who').textContent = u.full_name || u.email || '';
+    // User Access writes other people's permissions, which the database policy
+    // only lets a user-manager do — so it is not offered to anyone else.
+    if (!MJMAccess.canManageUsers()) $('tool-access').classList.add('hidden');
+
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>
