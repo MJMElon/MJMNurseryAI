@@ -45,17 +45,39 @@
   .chev { margin-left:auto; color:#c4b5fd; font-size:17px; flex-shrink:0; }
 
   /* ── System group ───────────────────────────────────────────── */
-  .grp-head { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
-              margin:20px 2px 8px; padding-bottom:6px; border-bottom:2px solid #ede9fe; }
-  .grp-head:first-child { margin-top:2px; }
-  .grp-title { font-size:12.5px; font-weight:900; color:#4c1d95; letter-spacing:.02em; }
-  .hq-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
-            padding:2px 8px; border-radius:999px; background:#dcfce7; color:#15803d; }
-  .sw-hq { margin-left:0; color:#15803d; }
-  .sw-hq input { accent-color:#16a34a; }
-  .grp-n { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em;
-           padding:2px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
-  .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:6px 4px 10px; }
+  /* Handlers are grouped the way routing is: one closed block per system,
+     opened only when somebody in it needs editing. */
+  .grp-body { border-top:1.5px solid #ede9fe; background:#fdfcff; }
+  .person + .person { border-top:1px dashed #ede9fe; }
+  .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:14px 18px; }
+
+  /* ── Pending allocation ─────────────────────────────────────── */
+  /* Always on the page and always open, whether or not anybody is waiting —
+     it is where somebody is brought into Nelos, not a leftovers pile. */
+  .pend-block { border-color:#fde68a; background:#fffbeb; }
+  .pend-head { display:flex; align-items:center; gap:10px; padding:15px 18px 6px; }
+  .pend-ico { font-size:17px; }
+  .pend-name { font-size:14px; font-weight:900; color:#92400e; }
+  .pend-n { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
+            text-transform:uppercase; color:#b45309; }
+  .pend-note { padding:0 18px 10px; font-size:11.5px; font-weight:600; color:#a16207; line-height:1.55; }
+  .find { padding:0 18px 16px; }
+  .find .inp { border-color:#fde68a; background:#fff; }
+  .find .inp:focus { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.18); }
+  .res { margin-top:7px; border:1.5px solid #fde68a; border-radius:11px; background:#fff; overflow:hidden;
+         max-height:250px; overflow-y:auto; }
+  .res-row { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px dashed #fef3c7; }
+  .res-row:last-child { border-bottom:none; }
+  .res-name { font-size:12.5px; font-weight:800; color:#1e293b; }
+  .res-mail { font-size:10.5px; font-weight:600; color:#94a3b8; }
+  .res-add { margin-left:auto; flex-shrink:0; padding:6px 12px; border-radius:8px; border:none; cursor:pointer;
+             background:#7c3aed; color:#fff; font-size:9.5px; font-weight:900;
+             letter-spacing:.08em; text-transform:uppercase; }
+  .res-add:hover { background:#6d28d9; }
+  .res-add:disabled { opacity:.5; cursor:wait; }
+  .res-has { margin-left:auto; flex-shrink:0; font-size:9.5px; font-weight:900; letter-spacing:.06em;
+             text-transform:uppercase; color:#cbd5e1; }
+  .res-msg { padding:12px; font-size:12px; font-weight:700; color:#94a3b8; }
 
   /* The handler's number, standing in for the avatar once they have one. */
   .seat-no { width:36px; height:36px; border-radius:10px; background:#7c3aed; color:#fff;
@@ -136,6 +158,11 @@
   .rt-fallback { font-size:11px; font-weight:700; color:#94a3b8; flex:1; min-width:180px; }
   .rt-empty { padding:18px 0 6px; font-size:12.5px; font-weight:700; color:#94a3b8; }
   .rt-empty a { color:#7c3aed; font-weight:900; }
+  /* Case titles used to live on their own page. They belong to the system
+     that raises them, so they are added here, in that system's own block. */
+  .rt-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+            padding:13px 0 2px; border-top:1.5px dashed #ede9fe; margin-top:4px; }
+  .rt-add .inp { flex:1; min-width:170px; padding:7px 10px; font-size:12.5px; }
   .pend-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
               padding:2px 8px; border-radius:999px; background:#fef3c7; color:#a16207; }
   .cell-note.pend { color:#a16207; font-weight:900; }
@@ -161,7 +188,7 @@
 </head>
 <body>
 
-<div id="mjm-ribbon" data-brand="MJM Nursery" data-center="NELOS" data-logo="off"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
 <div class="backbar">
@@ -203,8 +230,14 @@ let categories = [];   // active nelos_categories rows: { name, module_key }
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
 let extraSeats = 0;    // how many extra numbers the + button is offering
+let openGrp = null;    // which system's handler block is open
 let openRoute = null;  // which system's routing block is open
 let me = { name: '' };
+
+/* Pending Allocation's search. The directory is everybody in the company —
+   fetched once, then filtered here, so typing does not hit the network. */
+let directory = null;  // null until the first search asks for it
+let findQ = '';
 
 function toast(msg, ok) {
   const t = document.createElement('div');
@@ -256,7 +289,7 @@ function personHtml(p) {
       : '<span class="p-pin pin-unset">Not allocated</span>';
 
   return `
-    <div class="card">
+    <div>
       <div class="person" data-person="${esc(p.id)}">
         ${tagged && p.seat_no
           ? `<div class="seat-no">${p.seat_no}</div>`
@@ -335,54 +368,78 @@ function panelHtml(p) {
     </div>`;
 }
 
-/* One list, grouped by system and numbered inside it, with whoever has no
-   tag yet gathered at the bottom rather than scattered through. */
+/* One closed block per system, opened only when somebody in it needs
+   editing — the same shape as Case Routing, so the two tabs read alike.
+   Pending Allocation sits below them all, always open. */
 function renderPeople() {
   // Whatever "+ add another number" conjured belongs to the panel that was
   // open. With none open it must not survive — otherwise setting somebody
   // to #2 leaves a phantom #3 waiting for whoever is opened next.
   if (!open) extraSeats = 0;
 
-  if (!people.length) {
-    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
-         Nobody has Nelos access yet.<br>
-         <span class="text-[11px] font-semibold">Grant it on the main portal's User Access and they will appear here.</span>
-       </div>`;
-    return;
-  }
+  const blocks = modules.map(m => {
+    const rows = peopleIn(m.key);
+    const openHere = openGrp === m.key;
+    return `
+      <div class="card">
+        <div class="sys-block">
+          <button class="sys-row" data-grp="${esc(m.key)}">
+            <span class="sys-chev">${openHere ? '▾' : '▸'}</span>
+            <span class="sys-ico">${esc(m.icon || '📦')}</span>
+            <span class="sys-name">${esc(m.label)}</span>
+            ${m.sees_all_cases ? '<span class="hq-tag">HQ · sees every case</span>' : ''}
+            <span class="sys-count">${rows.length ? rows.length + (rows.length === 1 ? ' person' : ' people') : 'nobody'}</span>
+          </button>
+          ${openHere
+            ? `<div class="grp-body">${rows.length
+                 ? rows.map(personHtml).join('')
+                 : '<div class="grp-empty">— nobody tagged to this system yet —</div>'}</div>`
+            : ''}
+        </div>
+      </div>`;
+  }).join('');
 
-  const groups = modules.map(m => ({
-    key: m.key,
-    title: `${m.icon || '📦'} ${m.label}`,
-    // An HQ system's people oversee everything, so say so where the tag is
-    // set rather than only on the routing page.
-    hq: !!m.sees_all_cases,
-    rows: peopleIn(m.key)
-  }));
-
-  const untagged = people.filter(p => !p.primary_module);
-  if (untagged.length) {
-    groups.push({
-      key: null,
-      title: '⏳ Pending Allocation',
-      rows: untagged
-    });
-  }
-
-  $('people').innerHTML = groups.map(g => `
-    <div class="grp-head">
-      <span class="grp-title">${esc(g.title)}</span>
-      ${g.hq ? '<span class="hq-tag">HQ · sees every case</span>' : ''}
-      <span class="grp-n">${g.rows.length}</span>
-    </div>
-    ${g.rows.length ? g.rows.map(personHtml).join('')
-                    : '<div class="grp-empty">— nobody —</div>'}
-  `).join('');
-
+  $('people').innerHTML = blocks + pendingHtml();
   wirePeople();
 }
 
+/* Pending Allocation — the way somebody joins Nelos. It is a fixed part of
+   the page rather than a group that appears when the list is non-empty,
+   because it holds the search that puts people INTO the list. */
+function pendingHtml() {
+  const waiting = people.filter(p => !p.primary_module);
+  return `
+    <div class="card pend-block">
+      <div class="pend-head">
+        <span class="pend-ico">⏳</span>
+        <span class="pend-name">Pending Allocation</span>
+        <span class="pend-n">${waiting.length ? waiting.length + ' waiting' : 'nobody waiting'}</span>
+      </div>
+      <p class="pend-note">
+        Search anybody in the company by name or email. Adding them opens Nelos
+        for them on the main portal and puts them here, ready to be tagged to a system.
+      </p>
+      <div class="find">
+        <input class="inp" id="find" type="search" autocomplete="off"
+               placeholder="Search name or email…" value="${esc(findQ)}">
+        <div id="find-res"></div>
+      </div>
+      ${waiting.length
+        ? `<div class="grp-body">${waiting.map(personHtml).join('')}</div>`
+        : '<div class="grp-empty">— nobody is waiting to be tagged —</div>'}
+    </div>`;
+}
+
 function wirePeople() {
+  $('people').querySelectorAll('.sys-row').forEach(b =>
+    b.addEventListener('click', () => {
+      // Collapsing a system takes any panel open inside it with it.
+      openGrp = openGrp === b.dataset.grp ? null : b.dataset.grp;
+      open = null;
+      extraSeats = 0;
+      renderPeople();
+    }));
+
   $('people').querySelectorAll('.person').forEach(row =>
     row.addEventListener('click', () => {
       open = open === row.dataset.person ? null : row.dataset.person;
@@ -396,6 +453,8 @@ function wirePeople() {
       if (b.dataset.act === 'save-person')  return savePerson(b.dataset.person);
       if (b.dataset.act === 'close-person') { open = null; renderPeople(); }
     }));
+
+  wireFind();
 
   // Keep clicks inside the open panel from collapsing it.
   const panel = $('people').querySelector('.panel');
@@ -480,6 +539,110 @@ async function savePerson(userId) {
   await load();
 }
 
+/* ── Finding somebody to add ───────────────────────────────────── */
+
+/* True while the search box is the thing being used, so re-rendering the
+   list around it does not throw the cursor out mid-word. */
+let findFocus = false;
+
+function wireFind() {
+  const box = $('find');
+  if (!box) return;
+
+  box.addEventListener('input', async () => {
+    findQ = box.value;
+    findFocus = true;
+    if (directory === null) {
+      renderFind('Loading the company list…');
+      const { data, error } = await _supabase.rpc('nelos_directory');
+      // An older database has no nelos_directory(); say so rather than
+      // leaving the box looking broken.
+      directory = error ? [] : (data || []);
+      if (error) { renderFind('Could not load the company list — ' + error.message); return; }
+    }
+    renderFind();
+  });
+
+  box.addEventListener('blur', () => { findFocus = false; });
+
+  if (findFocus) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+  if (findQ.trim().length >= 2 && directory !== null) renderFind();
+}
+
+function renderFind(message) {
+  const out = $('find-res');
+  if (!out) return;
+
+  if (message) { out.innerHTML = `<div class="res"><div class="res-msg">${esc(message)}</div></div>`; return; }
+
+  const q = findQ.trim().toLowerCase();
+  if (q.length < 2) { out.innerHTML = ''; return; }
+
+  const has = new Set(people.map(p => p.id));
+  const hits = (directory || [])
+    .filter(d => (d.full_name || '').toLowerCase().includes(q) ||
+                 (d.email     || '').toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!hits.length) {
+    out.innerHTML = `<div class="res"><div class="res-msg">Nobody matches “${esc(findQ.trim())}”.</div></div>`;
+    return;
+  }
+
+  out.innerHTML = `<div class="res">${hits.map(d => `
+    <div class="res-row">
+      <div class="av">${esc(initials(d.full_name || d.email))}</div>
+      <div class="min-w-0">
+        <div class="res-name">${esc(d.full_name || d.email.split('@')[0])}</div>
+        <div class="res-mail">${esc(d.email)}</div>
+      </div>
+      ${has.has(d.id)
+        ? '<span class="res-has">already in Nelos</span>'
+        : `<button class="res-add" data-add="${esc(d.id)}">＋ Add</button>`}
+    </div>`).join('')}</div>`;
+
+  out.querySelectorAll('[data-add]').forEach(b =>
+    b.addEventListener('click', () => {
+      b.disabled = true;
+      b.textContent = 'Adding…';
+      addPerson(hits.find(d => d.id === b.dataset.add));
+    }));
+}
+
+/* Two halves, both needed for somebody to actually work in Nelos: the module
+   grant on the main portal, and a handler row here. Doing only the second is
+   what left people tagged but unable to open the module. */
+async function addPerson(person) {
+  if (!person) return;
+
+  const { data: level, error: grantErr } = await _supabase.rpc('nelos_grant_access', { p_user_id: person.id });
+  if (grantErr) {
+    toast('Could not grant Nelos — ' + grantErr.message, false);
+    renderFind();
+    return;
+  }
+
+  const { error } = await _supabase.from('nelos_handlers').upsert([{
+    user_id: person.id,
+    email: person.email,
+    full_name: person.full_name,
+    primary_module: null,
+    seat_no: null,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  }], { onConflict: 'user_id' });
+
+  if (error) { toast('Could not add — ' + error.message, false); renderFind(); return; }
+
+  toast(level === 'admin'
+    ? `${person.full_name || person.email} already had Nelos as an admin — added to the list.`
+    : `${person.full_name || person.email} can open Nelos now. Tag them to a system below.`);
+  await load();
+}
+
 /* ── Routing ───────────────────────────────────────────────────── */
 
 /* Edits are held here until Save, keyed "system|title", so a block can be
@@ -534,6 +697,13 @@ function renderRouting() {
     let inner = '';
 
     if (openHere) {
+      const addRow = `
+        <div class="rt-add">
+          <input class="inp cat-new" data-mod="${esc(m.key)}" maxlength="60"
+                 placeholder="Add a case category for ${esc(m.label)}…">
+          <button class="btn btn-ghost cat-add" data-mod="${esc(m.key)}">＋ Add</button>
+        </div>`;
+
       inner = titles.length ? `
         <div class="rt">
           <div class="rt-band"><span>From</span><span>Solve by</span></div>
@@ -544,16 +714,17 @@ function renderRouting() {
               <span class="rt-cat">${esc(cat)}</span>
               ${solveCells(m.key, cat)}
             </div>`).join('')}
+          ${addRow}
           <div class="rt-foot">
             <span class="rt-fallback">A case with no rule set stays with ${esc(m.label)}.</span>
             <button class="btn btn-save rt-save" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Save</button>
             <button class="btn btn-ghost rt-cancel" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Cancel</button>
           </div>
         </div>`
-      : `<div class="rt"><div class="rt-empty">
-           No case titles for ${esc(m.label)} yet —
-           add them on the <a href="nelos_settings.html">Categories</a> page.
-         </div></div>`;
+      : `<div class="rt">
+           <div class="rt-empty">No case categories for ${esc(m.label)} yet.</div>
+           ${addRow}
+         </div>`;
     }
 
     return `
@@ -601,6 +772,39 @@ function renderRouting() {
     b.addEventListener('click', () => saveBlock(b.dataset.mod)));
   $('routing').querySelectorAll('.rt-cancel').forEach(b =>
     b.addEventListener('click', () => { draft = {}; renderRouting(); }));
+
+  $('routing').querySelectorAll('.cat-add').forEach(b =>
+    b.addEventListener('click', () => addCategory(b.dataset.mod)));
+  $('routing').querySelectorAll('.cat-new').forEach(el =>
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addCategory(el.dataset.mod); }
+    }));
+}
+
+/* A new case category for one system. It is written straight away rather
+   than staged with the routing edits — a title has to exist before there is
+   a row to set a rule on. */
+async function addCategory(mod) {
+  const box = $('routing').querySelector(`.cat-new[data-mod="${mod}"]`);
+  const name = (box ? box.value : '').trim();
+  if (!name) { if (box) box.focus(); return; }
+
+  // Unique per system, case-insensitively (migration_nelos_category_system).
+  if (categories.some(c => c.module_key === mod && c.name.toLowerCase() === name.toLowerCase())) {
+    toast(`${labelOf(mod)} already has “${name}”.`, false);
+    return;
+  }
+
+  const { error } = await _supabase.from('nelos_categories').insert([{
+    name,
+    module_key: mod,
+    default_priority: 'normal',
+    sort_order: categories.reduce((mx, c) => Math.max(mx, c.sort_order || 0), 0) + 10
+  }]);
+  if (error) { toast('Could not add — ' + error.message, false); return; }
+
+  toast(`Added “${name}” to ${labelOf(mod)}.`);
+  await load();
 }
 
 /* Write every pending edit for one system, then reload. */
@@ -651,7 +855,7 @@ async function load() {
   const [pplRes, modRes, catRes, routeRes] = await Promise.all([
     _supabase.rpc('nelos_people').then(r => r, e => ({ error: e, data: [] })),
     _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
-    _supabase.from('nelos_categories').select('name,module_key').eq('active', true).order('sort_order')
+    _supabase.from('nelos_categories').select('name,module_key,sort_order').eq('active', true).order('sort_order')
       .then(r => r, () => ({ data: [] })),
     // Routes arrive with the routing migration. On a database that has not
     // run it yet this comes back empty and the page still works.
