@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nursery Case Log</title>
+<title>NELOS</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -26,13 +26,15 @@
   .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
   .tool-btn-access:hover { background:#ffe4e6; }
 
-  /* ── Stat tiles ─────────────────────────────────────────────── */
-  .stat { background:#fff; border:1.5px solid #ede9fe; border-radius:14px; padding:13px 15px;
-          box-shadow:0 3px 12px rgba(124,58,237,.06); cursor:pointer; transition:all .15s; text-align:left; }
-  .stat:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(124,58,237,.13); }
-  .stat.on { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.13); }
-  .stat-n { font-size:26px; font-weight:900; line-height:1; }
-  .stat-l { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8; margin-top:5px; }
+  .toolbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+  .count { font-size:11px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+           color:#94a3b8; margin-right:auto; }
+  .quiet { font-size:11px; font-weight:800; color:#7c3aed; text-decoration:none; }
+  .quiet:hover { text-decoration:underline; }
+  .f-chk { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800;
+           color:#475569; background:#fff; border:1.5px solid #e2e8f0; border-radius:9px;
+           padding:6px 11px; cursor:pointer; }
+  .f-chk input { width:14px; height:14px; accent-color:#7c3aed; }
 
   /* ── Case list ──────────────────────────────────────────────── */
   .case-card { display:block; background:#fff; border:1.5px solid #e9e3fb; border-left-width:5px; border-radius:12px;
@@ -87,50 +89,37 @@
 <body>
 
 <!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
-<div id="mjm-ribbon"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery" data-center="NELOS" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
-  <div>
-    <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Case Log</span>
-    <span class="text-[10px] font-bold text-slate-400 ml-2 hidden sm:inline">Nelos · Nursery Carlos</span>
-  </div>
-  <div class="flex items-center gap-2">
-    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
-    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NL</div>
-  </div>
-</div>
 
 <div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <!-- Tools -->
-  <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+  <!-- Raise a Case is the one thing done from here often, so it leads on
+       the right where the eye ends up; the two settings pages sit quietly
+       beside it. -->
+  <div class="toolbar">
+    <span class="count" id="count">—</span>
+    <a class="quiet" href="nelos_settings.html">Categories</a>
+    <a class="quiet hidden" id="user-setting-btn" href="nelos_user_setting.html">User Setting</a>
     <button class="tool-btn tool-btn-primary" id="new-case-btn">➕ Raise a Case</button>
-    <a class="tool-btn" href="nelos_settings.html">⚙️ Categories</a>
-    <a class="tool-btn tool-btn-access hidden" id="user-setting-btn" href="nelos_user_setting.html">👥 User Setting</a>
   </div>
 
-  <!-- Stat tiles double as filters: click one to narrow the list -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-    <button class="stat" data-quick="pending"><div class="stat-n text-amber-600" id="n-pending">–</div><div class="stat-l">Pending</div></button>
-    <button class="stat" data-quick="overdue"><div class="stat-n text-red-600"   id="n-overdue">–</div><div class="stat-l">Overdue</div></button>
-    <button class="stat" data-quick="mine">   <div class="stat-n text-violet-600" id="n-mine">–</div><div class="stat-l">Assigned to Me</div></button>
-    <button class="stat" data-quick="all">    <div class="stat-n text-slate-700" id="n-all">–</div><div class="stat-l">All Cases</div></button>
-  </div>
-
-  <!-- Filters -->
+  <!-- One list, filtered. Overdue is a filter rather than a separate block:
+       an overdue case is a pending case somebody is late on, not a
+       different kind of thing. -->
   <div class="flex flex-wrap items-center gap-2 mb-4">
     <select id="f-status" class="f-sel">
-      <option value="pending">Pending (open + in progress)</option>
+      <option value="pending">Pending to solve</option>
       <option value="open">Open</option>
       <option value="in_progress">In Progress</option>
       <option value="resolved">Resolved</option>
       <option value="closed">Closed</option>
       <option value="">Any status</option>
     </select>
-    <select id="f-source" class="f-sel"><option value="">Any module</option></select>
+    <select id="f-source" class="f-sel"><option value="">Any system</option></select>
     <select id="f-priority" class="f-sel">
       <option value="">Any priority</option>
       <option value="urgent">Urgent</option><option value="high">High</option>
@@ -141,6 +130,7 @@
       <option value="mine">Assigned to me</option>
       <option value="unassigned">Unassigned</option>
     </select>
+    <label class="f-chk"><input type="checkbox" id="f-overdue"> Overdue only</label>
     <input id="f-q" class="f-sel flex-1 min-w-[150px]" placeholder="Search title, batch, plot…">
   </div>
 
@@ -206,7 +196,6 @@ const esc = MJMNelos.esc;
 
 let allCases = [];      // everything we are allowed to see, loaded once
 let categories = [];
-let quick = 'pending';  // which stat tile is active
 let me = { id: null, name: null };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -276,10 +265,7 @@ function visibleCases() {
   const q        = $('f-q').value.trim().toLowerCase();
 
   return allCases.filter(c => {
-    // The stat tiles are a coarser filter that sits on top of the dropdowns.
-    if (quick === 'pending' && !isPending(c)) return false;
-    if (quick === 'overdue' && !isOverdue(c)) return false;
-    if (quick === 'mine'    && c.assignee_id !== me.id) return false;
+    if ($('f-overdue').checked && !isOverdue(c)) return false;
 
     if (status === 'pending') { if (!isPending(c)) return false; }
     else if (status && c.status !== status) return false;
@@ -300,23 +286,21 @@ function visibleCases() {
 }
 
 function render() {
-  document.querySelectorAll('.stat').forEach(b =>
-    b.classList.toggle('on', b.dataset.quick === quick));
+  // Overdue first, then the rest — one list, worst at the top, rather than
+  // an overdue block sitting apart from the queue it belongs to.
+  const rows = visibleCases().sort((a, b) => (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0));
 
-  const rows = visibleCases();
+  const overdue = rows.filter(isOverdue).length;
+  $('count').textContent = rows.length
+    ? `${rows.length} case${rows.length === 1 ? '' : 's'}${overdue ? ` · ${overdue} overdue` : ''}`
+    : 'nothing to show';
+
   $('list').innerHTML = rows.length
     ? rows.map(cardHtml).join('')
     : `<div class="empty">No cases match this filter.<br>
          <span class="text-[11px] font-semibold text-slate-400">
            ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “Raise a Case”.'}
          </span></div>`;
-}
-
-function renderStats() {
-  $('n-pending').textContent = allCases.filter(isPending).length;
-  $('n-overdue').textContent = allCases.filter(isOverdue).length;
-  $('n-mine').textContent    = allCases.filter(c => isPending(c) && c.assignee_id === me.id).length;
-  $('n-all').textContent     = allCases.length;
 }
 
 /* ── Loading ───────────────────────────────────────────────────── */
@@ -338,7 +322,6 @@ async function loadCases() {
   // Narrow to the modules and categories this person is set up for on the
   // User Setting page. Someone in no block at all still sees everything.
   allCases = await MJMNelos.applyScope(sorted);
-  renderStats();
   render();
 }
 
@@ -466,16 +449,8 @@ $('new-close').addEventListener('click', closeNew);
 $('new-scrim').addEventListener('click', e => { if (e.target === $('new-scrim')) closeNew(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNew(); });
 
-document.querySelectorAll('.stat').forEach(b => b.addEventListener('click', () => {
-  quick = b.dataset.quick;
-  // The tiles and the status dropdown would otherwise fight each other.
-  if (quick === 'all') $('f-status').value = '';
-  if (quick === 'pending' || quick === 'overdue' || quick === 'mine') $('f-status').value = 'pending';
-  render();
-}));
-
-['f-status','f-source','f-priority','f-mine'].forEach(id =>
-  $(id).addEventListener('change', () => { quick = 'all'; render(); }));
+['f-status', 'f-source', 'f-priority', 'f-mine', 'f-overdue'].forEach(id =>
+  $(id).addEventListener('change', render));
 $('f-q').addEventListener('input', render);
 
 (async () => {
@@ -489,7 +464,6 @@ $('f-q').addEventListener('input', render);
     }
     const u = MJMAccess.user();
     me = { id: u.id, name: u.full_name || u.email || '' };
-    $('who').textContent = me.name;
     MJMNelos.init(_supabase, { root: '../' });
 
     // User Setting decides who sees which module's cases. Only a Nelos
