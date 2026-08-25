@@ -3,85 +3,375 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>User Access — FC Scan Portal</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<title>Setting — 555 FC Portal</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%238b5cf6%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2713%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EFC%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
-<script src="../shared/shared_module_access.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .card { background:white; border:1px solid #ede9fe; border-radius:20px; box-shadow:0 4px 16px rgba(139,92,246,.08); }
+
+  /* One tab today. It is a tab and not a heading because the next thing that
+     belongs on this page — plots, stages, whatever comes — goes beside it. */
+  .tab { padding:9px 18px; border-radius:999px; border:1.5px solid #ede9fe; background:white;
+         color:#6d28d9; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+         cursor:pointer; }
+  .tab.on { background:#6d28d9; border-color:#5b21b6; color:white; }
+
+  .u-row { padding:16px 20px; border-bottom:1px solid #f5f3ff; }
+  .u-row:last-child { border-bottom:none; }
+  .avatar { width:40px; height:40px; border-radius:12px; background:#ede9fe; color:#6d28d9;
+            display:grid; place-items:center; font-weight:900; font-size:13px; flex-shrink:0; }
+  .btn { padding:9px 16px; border-radius:12px; font-size:11px; font-weight:900; letter-spacing:.08em;
+         text-transform:uppercase; cursor:pointer; border:1.5px solid transparent; }
+  .btn-edit { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+  .btn-edit:hover { background:#ede9fe; }
+  .btn-save { background:#7c3aed; color:white; }
+  .btn-save:hover { background:#6d28d9; }
+  .btn-save:disabled { opacity:.55; cursor:default; }
+  .btn-ghost { background:white; color:#64748b; border-color:#e2e8f0; }
+
+  /* The expanded panel. Inline under the name, not a drawer over the page —
+     you are setting up one person while looking at the list of people. */
+  .panel { border-top:1px dashed #ddd6fe; margin-top:14px; padding-top:14px; }
+  .page-block { border:1.5px solid #f1f5f9; border-radius:16px; padding:13px 15px; }
+  .page-block.on { border-color:#ddd6fe; background:#faf5ff; }
+  .chk { width:18px; height:18px; accent-color:#7c3aed; cursor:pointer; flex-shrink:0; }
+  .nur { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px;
+         border:1.5px solid #e2e8f0; background:white; font-size:12px; font-weight:700; color:#334155;
+         cursor:pointer; }
+  .nur.sel { border-color:#a78bfa; background:#f5f3ff; color:#5b21b6; }
+  .nur input { accent-color:#7c3aed; cursor:pointer; }
+  .hidden { display:none !important; }
+</style>
 </head>
 <body>
-<script>
-/* The FC Scan Portal is served from scan.mjmnursery.com, a separate site from
-   this one, so its pages are listed here as they are told to us rather than
-   read from the code. Send the rest and they drop into `pages` below. */
-MJMModuleAccess.init({
-  module: 'scan',
-  title:  'FC Scan Portal',
-  moduleLabel: 'Scan',
-  icon:   '🔖',
-  accent: 'violet',
-  back:   { href: '../index.html', label: 'Module Selection' },
-  // The portal itself opens in a new tab: it is a different site, so going
-  // "back" to it would otherwise mean leaving this one behind.
-  portal: { href: 'https://scan.mjmnursery.com', label: 'Back to Portal' },
-  note:   `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
-           For each of them, tick which of the modules they can open and exactly what they can do
-           inside each — and whether they can <strong>change other users' roles</strong>.
-           <br><br>
-           <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[12px]">
-             <strong>Nurseries</strong> are set separately, below the modules. Switch <em>All nurseries</em>
-             off for someone and tick only the ones they should see — that one setting governs
-             <strong>Maintenance</strong> and <strong>PALMS</strong> together,
-             so a BNN-only Field Conductor sees BNN on every screen.
-             <br><br>
-             A module with nothing ticked here stays open, so nobody loses access by never having been
-             set up. To take the whole Scan Portal away from someone, set their <strong>Scan</strong>
-             module to <em>None</em> on the main portal's User Access.
-           </span>`,
-  pages: [
-    { key:'barcode', label:'Scan Barcode Counter', desc:'Counting seedlings by scanning barcodes' },
-    { key:'do', label:'Issue Collection DO', desc:'Raising and managing collection delivery orders' },
-    { key:'maintenance', label:'Maintenance', desc:'Maintenance work recorded through the Scan Portal',
-      actions:[
-        { key:'record', label:'Record maintenance work', desc:'Scan and submit a maintenance record' },
-        { key:'edit',   label:'Edit & delete records',   desc:'Change or remove a maintenance record already submitted' },
-        { key:'export', label:'Download records',        desc:'Export the maintenance records' }
-      ]},
-    { key:'palms', label:'PALMS', desc:'Plot Activity Log Monitoring System',
-      actions:[
-        { key:'settings', label:'Open Settings', desc:'The cog in the bar \u2014 sets up PALMS for everyone, not just this user' }
-      ]}
-  ],
-  scopes: [
-    {
-      // Named for the retired Plot Status module. Renaming the key would
-      // silently reopen every nursery for anyone already narrowed down, so it
-      // keeps the old name and governs Maintenance and PALMS.
-      key:      'plot_status_nurseries',
-      label:    'Nurseries',
-      desc:     'Which nurseries this person sees in Maintenance and PALMS',
-      allLabel: 'All nurseries',
-      emptyText:'No nurseries found in shared_plots yet.',
-      // Read from the plots themselves, so a nursery added later shows up here
-      // without anyone editing this file.
-      options: async (supa) => {
-        const { data, error } = await supa
-          .from('shared_plots')
-          .select('nursery_name')
-          .not('nursery_name', 'is', null);
-        if (error) throw error;
-        return [...new Set((data || []).map(r => r.nursery_name).filter(Boolean))].sort();
-      }
-    }
-  ]
-});
-</script>
 
-<!-- Nelos floating To-Do dock — the round button in the corner.
-     See shared/shared_nelos_dock.js -->
-<script src="../shared/shared_nelos_dock.js"></script>
+<div id="mjm-ribbon" data-logo="off" data-brand=""></div>
+<script src="../shared/shared_ribbon.js"></script>
+<script src="../shared/shared_fc_brand.js" data-sub="Setting"></script>
+
+<div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="forbidden" class="max-w-[940px] mx-auto px-6 py-16 hidden">
+  <div class="card p-10 text-center">
+    <div class="text-4xl mb-3">🔒</div>
+    <h2 class="text-lg font-black text-slate-800 uppercase tracking-widest">Access Denied</h2>
+    <p class="text-xs text-slate-500 mt-2">Only users with <strong>Manage Users</strong> permission can open this page.</p>
+    <a href="scan_admin.html" class="inline-block mt-6 text-[10px] font-bold text-violet-700 uppercase tracking-widest bg-violet-50 border border-violet-200 rounded-full px-4 py-2 no-underline">Back</a>
+  </div>
+</div>
+
+<div id="main" class="max-w-[940px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <div class="flex items-center gap-2 mb-5">
+    <button class="tab on" data-tab="users">User Setting</button>
+  </div>
+
+  <div class="card p-5 mb-4">
+    <p class="text-[12.5px] text-slate-600 leading-relaxed">
+      Tick the pages this person opens in the 555 FC Portal, and for each one, the nurseries they may see.
+      A page with no nursery ticked shows them nothing; <strong>All</strong> means every nursery, including any
+      added later.
+    </p>
+    <p class="text-[11px] text-slate-400 mt-2">
+      Whether they can open the portal at all is set on the
+      <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">main User Access</a>.
+      Only people who already have the module appear below.
+    </p>
+  </div>
+
+  <div class="card overflow-hidden">
+    <div class="px-5 py-3.5 border-b border-violet-50 flex items-center justify-between gap-3">
+      <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Users</span>
+      <input id="q" placeholder="Search name or email…"
+             class="text-[13px] font-semibold px-3.5 py-2 rounded-xl border border-slate-200 outline-none focus:border-violet-400 w-[240px] max-w-[55%]">
+    </div>
+    <div id="list"></div>
+    <div id="empty" class="hidden px-6 py-12 text-center text-[12px] font-bold text-slate-400">
+      Nobody has the 555 FC Portal yet — open it for somebody on the main User Access first.
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm font-bold px-5 py-3 rounded-xl shadow-xl hidden"></div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* The five things a person opens in the portal. `key` is what canScan() reads
+   on the phone (permissions.scan_actions.<key>.view) and what the nursery list
+   is filed under (permissions.scan_nurseries.<key>). */
+const PAGES = [
+  { key:'barcode',     label:'Scan Barcode Counter', desc:'Counting seedlings by scanning barcodes' },
+  { key:'do',          label:'Issue Collection DO',  desc:'Raising and managing collection delivery orders' },
+  { key:'maintenance', label:'Maintenance',          desc:'Recording maintenance work in the field' },
+  { key:'palms',       label:'PALMS',                desc:'The daily plot status round' },
+  { key:'culling',     label:'Culling Calculator',   desc:'Counting pokok inang against the batch balance' },
+];
+
+let profiles = [];        // everyone who holds the scan module
+let nurseries = [];       // distinct nursery names from shared_plots
+let openUid = null;       // the row expanded right now
+let draft = null;         // that row's permissions, being edited
+
+const initials = (p) => (String(p.full_name || p.email || '?').trim().split(/\s+/)
+  .map((s) => s[0]).slice(0, 2).join('') || '?').toUpperCase();
+
+function flash(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => el.classList.add('hidden'), 2600);
+}
+
+/* ---- reading a person's current state ----
+   Both fall back the same way the phone does, so what is shown here is what
+   the Field Conductor actually gets. */
+
+// canScan fails OPEN on a page nobody has configured: somebody who has never
+// been through this screen keeps the access they had, rather than losing it.
+function pageOn(perms, key) {
+  const acts = (perms.scan_actions || {})[key];
+  return acts ? !!acts.view : true;
+}
+
+// null means every nursery. The pre-per-page list still answers for a person
+// whose access has not been re-saved since, or turning this on would silently
+// reopen every nursery for everyone who had been narrowed down.
+function pageNurseries(perms, key) {
+  const per = perms.scan_nurseries || {};
+  if (Array.isArray(per[key])) return per[key];
+  if (Array.isArray(perms.plot_status_nurseries)) return perms.plot_status_nurseries;
+  return null;
+}
+
+/* ---- the list ---- */
+function rowHtml(p) {
+  const open = openUid === p.id;
+  return `
+    <div class="u-row" data-uid="${esc(p.id)}">
+      <div class="flex items-center gap-3.5">
+        <div class="avatar">${esc(initials(p))}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-black text-slate-800 text-[14px] truncate">${esc(p.full_name || '(no name)')}</div>
+          <div class="text-[11.5px] text-slate-400 truncate">${esc(p.email || '—')}</div>
+          <div class="text-[11px] text-violet-700 font-bold mt-0.5">${esc(summaryOf(p.permissions || {}))}</div>
+        </div>
+        <button class="btn btn-edit" data-edit="${esc(p.id)}">${open ? 'Close' : 'Edit Access'}</button>
+      </div>
+      ${open ? panelHtml() : ''}
+    </div>`;
+}
+
+/** "PALMS, Maintenance · BNN" — enough to read the list without opening rows.
+    Says "mixed" rather than picking one page's answer for all of them: with
+    the nurseries set per page they genuinely can differ, and quoting the
+    unrestricted one would read as no restriction at all. */
+function summaryOf(perms) {
+  const on = PAGES.filter((pg) => pageOn(perms, pg.key));
+  if (!on.length) return 'No pages';
+  const names = on.map((pg) => pg.label).join(', ');
+  const lists = on.map((pg) => pageNurseries(perms, pg.key));
+  const shown = lists.map((l) => (l === null ? '*' : l.slice().sort().join(',')));
+  if (shown.some((x) => x !== shown[0])) return names + ' · nurseries differ by page';
+  if (lists[0] === null) return names + ' · all nurseries';
+  return names + (lists[0].length ? ' · ' + lists[0].join(', ') : ' · no nursery');
+}
+
+function panelHtml() {
+  return '<div class="panel space-y-2.5">' +
+    PAGES.map(pageBlockHtml).join('') +
+    `<div class="flex items-center justify-end gap-2 pt-1">
+       <button class="btn btn-ghost" data-cancel="1">Cancel</button>
+       <button class="btn btn-save" id="save-btn">Save</button>
+     </div>` +
+    '</div>';
+}
+
+function pageBlockHtml(pg) {
+  const on = pageOn(draft, pg.key);
+  const list = pageNurseries(draft, pg.key);
+  const all = list === null;
+  const chosen = new Set(all ? [] : list);
+  return `
+    <div class="page-block ${on ? 'on' : ''}">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" class="chk" data-page="${pg.key}" ${on ? 'checked' : ''}>
+        <span class="min-w-0">
+          <span class="block text-[13px] font-black text-slate-800">${esc(pg.label)}</span>
+          <span class="block text-[11px] text-slate-400 leading-snug">${esc(pg.desc)}</span>
+        </span>
+      </label>
+
+      <div class="mt-2.5 ${on ? '' : 'hidden'}" data-nur-for="${pg.key}">
+        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nurseries</div>
+        <div class="flex flex-wrap gap-2">
+          <label class="nur ${all ? 'sel' : ''}">
+            <input type="checkbox" data-nall="${pg.key}" ${all ? 'checked' : ''}> All
+          </label>
+          ${nurseries.map((n) => `
+            <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
+              <input type="checkbox" data-npage="${pg.key}" data-nname="${esc(n)}"
+                     ${!all && chosen.has(n) ? 'checked' : ''} ${all ? 'disabled' : ''}>
+              ${esc(n)}
+            </label>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function render() {
+  const q = $('q').value.trim().toLowerCase();
+  const shown = profiles.filter((p) => !q
+    || String(p.full_name || '').toLowerCase().includes(q)
+    || String(p.email || '').toLowerCase().includes(q));
+  $('empty').classList.toggle('hidden', shown.length > 0);
+  $('list').innerHTML = shown.map(rowHtml).join('');
+}
+
+/* ---- editing ---- */
+function openRow(uid) {
+  const p = profiles.find((x) => x.id === uid);
+  if (!p) return;
+  // A copy: nothing reaches the person's row until Save.
+  draft = JSON.parse(JSON.stringify(p.permissions || {}));
+  draft.scan_actions = draft.scan_actions || {};
+  draft.scan_nurseries = draft.scan_nurseries || {};
+
+  /* Settle what the panel SHOWS into the draft the moment the row is opened,
+     so Save records what the admin was looking at.
+
+     canScan fails open, so a page nobody has configured renders ticked. It
+     used to be saved as false: opening somebody's row and pressing Save with
+     no changes at all silently took away every page they had. Writing the
+     displayed value in first is what makes the panel honest. */
+  PAGES.forEach((pg) => {
+    const acts = draft.scan_actions[pg.key];
+    draft.scan_actions[pg.key] = { ...(acts || {}), view: acts ? !!acts.view : true };
+  });
+
+  /* Settle the pre-per-page list into the five pages too, and drop it.
+
+     Without this, ticking "All" on a page did nothing at all for anyone still
+     on that list: "All" means removing the per-page entry, the old list then
+     answered in its place, and the tick came straight back off. The panel has
+     to be reading only what the panel writes. */
+  if (Array.isArray(draft.plot_status_nurseries)) {
+    PAGES.forEach((pg) => {
+      if (!Array.isArray(draft.scan_nurseries[pg.key])) {
+        draft.scan_nurseries[pg.key] = draft.plot_status_nurseries.slice();
+      }
+    });
+    delete draft.plot_status_nurseries;
+  }
+
+  openUid = uid;
+  render();
+}
+function closeRow() { openUid = null; draft = null; render(); }
+
+document.addEventListener('click', (e) => {
+  const edit = e.target.closest('[data-edit]');
+  if (edit) { const uid = edit.dataset.edit; return uid === openUid ? closeRow() : openRow(uid); }
+  if (e.target.closest('[data-cancel]')) return closeRow();
+  if (e.target.id === 'save-btn') return save();
+});
+
+document.addEventListener('change', (e) => {
+  if (!draft) return;
+  const t = e.target;
+
+  if (t.dataset.page) {
+    const acts = draft.scan_actions[t.dataset.page] || {};
+    acts.view = t.checked;
+    draft.scan_actions[t.dataset.page] = acts;
+    return render();
+  }
+  if (t.dataset.nall) {
+    const key = t.dataset.nall;
+    // "All" is the ABSENCE of a list, not a list of everything — so a nursery
+    // added next month is included without anybody re-ticking every person.
+    if (t.checked) delete draft.scan_nurseries[key];
+    else draft.scan_nurseries[key] = nurseries.slice();
+    return render();
+  }
+  if (t.dataset.npage) {
+    const key = t.dataset.npage;
+    draft.scan_nurseries[key] = [...document.querySelectorAll('[data-npage="' + key + '"]')]
+      .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
+    return render();
+  }
+  if (t.id === 'q') render();
+});
+$('q').addEventListener('input', render);
+
+async function save() {
+  const p = profiles.find((x) => x.id === openUid);
+  if (!p || !draft) return;
+  const btn = $('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  /* Every page is already explicitly recorded — openRow() writes the
+     displayed value in, including the ones that were only ticked because
+     canScan fails open. So the draft is the truth and nothing is re-derived
+     here; deriving it again is exactly how the false-for-everything bug got
+     in. */
+  const next = { ...(p.permissions || {}), ...draft };
+  /* The single pre-per-page list is dropped once this person has been saved
+     here: it is only a fallback for anyone who has NOT been, and leaving it
+     behind would keep answering for pages set to All. */
+  delete next.plot_status_nurseries;
+
+  const { error } = await _supabase.from('shared_profiles')
+    .update({ permissions: next }).eq('id', p.id);
+
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) { flash('Could not save: ' + error.message); return; }
+  p.permissions = next;
+  closeRow();
+  flash('Saved for ' + (p.full_name || p.email || 'user'));
+}
+
+/* ---- boot ---- */
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    $('loading').classList.add('hidden');
+    if (!MJMAccess.canManageUsers()) { $('forbidden').classList.remove('hidden'); return; }
+
+    const [plots, people] = await Promise.all([
+      _supabase.from('shared_plots').select('nursery_name'),
+      _supabase.from('shared_profiles').select('id, email, full_name, permissions')
+        .order('full_name', { ascending: true }),
+    ]);
+
+    nurseries = [...new Set(((plots && plots.data) || []).map((r) => r.nursery_name).filter(Boolean))].sort();
+    // Only people the main User Access has opened the module for. Setting up
+    // pages for somebody who cannot open the portal is a setting with no
+    // effect, and a list of every account to scroll past.
+    profiles = (((people && people.data) || [])).filter((p) => {
+      const lvl = ((p.permissions || {}).modules || {}).scan;
+      return lvl && String(lvl).toLowerCase() !== 'none';
+    });
+
+    render();
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('forbidden').classList.remove('hidden');
+  }
+})();
+</script>
 </body>
 </html>

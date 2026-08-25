@@ -30,26 +30,26 @@
   .portal-btn .pb-phone { width:20px; height:20px; flex-shrink:0; }
   .portal-btn .pb-out   { width:15px; height:15px; opacity:.85; flex-shrink:0; }
 
-  .tool { display:flex; align-items:center; gap:14px; padding:16px 18px; border-radius:18px;
+  /* A square tile rather than a wide row: there is one of these, and a row
+     stretched across the page reads as a list with an item missing. */
+  .tool { width:132px; height:132px; display:flex; flex-direction:column; align-items:center;
+          justify-content:center; gap:10px; border-radius:22px;
           background:white; border:1.5px solid #ede9fe; text-decoration:none; transition:all .15s; }
-  .tool:hover { border-color:#c4b5fd; transform:translateY(-1px); box-shadow:0 8px 20px -6px rgba(139,92,246,.25); }
-  .tool-ico { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; font-size:20px; flex-shrink:0; }
+  .tool:hover { border-color:#c4b5fd; transform:translateY(-2px); box-shadow:0 10px 24px -6px rgba(139,92,246,.28); }
+  .tool-ico { width:52px; height:52px; border-radius:16px; display:grid; place-items:center; font-size:24px; }
+  .tool-name { font-size:12px; font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:.1em; }
   .hidden { display:none !important; }
 </style>
 </head>
 <body>
 
-<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
-<div id="mjm-ribbon"></div>
+<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js.
+     data-logo="off" drops the [AI] square; the wordmark beside it is then
+     replaced below with the portal's own three-line mark. Only this page does
+     that: every other module keeps the standard ribbon. -->
+<div id="mjm-ribbon" data-logo="off" data-brand=""></div>
 <script src="../shared/shared_ribbon.js"></script>
-
-<div class="bg-white border-b border-violet-100 px-6 py-3 flex items-center justify-between">
-  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">555 FC Portal — Manage</span>
-  <div class="flex items-center gap-2">
-    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
-    <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-black text-[11px]">FC</div>
-  </div>
-</div>
+<script src="../shared/shared_fc_brand.js" data-sub="Manage"></script>
 
 <div id="loading" class="max-w-[860px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -64,13 +64,8 @@
 
   <div class="mt-6">
     <a class="tool" id="tool-access" href="scan_user_access.html">
-      <span class="tool-ico bg-rose-100">🔐</span>
-      <span class="min-w-0">
-        <span class="block text-[13px] font-black text-slate-800">User Access</span>
-        <span class="block text-[11px] text-slate-500 leading-snug">
-          Which pages each person opens, what they may do inside, and which nurseries they see
-        </span>
-      </span>
+      <span class="tool-ico bg-violet-100">⚙️</span>
+      <span class="tool-name">Setting</span>
     </a>
   </div>
 </div>
@@ -106,8 +101,8 @@ $('portal-link').addEventListener('click', (e) => {
       return;
     }
 
-    const u = MJMAccess.user();
-    $('who').textContent = u.full_name || u.email || '';
+    // The signed-in name is the ribbon's own #welcome-text; this page had a
+    // second copy in the header bar that has gone with it.
     // User Access writes other people's permissions, which the database policy
     // only lets a user-manager do — so it is not offered to anyone else.
     if (!MJMAccess.canManageUsers()) $('tool-access').classList.add('hidden');
