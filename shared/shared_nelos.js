@@ -216,6 +216,10 @@
    *                   //   nelos/nelos_case.html is what follows it
    *   nursery, plot, batch,        // optional subject of the case
    *   assigneeId, assigneeName,    // optional owner
+   *   photoUrl,       // optional — one photo, in the nelos-photos bucket
+   *   assignedModule, assignedSeatNo,
+   *                   // optional — the queue to put it in, overriding the
+   *                   //   routing rules for this one case
    *   dueDate,        // optional 'YYYY-MM-DD'
    *   dedupe          // optional — when true, an identical OPEN case from
    *                   //   the same source/batch/plot is reused instead of
@@ -261,6 +265,13 @@
       // column when there is actually a photo, so a database that has not
       // run that file yet still takes the insert.
       if (opts.photoUrl) row.photo_url = opts.photoUrl;
+
+      // Where the case is to be WORKED, when the raiser chose rather than
+      // leaving it to the routing rules. nelos_route_case() returns early on
+      // a case that already names its queue, so setting this overrides the
+      // rule for this one case without touching the rule.
+      if (opts.assignedModule) row.assigned_module = opts.assignedModule;
+      if (opts.assignedSeatNo) row.assigned_seat_no = Number(opts.assignedSeatNo);
 
       const { data, error } = await supa.from('nelos_cases').insert([row]).select().single();
       if (error) return { data: null, error };

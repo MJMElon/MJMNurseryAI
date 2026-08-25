@@ -44,8 +44,8 @@
             text-transform:uppercase; color:#8b5cf6; background:#ede9fe;
             padding:3px 10px; border-radius:999px; }
 
-  /* Four columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:112px 168px 1fr 118px; gap:14px; }
+  /* Five columns, the same grid for the header strip and every row. */
+  .th, .tr { display:grid; grid-template-columns:104px 158px 1fr 116px 112px; gap:13px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
   .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
@@ -62,6 +62,13 @@
   .sys-line { font-size:12.5px; font-weight:800; color:#4c1d95; }
   .pic-line { font-size:11.5px; font-weight:700; color:#64748b; }
   .pic-none { font-style:italic; color:#b45309; }
+  .by-name { font-size:12.5px; font-weight:800; color:#1e293b; }
+  .by-none { font-style:italic; font-weight:700; color:#cbd5e1; }
+  .by-when { font-size:10.5px; font-weight:700; color:#94a3b8; }
+  /* Only for the stacked phone layout — on a wide screen the column
+     heading already says what this is. */
+  .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
+              text-transform:uppercase; color:#c4b5fd; }
 
   .td-case { display:flex; gap:11px; min-width:0; }
   .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
@@ -109,6 +116,7 @@
     .tr { grid-template-columns:1fr; gap:9px; padding:15px 16px; }
     .td-act { flex-direction:row; flex-wrap:wrap; }
     .act { width:auto; flex:1; min-width:88px; }
+    .cell-cap { display:block; }
   }
 
   /* ── Filters ────────────────────────────────────────────────── */
@@ -129,6 +137,21 @@
          border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; outline:none; box-sizing:border-box; }
   .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
   textarea.inp { min-height:88px; resize:vertical; }
+  /* ── The six steps ──────────────────────────────────────────── */
+  /* Numbered blocks rather than a flat stack of fields, so the order the
+     drawer wants to be filled in is the order it reads in. */
+  .step { border:1.5px solid #ede9fe; border-radius:13px; padding:13px 15px; margin-bottom:11px;
+          background:#fdfcff; }
+  .step-h { display:flex; align-items:center; gap:9px; margin-bottom:9px;
+            font-size:12.5px; font-weight:900; color:#4c1d95; }
+  .step-n { width:21px; height:21px; border-radius:7px; background:#7c3aed; color:#fff; flex-shrink:0;
+            display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; }
+  .step-row  { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .step-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; }
+  @media (max-width:520px) { .step-row3 { grid-template-columns:1fr; } }
+  .step-note { font-size:10.5px; font-weight:600; color:#a78bfa; margin-top:7px; line-height:1.5; }
+  .step-note.warn { color:#b45309; font-weight:800; }
+
   .save-btn { width:100%; padding:13px; border-radius:12px; background:#7c3aed; color:#fff; border:none;
               font-size:12px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; }
   .save-btn:hover { background:#6d28d9; }
@@ -150,10 +173,10 @@
 
 <div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <!-- Raise a Case is the one thing done from here often, so it leads on
-       the right where the eye ends up, on a row of its own. -->
+  <!-- New Case is the one thing done from here often, so it leads on the
+       right where the eye ends up, on a row of its own. -->
   <div class="toolbar">
-    <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">➕ Raise a Case</button>
+    <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">➕ New Case</button>
   </div>
 
   <!-- One list, filtered. Overdue is a filter rather than a separate block:
@@ -192,6 +215,7 @@
       <span>Status</span>
       <span>System &amp; PIC</span>
       <span>Case Details</span>
+      <span>Raised By</span>
       <span>Actions</span>
     </div>
     <div id="list"></div>
@@ -210,55 +234,80 @@
 <div id="new-scrim" class="scrim hidden">
   <div class="sheet">
     <div class="flex items-center justify-between mb-4">
-      <span class="font-black text-slate-800 uppercase tracking-widest text-xs" id="c-heading">Raise a Case</span>
+      <span class="font-black text-slate-800 uppercase tracking-widest text-xs" id="c-heading">New Case</span>
       <button id="new-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none font-bold">&times;</button>
     </div>
 
-    <div class="mb-3"><label class="lbl" for="c-title">Title *</label>
-      <input id="c-title" class="inp" placeholder="What is wrong, in one line" maxlength="300"></div>
+    <!-- The flow, in the order somebody actually thinks in: which system,
+         what went wrong, where, who deals with it, then the evidence. -->
 
-    <div class="grid grid-cols-2 gap-3 mb-3">
-      <div><label class="lbl" for="c-category">Category</label><select id="c-category" class="inp"></select></div>
-      <div><label class="lbl" for="c-priority">Priority</label>
-        <select id="c-priority" class="inp">
-          <option value="low">Low</option><option value="normal" selected>Normal</option>
-          <option value="high">High</option><option value="urgent">Urgent</option>
-        </select></div>
+    <div class="step" id="step-system">
+      <div class="step-h"><span class="step-n">1</span>Which system is this under?</div>
+      <!-- Filled from nelos_modules, so the systems here and the ones on the
+           User Setting page stay the same list. -->
+      <select id="c-system" class="inp"><option value="nelos">Nelos</option></select>
     </div>
 
-    <div class="grid grid-cols-3 gap-3 mb-3">
-      <div><label class="lbl" for="c-nursery">Nursery</label><input id="c-nursery" class="inp" placeholder="optional"></div>
-      <div><label class="lbl" for="c-plot">Plot</label><input id="c-plot" class="inp" placeholder="optional"></div>
-      <div><label class="lbl" for="c-batch">Batch</label><input id="c-batch" class="inp" placeholder="optional"></div>
+    <div class="step" id="step-problem">
+      <div class="step-h"><span class="step-n">2</span>What is the problem?</div>
+      <!-- That system's own case categories, set on User Setting → Case
+           Routing. "Other" is always last, for something not listed yet. -->
+      <select id="c-problem" class="inp"></select>
+      <input id="c-problem-other" class="inp hidden" maxlength="120"
+             placeholder="Name the problem in a few words" style="margin-top:8px;">
+      <div class="step-row" style="margin-top:9px;">
+        <div><label class="lbl" for="c-priority">Priority</label>
+          <select id="c-priority" class="inp">
+            <option value="low">Low</option><option value="normal" selected>Normal</option>
+            <option value="high">High</option><option value="urgent">Urgent</option>
+          </select></div>
+        <div><label class="lbl" for="c-due">Due date</label>
+          <input id="c-due" type="date" class="inp"></div>
+      </div>
+      <p class="step-note">Both are filled in from the problem's usual settings, and stay editable.</p>
     </div>
 
-    <div class="grid grid-cols-2 gap-3 mb-3">
-      <div><label class="lbl" for="c-assignee">Assign to</label><select id="c-assignee" class="inp"></select></div>
-      <div><label class="lbl" for="c-due">Due date</label><input id="c-due" type="date" class="inp"></div>
+    <div class="step" id="step-where">
+      <div class="step-h"><span class="step-n">3</span>Where is it?</div>
+      <div class="step-row3">
+        <div><label class="lbl" for="c-nursery">Nursery *</label>
+          <select id="c-nursery" class="inp"></select></div>
+        <div><label class="lbl" for="c-plot">Plot</label>
+          <select id="c-plot" class="inp"><option value="">— any —</option></select></div>
+        <div><label class="lbl" for="c-batch">Batch</label>
+          <select id="c-batch" class="inp"><option value="">— any —</option></select></div>
+      </div>
+      <p class="step-note">A nursery is needed. Plot and batch narrow it down if you know them.</p>
     </div>
 
-    <div class="mb-3"><label class="lbl" for="c-desc">Detail</label>
-      <textarea id="c-desc" class="inp" placeholder="What happened, what needs doing, anything the assignee needs to know."></textarea></div>
+    <div class="step" id="step-who">
+      <div class="step-h"><span class="step-n">4</span>Who deals with it?</div>
+      <div class="step-row">
+        <div><label class="lbl" for="c-dest">System</label>
+          <select id="c-dest" class="inp"></select></div>
+        <div><label class="lbl" for="c-pic">Person in charge</label>
+          <select id="c-pic" class="inp"></select></div>
+      </div>
+      <p class="step-note" id="c-who-note"></p>
+    </div>
 
-    <!-- One photo. A case is usually about a thing somebody is standing in
-         front of, and a picture of it saves a paragraph. -->
-    <div class="mb-3"><label class="lbl" for="c-photo">Photo</label>
+    <div class="step" id="step-photo">
+      <div class="step-h"><span class="step-n">5</span>Photo</div>
       <input id="c-photo" type="file" accept="image/*" class="inp" style="padding:8px 10px;font-size:12px;">
-      <div id="c-photo-now" class="hidden" style="margin-top:7px;display:flex;align-items:center;gap:9px;">
+      <div id="c-photo-now" class="hidden" style="margin-top:8px;display:flex;align-items:center;gap:9px;">
         <img id="c-photo-thumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1.5px solid #ede9fe;">
         <button type="button" id="c-photo-drop"
                 style="font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#b91c1c;background:none;border:none;cursor:pointer;">
           Remove photo</button>
       </div>
+      <p class="step-note">One picture of the thing itself. Optional, but it usually saves a paragraph.</p>
     </div>
 
-    <div class="mb-4" id="c-source-wrap"><label class="lbl" for="c-source">Raised from</label>
-      <!-- Filled from nelos_modules, so the linked modules on the User
-           Setting page and the ones you can raise against stay the same
-           list. Falls back to Nelos alone if that table is unreachable. -->
-      <select id="c-source" class="inp">
-        <option value="nelos">Nelos</option>
-      </select></div>
+    <div class="step" id="step-desc">
+      <div class="step-h"><span class="step-n">6</span>Describe it</div>
+      <textarea id="c-desc" class="inp"
+                placeholder="What happened, what needs doing, anything the person in charge needs to know."></textarea>
+    </div>
 
     <button id="c-save" class="save-btn">Create Case</button>
   </div>
@@ -270,7 +319,12 @@ const $ = id => document.getElementById(id);
 const esc = MJMNelos.esc;
 
 let allCases = [];      // everything we are allowed to see, loaded once
-let categories = [];
+let categories = [];    // nelos_categories — the problems, per system
+let modules = [];       // nelos_modules — the linked systems
+let plots = [];         // shared_plots — { plot_name, nursery_name }
+let batches = [];       // operation_batches names
+let handlers = [];      // nelos_handlers — who works in which system
+let routes = [];        // nelos_routes — where a system's cases go
 let me = { id: null, name: null };
 
 /* What this person may press. Read once from nelos_my_rights(). The
@@ -349,10 +403,16 @@ function rowHtml(c) {
           <div class="case-meta">
             ${c.category ? `<span>🏷️ ${esc(c.category)}</span>` : ''}
             ${subject ? `<span>📍 ${esc(subject)}</span>` : ''}
-            <span>🕑 ${esc(new Date(c.created_at).toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}</span>
             ${due}
           </div>
         </div>
+      </div>
+
+      <div class="td-stack">
+        <span class="cell-cap">Raised by</span>
+        <span class="by-name">${c.raised_by ? esc(c.raised_by) : '<span class="by-none">unknown</span>'}</span>
+        <span class="by-when">${esc(new Date(c.created_at).toLocaleDateString('en-MY',
+          { day:'numeric', month:'short', year:'numeric' }))}</span>
       </div>
 
       <div class="td-act">
@@ -408,7 +468,7 @@ function render() {
     ? rows.map(rowHtml).join('')
     : `<div class="empty">No cases match this filter.<br>
          <span class="text-[11px] font-semibold text-slate-400">
-           ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “Raise a Case”.'}
+           ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “New Case”.'}
          </span></div>`;
 
   $('list').querySelectorAll('[data-act]').forEach(b =>
@@ -508,47 +568,182 @@ async function loadCategories() {
   const { data } = await _supabase.from('nelos_categories').select('*')
     .eq('active', true).order('sort_order').then(r => r, () => ({ data: [] }));
   categories = data || [];
-  fillCategories($('c-source').value);
+  fillProblems($('c-system').value);
 }
 
-/* A case title belongs to one system, so the picker offers only the titles
-   of whichever system the case is being raised in. Older databases have no
-   module_key on a category; there, every title is offered, which is how it
-   behaved before migration_nelos_category_system.sql. */
-function fillCategories(sourceKey) {
+/* STEP 2 — the problems the chosen system knows about. A case category
+   belongs to one system since migration_nelos_category_system.sql; an older
+   database has none, and there every category is offered, which is how it
+   behaved before. "Other" is always last so something not listed yet can
+   still be raised. */
+function fillProblems(systemKey) {
   const scoped = categories.some(c => c.module_key)
-    ? categories.filter(c => c.module_key === sourceKey)
+    ? categories.filter(c => c.module_key === systemKey)
     : categories;
-  const keep = $('c-category').value;
-  $('c-category').innerHTML = '<option value="">— none —</option>' +
-    scoped.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
-  if (scoped.some(c => c.name === keep)) $('c-category').value = keep;
+  const keep = $('c-problem').value;
+
+  $('c-problem').innerHTML =
+    '<option value="">— choose the problem —</option>' +
+    scoped.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('') +
+    '<option value="__other">Other — not listed</option>';
+
+  if (keep && (keep === '__other' || scoped.some(c => c.name === keep))) $('c-problem').value = keep;
+  syncOther();
 }
 
-async function loadAssignees() {
-  // nelos_assignable_users() — a SECURITY DEFINER function, because normal
-  // users may not select from shared_profiles (see migration_nelos.sql).
-  const { data } = await _supabase.rpc('nelos_assignable_users').then(r => r, () => ({ data: [] }));
-  const users = data || [];
-  $('c-assignee').innerHTML = '<option value="">— unassigned —</option>' +
-    users.map(u => `<option value="${esc(u.id)}">${esc(u.full_name || u.email)}</option>`).join('');
+/* The free-text box appears only for "Other". */
+function syncOther() {
+  $('c-problem-other').classList.toggle('hidden', $('c-problem').value !== '__other');
 }
 
-/* The linked modules, for the "Raised from" picker. Nelos itself is always
-   an option — a case need not come from another module. */
+/* What was actually chosen in step 2 — a listed problem, or the typed one. */
+function problemName() {
+  return $('c-problem').value === '__other'
+    ? $('c-problem-other').value.trim()
+    : $('c-problem').value;
+}
+
+/* ── Step 3: nursery → plot → batch ─────────────────────────────
+   All three are stored and matched by NAME across this codebase, not by id,
+   so the option values are the names themselves. */
+
+function fillNurseries() {
+  const names = [...new Set(plots.map(p => p.nursery_name).filter(Boolean))].sort();
+  $('c-nursery').innerHTML = '<option value="">— choose a nursery —</option>' +
+    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+
+/* Plot names run B1, B2 … B10, so they sort numerically or B10 lands
+   before B2 — the same comparison every other picker in the portal uses. */
+function fillPlots() {
+  const nursery = $('c-nursery').value;
+  const mine = plots
+    .filter(p => p.plot_name && (!nursery || p.nursery_name === nursery))
+    .map(p => p.plot_name)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  $('c-plot').innerHTML = '<option value="">— any plot —</option>' +
+    [...new Set(mine)].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+
+/* Batches narrow to the chosen plot when one is chosen, by asking the
+   ledger which batches have ever moved on it. operation_batches carries no
+   plot, so this is the only place the association exists. With no plot
+   chosen — or nothing on record for it — the full batch list stands. */
+async function fillBatches() {
+  const plot = $('c-plot').value;
+  const keep = $('c-batch').value;
+  let names = batches;
+
+  if (plot) {
+    const { data } = await _supabase.from('shared_inventory_logs')
+      .select('batch_name').eq('plot_name', plot).limit(2000)
+      .then(r => r, () => ({ data: null }));
+    const onPlot = [...new Set((data || []).map(r => r.batch_name).filter(Boolean))];
+    if (onPlot.length) names = onPlot;
+  }
+
+  names = [...names].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  $('c-batch').innerHTML = '<option value="">— any batch —</option>' +
+    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if (names.includes(keep)) $('c-batch').value = keep;
+}
+
+async function loadPlaces() {
+  const [plotRes, batchRes] = await Promise.all([
+    _supabase.from('shared_plots').select('plot_name,nursery_name')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('operation_batches').select('name')
+      .then(r => r, () => ({ data: [] }))
+  ]);
+  plots = plotRes.data || [];
+  batches = [...new Set((batchRes.data || []).map(b => b.name).filter(Boolean))];
+  fillNurseries();
+  fillPlots();
+  await fillBatches();
+}
+
+/* ── Step 4: who deals with it ──────────────────────────────────
+   The handler list is readable by anybody holding Nelos (migration_nelos_rls
+   grants SELECT on the config tables), so this works for an ordinary user —
+   nelos_people() would not, being admin-only. */
+
+async function loadHandlers() {
+  const [hRes, rRes] = await Promise.all([
+    _supabase.from('nelos_handlers').select('user_id,full_name,email,primary_module,seat_no')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nelos_routes').select('source_module,category,to_module,to_seat_no')
+      .then(r => r, () => ({ data: [] }))
+  ]);
+  handlers = hRes.data || [];
+  routes = rRes.data || [];
+}
+
+/* Everybody tagged to one system, lowest number first. */
+const handlersIn = key => handlers
+  .filter(h => h.primary_module === key && key)
+  .sort((a, b) => (a.seat_no || 99) - (b.seat_no || 99));
+
+/* Where the routing rules would send this case — the exact-category rule
+   first, then the system's catch-all, then nowhere (it stays put). */
+function routedTo(systemKey, problem) {
+  const rule = routes.find(r => r.source_module === systemKey && r.category === problem) ||
+               routes.find(r => r.source_module === systemKey && r.category === null);
+  return rule ? rule.to_module : systemKey;
+}
+
+function fillDest() {
+  const want = $('c-dest').value || routedTo($('c-system').value, problemName());
+  $('c-dest').innerHTML = modules.map(m =>
+    `<option value="${esc(m.key)}">${esc(m.label)}${m.sees_all_cases ? '  (HQ)' : ''}</option>`).join('');
+  if (modules.some(m => m.key === want)) $('c-dest').value = want;
+}
+
+/* The people in the destination system. "Auto" is the default and means the
+   lowest-numbered handler there — the #1 — which is who the case goes to if
+   nobody picks. */
+function fillPics() {
+  const staff = handlersIn($('c-dest').value);
+  const keep = $('c-pic').value;
+
+  $('c-pic').innerHTML = staff.length
+    ? `<option value="">Auto — #${staff[0].seat_no || 1} (${esc(staff[0].full_name || staff[0].email)})</option>` +
+      staff.map(h => `<option value="${esc(h.user_id)}">#${h.seat_no || '—'} ${
+        esc(h.full_name || h.email)}</option>`).join('')
+    : '<option value="">Nobody is tagged to that system</option>';
+  if (staff.some(h => h.user_id === keep)) $('c-pic').value = keep;
+
+  const chosen = pickedPic();
+  $('c-who-note').className = 'step-note' + (chosen ? '' : ' warn');
+  $('c-who-note').textContent = chosen
+    ? `${chosen.full_name || chosen.email} will find this in their Nelos to-do list as soon as it is created.`
+    : 'Nobody is tagged to that system yet, so this case will sit unassigned. ' +
+      'Tag somebody on User Setting → Case Handlers.';
+}
+
+/* Who the case will actually go to: the person picked, or the #1 of the
+   destination system when the picker is left on Auto. */
+function pickedPic() {
+  const staff = handlersIn($('c-dest').value);
+  if (!staff.length) return null;
+  return staff.find(h => h.user_id === $('c-pic').value) || staff[0];
+}
+
+/* STEP 1 — the linked systems. Everything active is a destination in step
+   4; only what may raise a case is offered in step 1. Nelos itself is always
+   there, for a case that belongs to no module. */
 async function loadModules() {
-  // Only sections that may raise a case are offered. A section switched off
-  // on the User Setting page stops appearing here rather than raising cases
-  // that route nowhere.
-  const { data } = await _supabase.from('nelos_modules').select('key,label')
-    .eq('active', true).eq('can_create', true).order('sort_order')
+  const { data } = await _supabase.from('nelos_modules').select('*')
+    .eq('active', true).order('sort_order')
     .then(r => r, () => ({ data: [] }));
-  const mods = data || [];
-  if (!mods.length) return;
-  $('c-source').innerHTML =
-    mods.map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join('') +
+  modules = data || [];
+  if (!modules.length) return;
+
+  const canRaise = modules.filter(m => m.can_create !== false);
+  $('c-system').innerHTML =
+    canRaise.map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join('') +
     '<option value="nelos">Nelos (no module)</option>';
-  $('c-source').value = 'nelos';
+  $('c-system').value = 'nelos';
 }
 
 function loadSourceFilter() {
@@ -560,12 +755,18 @@ function loadSourceFilter() {
 /* ── New case ──────────────────────────────────────────────────── */
 
 function clearDrawer() {
-  ['c-title','c-desc','c-nursery','c-plot','c-batch','c-due'].forEach(id => $(id).value = '');
+  ['c-desc', 'c-due', 'c-problem-other'].forEach(id => $(id).value = '');
   $('c-priority').value = 'normal';
-  $('c-category').value = '';
-  $('c-assignee').value = '';
+  $('c-problem').value = '';
+  // The three place pickers have to be cleared by hand. fillBatches() keeps
+  // whatever was chosen if it is still on offer — right when a plot changes
+  // mid-case, wrong when the drawer is being opened fresh, which would
+  // otherwise carry the last case's batch into the next one.
+  ['c-nursery', 'c-plot', 'c-batch'].forEach(id => $(id).value = '');
+  $('c-pic').value = '';
   $('c-photo').value = '';
   setPhoto(null);
+  syncOther();
 }
 
 /* Shows (or clears) the photo currently attached to whatever is in the
@@ -576,49 +777,97 @@ function setPhoto(url) {
   if (photoUrl) $('c-photo-thumb').src = photoUrl;
 }
 
-function openNew(prefill) {
-  editingId = null;
-  clearDrawer();
-  $('c-heading').textContent = 'Raise a Case';
-  $('c-save').textContent = 'Create Case';
-  $('c-source-wrap').classList.remove('hidden');
-  $('new-scrim').classList.remove('hidden');
-  if (prefill) {
-    if (prefill.source) { $('c-source').value = prefill.source; fillCategories(prefill.source); }
-    if (prefill.batch)  $('c-batch').value  = prefill.batch;
-    if (prefill.plot)   $('c-plot').value   = prefill.plot;
-    if (prefill.nursery) $('c-nursery').value = prefill.nursery;
-    if (prefill.title)  $('c-title').value  = prefill.title;
-  }
-  setTimeout(() => $('c-title').focus(), 60);
+/* Steps 2 and 4 both follow from step 1, and step 4 follows from step 2, so
+   one call re-draws whatever is downstream of what just changed. */
+function refreshFrom(step) {
+  if (step <= 1) fillProblems($('c-system').value);
+  if (step <= 2) { $('c-dest').value = routedTo($('c-system').value, problemName()); }
+  fillDest();
+  fillPics();
 }
 
-/* The same drawer, filled in. "Raised from" is hidden while editing: where
-   a case came from is a fact about it, and changing it would re-route a
-   case somebody is already working on. */
-function openEdit(c) {
+async function openNew(prefill) {
+  editingId = null;
+  clearDrawer();
+  $('c-heading').textContent = 'New Case';
+  $('c-save').textContent = 'Create Case';
+  $('step-system').classList.remove('hidden');
+  // Shown before the batch list is fetched — a drawer that waits on a round
+  // trip before appearing reads as a button that did nothing.
+  $('new-scrim').classList.remove('hidden');
+
+  $('c-system').value = (prefill && prefill.source) || 'nelos';
+  refreshFrom(1);
+
+  // A deep link may name the problem (…&title=Broken+tray). If it matches
+  // one of that system's own, use it; otherwise it goes in as "Other".
+  if (prefill && prefill.title) {
+    if ([...$('c-problem').options].some(o => o.value === prefill.title)) {
+      $('c-problem').value = prefill.title;
+    } else {
+      $('c-problem').value = '__other';
+      $('c-problem-other').value = prefill.title;
+    }
+    syncOther();
+    refreshFrom(2);
+  }
+
+  fillNurseries();
+  fillPlots();
+  $('c-nursery').value = (prefill && prefill.nursery) || '';
+  if (prefill && prefill.plot) { fillPlots(); $('c-plot').value = prefill.plot; }
+  await fillBatches();
+  if (prefill && prefill.batch) $('c-batch').value = prefill.batch;
+
+  setTimeout(() => $('c-system').focus(), 60);
+}
+
+/* The same drawer, filled in. Step 1 is hidden while editing: where a case
+   came from is a fact about it, and changing it would re-route a case
+   somebody is already working on. */
+async function openEdit(c) {
   editingId = c.id;
   clearDrawer();
   $('c-heading').textContent = 'Edit ' + (c.case_no || 'Case');
   $('c-save').textContent = 'Save Changes';
-  $('c-source-wrap').classList.add('hidden');
-
-  $('c-source').value = c.source_module || 'nelos';
-  fillCategories(c.source_module || 'nelos');
-
-  $('c-title').value   = c.title || '';
-  $('c-desc').value    = c.description || '';
-  $('c-priority').value = c.priority || 'normal';
-  $('c-nursery').value = c.nursery_name || '';
-  $('c-plot').value    = c.plot_name || '';
-  $('c-batch').value   = c.batch_name || '';
-  $('c-due').value     = c.due_date || '';
-  if (c.category) $('c-category').value = c.category;
-  if (c.assignee_id) $('c-assignee').value = c.assignee_id;
-  setPhoto(c.photo_url);
-
+  $('step-system').classList.add('hidden');
   $('new-scrim').classList.remove('hidden');
-  setTimeout(() => $('c-title').focus(), 60);
+
+  $('c-system').value = c.source_module || 'nelos';
+  fillProblems(c.source_module || 'nelos');
+
+  // A category that has since been renamed or removed is still this case's
+  // problem, so it goes in the free-text box rather than being lost.
+  if (c.category && [...$('c-problem').options].some(o => o.value === c.category)) {
+    $('c-problem').value = c.category;
+  } else if (c.title) {
+    $('c-problem').value = '__other';
+    $('c-problem-other').value = c.title;
+  }
+  syncOther();
+
+  $('c-desc').value     = c.description || '';
+  $('c-priority').value = c.priority || 'normal';
+  $('c-due').value      = c.due_date || '';
+
+  fillNurseries();
+  $('c-nursery').value = c.nursery_name || '';
+  fillPlots();
+  $('c-plot').value = c.plot_name || '';
+  await fillBatches();
+  $('c-batch').value = c.batch_name || '';
+
+  $('c-dest').value = c.assigned_module || c.source_module || '';
+  fillDest();
+  $('c-pic').value = '';
+  fillPics();
+  if (c.assignee_id && [...$('c-pic').options].some(o => o.value === c.assignee_id)) {
+    $('c-pic').value = c.assignee_id;
+    fillPics();
+  }
+
+  setPhoto(c.photo_url);
+  setTimeout(() => $('c-problem').focus(), 60);
 }
 
 function closeNew() { $('new-scrim').classList.add('hidden'); }
@@ -640,21 +889,30 @@ async function uploadPhoto() {
   return _supabase.storage.from('nelos-photos').getPublicUrl(path).data.publicUrl;
 }
 
-/* Choosing a category fills in its house defaults — the priority it is
-   usually raised at, and the due date it is usually given. Both stay
-   editable; this only saves typing. */
-$('c-source').addEventListener('change', () => fillCategories($('c-source').value));
+/* ── Wiring the steps together ─────────────────────────────────── */
 
-$('c-category').addEventListener('change', () => {
-  const cat = categories.find(c => c.name === $('c-category').value);
-  if (!cat) return;
-  if (cat.default_priority) $('c-priority').value = cat.default_priority;
-  if (cat.default_days != null && !$('c-due').value) {
-    const d = new Date();
-    d.setDate(d.getDate() + Number(cat.default_days));
-    $('c-due').value = d.toISOString().slice(0, 10);
+$('c-system').addEventListener('change', () => refreshFrom(1));
+
+$('c-problem').addEventListener('change', () => {
+  syncOther();
+  // A problem carries its house settings — the priority it is usually
+  // raised at, and how long it usually gets. Both stay editable.
+  const cat = categories.find(c => c.name === $('c-problem').value);
+  if (cat) {
+    if (cat.default_priority) $('c-priority').value = cat.default_priority;
+    if (cat.default_days != null && !$('c-due').value) {
+      const d = new Date();
+      d.setDate(d.getDate() + Number(cat.default_days));
+      $('c-due').value = d.toISOString().slice(0, 10);
+    }
   }
+  refreshFrom(2);
 });
+
+$('c-nursery').addEventListener('change', async () => { fillPlots(); await fillBatches(); });
+$('c-plot').addEventListener('change', () => fillBatches());
+$('c-dest').addEventListener('change', () => fillPics());
+$('c-pic').addEventListener('change', () => fillPics());
 
 $('c-photo').addEventListener('change', () => {
   const f = $('c-photo').files && $('c-photo').files[0];
@@ -665,8 +923,13 @@ $('c-photo').addEventListener('change', () => {
 $('c-photo-drop').addEventListener('click', () => { $('c-photo').value = ''; setPhoto(null); });
 
 $('c-save').addEventListener('click', async () => {
-  const title = $('c-title').value.trim();
-  if (!title) { toast('A case needs a title.', false); $('c-title').focus(); return; }
+  const problem = problemName();
+  if (!problem) {
+    toast('Choose what the problem is.', false);
+    ($('c-problem').value === '__other' ? $('c-problem-other') : $('c-problem')).focus();
+    return;
+  }
+  if (!$('c-nursery').value) { toast('Choose which nursery.', false); $('c-nursery').focus(); return; }
 
   const btn = $('c-save');
   const wording = editingId ? 'Save Changes' : 'Create Case';
@@ -681,18 +944,24 @@ $('c-save').addEventListener('click', async () => {
     return;
   }
 
+  // Who it goes to: the person picked in step 4, or the #1 of the
+  // destination system when the picker is left on Auto.
+  const pic = pickedPic();
+  const listed = $('c-problem').value !== '__other';
+
   if (editingId) {
-    const sel = $('c-assignee');
     const row = {
-      title,
+      title:         problem,
       description:   $('c-desc').value.trim() || null,
-      category:      $('c-category').value || null,
+      category:      listed ? problem : null,
       priority:      $('c-priority').value,
-      nursery_name:  $('c-nursery').value.trim() || null,
-      plot_name:     $('c-plot').value.trim() || null,
-      batch_name:    $('c-batch').value.trim() || null,
-      assignee_id:   sel.value || null,
-      assignee_name: sel.value ? sel.options[sel.selectedIndex].text : null,
+      nursery_name:  $('c-nursery').value || null,
+      plot_name:     $('c-plot').value || null,
+      batch_name:    $('c-batch').value || null,
+      assigned_module:  $('c-dest').value || null,
+      assigned_seat_no: pic ? (pic.seat_no || null) : null,
+      assignee_id:   pic ? pic.user_id : null,
+      assignee_name: pic ? (pic.full_name || pic.email) : null,
       due_date:      $('c-due').value || null,
       updated_by:    me.name,
       updated_at:    new Date().toISOString()
@@ -713,31 +982,35 @@ $('c-save').addEventListener('click', async () => {
     return;
   }
 
-  const sel = $('c-assignee');
   const { data, error } = await MJMNelos.raise({
     photoUrl:    uploaded || null,
-    title,
+    title:       problem,
     description: $('c-desc').value.trim() || null,
-    category:    $('c-category').value || null,
+    category:    listed ? problem : null,
     priority:    $('c-priority').value,
-    source:      $('c-source').value,
-    nursery:     $('c-nursery').value.trim() || null,
-    plot:        $('c-plot').value.trim() || null,
-    batch:       $('c-batch').value.trim() || null,
-    assigneeId:  sel.value || null,
-    assigneeName: sel.value ? sel.options[sel.selectedIndex].text : null,
+    source:      $('c-system').value,
+    nursery:     $('c-nursery').value || null,
+    plot:        $('c-plot').value || null,
+    batch:       $('c-batch').value || null,
+    assignedModule:  $('c-dest').value || null,
+    assignedSeatNo:  pic ? pic.seat_no : null,
+    assigneeId:      pic ? pic.user_id : null,
+    assigneeName:    pic ? (pic.full_name || pic.email) : null,
     dueDate:     $('c-due').value || null
   });
 
   btn.disabled = false; btn.textContent = wording;
   if (error) { toast('Could not create the case — ' + error.message, false); return; }
 
-  toast('Case ' + (data.case_no || '') + ' created.');
+  toast(pic
+    ? `Case ${data.case_no || ''} created — it is now in ${pic.full_name || pic.email}'s to-do list.`
+    : `Case ${data.case_no || ''} created.`);
   closeNew();
   clearDrawer();
   await loadCases();
   loadSourceFilter();
 });
+
 
 /* ── Wiring ────────────────────────────────────────────────────── */
 
@@ -772,7 +1045,11 @@ $('f-q').addEventListener('input', render);
     // What this person may press, before the first render draws buttons.
     await loadRights();
 
-    await Promise.all([loadCases(), loadCategories(), loadAssignees(), loadModules()]);
+    // Modules first: the problem list, the destination list and the PIC
+    // list all read from it, so the drawer's steps have nothing to draw
+    // until it is in.
+    await loadModules();
+    await Promise.all([loadCases(), loadCategories(), loadHandlers(), loadPlaces()]);
     loadSourceFilter();
 
     $('loading').classList.add('hidden');
