@@ -130,25 +130,39 @@
         5px 5px 0 var(--green-3), 6px 6px 0 var(--green-3),
         7px 7px 0 var(--green-4), 8px 8px 0 var(--green-4),
         10px 12px 16px rgba(6,42,22,.4);
-      /* The glyph box is centred, but the shadow only falls down-RIGHT and
-         shadows take up no layout, so the INK lands right of centre.
-         Measured off a render: at 0 the centre of mass sits 8.4px right,
-         and 1px of translate moves it 1px. -7px puts centre of mass and
-         bounding box either side of zero. */
-      transform: translateX(-7px) rotate(-1.2deg);
+      /* No sideways nudge on this cover, and that is measured, not an
+         oversight — the -7px that used to be here pushed it left.
+
+         Two things move the ink: the glyphs lean right (and their extrusion
+         further), while the cover's own -.4deg tilt swings anything ABOVE
+         its centre to the left. On the FC and Admin covers a house name sits
+         over the 555, pushing it down past the centre where that second
+         effect works the other way, so those two need a nudge. Here the 555
+         is the top thing on the cover and the two effects cancel: the face
+         of the middle 5 lands within half a pixel of centre on its own, at
+         both 64px and 74px. */
+      transform: rotate(-1.2deg);
     }
+    /* A centred, letter-spaced line is NOT centred: CSS puts the space
+       after the last letter too, so the ink sits half a letter-space left
+       of the box. An equal text-indent puts it back — indent and trailing
+       space cancel. Both come off one --ls so the pair cannot drift. */
     .portal-name {
+      --ls: .34em;
       margin-top: 12px;
       text-align: center;
       font-size: 12px; font-weight: 900;
-      letter-spacing: .34em; text-transform: uppercase;
+      letter-spacing: var(--ls); text-indent: var(--ls);
+      text-transform: uppercase;
       color: var(--quiet);
     }
     .portal-sub {
       margin-top: 5px;
       text-align: center;
+      --ls: .2em;
       font-size: 9.5px; font-weight: 700;
-      letter-spacing: .2em; text-transform: uppercase;
+      letter-spacing: var(--ls); text-indent: var(--ls);
+      text-transform: uppercase;
       color: var(--quiet);
     }
 
@@ -372,7 +386,7 @@
     @media (max-width: 360px) {
       .cover { padding: 26px 20px 22px; }
       .logo555 { font-size: 64px; }
-      .portal-name { letter-spacing: .26em; font-size: 11px; }
+      .portal-name { --ls: .26em; font-size: 11px; }
     }
     @media (min-height: 800px) {
       .lines { margin-top: 48px; }
