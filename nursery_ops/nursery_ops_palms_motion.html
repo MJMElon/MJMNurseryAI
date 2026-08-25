@@ -43,27 +43,23 @@
 </head>
 <body>
 
-<div id="mjm-ribbon"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
-  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">PALMS — Motion Study</span>
-  <div class="flex items-center gap-2">
-    <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
-  </div>
-</div>
 
 <div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1280px] mx-auto px-4 md:px-6 py-7 hidden palms-frame">
 
-  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-    <div id="palms-nav" data-page="motion"></div>
-    <script src="../shared/shared_palms_nav.js"></script>
-    <div class="flex flex-wrap items-center gap-2">
-      <select id="f-nursery" class="pick"></select>
-      <select id="f-month" class="pick"></select>
-    </div>
+  <aside id="palms-nav" data-page="motion" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body">
+
+  <div class="flex flex-wrap items-center justify-end gap-2 mb-6">
+    <select id="f-nursery" class="pick"></select>
+    <select id="f-month" class="pick"></select>
   </div>
 
   <div class="card p-5 mb-5">
@@ -197,6 +193,8 @@
       created — run <code class="bg-slate-100 px-1.5 py-0.5 rounded">shared/create_palms_tables.sql</code>.
     </p>
   </div>
+
+</div>
 
   <p class="text-[11px] text-slate-400 text-center mt-7">
     Page access is granted on this module's

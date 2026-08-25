@@ -1,57 +1,91 @@
 /* ================================================================
-   PALMS — the tab strip
+   PALMS — the side bar
    shared/shared_palms_nav.js
 
-   PALMS used to be four tiles on the Nursery Operation Manage
-   dashboard: the board, Life of Plot, the motion study and its
-   settings. Four tiles side by side said nothing about the four being
-   one thing, and the dashboard was mostly PALMS by tile count while
-   PALMS is one of three jobs the module does.
+   PALMS is four pages: the monitoring board, Life of Plot, the motion
+   study and its settings. All four are readings of the SAME record —
+   the plot log the Field Conductor keeps in the FC Portal
+   (fcportal_palms_plot_logs) — which is what makes them one module
+   rather than four pages that happen to be filed together, and why the
+   settings page belongs with them: the ideal durations it holds are
+   what the board calls a plot late by.
 
-   So the dashboard has one PALMS tile now, and this is what you get
-   once you are through it: the same strip on every PALMS page, with
-   the page you are on marked. Getting from the board to the motion
-   study no longer means going back out to the dashboard first.
+   So they share a side bar, and the bar is where you move between them.
+   It also carries the way out, back to Nursery Operation Manage, which
+   is a different thing from moving around inside PALMS and is kept
+   visually apart from the four for that reason.
 
-   All four are readings of the SAME record — the plot log the Field
-   Conductor keeps in the FC Portal (fcportal_palms_plot_logs). That is
-   what makes them one module rather than four pages that happen to be
-   filed together, and it is why the settings page belongs here: the
-   ideal durations it holds are what the board calls a plot late by and
-   what the motion study measures against.
+   Usage — a mount point where the bar should sit:
 
-   Usage — a mount point, anywhere on the page:
-
-     <div id="palms-nav" data-page="board"></div>
+     <aside id="palms-nav" data-page="board"></aside>
      <script src="../shared/shared_palms_nav.js"></script>
 
-   data-page is one of the keys in PAGES below. An unknown key, or none,
-   simply marks nothing current — a page that is not in the strip can
-   still show the strip to get out of.
+   data-page is one of the keys in PAGES. An unknown key, or none, marks
+   nothing current — a page not in the bar can still show it to get out.
 
-   Inline styles, like shared_ribbon.js, so it renders the same whether
-   the host page has Tailwind or not.
+   STYLING NOTE. Everything here is a class in the injected <style>, not
+   an inline style attribute. That is deliberate: an inline declaration
+   outranks a stylesheet one whatever the selector, so a bar styled
+   inline could not be narrowed by a media query — which is exactly the
+   bug the ribbon carried, where its phone title never applied and an
+   867px title was clipped into 372px of bar. The bar has to change shape
+   on a phone, so it cannot be built that way.
    ================================================================ */
 (function (global) {
 
-  /* Href is relative to nursery_ops/, which is where all four live. */
+  /* Hrefs are relative to nursery_ops/, where all four live. */
   var PAGES = [
-    { key: 'board',    label: 'Board',        icon: '🪴', href: 'nursery_ops_palms_board.html' },
-    { key: 'life',     label: 'Life of Plot', icon: '🌱', href: 'nursery_ops_plot_life.html' },
-    { key: 'motion',   label: 'Motion Study', icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
-    { key: 'settings', label: 'Settings',     icon: '⚙️', href: 'nursery_ops_settings.html' },
+    { key: 'board',    label: 'Monitoring Board', icon: '🪴', href: 'nursery_ops_palms_board.html' },
+    { key: 'life',     label: 'Life of Plot',     icon: '🌱', href: 'nursery_ops_plot_life.html' },
+    { key: 'motion',   label: 'Motion Study',     icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
+    { key: 'settings', label: 'Settings',         icon: '⚙️', href: 'nursery_ops_settings.html' },
   ];
 
-  var BASE =
-    'display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:999px;' +
-    'font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap;' +
-    'border:1px solid transparent;transition:background .15s,color .15s;';
-
-  /* The current page is a filled tab, not a link that looks pressed —
-     it stays an <a> to its own href so a tap on it is a reload rather
-     than nothing happening, which is what a dead tab feels like. */
-  var ON  = BASE + 'background:#0f766e;color:#fff;';
-  var OFF = BASE + 'background:#f0fdfa;color:#0f766e;border-color:#99f6e4;';
+  /* The two-column frame lives here, not in the host page's Tailwind.
+     These pages pull Tailwind from a CDN, so a layout written as
+     `md:grid-cols-[212px_minmax(0,1fr)]` is a layout that exists only if
+     that CDN answered — and one that cannot be checked anywhere the CDN
+     is unreachable. The bar owns its own geometry instead: .palms-frame
+     on the page's #main, .palms-body on the content beside it. */
+  var CSS =
+    '.palms-frame{display:block;}' +
+    '.palms-body{min-width:0;}' +
+    '@media(min-width:768px){.palms-frame{display:grid;' +
+      'grid-template-columns:212px minmax(0,1fr);gap:28px;align-items:start;}}' +
+    '#palms-nav{display:block;font-family:Outfit,system-ui,-apple-system,sans-serif;}' +
+    '#palms-nav .pn-out{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:12px;' +
+      'background:#f8fafc;border:1px solid #e2e8f0;color:#475569;text-decoration:none;' +
+      'font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;' +
+      'line-height:1.25;transition:background .15s,color .15s;}' +
+    '#palms-nav .pn-out:hover{background:#f1f5f9;color:#0f172a;}' +
+    /* The four pages, held apart from the way out by a rule rather than
+       by distance alone, so the bar reads as "leave" then "inside". */
+    '#palms-nav .pn-group{margin-top:14px;padding-top:14px;border-top:1px solid #ccfbf1;' +
+      'display:flex;flex-direction:column;gap:4px;}' +
+    '#palms-nav .pn-cap{font-size:9.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;' +
+      'color:#5eead4;padding:0 4px 7px;}' +
+    '#palms-nav .pn-tab{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:12px;' +
+      'text-decoration:none;font-size:12.5px;font-weight:800;color:#0f766e;background:transparent;' +
+      'border:1px solid transparent;line-height:1.25;transition:background .15s,color .15s;}' +
+    '#palms-nav .pn-tab:hover{background:#ccfbf1;}' +
+    '#palms-nav .pn-tab.is-on{background:#0f766e;color:#fff;}' +
+    '#palms-nav .pn-tab.is-on:hover{background:#115e59;}' +
+    '#palms-nav .pn-ico{font-size:14px;line-height:1;flex:0 0 auto;}' +
+    /* Desktop: a real column that stays put while a long board scrolls
+       past it. 84px clears the ribbon, which is sticky. */
+    '@media(min-width:768px){#palms-nav{position:sticky;top:84px;align-self:start;}}' +
+    /* Phone: the column becomes a row above the content — a 212px column
+       beside a table on a 412px screen leaves neither of them usable.
+       The four scroll sideways if they have to, and the way out stays on
+       its own line above them. */
+    '@media(max-width:767px){' +
+      '#palms-nav .pn-group{margin-top:10px;padding-top:10px;flex-direction:row;overflow-x:auto;' +
+        'gap:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}' +
+      '#palms-nav .pn-group::-webkit-scrollbar{display:none;}' +
+      '#palms-nav .pn-cap{display:none;}' +
+      '#palms-nav .pn-tab{flex:0 0 auto;background:#f0fdfa;border-color:#99f6e4;font-size:12px;padding:9px 13px;}' +
+      '#palms-nav .pn-out{justify-content:center;}' +
+    '}';
 
   function esc(t) {
     return String(t == null ? '' : t)
@@ -62,25 +96,24 @@
   function html(current) {
     var tabs = PAGES.map(function (p) {
       var on = p.key === current;
-      return '<a class="palms-nav-tab' + (on ? ' is-on' : '') + '" href="' + esc(p.href) + '"' +
-             (on ? ' aria-current="page"' : '') +
-             ' style="' + (on ? ON : OFF) + '">' +
-               '<span aria-hidden="true">' + p.icon + '</span>' + esc(p.label) +
+      return '<a class="pn-tab' + (on ? ' is-on' : '') + '" href="' + esc(p.href) + '"' +
+             (on ? ' aria-current="page"' : '') + '>' +
+               '<span class="pn-ico" aria-hidden="true">' + p.icon + '</span>' +
+               '<span>' + esc(p.label) + '</span>' +
              '</a>';
     }).join('');
 
     return '' +
-      '<nav aria-label="PALMS" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;' +
-                 'font-family:Outfit,system-ui,-apple-system,sans-serif;">' +
-        /* Out of PALMS entirely, kept visually apart from the four tabs
-           so it does not read as a fifth one. */
-        '<a href="nursery_ops_dashboard.html" style="' + BASE +
-           'background:#f8fafc;color:#64748b;border-color:#e2e8f0;margin-right:4px;">' +
-          '&#8592; Module</a>' +
-        tabs +
+      '<nav aria-label="PALMS">' +
+        '<a class="pn-out" href="nursery_ops_dashboard.html">' +
+          '<span aria-hidden="true">&#8592;</span>' +
+          '<span>Back to Operation Manage Page</span>' +
+        '</a>' +
+        '<div class="pn-group">' +
+          '<div class="pn-cap">PALMS</div>' + tabs +
+        '</div>' +
       '</nav>' +
-      '<style>#palms-nav .palms-nav-tab:hover{background:#ccfbf1;}' +
-             '#palms-nav .palms-nav-tab.is-on:hover{background:#115e59;}</style>';
+      '<style>' + CSS + '</style>';
   }
 
   function mount() {

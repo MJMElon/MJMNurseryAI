@@ -82,18 +82,19 @@
 </head>
 <body>
 
-<div class="bg-white border-b border-teal-100 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
-  <span class="justify-self-start"></span>
-  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Life of Plot</span>
-  <div class="justify-self-end"><div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div></div>
-</div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
 
 <div id="loading" class="max-w-[1150px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
 
-<div id="main" class="max-w-[1150px] mx-auto px-4 md:px-6 py-8 hidden">
+<div id="main" class="max-w-[1390px] mx-auto px-4 md:px-6 py-8 hidden palms-frame">
 
-  <div id="palms-nav" data-page="life" class="mb-6"></div>
+  <aside id="palms-nav" data-page="life" class="mb-5 md:mb-0"></aside>
   <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body">
+
 
   <!-- ── Over-ideal-time Alert Board ─────────────────────────── -->
   <div class="card overflow-hidden mb-6" style="border-color:#fecdd3;">
@@ -191,6 +192,8 @@
       </div>
     </div>
   </div>
+
+</div>
 </div>
 
 <!-- ── Ad-hoc work log modal ─────────────────────────────────── -->
