@@ -117,7 +117,7 @@
 /* Language + sign-out pills share one shape so they read as a pair. */
 .fcr-lang,
 .fcr-signout{
-  height:32px;
+  height:33px;
   padding:0 12px;
   border-radius:999px;
   background:#f8fafc;
@@ -160,10 +160,25 @@
    dropped below 380px; the space the sign-out word gave back pays
    for it, and "Auditor Portal" is the half that says what the bar
    is. */
+/* The welcome name goes first, and it has to go earlier than the phone
+   breakpoint now. The wordmark is wider than the old one, and centring
+   it needs room for the right-hand cluster TWICE over — the two grid
+   columns either side of it claim equal width. Measured: with the name
+   showing that comes to 771px, so anything under about 820 was pushing
+   the bar into a sideways scroll. Without it the same bar needs 584. */
+/* The welcome name goes first, and it has to go before the phone
+   breakpoint: centring the wordmark needs room for the right-hand
+   cluster TWICE over, since the two grid columns either side of it
+   claim equal width. Measured on this bar: 664px with the name
+   showing, 528 without. Below 680 it would push the bar into a
+   sideways scroll, so that is where it goes. */
+@media (max-width:680px){
+  .fcr-welcome{display:none}
+}
+
 @media (max-width:640px){
   .fcr{gap:8px;padding:10px 12px}
   .fcr-right{gap:8px}
-  .fcr-welcome{display:none}
   .fcr-signout-label{display:none}
   .fcr-signout-icon{display:inline}
   .fcr-brand-name{font-size:27px}
