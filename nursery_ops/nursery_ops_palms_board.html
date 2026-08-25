@@ -193,13 +193,24 @@ function lineForPlot(plot) {
 }
 
 /* What the map paints. 'over' is red, 'ok' green, anything else grey. */
+/* The key beside the map: the office's own stages, in their own order,
+   grouped into the phases the map can actually colour apart. Read from
+   MJMPalms.ACTIVITIES rather than written out, so a stage added or renamed
+   in Settings shows up here without this file being touched. */
+let PAL = { legend: [], keyOf: {} };
+
+/* What the map paints a plot. `key` picks the colour off the key beside it;
+   `late` is the only words left on the map, and only where there are any. */
 function mapStatusOf(plot) {
   const ln = lineForPlot(plot);
   if (!ln || ln.state === 'none') return { tone: 'none', line: 'no status' };
-  const days = ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left';
+  const act = MJMPalms.actByN(ln.actN);
   return {
     tone: ln.state === 'overdue' ? 'over' : 'ok',
-    line: (ln.status || '—') + ' · ' + days,
+    key: act ? PAL.keyOf[act.name] : null,
+    late: ln.left < 0 ? (-ln.left) + 'd over' : '',
+    // Kept for anything that still wants the whole sentence.
+    line: (ln.status || '—') + ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left'),
   };
 }
 
@@ -440,9 +451,12 @@ function render() {
     await MJMPalms.loadStages(_supabase);
     LOGS = await MJMPalms.loadLogs(_supabase);
 
+    PAL = MJMPlotMap.phases((MJMPalms.ACTIVITIES || []).map((a) => a.name));
     MAP = MJMPlotMap.create({
       mount: $('plot-map'),
       title: '🗺️ Plot Status Map',
+      legend: PAL.legend,
+      legendTitle: 'Current stage',
       statusOf: mapStatusOf,
       onNurseryChange: renderTable,
     });

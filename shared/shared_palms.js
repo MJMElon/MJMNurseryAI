@@ -197,6 +197,11 @@
       label: keyLabel(key),
       state: st.state,                                   // overdue | ontrack | none
       status: open.length ? open.map((a) => a.name).join(' + ') : null,
+      // The single stage the plot counts as being on, for anything that can
+      // show only one — the map paints one colour per plot, and a plot on
+      // two activities at once is furthest along at the later of them.
+      // openActivities is sorted by n, so the last is the highest.
+      actN: open.length ? open[open.length - 1].n : null,
       due: st.state === 'none' ? null : st.due,          // expected completion
       left: st.state === 'none' ? null : st.left,        // <0 = days over
       start: st.state === 'none' ? null : st.start,
