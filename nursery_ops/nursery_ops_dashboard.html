@@ -16,11 +16,23 @@
   body { background:#f0fdfa; margin:0; }
 
   /* Small tool buttons */
-  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+  /* Square tiles, laid out on a grid that fits as many as the width allows
+     and never fewer than two, so the set still reads as a set on a phone. */
+  .tool-grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); }
+  .tool-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+              aspect-ratio:1/1; padding:12px; border-radius:18px; text-align:center;
               background:white; border:1.5px solid #99f6e4; color:#0f766e; font-weight:900; font-size:11px;
-              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s;
-              box-shadow:0 3px 10px rgba(13,148,136,.10); }
-  .tool-btn:hover { background:#ccfbf1; transform:translateY(-1px); }
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none;
+              transition:transform .12s, background .15s, box-shadow .15s;
+              box-shadow:0 3px 10px rgba(13,148,136,.10); touch-action:none; user-select:none; }
+  .tool-btn .ti { font-size:30px; line-height:1; }
+  .tool-btn .tl { line-height:1.25; }
+  .tool-btn:hover { background:#ccfbf1; transform:translateY(-2px); }
+  /* The one being carried follows the pointer and is lifted off the grid;
+     the gap it left stays open so the drop target is obvious. */
+  .tool-btn.dragging { opacity:.9; box-shadow:0 18px 40px -10px rgba(13,148,136,.45);
+                       transform:scale(1.04); z-index:30; position:relative; }
+  .tool-btn.ghost { opacity:.25; }
   .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
   .tool-btn-access:hover { background:#ffe4e6; }
   .hidden { display:none !important; }
@@ -72,19 +84,26 @@
 <body>
 
 <!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
-<div id="mjm-ribbon"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="Nursery Operation Management"
+     data-sub="Seeds · Plots · Maintenance" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
+<<<<<<< HEAD
 <!-- Page sub-header: keeps the old module title + user chip below the ribbon -->
 <div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
   <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Operation Management</span>
   <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
 </div>
+=======
+<!-- The module names itself in the ribbon now, the way the Nelos pages do,
+     so the strip that used to repeat it under the bar has gone. -->
+>>>>>>> claude/fc-mobile-barcode-z130j8
 
 <div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-8 hidden">
 
+<<<<<<< HEAD
   <!-- Small tool buttons -->
   <div class="flex flex-wrap items-center justify-center gap-3 mb-7">
     <a class="tool-btn" data-page="seeds"       href="nursery_ops_seeds.html">🌰 Seeds Management</a>
@@ -97,6 +116,8 @@
     <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html">🔐 User Access</a>
   </div>
 
+=======
+>>>>>>> claude/fc-mobile-barcode-z130j8
   <!-- Nelos To-Do: cases raised against nursery operations that are still
        open. shared_nelos.js removes the strip if Nelos is unreachable or
        nothing is pending, so the chalkboard below is never pushed down for
@@ -122,6 +143,25 @@
         <a id="edit-btn" class="edit-chalk" href="nursery_ops_monthly.html">✏️ Edit Schedule</a>
       </div>
     </div>
+  </div>
+
+
+  <!-- The tools, under the board. Squares rather than pills: they are the
+       ways out of this page and they are read as a set, so they want equal
+       weight and a shape you can aim at on a laptop trackpad.
+
+       Drag one to reorder them. Which tool matters most differs by who is
+       looking — the seeds team and the maintenance team open different
+       things first — and the order is kept per browser rather than per
+       account, because it is a convenience, not a setting worth a column in
+       the database. -->
+  <div id="tools" class="tool-grid mt-7">
+    <a draggable="false" class="tool-btn" data-page="seeds"       href="nursery_ops_seeds.html"><span class="ti">🌰</span><span class="tl">Seeds Management</span></a>
+    <a draggable="false" class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html"><span class="ti">🌱</span><span class="tl">Life of Plot</span></a>
+    <a draggable="false" class="tool-btn" data-page="maintenance" href="nursery_ops_maintenance.html"><span class="ti">🛠️</span><span class="tl">Work Maintenance</span></a>
+    <a draggable="false" class="tool-btn" data-page="motion"      href="nursery_ops_settings.html"><span class="ti">⏱️</span><span class="tl">Motion Study Settings</span></a>
+    <!-- Shown only to users who may change other people's access. -->
+    <a draggable="false" class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html"><span class="ti">🔐</span><span class="tl">User Access</span></a>
   </div>
 
   <p class="text-[11px] text-slate-400 text-center mt-8">
@@ -196,6 +236,103 @@ async function loadBoard() {
     : '&nbsp;';
 }
 
+/* ── Reordering the tools ──────────────────────────────────────────
+   Pointer events rather than HTML5 drag-and-drop: the native API does not
+   fire on touch at all, and this page is opened on a tablet in the office as
+   often as on a laptop.
+
+   A drag only starts after the pointer has moved a few pixels, so a plain
+   tap still follows the link. While dragging, the tile under the pointer
+   swaps places with the one being carried, which is enough for a handful of
+   tiles and avoids measuring the whole grid on every move.
+
+   The order lives in this browser. Which tool matters most differs by who is
+   looking, and a preference this small is not worth a column in the
+   database — or the round trip to read it before the page can draw. */
+const TOOL_ORDER_KEY = 'nops_tool_order';
+
+function toolsEl() { return document.getElementById('tools'); }
+
+function applySavedToolOrder() {
+  const box = toolsEl();
+  if (!box) return;
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(TOOL_ORDER_KEY) || 'null'); } catch (_) { saved = null; }
+  if (!Array.isArray(saved)) return;
+  // Anything saved but no longer on the page is skipped, and anything new
+  // stays where the markup put it — a stored order must not be able to hide
+  // a tool that has since been added.
+  saved.forEach((page) => {
+    const el = box.querySelector(`.tool-btn[data-page="${CSS.escape(page)}"]`);
+    if (el) box.appendChild(el);
+  });
+}
+
+function saveToolOrder() {
+  const box = toolsEl();
+  if (!box) return;
+  const order = [...box.querySelectorAll('.tool-btn[data-page]')].map((el) => el.dataset.page);
+  try { localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order)); } catch (_) { /* private mode */ }
+}
+
+function initToolDrag() {
+  const box = toolsEl();
+  if (!box) return;
+  let held = null, startX = 0, startY = 0, moved = false;
+
+  /* A tile is a link, and a link is draggable by default: the browser starts
+     its own link-drag on pointerdown and the pointermove stream never
+     arrives, so the tiles simply would not reorder. draggable="false" on the
+     markup and this belt-and-braces both say no. */
+  box.addEventListener('dragstart', (e) => e.preventDefault());
+
+  box.addEventListener('pointerdown', (e) => {
+    const tile = e.target.closest('.tool-btn');
+    if (!tile || e.button > 0) return;
+    held = tile; startX = e.clientX; startY = e.clientY; moved = false;
+    tile.setPointerCapture(e.pointerId);
+  });
+
+  box.addEventListener('pointermove', (e) => {
+    if (!held) return;
+    if (!moved) {
+      // 6px of slop: below it this is a tap on a link, not a drag.
+      if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) return;
+      moved = true;
+      held.classList.add('dragging');
+    }
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    const target = over && over.closest('.tool-btn');
+    if (target && target !== held && target.parentElement === box) {
+      // Insert before or after depending on which way we came at it, so a
+      // tile dragged rightwards does not jump back past its neighbour.
+      const rect = target.getBoundingClientRect();
+      const after = e.clientX > rect.left + rect.width / 2;
+      box.insertBefore(held, after ? target.nextSibling : target);
+    }
+  });
+
+  const drop = () => {
+    if (!held) return;
+    const wasDrag = moved;
+    held.classList.remove('dragging');
+    held = null; moved = false;
+    if (wasDrag) { saveToolOrder(); box.dataset.justDragged = '1'; }
+  };
+  box.addEventListener('pointerup', drop);
+  box.addEventListener('pointercancel', drop);
+  /* A drag that ends on a tile must not also open it. Capture, so this runs
+     before the anchor's own default, and the flag is cleared as it is read —
+     it is only ever true for the one click that follows a drag. */
+  box.addEventListener('click', (e) => {
+    if (box.dataset.justDragged === '1') {
+      box.dataset.justDragged = '0';
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+}
+
 $('prev-month').addEventListener('click', () => { boardMonth = shiftMonth(boardMonth, -1); loadBoard(); });
 $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardMonth,  1); loadBoard(); });
 
@@ -209,6 +346,10 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
       return;
     }
     const u = MJMAccess.user();
+<<<<<<< HEAD
+=======
+    // The ribbon greets the user by name, so nothing to fill here now.
+>>>>>>> claude/fc-mobile-barcode-z130j8
     // Per-page access, set on this module's own User Access. A page the user
     // may not open should not be offered to them.
     // Fails OPEN if shared_access.js is an older cached copy without these
@@ -243,6 +384,8 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
     await loadBoard();
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('main').classList.remove('hidden');
+    applySavedToolOrder();
+    initToolDrag();
   } catch (e) {
     if (e && e.message === 'NO_OPS_ACCESS') return;
     console.warn(e);
