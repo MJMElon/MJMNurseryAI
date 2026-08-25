@@ -98,11 +98,11 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
    on the phone (permissions.scan_actions.<key>.view) and what the nursery list
    is filed under (permissions.scan_nurseries.<key>). */
 const PAGES = [
-  { key:'barcode',     label:'Scan Barcode Counter', desc:'Counting seedlings by scanning barcodes' },
-  { key:'do',          label:'Issue Collection DO',  desc:'Raising and managing collection delivery orders' },
-  { key:'maintenance', label:'Maintenance',          desc:'Recording maintenance work in the field' },
-  { key:'palms',       label:'PALMS',                desc:'The daily plot status round' },
-  { key:'culling',     label:'Culling Calculator',   desc:'Counting pokok inang against the batch balance' },
+  { key:'barcode',     label:'Scan Barcode Counter' },
+  { key:'do',          label:'Issue Collection DO' },
+  { key:'maintenance', label:'Schedule maintenance work' },
+  { key:'palms',       label:'PALMS (Plot status update)' },
+  { key:'culling',     label:'Culling Calculator' },
 ];
 
 let profiles = [];        // everyone who holds the scan module
@@ -178,10 +178,7 @@ function pageBlockHtml(pg) {
     <div class="page-block ${on ? 'on' : ''}">
       <label class="flex items-center gap-3 cursor-pointer">
         <input type="checkbox" class="chk" data-page="${pg.key}" ${on ? 'checked' : ''}>
-        <span class="min-w-0">
-          <span class="block text-[13px] font-black text-slate-800">${esc(pg.label)}</span>
-          <span class="block text-[11px] text-slate-400 leading-snug">${esc(pg.desc)}</span>
-        </span>
+        <span class="block text-[13px] font-black text-slate-800 min-w-0">${esc(pg.label)}</span>
       </label>
 
       <div class="mt-2.5 ${on ? '' : 'hidden'}" data-nur-for="${pg.key}">

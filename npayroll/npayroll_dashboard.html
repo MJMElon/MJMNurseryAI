@@ -11,7 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=7">
+<link rel="stylesheet" href="npayroll_styles.css?v=9">
 </head>
 <body>
 
@@ -30,7 +30,6 @@
         <span>Month</span>
         <input type="month" id="global-month">
       </label>
-      <span id="who" class="who"></span>
       <div class="topbar-badge">NP</div>
     </div>
   </div>
@@ -207,9 +206,9 @@
       <!-- The number this worker will key into the worker portal to sign in.
            Also settable straight from the register list. -->
       <div class="frow"><label>Worker PIN</label>
-        <input type="text" id="wf-pin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4–6 digits">
+        <input type="text" id="wf-pin" inputmode="numeric" autocomplete="off" placeholder="Digits, any length">
         <div style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:4px;">
-          For signing in to the worker portal. Leave blank if they have not been given one. No two workers share a PIN.
+          For signing in to the worker portal. Numbers only, any length. Leave blank if they have not been given one. No two workers share a PIN.
         </div>
       </div>
       <!-- Decides whether this person gets a column on the Work Maintenance
@@ -293,7 +292,7 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=10"></script>
+<script src="npayroll_script.js?v=12"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

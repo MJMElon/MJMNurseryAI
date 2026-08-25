@@ -214,7 +214,7 @@ function renderWorkers() {
         <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
           ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
         <td><input class="pin-in" type="text" inputmode="numeric" autocomplete="off"
-                   maxlength="6" placeholder="––––" value="${esc(w.pin || '')}"
+                   placeholder="––––" value="${esc(w.pin || '')}"
                    ${(_pinCol && canEdit) ? '' : 'disabled'}
                    title="${_pinCol ? 'PIN this worker signs in to the worker portal with' : 'Run shared/add_npayroll_worker_pin.sql to switch PINs on'}"
                    onchange="savePin(${w.id}, this)"
@@ -258,15 +258,19 @@ function renderWorkers() {
    The number a worker will key into the worker portal to sign in. Kept on
    the register beside them so whoever hands it out can see and change it.
 
-   Rules: 4 to 6 digits, or blank for a worker who has not been given one;
-   and no two workers share a PIN, since a PIN is how the portal will tell
-   them apart. Both are checked here for a plain message, and again by the
-   database (see shared/add_npayroll_worker_pin.sql) so a second browser
-   cannot slip a duplicate past this one.
+   Rules: digits, as many as you like, or blank for a worker who has not
+   been given one; and no two workers share a PIN, since a PIN is how the
+   portal will tell them apart. Both are checked here for a plain message,
+   and again by the database (see shared/add_npayroll_worker_pin.sql) so a
+   second browser cannot slip a duplicate past this one.
+
+   There is no length limit. A short PIN is easier to guess than a long
+   one, so a two-digit PIN is a decision rather than an accident — the
+   register takes whatever is keyed.
    ─────────────────────────────────────────────────────────────────────── */
 function pinProblem(pin, id) {
   if (!pin) return null;                                  // blank clears it
-  if (!/^\d{4,6}$/.test(pin)) return 'A PIN is 4 to 6 digits, numbers only.';
+  if (!/^\d+$/.test(pin)) return 'A PIN is numbers only.';
   const clash = workers.find(x => x.id !== id && String(x.pin || '') === pin);
   return clash ? `That PIN is already ${clash.full_name}'s. Give each worker a different one.` : null;
 }
@@ -1211,7 +1215,6 @@ $('global-month').addEventListener('change', async () => {
     isAdmin   = MJMAccess.isAdminOf('npayroll');
     // One missing helper must not take the whole module down with it.
     try { if (MJMAccess.canManageUsers()) $('user-access-tab').classList.remove('hidden'); } catch (_) {}
-    $('who').textContent = u.full_name || u.email || '';
 
     let savedMonth = null;
     try { savedMonth = localStorage.getItem('npayroll_month'); } catch (_) {}
