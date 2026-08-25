@@ -70,17 +70,27 @@ BEGIN
   END IF;
 END $$;
 
--- Seed the categories we already know about. ON CONFLICT so a re-run never
--- resurrects a category an admin deliberately renamed or deactivated.
-INSERT INTO nelos_categories (name, sort_order, default_priority, default_days) VALUES
-  ('Planting Discrepancy', 10, 'high',   3),
-  ('Height Shortfall',     20, 'normal', 7),
-  ('Stock Variance',       30, 'high',   3),
-  ('Pest / Disease',       40, 'urgent', 1),
-  ('Maintenance Overdue',  50, 'normal', 7),
-  ('Delivery Issue',       60, 'high',   2),
-  ('Other',                90, 'normal', NULL)
-ON CONFLICT (name) DO NOTHING;
+-- Seed the case titles we already know about. Matching on the name means a
+-- re-run never resurrects one an admin renamed or retired.
+--
+-- NOT EXISTS rather than ON CONFLICT (name): a later migration scopes a case
+-- title to one system and replaces the global unique on name with a
+-- per-system one, at which point ON CONFLICT (name) has no constraint to
+-- match and a re-run of this file would fail outright.
+INSERT INTO nelos_categories (name, sort_order, default_priority, default_days)
+SELECT v.name, v.so, v.pri, v.days
+  FROM (VALUES
+    ('Planting Discrepancy', 10, 'high',   3),
+    ('Height Shortfall',     20, 'normal', 7),
+    ('Stock Variance',       30, 'high',   3),
+    ('Pest / Disease',       40, 'urgent', 1),
+    ('Maintenance Overdue',  50, 'normal', 7),
+    ('Delivery Issue',       60, 'high',   2),
+    ('Other',                90, 'normal', NULL)
+  ) AS v(name, so, pri, days)
+ WHERE NOT EXISTS (
+   SELECT 1 FROM nelos_categories c WHERE lower(c.name) = lower(v.name)
+ );
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 2: Cases

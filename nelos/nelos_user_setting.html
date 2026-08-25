@@ -128,6 +128,14 @@
   .cell .inp { padding:7px 10px; font-size:12.5px; }
   .cell-note { font-size:10px; font-weight:700; color:#94a3b8; }
   .warn-txt { color:#b45309; }
+  .rt-foot { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:14px 0 2px; }
+  .rt-fallback { font-size:11px; font-weight:700; color:#94a3b8; flex:1; min-width:180px; }
+  .rt-empty { padding:18px 0 6px; font-size:12.5px; font-weight:700; color:#94a3b8; }
+  .rt-empty a { color:#7c3aed; font-weight:900; }
+  .pend-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+              padding:2px 8px; border-radius:999px; background:#fef3c7; color:#a16207; }
+  .cell-note.pend { color:#a16207; font-weight:900; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
   .r-clear { align-self:flex-start; background:none; border:none; cursor:pointer; padding:0;
              font-size:10px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
              color:#b91c1c; }
@@ -190,7 +198,7 @@ const esc = MJMNelos.esc;
 
 let people = [];       // nelos_people() rows
 let modules = [];      // nelos_modules rows
-let categories = [];   // active category names
+let categories = [];   // active nelos_categories rows: { name, module_key }
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
 let extraSeats = 0;    // how many extra numbers the + button is offering
@@ -213,6 +221,10 @@ const handlerCount = key => people.filter(p => p.primary_module === key).length;
    their number after it, so "Admin 1". */
 /* A system's name as it reads in a picker. HQ is marked so it is obvious in
    the list that everyone there oversees every case, not just this queue. */
+/* A system's own case titles, in order. Categories carry module_key since
+   migration_nelos_category_system.sql; a row without one (an older database)
+   is treated as belonging to nowhere rather than to everywhere. */
+const categoriesIn = key => categories.filter(c => c.module_key === key).map(c => c.name);
 const pickLabel = m => m.label + (m.sees_all_cases ? '  (HQ)' : '');
 const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
 const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
@@ -469,41 +481,44 @@ async function savePerson(userId) {
 
 /* ── Routing ───────────────────────────────────────────────────── */
 
-/* SOLVE BY — which system takes the case, and which person in it. The PIC
-   list follows the chosen system, because a number belongs to one system. */
-function solveCells(mod, cat, rule, isDefault) {
-  const own = routes.some(r => r.source_module === mod && r.category === cat);
-  const inherited = !isDefault && !own;
+/* Edits are held here until Save, keyed "system|title", so a block can be
+   changed and then abandoned. Empty means nothing is pending. */
+let draft = {};
+const draftKey = (mod, cat) => mod + '|' + cat;
+const draftOf = (mod, cat) => draft[draftKey(mod, cat)];
+const dirty = mod => Object.keys(draft).some(k => k.split('|')[0] === mod);
+
+/* SOLVE BY — which system takes the case, and which person in it. Reads the
+   pending edit if there is one, so the row shows what Save would write. */
+function solveCells(mod, cat) {
+  const pend = draftOf(mod, cat);
+  const rule = pend || routes.find(r => r.source_module === mod && r.category === cat);
   const toModule = rule ? rule.to_module : mod;
-  const toSeat = rule && !inherited ? rule.to_seat_no : null;
+  const toSeat = rule ? rule.to_seat_no : null;
   const staff = peopleIn(toModule).filter(p => p.seat_no);
   const n = handlerCount(toModule);
 
   return `
-    <div class="cell" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}">
-      <select class="inp r-dest">
+    <div class="cell">
+      <select class="inp r-dest" data-rule="${esc(mod)}" data-cat="${esc(cat)}">
         ${modules.map(x =>
           `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(pickLabel(x))}</option>`).join('')}
       </select>
-      ${inherited ? '<span class="cell-note"><em>following the default</em></span>'
-        : n ? '' : '<span class="cell-note warn-txt">⚠ nobody tagged there</span>'}
+      ${n ? '' : '<span class="cell-note warn-txt">⚠ nobody tagged there</span>'}
     </div>
     <div class="cell">
-      <select class="inp r-seat" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}"
+      <select class="inp r-seat" data-rule="${esc(mod)}" data-cat="${esc(cat)}"
               ${staff.length ? '' : 'disabled'}>
         <option value="">${staff.length ? 'Anyone' : 'Nobody tagged'}</option>
         ${staff.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
           esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
       </select>
-      ${!isDefault && own
-        ? `<button class="r-clear" data-rule="${esc(mod)}" data-cat="${esc(cat)}"
-                   title="Drop this rule and follow the default">clear</button>` : ''}
+      ${pend ? '<span class="cell-note pend">unsaved</span>' : ''}
     </div>`;
 }
 
-/* Each system is a closed block. Routing is set once and then read rarely,
-   so five systems' worth of rules open at once is noise — you open the one
-   you came to change. */
+/* Each system is a closed block holding its own case titles. Routing is set
+   once and read rarely, so five systems' rules open at once was noise. */
 function renderRouting() {
   if (!modules.length) {
     $('routing').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
@@ -514,26 +529,30 @@ function renderRouting() {
 
   $('routing').innerHTML = modules.map(m => {
     const openHere = openRoute === m.key;
-    const set = routes.filter(r => r.source_module === m.key && r.category !== null).length;
-
+    const titles = categoriesIn(m.key);
     let inner = '';
+
     if (openHere) {
-      inner = `
+      inner = titles.length ? `
         <div class="rt">
           <div class="rt-band"><span>From</span><span>Solve by</span></div>
           <div class="rt-sub"><span>#</span><span>Case Category</span><span>System</span><span>PIC</span></div>
-          ${categories.map((cat, i) => `
+          ${titles.map((cat, i) => `
             <div class="rt-row">
               <span class="rt-n">${i + 1}.</span>
               <span class="rt-cat">${esc(cat)}</span>
-              ${solveCells(m.key, cat, routeFor(m.key, cat), false)}
+              ${solveCells(m.key, cat)}
             </div>`).join('')}
-          <div class="rt-row is-default">
-            <span class="rt-n">—</span>
-            <span class="rt-cat">Any other case title</span>
-            ${solveCells(m.key, null, routes.find(r => r.source_module === m.key && r.category === null), true)}
+          <div class="rt-foot">
+            <span class="rt-fallback">A case with no rule set stays with ${esc(m.label)}.</span>
+            <button class="btn btn-save rt-save" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Save</button>
+            <button class="btn btn-ghost rt-cancel" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Cancel</button>
           </div>
-        </div>`;
+        </div>`
+      : `<div class="rt"><div class="rt-empty">
+           No case titles for ${esc(m.label)} yet —
+           add them on the <a href="nelos_settings.html">Categories</a> page.
+         </div></div>`;
     }
 
     return `
@@ -543,7 +562,7 @@ function renderRouting() {
           <span class="sys-ico">${esc(m.icon || '📦')}</span>
           <span class="sys-name">${esc(m.label)}</span>
           ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
-          <span class="sys-count">${set ? set + ' set' : 'all default'}</span>
+          ${dirty(m.key) ? '<span class="pend-tag">unsaved</span>' : ''}
         </button>
         ${inner}
       </div>`;
@@ -551,34 +570,55 @@ function renderRouting() {
 
   $('routing').querySelectorAll('.sys-row').forEach(b =>
     b.addEventListener('click', () => {
+      // Leaving a block with pending edits would lose them silently.
+      if (dirty(openRoute) && openRoute !== b.dataset.open &&
+          !confirm('Discard the unsaved routing changes?')) return;
+      if (openRoute !== b.dataset.open) draft = {};
       openRoute = openRoute === b.dataset.open ? null : b.dataset.open;
       renderRouting();
     }));
 
-  const cat = el => el.dataset.cat === '' ? null : el.dataset.cat;
+  /* Staging an edit, rather than writing it. Changing the system clears the
+     PIC, because a number belongs to one system and whoever was chosen in
+     the old one would route nowhere. */
+  const stage = (mod, cat, toModule, toSeatNo) => {
+    draft[draftKey(mod, cat)] = { to_module: toModule, to_seat_no: toSeatNo };
+    renderRouting();
+  };
 
   $('routing').querySelectorAll('.r-dest').forEach(el =>
-    el.addEventListener('change', () => {
-      // A new system means a new set of people, so the PIC is cleared —
-      // whoever was chosen in the old system would route nowhere.
-      const box = el.closest('.cell');
-      saveRule(box.dataset.rule, cat(box), el.value, null);
-    }));
+    el.addEventListener('change', () => stage(el.dataset.rule, el.dataset.cat, el.value, null)));
 
   $('routing').querySelectorAll('.r-seat').forEach(el =>
     el.addEventListener('change', () => {
       const dest = $('routing').querySelector(
-        `.cell[data-rule="${el.dataset.rule}"][data-cat="${el.dataset.cat}"] .r-dest`);
-      saveRule(el.dataset.rule, cat(el), dest.value, el.value || null);
+        `.r-dest[data-rule="${el.dataset.rule}"][data-cat="${el.dataset.cat}"]`);
+      stage(el.dataset.rule, el.dataset.cat, dest.value, el.value || null);
     }));
 
-  $('routing').querySelectorAll('.r-clear').forEach(el =>
-    el.addEventListener('click', () => clearRule(el.dataset.rule, cat(el))));
+  $('routing').querySelectorAll('.rt-save').forEach(b =>
+    b.addEventListener('click', () => saveBlock(b.dataset.mod)));
+  $('routing').querySelectorAll('.rt-cancel').forEach(b =>
+    b.addEventListener('click', () => { draft = {}; renderRouting(); }));
 }
 
-/* One rule per (section, category); the default row is category NULL.
-   Upsert would need a unique constraint PostgREST can name, and the
-   default's uniqueness is a partial index, so this reads then writes. */
+/* Write every pending edit for one system, then reload. */
+async function saveBlock(mod) {
+  const pending = Object.entries(draft).filter(([k]) => k.split('|')[0] === mod);
+  if (!pending.length) return;
+
+  for (const [k, val] of pending) {
+    const cat = k.slice(k.indexOf('|') + 1);
+    const ok = await saveRule(mod, cat, val.to_module, val.to_seat_no);
+    if (!ok) return;                       // stop on the first failure
+  }
+  draft = {};
+  toast(`Routing saved for ${labelOf(mod)}.`);
+  await load();
+}
+
+/* Write one rule. Returns true on success — saveBlock() does the toast and
+   the reload once for the whole block, rather than per row. */
 async function saveRule(mod, cat, toModule, toSeatNo) {
   const existing = routes.find(r => r.source_module === mod && r.category === cat);
   const row = {
@@ -592,21 +632,8 @@ async function saveRule(mod, cat, toModule, toSeatNo) {
   const { error } = existing
     ? await _supabase.from('nelos_routes').update(row).eq('id', existing.id)
     : await _supabase.from('nelos_routes').insert([row]);
-
-  if (error) { toast('Could not save — ' + error.message, false); }
-  else toast(cat
-    ? `${cat} → ${labelOf(toModule)}${toSeatNo ? ' · ' + seatName(toModule, Number(toSeatNo)) : ''}`
-    : 'Default saved.');
-  await load();
-}
-
-async function clearRule(mod, cat) {
-  const existing = routes.find(r => r.source_module === mod && r.category === cat);
-  if (!existing) return;
-  const { error } = await _supabase.from('nelos_routes').delete().eq('id', existing.id);
-  if (error) { toast('Could not clear — ' + error.message, false); return; }
-  toast('Rule cleared — follows the section default.');
-  await load();
+  if (error) { toast('Could not save — ' + error.message, false); return false; }
+  return true;
 }
 
 /* ── Tabs ──────────────────────────────────────────────────────── */
@@ -623,7 +650,7 @@ async function load() {
   const [pplRes, modRes, catRes, routeRes] = await Promise.all([
     _supabase.rpc('nelos_people').then(r => r, e => ({ error: e, data: [] })),
     _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
-    _supabase.from('nelos_categories').select('name').eq('active', true).order('sort_order')
+    _supabase.from('nelos_categories').select('name,module_key').eq('active', true).order('sort_order')
       .then(r => r, () => ({ data: [] })),
     // Routes arrive with the routing migration. On a database that has not
     // run it yet this comes back empty and the page still works.
@@ -639,7 +666,7 @@ async function load() {
   }
 
   modules = modRes.data || [];
-  categories = (catRes.data || []).map(c => c.name);
+  categories = catRes.data || [];
   routes = routeRes.data || [];
 
   if (pplRes.error || !pplRes.data) {

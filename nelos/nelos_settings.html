@@ -28,6 +28,12 @@
   .act-add:hover { background:#6d28d9; }
   .act-del  { background:#fee2e2; color:#b91c1c; }
   .act-off  { background:#f1f5f9; color:#64748b; }
+  .grp { font-size:12.5px; font-weight:900; color:#4c1d95; padding:14px 0 7px;
+         border-bottom:2px solid #ede9fe; margin-top:10px; display:flex; align-items:center; gap:8px; }
+  .grp:first-of-type { margin-top:0; }
+  .grp-n { margin-left:auto; font-size:9.5px; font-weight:900; padding:2px 8px; border-radius:999px;
+           background:#ede9fe; color:#6d28d9; }
+  .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:9px 0; }
   .row { display:grid; grid-template-columns:1fr 110px 92px 110px auto; gap:9px; align-items:center;
          padding:9px 0; border-bottom:1px dashed #e9e3fb; }
   .row:last-child { border-bottom:none; }
@@ -64,7 +70,8 @@
 
   <div class="card mb-4">
     <span class="lbl">Add a category</span>
-    <div class="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_auto] gap-2 items-end">
+    <div class="grid grid-cols-1 md:grid-cols-[minmax(150px,1fr)_1fr_120px_100px_auto] gap-2 items-end">
+      <div><label class="lbl" for="n-module">System</label><select id="n-module" class="inp"></select></div>
       <div><label class="lbl" for="n-name">Name</label><input id="n-name" class="inp" placeholder="e.g. Irrigation Fault"></div>
       <div><label class="lbl" for="n-priority">Priority</label>
         <select id="n-priority" class="inp">
@@ -95,6 +102,7 @@ const $ = id => document.getElementById(id);
 const esc = MJMNelos.esc;
 
 let cats = [];
+let modules = [];      // nelos_modules rows, to group titles by system
 let counts = {};      // category name → how many cases use it
 let mayManage = true;
 
@@ -127,10 +135,19 @@ function rowHtml(c) {
     </div>`;
 }
 
+/* Grouped by the system a title belongs to, because that is now what
+   decides where it is offered — on the raise form and in Case Routing. */
 function render() {
-  $('rows').innerHTML = cats.length
-    ? cats.map(rowHtml).join('')
-    : '<div class="text-center text-[12px] font-bold text-slate-400 py-8">No categories yet.</div>';
+  $('rows').innerHTML = modules.length
+    ? modules.map(m => {
+        const mine = cats.filter(c => c.module_key === m.key);
+        return `
+          <div class="grp">${esc(m.icon || '📦')} ${esc(m.label)}
+            <span class="grp-n">${mine.length}</span></div>
+          ${mine.length ? mine.map(rowHtml).join('')
+            : '<div class="grp-empty">No case titles for this system yet.</div>'}`;
+      }).join('')
+    : '<div class="text-center text-[12px] font-bold text-slate-400 py-8">No systems yet.</div>';
 
   if (!mayManage) return;
   $('rows').querySelectorAll('.row').forEach(row => {
@@ -179,15 +196,18 @@ $('add-btn').addEventListener('click', async () => {
   const name = $('n-name').value.trim();
   if (!name) { toast('Give the category a name.', false); $('n-name').focus(); return; }
   const days = $('n-days').value;
+  const modKey = $('n-module').value;
+  if (!modKey) { toast('Choose which system this case title belongs to.', false); return; }
   const { error } = await _supabase.from('nelos_categories').insert([{
     name,
+    module_key: modKey,
     default_priority: $('n-priority').value,
     default_days: days === '' ? null : Number(days),
     sort_order: (cats.reduce((m, c) => Math.max(m, c.sort_order || 0), 0)) + 10
   }]);
   if (error) {
     toast(/duplicate|unique/i.test(error.message)
-      ? 'There is already a category with that name.' : 'Could not add — ' + error.message, false);
+      ? 'That system already has a case title by that name.' : 'Could not add — ' + error.message, false);
     return;
   }
   $('n-name').value = ''; $('n-days').value = ''; $('n-priority').value = 'normal';
@@ -196,9 +216,11 @@ $('add-btn').addEventListener('click', async () => {
 });
 
 async function load() {
-  const [catRes, caseRes] = await Promise.all([
+  const [catRes, caseRes, modRes] = await Promise.all([
     _supabase.from('nelos_categories').select('*').order('sort_order').order('name'),
-    _supabase.from('nelos_cases').select('category').limit(2000).then(r => r, () => ({ data: [] }))
+    _supabase.from('nelos_cases').select('category').limit(2000).then(r => r, () => ({ data: [] })),
+    _supabase.from('nelos_modules').select('key,label,icon,sort_order').eq('active', true)
+      .order('sort_order').then(r => r, () => ({ data: [] }))
   ]);
   if (catRes.error) {
     $('rows').innerHTML = `<div class="text-center text-[12px] font-bold text-slate-400 py-8">
@@ -207,6 +229,9 @@ async function load() {
     return;
   }
   cats = catRes.data || [];
+  modules = modRes.data || [];
+  $('n-module').innerHTML = '<option value="">— choose —</option>' +
+    modules.map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join('');
   counts = {};
   (caseRes.data || []).forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
   render();

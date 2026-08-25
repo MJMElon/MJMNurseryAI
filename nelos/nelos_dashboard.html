@@ -346,8 +346,21 @@ async function loadCategories() {
   const { data } = await _supabase.from('nelos_categories').select('*')
     .eq('active', true).order('sort_order').then(r => r, () => ({ data: [] }));
   categories = data || [];
+  fillCategories($('c-source').value);
+}
+
+/* A case title belongs to one system, so the picker offers only the titles
+   of whichever system the case is being raised in. Older databases have no
+   module_key on a category; there, every title is offered, which is how it
+   behaved before migration_nelos_category_system.sql. */
+function fillCategories(sourceKey) {
+  const scoped = categories.some(c => c.module_key)
+    ? categories.filter(c => c.module_key === sourceKey)
+    : categories;
+  const keep = $('c-category').value;
   $('c-category').innerHTML = '<option value="">— none —</option>' +
-    categories.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    scoped.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  if (scoped.some(c => c.name === keep)) $('c-category').value = keep;
 }
 
 async function loadAssignees() {
@@ -387,7 +400,7 @@ function loadSourceFilter() {
 function openNew(prefill) {
   $('new-scrim').classList.remove('hidden');
   if (prefill) {
-    if (prefill.source) $('c-source').value = prefill.source;
+    if (prefill.source) { $('c-source').value = prefill.source; fillCategories(prefill.source); }
     if (prefill.batch)  $('c-batch').value  = prefill.batch;
     if (prefill.plot)   $('c-plot').value   = prefill.plot;
     if (prefill.nursery) $('c-nursery').value = prefill.nursery;
@@ -400,6 +413,8 @@ function closeNew() { $('new-scrim').classList.add('hidden'); }
 /* Choosing a category fills in its house defaults — the priority it is
    usually raised at, and the due date it is usually given. Both stay
    editable; this only saves typing. */
+$('c-source').addEventListener('change', () => fillCategories($('c-source').value));
+
 $('c-category').addEventListener('change', () => {
   const cat = categories.find(c => c.name === $('c-category').value);
   if (!cat) return;
