@@ -3,23 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>User Access — Nursery Audit</title>
+<title>Settings — Nursery Audit</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23ea580c%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
-<script src="../shared/shared_module_access.js?v=1"></script>
+<script src="../shared/shared_module_access.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
 <script>
+/* ══════════════════════════════════════════════════════════════════════
+   NURSERY AUDIT — SETTINGS
+
+   The module files two things under one door: who may do what (the User
+   Access screen every module shares), and the settings that belong to the
+   installation itself rather than to a person.
+
+   The file keeps its old name so every link, bookmark and the service
+   worker's cache list still find it; only what it is called on screen
+   changed.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── System Setting ────────────────────────────────────────────────────
+   The audit portal is an offline app: it installs a service worker and
+   keeps its pages in a cache so a phone in the field opens instantly with
+   no signal. That is also the one thing that can go wrong invisibly — a
+   device holding an old copy shows old screens and nobody can tell by
+   looking. So this section states which copy the device is running and
+   gives the one button that fixes it.
+   ─────────────────────────────────────────────────────────────────────── */
+const SYSTEM_HTML = `
+<div class="card p-6 space-y-5">
+  <div>
+    <h2 class="text-sm font-black text-slate-800 uppercase tracking-widest">App &amp; Offline Copy</h2>
+    <p class="text-[12px] text-slate-500 mt-1 leading-relaxed">
+      This device keeps its own copy of the audit portal so it opens without a signal.
+      If a screen looks out of date, update the copy here.
+    </p>
+  </div>
+
+  <div class="rounded-xl border border-slate-200 bg-slate-50 divide-y divide-slate-200">
+    <div class="flex items-center justify-between gap-4 px-4 py-3">
+      <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Copy on this device</span>
+      <span id="sys-ver" class="text-[12px] font-bold text-slate-800 text-right break-all">Checking…</span>
+    </div>
+    <div class="flex items-center justify-between gap-4 px-4 py-3">
+      <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Offline pages held</span>
+      <span id="sys-cached" class="text-[12px] font-bold text-slate-800">—</span>
+    </div>
+    <div class="flex items-center justify-between gap-4 px-4 py-3">
+      <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Connection</span>
+      <span id="sys-online" class="text-[12px] font-bold text-slate-800">—</span>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <button id="sys-update"
+            class="bg-orange-600 hover:bg-orange-700 text-white font-black text-[10px] uppercase tracking-widest px-5 py-3 rounded-xl">
+      Update the app now
+    </button>
+    <a href="audit_diagnostics.html"
+       class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest px-5 py-3 rounded-xl border border-slate-200 no-underline">
+      Open diagnostics
+    </a>
+  </div>
+  <p id="sys-note" class="text-[11px] text-slate-500 leading-relaxed">
+    Updating clears the saved pages and reloads. Anything already recorded is safe —
+    audits live in the database, and anything still waiting to sync stays queued on this
+    device.
+  </p>
+</div>`;
+
+function mountSystem(root) {
+  const $ = (id) => root.querySelector('#' + id);
+
+  const online = () => {
+    const el = $('sys-online');
+    if (el) el.textContent = navigator.onLine ? 'Online' : 'Offline';
+  };
+  online();
+  window.addEventListener('online', online);
+  window.addEventListener('offline', online);
+
+  /* The version is the cache's own name — audit_sw.js opens one cache per
+     build (VER). Reading it back is how the device says which build it is
+     actually serving, rather than which one the server has. */
+  (async function () {
+    const ver = $('sys-ver'), cached = $('sys-cached');
+    try {
+      if (!window.caches || !caches.keys) throw new Error('no cache API');
+      const keys = await caches.keys();
+      const mine = keys.filter((k) => k.indexOf('mjm-') === 0);
+      if (ver) ver.textContent = mine.length ? mine.join(', ') : 'Not saved offline yet';
+      if (cached && mine.length) {
+        const c = await caches.open(mine[0]);
+        const all = await c.keys();
+        cached.textContent = all.length + ' file' + (all.length === 1 ? '' : 's');
+      } else if (cached) {
+        cached.textContent = '0 files';
+      }
+    } catch (_) {
+      if (ver) ver.textContent = 'Not available on this browser';
+      if (cached) cached.textContent = '—';
+    }
+  })();
+
+  const btn = $('sys-update');
+  if (btn) btn.addEventListener('click', async function () {
+    if (!confirm('Update this device to the latest version?\n\nThe saved offline pages are cleared and the page reloads. Recorded audits are not affected.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Updating…';
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch (_) { /* keep going — the caches matter more */ }
+    try {
+      if (window.caches && caches.keys) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (_) {}
+    // Cache-busted, so the reload cannot be answered from the HTTP cache.
+    location.replace(location.pathname + '?updated=' + Date.now());
+  });
+}
+
 MJMModuleAccess.init({
   module: 'audit',
   title:  'Nursery Audit',
   moduleLabel: 'Audit',
   icon:   '📋',
   accent: 'orange',
+  // What the module calls this screen now that it holds more than one thing.
+  pageLabel:   'Settings',
+  barLabel:    'Module Settings',
+  accessLabel: 'User Access',
+  tabs: [
+    { key: 'system', label: 'System Setting', html: SYSTEM_HTML, mount: mountSystem }
+  ],
   // The back end is where this is opened from, and what "Main Page" names.
   back:   { href: 'audit_admin.html', label: 'Back to Main Page' },
   pages: [

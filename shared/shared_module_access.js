@@ -74,11 +74,54 @@
 
     let allUsers = [], totalSystem = 0, editingUid = null, editingPerms = null;
 
-    document.title = 'User Access — ' + cfg.title;
+    /* A module may file this screen under a broader name — the Audit
+       module calls it Settings and puts User Access inside it — and may
+       hang its own sections beside the user list. Both are opt-in: with
+       neither, the page is exactly the User Access screen it has always
+       been. */
+    const PAGE_LABEL = cfg.pageLabel || 'User Access';
+    const TABS       = cfg.tabs || [];
+
+    document.title = PAGE_LABEL + ' — ' + cfg.title;
     document.head.insertAdjacentHTML('beforeend', styleTag(A));
-    document.body.innerHTML = pageHtml(cfg, A, BACK);
+    document.body.innerHTML = pageHtml(cfg, A, BACK, PAGE_LABEL, TABS);
 
     const $ = id => document.getElementById(id);
+
+    /* ── Section tabs ────────────────────────────────────────────────
+       Only rendered when the module asked for extra sections. The user
+       list is always the first one, so a module that adds none behaves
+       as before and nothing here runs. */
+    if (TABS.length) {
+      const panels = ['access'].concat(TABS.map(s => s.key));
+      const show = (key) => {
+        panels.forEach(k => {
+          const panel = $('ma-sec-' + k);
+          const tab   = $('ma-tab-' + k);
+          if (panel) panel.classList.toggle('hidden', k !== key);
+          if (tab) {
+            tab.classList.toggle('ma-tab-on', k === key);
+            tab.setAttribute('aria-selected', k === key ? 'true' : 'false');
+          }
+        });
+        try { sessionStorage.setItem('ma_tab_' + MODULE, key); } catch (_) {}
+      };
+      panels.forEach(k => {
+        const tab = $('ma-tab-' + k);
+        if (tab) tab.addEventListener('click', () => show(k));
+      });
+      // Each section is handed its own container once, after it is in the
+      // DOM, so it can wire up whatever it drew.
+      TABS.forEach(s => {
+        const el = $('ma-sec-' + s.key);
+        if (el && typeof s.mount === 'function') {
+          try { s.mount(el); } catch (e) { console.warn('[module-access] section', s.key, e); }
+        }
+      });
+      let start = 'access';
+      try { start = sessionStorage.getItem('ma_tab_' + MODULE) || 'access'; } catch (_) {}
+      show(panels.includes(start) ? start : 'access');
+    }
 
     /* ── What this user can actually do on one page, today ──────────
        The saved entry wins when present. Otherwise nothing has been
@@ -467,13 +510,20 @@
   .tog input:checked + .tog-slider::before { transform:translateX(22px); }
   .preset-btn { padding:8px 14px; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; border-radius:10px; border:1.5px solid #e2e8f0; background:white; color:#334155; cursor:pointer; transition:all .15s; }
   .preset-btn:hover { background:#f1f5f9; border-color:#cbd5e1; }
+  /* Section tabs — only present on a page that asked for sections. */
+  .ma-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+  .ma-tab { font-size:11px; font-weight:900; letter-spacing:.12em; text-transform:uppercase;
+            color:#64748b; background:#fff; border:1px solid #e2e8f0; border-radius:999px;
+            padding:10px 18px; cursor:pointer; font-family:inherit; transition:all .15s; }
+  .ma-tab:hover { background:#f8fafc; color:#334155; }
+  .ma-tab-on { color:#fff; border-color:transparent; background:${A.chk}; box-shadow:0 4px 12px ${A.ring}; }
   .user-row { padding:18px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid #f1f5f9; transition:background .15s; }
   .user-row:hover { background:#f8fafc; }
   .user-row:last-child { border-bottom:none; }
 </style>`;
   }
 
-  function pageHtml(cfg, A, BACK) {
+  function pageHtml(cfg, A, BACK, PAGE_LABEL, TABS) {
     const note = cfg.note ||
       `This page manages users who were <strong>opened for this module</strong> on the main portal's User Access.
        For each of them, tick exactly what they can do on every page — and whether they can
@@ -481,7 +531,7 @@
     return `
 <div class="bg-white border-b border-slate-200 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
   <a href="${esc(BACK.href)}" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; ${esc(BACK.label)}</a>
-  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Module User Access</span>
+  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">${esc(cfg.barLabel || 'Module User Access')}</span>
   <div class="justify-self-end flex items-center gap-2">
     ${cfg.portal ? `<a href="${esc(cfg.portal.href)}" target="_blank" rel="noopener"
        class="text-[10px] font-bold ${A.text} hover:brightness-90 uppercase tracking-widest bg-white px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors whitespace-nowrap">${esc(cfg.portal.label)} &#8599;</a>` : ''}
@@ -504,7 +554,7 @@
   <div class="card p-6 space-y-4">
     <div class="flex items-center gap-3">
       <span class="text-2xl">${cfg.icon || '🔐'}</span>
-      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">${esc(cfg.title)} — User Access</h1>
+      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">${esc(cfg.title)} — ${esc(PAGE_LABEL)}</h1>
     </div>
     <p class="text-[13px] text-slate-600 leading-relaxed">${note}</p>
     <p class="text-[12px] text-slate-500 leading-relaxed">
@@ -513,19 +563,29 @@
     </p>
   </div>
 
-  <div class="flex flex-col md:flex-row gap-3 items-stretch">
-    <input id="search" type="text" placeholder="🔎 Search users by email or name…" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none ${A.focus} focus:ring-4">
-    <button id="reload-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest px-5 py-3 rounded-xl border border-slate-200">Reload</button>
+  ${TABS.length ? `
+  <div class="ma-tabs" role="tablist">
+    <button id="ma-tab-access" role="tab" class="ma-tab">${esc(cfg.accessLabel || 'User Access')}</button>
+    ${TABS.map(s => `<button id="ma-tab-${esc(s.key)}" role="tab" class="ma-tab">${esc(s.label)}</button>`).join('')}
+  </div>` : ''}
+
+  <div id="ma-sec-access" class="space-y-6">
+    <div class="flex flex-col md:flex-row gap-3 items-stretch">
+      <input id="search" type="text" placeholder="🔎 Search users by email or name…" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none ${A.focus} focus:ring-4">
+      <button id="reload-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest px-5 py-3 rounded-xl border border-slate-200">Reload</button>
+    </div>
+
+    <div id="users-list" class="card overflow-hidden"></div>
+
+    <p id="count-line" class="text-[11px] font-bold text-slate-600 text-center">—</p>
+    <p class="text-[11px] text-slate-500 text-center">
+      Someone missing here? They haven't been opened for this module yet — grant them
+      <strong>${esc(cfg.moduleLabel || cfg.title)}</strong> access on the main portal's
+      <a href="../user_access.html" class="${A.text} font-bold underline underline-offset-2">User Access</a> first.
+    </p>
   </div>
 
-  <div id="users-list" class="card overflow-hidden"></div>
-
-  <p id="count-line" class="text-[11px] font-bold text-slate-600 text-center">—</p>
-  <p class="text-[11px] text-slate-500 text-center">
-    Someone missing here? They haven't been opened for this module yet — grant them
-    <strong>${esc(cfg.moduleLabel || cfg.title)}</strong> access on the main portal's
-    <a href="../user_access.html" class="${A.text} font-bold underline underline-offset-2">User Access</a> first.
-  </p>
+  ${TABS.map(s => `<div id="ma-sec-${esc(s.key)}" class="space-y-6 hidden">${s.html || ''}</div>`).join('')}
 </div>
 
 <div id="drawer-backdrop" class="drawer-backdrop"></div>

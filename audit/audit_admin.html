@@ -22,7 +22,7 @@
        module outside its scheduled window at all.
 
        What is genuinely administrative — the cross-nursery alerts, the
-       monthly report and User Access — is marked .admin-only and hidden
+       monthly report and Settings — is marked .admin-only and hidden
        from everyone else. The class goes on <html> in the head, before
        any of it paints, so a non-admin never sees it flash. Which
        people may see which module card is coming as a setting on this
@@ -524,15 +524,17 @@
         </div>
       </a>
 
-      <!-- Revealed only for a portal user who may change other people's
-           access — the same rule the auditor home used. Being an audit admin
-           is not on its own enough to hand out user management. -->
+      <!-- Settings: user access, and the settings that belong to the
+           installation rather than to a person. Revealed only for a portal
+           user who may change other people's access — the same rule the
+           auditor home used. Being an audit admin is not on its own enough
+           to hand out user management. -->
       <a class="fc-card" id="card-user-access" href="audit_user_access.html" style="display:none">
         <div class="fc-ico" style="background:#fdeaea">
           <svg viewBox="0 0 24 24" style="stroke:#b91c4a"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#b91c4a">User Access</div>
-        <div class="fc-desc">Set which audits each person may open and record, per nursery and per module.</div>
+        <div class="fc-ttl" style="color:#b91c4a">Settings</div>
+        <div class="fc-desc">User access — which audits each person may open and record — and the system settings for this installation.</div>
         <div class="fc-enter" style="color:#b91c4a">
           <span>Enter Module</span>
           <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
@@ -540,7 +542,7 @@
       </a>
     </div>
 
-    <div class="note admin-only">The alerts, the monthly report and User Access are shown to audit admins only.
+    <div class="note admin-only">The alerts, the monthly report and Settings are shown to audit admins only.
          Every signed-in auditor sees the module cards above and can open the auditor portal.</div>
   </div>
 </div>
@@ -555,7 +557,7 @@
 <script src="audit_lang.js?v=20260825a"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
 
-<!-- The portal permission layer, for the User Access card only. An admin who
+<!-- The portal permission layer, for the Settings card only. An admin who
      signed in through the audit login has no portal session, so the card
      stays hidden — it fails closed. -->
 <script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
@@ -908,7 +910,9 @@ setInterval(function(){
   if (document.visibilityState === 'visible') { loadWorkDashboard(); loadAlerts(); }
 }, 5 * 60 * 1000);
 
-/* User Access needs the portal's own permission, not just audit admin. */
+/* Settings holds User Access, so it needs the portal's own permission —
+   not just audit admin. The element id is unchanged so nothing else that
+   looks for it breaks. */
 (async () => {
   try {
     const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
