@@ -15,20 +15,26 @@
   body { background:#faf5ff; margin:0; }
   .card { background:white; border:1px solid #ede9fe; border-radius:20px; box-shadow:0 4px 16px rgba(139,92,246,.08); }
 
-  /* One tab today. It is a tab and not a heading because the next thing that
-     belongs on this page — plots, stages, whatever comes — goes beside it. */
-  .tab { padding:9px 18px; border-radius:999px; border:1.5px solid #ede9fe; background:white;
-         color:#6d28d9; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-         cursor:pointer; }
-  .tab.on { background:#6d28d9; border-color:#5b21b6; color:white; }
-  /* The title row is laid out here, not only by Tailwind classes: the CDN is
-     a third-party script, and until it lands these stack instead of sitting
-     side by side. Same reason the manage page pins its button's icons. */
-  .title-row { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
-  .back-btn { display:grid; place-items:center; width:38px; height:38px; border-radius:999px;
+  /* 1fr auto 1fr, so the title is centred on the PAGE rather than in
+     whatever space the back button leaves — the button can be any width and
+     the title does not move. Laid out here and not only by Tailwind classes:
+     the CDN is a third-party script, and until it lands these stack instead
+     of sitting side by side. */
+  .title-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+               gap:12px; margin-bottom:22px; }
+  .page-title { justify-self:center; margin:0; font-size:19px; font-weight:900; color:#1e293b;
+                letter-spacing:.08em; text-transform:uppercase; text-align:center; }
+  .back-btn { justify-self:start; display:inline-flex; align-items:center; gap:8px;
+              padding:9px 16px; border-radius:999px;
               background:white; border:1.5px solid #ede9fe; color:#6d28d9; text-decoration:none;
-              font-size:17px; font-weight:900; line-height:1; flex-shrink:0; transition:all .15s; }
+              font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+              line-height:1; transition:all .15s; }
   .back-btn:hover { background:#f5f3ff; border-color:#ddd6fe; }
+  /* Narrow: stack rather than squeeze a long label and a title into one row. */
+  @media (max-width:700px) {
+    .title-row { grid-template-columns:1fr; justify-items:center; gap:10px; }
+    .back-btn { justify-self:center; }
+  }
 
   .u-row { padding:16px 20px; border-bottom:1px solid #f5f3ff; }
   .u-row:last-child { border-bottom:none; }
@@ -38,6 +44,10 @@
          text-transform:uppercase; cursor:pointer; border:1.5px solid transparent; }
   .btn-edit { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
   .btn-edit:hover { background:#ede9fe; }
+  /* Open rows close with an ✕ rather than the word: the panel below is the
+     thing being read, and a labelled button there competes with it. */
+  .btn-x { width:38px; height:38px; padding:0; display:grid; place-items:center;
+           border-radius:999px; font-size:15px; letter-spacing:0; }
   .btn-save { background:#7c3aed; color:white; }
   .btn-save:hover { background:#6d28d9; }
   .btn-save:disabled { opacity:.55; cursor:default; }
@@ -61,7 +71,9 @@
 
 <div id="mjm-ribbon" data-logo="off" data-brand="" data-center=" "></div>
 <script src="../shared/shared_ribbon.js"></script>
-<script src="../shared/shared_fc_brand.js" data-sub="Setting"></script>
+<!-- Manage, not Setting: the bar names the portal you are in, and it does
+     not change as you move around inside it. The page names itself below. -->
+<script src="../shared/shared_fc_brand.js" data-sub="Manage"></script>
 
 <div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -77,11 +89,12 @@
 <div id="main" class="max-w-[940px] mx-auto px-4 md:px-6 py-7 hidden">
 
   <div class="title-row">
-    <!-- Back a step inside the portal, beside the title of the page it is
-         leaving. The ribbon's own [← Portal] leaves the FC Portal entirely;
-         two arrows in the same bar would be a coin toss. -->
-    <a class="back-btn" href="scan_admin.html" title="Back" aria-label="Back">&#8592;</a>
-    <button class="tab on" data-tab="users">User Setting</button>
+    <!-- Says where it goes, because the ribbon's own [← Portal] goes somewhere
+         else entirely — out of the FC Portal to the module selection. Two bare
+         arrows would have been a coin toss. -->
+    <a class="back-btn" href="scan_admin.html">&#8592; Back to FC Portal Manage</a>
+    <h1 class="page-title">User Setting</h1>
+    <span aria-hidden="true"></span>
   </div>
 
 
@@ -170,7 +183,8 @@ function rowHtml(p) {
           <div class="font-black text-slate-800 text-[14px] truncate">${esc(p.full_name || '(no name)')}</div>
           <div class="text-[11.5px] text-slate-400 truncate">${esc(p.email || '—')}</div>
         </div>
-        <button class="btn btn-edit" data-edit="${esc(p.id)}">${open ? 'Close' : 'Edit Access'}</button>
+        <button class="btn btn-edit ${open ? 'btn-x' : ''}" data-edit="${esc(p.id)}"
+                ${open ? 'title="Close" aria-label="Close"' : ''}>${open ? '&#10005;' : 'Edit Access'}</button>
       </div>
       ${open ? panelHtml() : ''}
     </div>`;
@@ -207,7 +221,7 @@ function pageBlockHtml(pg) {
           ${nurseries.map((n) => `
             <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
               <input type="checkbox" data-npage="${pg.key}" data-nname="${esc(n)}"
-                     ${!all && chosen.has(n) ? 'checked' : ''} ${all ? 'disabled' : ''}>
+                     ${!all && chosen.has(n) ? 'checked' : ''}>
               ${esc(n)}
             </label>`).join('')}
         </div>
@@ -292,6 +306,22 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.npage) {
     const key = t.dataset.npage;
+
+    /* Coming out of "All" by picking a nursery: that nursery becomes the
+       whole selection, there and then.
+
+       These boxes used to be disabled while All was on, so narrowing to one
+       nursery meant unticking All — which selected every nursery — and then
+       unticking the other two. Three clicks, and a state in between that said
+       something nobody meant. Ticking the one you want now says it directly.
+
+       Only the ticking case exists: under All every box renders unticked, so
+       a click here is always a tick. */
+    if (!Array.isArray(draft.scan_nurseries[key])) {
+      draft.scan_nurseries[key] = [t.dataset.nname];
+      return render();
+    }
+
     draft.scan_nurseries[key] = [...document.querySelectorAll('[data-npage="' + key + '"]')]
       .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
     return render();
