@@ -359,6 +359,11 @@
     .nelos-todo-count { font-size:10px; font-weight:900; padding:2px 8px; border-radius:999px;
                         background:#fee2e2; color:#b91c1c; letter-spacing:.04em; }
     .nelos-todo-count.zero { background:#dcfce7; color:#15803d; }
+    /* The count is pushed right by the "Open Nelos" link's margin-left:auto.
+       With that link dropped (openLink:false) the count becomes the last
+       child and has to claim the space itself, or it sits tucked against
+       the title with the row's whole width empty beside it. */
+    .nelos-todo-head .nelos-todo-count:last-child { margin-left:auto; }
     .nelos-todo-all { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                       color:#7c3aed; text-decoration:none; }
     .nelos-todo-all:hover { text-decoration:underline; }
@@ -377,6 +382,13 @@
                   padding:1px 6px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-right:5px; }
     .nelos-due-over { color:#b91c1c; font-weight:900; }
     .nelos-empty { text-align:center; font-size:12px; font-weight:700; color:#94a3b8; padding:22px 6px; }
+    /* The new-case button on its own row directly under the head,
+       rather than at the foot of the list. A dashboard widget is read
+       top-down and the action belongs with the heading it acts on —
+       at the bottom it sat below however many rows happened to be
+       pending, which is a different place every day. */
+    .nelos-todo-actions { display:flex; gap:8px; margin:-3px 0 11px; }
+    .nelos-todo-actions .nelos-new { margin-top:0; }
     .nelos-new { display:inline-flex; align-items:center; gap:6px; margin-top:11px; padding:8px 15px; border-radius:10px;
                  background:#7c3aed; color:#fff; font-size:10px; font-weight:900; letter-spacing:.08em;
                  text-transform:uppercase; text-decoration:none; border:none; cursor:pointer; }
@@ -432,7 +444,11 @@
    *   plot, batch, nursery,
    *   limit,       // rows to show (default 6)
    *   title,       // widget heading (default 'Nelos — Pending Cases')
-   *   newCase,     // false to hide the "Raise a Case" button
+   *   newCase,     // false to hide the "Raise a Case" button; 'top' to put
+   *                //   it on its own row under the heading instead of at
+   *                //   the foot of the list
+   *   newCaseLabel,// override the button's text (default "➕ Raise a Case")
+   *   openLink,    // false to drop the "Open Nelos →" link from the heading
    *   hideIfEmpty  // true → remove the widget entirely when nothing is pending
    * })
    *
@@ -465,19 +481,24 @@
     // Nelos itself.
     const raisedAs = opts.source || opts.module;
     const newBtn = opts.newCase === false ? '' :
-      `<a class="nelos-new" href="${esc(homeHref())}?new=1${raisedAs ? '&source=' + encodeURIComponent(raisedAs) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}">➕ Raise a Case</a>`;
+      `<a class="nelos-new" href="${esc(homeHref())}?new=1${raisedAs ? '&source=' + encodeURIComponent(raisedAs) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}">${esc(opts.newCaseLabel || '➕ Raise a Case')}</a>`;
+    /* Default stays where it has always been, at the foot of the list. */
+    const topBtn = (opts.newCase === 'top') ? `<div class="nelos-todo-actions">${newBtn}</div>` : '';
+    const footBtn = (opts.newCase === 'top') ? '' : newBtn;
 
     el.innerHTML = `
       <div class="nelos-todo">
         <div class="nelos-todo-head">
           <span class="nelos-todo-title">📋 ${esc(opts.title || 'Nelos — Pending Cases')}</span>
           <span class="nelos-todo-count ${total ? '' : 'zero'}">${total || 'clear'}</span>
-          <a class="nelos-todo-all" href="${esc(homeHref())}">Open Nelos →</a>
+          ${opts.openLink === false ? '' :
+            `<a class="nelos-todo-all" href="${esc(homeHref())}">Open Nelos →</a>`}
         </div>
+        ${topBtn}
         ${total
           ? data.map(rowHtml).join('')
           : '<div class="nelos-empty">Nothing pending — all clear ✓</div>'}
-        ${newBtn}
+        ${footBtn}
       </div>`;
     return total;
   }
