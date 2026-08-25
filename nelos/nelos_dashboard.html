@@ -45,7 +45,7 @@
             padding:3px 10px; border-radius:999px; }
 
   /* Five columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:104px 158px 1fr 116px 112px; gap:13px; }
+  .th, .tr { display:grid; grid-template-columns:74px 118px 160px 1fr 126px; gap:13px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
   .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
@@ -54,17 +54,27 @@
   .tr.is-overdue { background:#fffbfb; }
 
   .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
+
+  /* Created date, leftmost. */
+  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
+  .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
+
+  /* Case number sits to the left of the status word, on one line. */
+  .st-line { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .st-word { font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
              padding:4px 10px; border-radius:7px; }
   .st-pending { background:#fef3c7; color:#a16207; }
   .st-solved  { background:#dcfce7; color:#15803d; }
-  .st-exact { font-size:9.5px; font-weight:800; color:#94a3b8; letter-spacing:.05em; text-transform:uppercase; }
-  .sys-line { font-size:12.5px; font-weight:800; color:#4c1d95; }
-  .pic-line { font-size:11.5px; font-weight:700; color:#64748b; }
+
+  /* Where it is going. */
+  /* Shown on both layouts — it is this column's own caption, so it does
+     not also get a .cell-cap or the word lands twice. */
+  .to-lab { font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:#c4b5fd; }
+  .sys-line { font-size:13px; font-weight:900; color:#4c1d95; line-height:1.25; }
+  .pic-line { font-size:11.5px; font-weight:700; color:#475569; }
   .pic-none { font-style:italic; color:#b45309; }
-  .by-name { font-size:12.5px; font-weight:800; color:#1e293b; }
-  .by-none { font-style:italic; font-weight:700; color:#cbd5e1; }
-  .by-when { font-size:10.5px; font-weight:700; color:#94a3b8; }
+  .by-line { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:2px; }
+  .by-line b { font-weight:800; color:#64748b; }
   /* Only for the stacked phone layout — on a wide screen the column
      heading already says what this is. */
   .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
@@ -74,26 +84,41 @@
   .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
            border:1.5px solid #ede9fe; background:#f8fafc; }
   .case-no { font-size:10px; font-weight:900; letter-spacing:.06em; color:#7c3aed; }
-  .case-title { font-size:14px; font-weight:800; color:#1e293b; margin-top:2px; line-height:1.35; }
-  .case-desc { font-size:11.5px; font-weight:600; color:#64748b; margin-top:3px; line-height:1.5;
-               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .case-meta { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:5px;
-               display:flex; flex-wrap:wrap; gap:3px 10px; }
+  .case-title { font-size:14px; font-weight:800; color:#1e293b; line-height:1.35; }
+  .case-cat { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+              color:#8b5cf6; margin-top:2px; }
+
+  /* The detail lines, one per row: a label on the left and its value on the
+     right, so figures line up down the column instead of running together
+     in a paragraph. */
+  .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; }
+  .d-row { display:grid; grid-template-columns:112px 1fr; gap:8px; align-items:baseline;
+           padding:2px 0; border-bottom:1px dotted #f1eafe; }
+  .d-row:last-child { border-bottom:none; }
+  .d-row.d-free { grid-template-columns:1fr; }
+  .d-lab { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+           color:#a78bfa; overflow-wrap:anywhere; }
+  .d-val { font-size:12px; font-weight:700; color:#334155; overflow-wrap:anywhere; }
+  .d-row.d-free .d-val { font-weight:600; color:#64748b; }
+  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
+  .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
+  @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
 
   .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
   .pi-urgent { background:#fee2e2; color:#b91c1c; } .pi-high { background:#ffedd5; color:#c2410c; }
   .pi-normal { background:#e0f2fe; color:#0369a1; } .pi-low  { background:#f1f5f9; color:#64748b; }
   .src { background:#f5f3ff; color:#6d28d9; }
-  .overdue { font-size:10px; font-weight:900; color:#b91c1c; }
+  .overdue { font-size:10.5px; font-weight:900; color:#b91c1c; margin-top:6px; }
 
   /* ── Row actions ────────────────────────────────────────────── */
   /* Which of these appear is decided by the person's rights, read once from
      nelos_my_rights() — see migration_nelos_case_tools.sql. */
-  .td-act { display:flex; flex-direction:column; gap:5px; }
-  .act { display:inline-flex; align-items:center; justify-content:center; gap:5px; width:100%;
-         padding:6px 8px; border-radius:8px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
-         font-size:9.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:#6d28d9;
-         text-decoration:none; white-space:nowrap; }
+  /* Symbols only — four of these on every row, so the words were most of
+     the column. The name is on the hover title instead. */
+  .td-act { display:flex; flex-wrap:wrap; gap:6px; }
+  .act { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
+         border-radius:8px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
+         font-size:15px; line-height:1; color:#6d28d9; text-decoration:none; padding:0; }
   .act:hover { background:#f5f3ff; border-color:#c4b5fd; }
   .act-solve  { color:#15803d; border-color:#bbf7d0; } .act-solve:hover  { background:#f0fdf4; border-color:#86efac; }
   .act-del    { color:#b91c1c; border-color:#fecaca; } .act-del:hover    { background:#fef2f2; border-color:#fca5a5; }
@@ -114,8 +139,6 @@
   @media (max-width:820px) {
     .th { display:none; }
     .tr { grid-template-columns:1fr; gap:9px; padding:15px 16px; }
-    .td-act { flex-direction:row; flex-wrap:wrap; }
-    .act { width:auto; flex:1; min-width:88px; }
     .cell-cap { display:block; }
   }
 
@@ -212,10 +235,10 @@
       <span class="list-n" id="count">—</span>
     </div>
     <div class="th">
+      <span>Created</span>
       <span>Status</span>
-      <span>System &amp; PIC</span>
+      <span>To</span>
       <span>Case Details</span>
-      <span>Raised By</span>
       <span>Actions</span>
     </div>
     <div id="list"></div>
@@ -359,72 +382,114 @@ function fmtDate(d) {
    to where it was raised. */
 const queueOf = c => c.assigned_module || c.source_module;
 
-/* One row of the list. Four columns: how it stands, who has to deal with
-   it, what it is about, and what can be done to it from here. */
-function rowHtml(c) {
-  const subject = [
-    c.batch_name && 'Batch ' + c.batch_name,
-    c.plot_name, c.nursery_name
-  ].filter(Boolean).join(' · ');
 
+/* The lines under a case's title, one per row. The three place columns come
+   first, then whatever the description holds.
+
+   A raising module writes its own figures as "Label: value", one per line —
+   Plot balance, Pokok inang, Estimate culling rate and so on — and each of
+   those becomes its own row here. A line without a label is shown as it was
+   written. Long descriptions are trimmed, since the case page shows the
+   whole thing. */
+const DETAIL_CAP = 8;
+
+function detailRows(c) {
+  const rows = [];
+  if (c.nursery_name) rows.push(['Nursery', c.nursery_name]);
+  if (c.plot_name)    rows.push(['Plot',    c.plot_name]);
+  if (c.batch_name)   rows.push(['Batch',   c.batch_name]);
+
+  String(c.description || '').split(/\r?\n/).forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    // A short leading label, then a colon — ASCII or the full-width one that
+    // a phone keyboard set to Chinese produces.
+    const m = t.match(/^([^:：]{1,40}?)\s*[:：]\s*(.+)$/);
+    rows.push(m ? [m[1].trim(), m[2].trim()] : [null, t]);
+  });
+  return rows;
+}
+
+function rowHtml(c) {
   const pending = isPending(c);
   const due = c.due_date
-    ? (isOverdue(c) ? `<div class="overdue">⏰ Overdue — was due ${esc(fmtDate(c.due_date))}</div>`
-                    : `<span>📅 Due ${esc(fmtDate(c.due_date))}</span>`)
+    ? (isOverdue(c) ? `<div class="overdue">Overdue — was due ${esc(fmtDate(c.due_date))}</div>`
+                    : `<div class="due-line">Due ${esc(fmtDate(c.due_date))}</div>`)
     : '';
 
   const queue = queueOf(c);
   const raisedIn = MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '';
   const queueIn  = MJMNelos.SOURCE_LABEL[queue] || queue || '';
 
+  const when = new Date(c.created_at);
+  const rows = detailRows(c);
+  const shown = rows.slice(0, DETAIL_CAP);
+
   return `
     <div class="tr ${isOverdue(c) ? 'is-overdue' : ''}" data-case="${esc(c.id)}">
 
-      <div class="td-stack">
-        <span class="st-word ${pending ? 'st-pending' : 'st-solved'}">${pending ? 'Pending' : 'Solved'}</span>
-        <span class="st-exact">${esc(MJMNelos.STATUS_LABEL[c.status] || c.status)}</span>
-        <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
+      <div class="td-stack td-when">
+        <span class="cell-cap">Created</span>
+        <span class="when-d">${esc(when.toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}</span>
+        <span class="when-y">${when.getFullYear()}</span>
       </div>
 
       <div class="td-stack">
+        <span class="cell-cap">Status</span>
+        <span class="st-line">
+          <span class="case-no">${esc(c.case_no || '')}</span>
+          <span class="st-word ${pending ? 'st-pending' : 'st-solved'}">${pending ? 'Pending' : 'Solved'}</span>
+        </span>
+        <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
+      </div>
+
+      <!-- Where it is going, not where it came from: a case raised in the FC
+           Portal and routed to the auditors is the auditors' work now. -->
+      <div class="td-stack">
+        <span class="to-lab">To</span>
         <span class="sys-line">${esc(queueIn)}</span>
-        ${queue !== c.source_module ? `<span class="st-exact">raised in ${esc(raisedIn)}</span>` : ''}
         <span class="pic-line">${c.assignee_name
-          ? '👤 ' + esc(c.assignee_name)
-          : '<span class="pic-none">👤 no PIC yet</span>'}</span>
+          ? esc(c.assignee_name)
+          : '<span class="pic-none">no PIC yet</span>'}</span>
+        <span class="by-line">Created by
+          <b>${c.raised_by ? esc(c.raised_by) : 'unknown'}</b></span>
+        ${queue !== c.source_module ? `<span class="by-line">Raised in ${esc(raisedIn)}</span>` : ''}
       </div>
 
       <div class="td-case">
         ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
-        <div class="min-w-0">
-          <span class="case-no">${esc(c.case_no || '')}</span>
+        <div class="min-w-0 flex-1">
           <div class="case-title">${esc(c.title)}</div>
-          ${c.description ? `<div class="case-desc">${esc(c.description)}</div>` : ''}
-          <div class="case-meta">
-            ${c.category ? `<span>🏷️ ${esc(c.category)}</span>` : ''}
-            ${subject ? `<span>📍 ${esc(subject)}</span>` : ''}
-            ${due}
+          ${c.category ? `<div class="case-cat">${esc(c.category)}</div>` : ''}
+          <div class="d-rows">
+            ${shown.map(([lab, val]) => lab
+              ? `<div class="d-row"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`
+              : `<div class="d-row d-free"><span class="d-val">${esc(val)}</span></div>`).join('')}
+            ${rows.length > DETAIL_CAP
+              ? `<div class="d-row d-free"><span class="d-more">+${rows.length - DETAIL_CAP} more — open the case to read it all</span></div>`
+              : ''}
           </div>
+          ${due}
         </div>
       </div>
 
-      <div class="td-stack">
-        <span class="cell-cap">Raised by</span>
-        <span class="by-name">${c.raised_by ? esc(c.raised_by) : '<span class="by-none">unknown</span>'}</span>
-        <span class="by-when">${esc(new Date(c.created_at).toLocaleDateString('en-MY',
-          { day:'numeric', month:'short', year:'numeric' }))}</span>
-      </div>
-
+      <!-- Symbols, not words and not emoji: four of these on every row, and
+           the label is on the hover title where it does not cost a column. -->
       <div class="td-act">
-        <a class="act" href="nelos_case.html?id=${encodeURIComponent(c.id)}">👁 View</a>
-        ${rights.may_edit  ? `<button class="act act-edit"  data-act="edit"  data-id="${esc(c.id)}">✏️ Edit</button>` : ''}
+        <a class="act" title="View" aria-label="View"
+           href="nelos_case.html?id=${encodeURIComponent(c.id)}">&#x229A;</a>
+        ${rights.may_edit  ? `<button class="act act-edit" title="Edit" aria-label="Edit"
+           data-act="edit" data-id="${esc(c.id)}">&#x270E;</button>` : ''}
         ${rights.may_solve && pending
-                           ? `<button class="act act-solve" data-act="solve" data-id="${esc(c.id)}">✅ Solve</button>` : ''}
-        ${rights.may_delete ? `<button class="act act-del" data-act="del"   data-id="${esc(c.id)}">🗑 Delete</button>` : ''}
+                           ? `<button class="act act-solve" title="Solve" aria-label="Solve"
+           data-act="solve" data-id="${esc(c.id)}">&#x2713;</button>` : ''}
+        ${rights.may_delete ? `<button class="act act-del" title="Delete" aria-label="Delete"
+           data-act="del" data-id="${esc(c.id)}">&#x2715;</button>` : ''}
       </div>
 
     </div>`;
 }
+
 
 function visibleCases() {
   const status   = $('f-status').value;
@@ -490,7 +555,9 @@ async function solveCase(c, btn) {
   if (what === null) return;                       // Cancel
   if (!what.trim()) { toast('Say what was done, in a line.', false); return; }
 
-  btn.disabled = true; btn.textContent = 'Saving…';
+  // Only disabled, never re-labelled: the button is a 28px symbol now and a
+  // word would burst it.
+  btn.disabled = true;
   const { error } = await _supabase.from('nelos_cases').update({
     status: 'resolved',
     resolution: what.trim(),
@@ -501,7 +568,7 @@ async function solveCase(c, btn) {
   }).eq('id', c.id);
 
   if (error) {
-    btn.disabled = false; btn.textContent = '✅ Solve';
+    btn.disabled = false;
     toast('Could not solve it — ' + error.message, false);
     return;
   }
@@ -515,10 +582,10 @@ async function deleteCase(c, btn) {
   if (!confirm(`Delete ${c.case_no || 'this case'} — “${c.title}” — for good?\n\n` +
                'This cannot be undone. To retire a case and keep the record, solve it instead.')) return;
 
-  btn.disabled = true; btn.textContent = 'Deleting…';
+  btn.disabled = true;
   const { error } = await _supabase.from('nelos_cases').delete().eq('id', c.id);
   if (error) {
-    btn.disabled = false; btn.textContent = '🗑 Delete';
+    btn.disabled = false;
     toast('Could not delete it — ' + error.message, false);
     return;
   }
