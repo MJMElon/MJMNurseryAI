@@ -21,6 +21,14 @@
          color:#6d28d9; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
          cursor:pointer; }
   .tab.on { background:#6d28d9; border-color:#5b21b6; color:white; }
+  /* The title row is laid out here, not only by Tailwind classes: the CDN is
+     a third-party script, and until it lands these stack instead of sitting
+     side by side. Same reason the manage page pins its button's icons. */
+  .title-row { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+  .back-btn { display:grid; place-items:center; width:38px; height:38px; border-radius:999px;
+              background:white; border:1.5px solid #ede9fe; color:#6d28d9; text-decoration:none;
+              font-size:17px; font-weight:900; line-height:1; flex-shrink:0; transition:all .15s; }
+  .back-btn:hover { background:#f5f3ff; border-color:#ddd6fe; }
 
   .u-row { padding:16px 20px; border-bottom:1px solid #f5f3ff; }
   .u-row:last-child { border-bottom:none; }
@@ -53,7 +61,7 @@
 
 <div id="mjm-ribbon" data-logo="off" data-brand="" data-center=" "></div>
 <script src="../shared/shared_ribbon.js"></script>
-<script src="../shared/shared_fc_brand.js" data-sub="Setting" data-back="scan_admin.html"></script>
+<script src="../shared/shared_fc_brand.js" data-sub="Setting"></script>
 
 <div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -68,7 +76,11 @@
 
 <div id="main" class="max-w-[940px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <div class="flex items-center gap-2 mb-5">
+  <div class="title-row">
+    <!-- Back a step inside the portal, beside the title of the page it is
+         leaving. The ribbon's own [← Portal] leaves the FC Portal entirely;
+         two arrows in the same bar would be a coin toss. -->
+    <a class="back-btn" href="scan_admin.html" title="Back" aria-label="Back">&#8592;</a>
     <button class="tab on" data-tab="users">User Setting</button>
   </div>
 
@@ -96,12 +108,17 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
 
 /* The five things a person opens in the portal. `key` is what canScan() reads
    on the phone (permissions.scan_actions.<key>.view) and what the nursery list
-   is filed under (permissions.scan_nurseries.<key>). */
+   is filed under (permissions.scan_nurseries.<key>).
+
+   Labels are Title Case throughout — every word capitalised bar the ones
+   inside brackets that are not, and DO stays an abbreviation. Five settings
+   in a column read as a set or as five unrelated things, and the difference
+   is entirely whether they are written the same way. */
 const PAGES = [
   { key:'barcode',     label:'Scan Barcode Counter' },
   { key:'do',          label:'Issue Collection DO' },
-  { key:'maintenance', label:'Schedule maintenance work' },
-  { key:'palms',       label:'PALMS (Plot status update)' },
+  { key:'maintenance', label:'Schedule Maintenance Work' },
+  { key:'palms',       label:'PALMS (Plot Status Update)' },
   { key:'culling',     label:'Culling Calculator' },
 ];
 
