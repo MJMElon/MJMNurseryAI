@@ -78,10 +78,7 @@
 <!-- Page sub-header: keeps the old module title + user chip below the ribbon -->
 <div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
   <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Operation Management</span>
-  <div class="flex items-center gap-2">
-    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
-    <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
-  </div>
+  <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
 </div>
 
 <div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
@@ -212,7 +209,6 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
       return;
     }
     const u = MJMAccess.user();
-    document.getElementById('who').textContent = u.full_name || u.email || '';
     // Per-page access, set on this module's own User Access. A page the user
     // may not open should not be offered to them.
     // Fails OPEN if shared_access.js is an older cached copy without these

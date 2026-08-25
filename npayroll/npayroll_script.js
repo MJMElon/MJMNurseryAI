@@ -1211,7 +1211,6 @@ $('global-month').addEventListener('change', async () => {
     isAdmin   = MJMAccess.isAdminOf('npayroll');
     // One missing helper must not take the whole module down with it.
     try { if (MJMAccess.canManageUsers()) $('user-access-tab').classList.remove('hidden'); } catch (_) {}
-    $('who').textContent = u.full_name || u.email || '';
 
     let savedMonth = null;
     try { savedMonth = localStorage.getItem('npayroll_month'); } catch (_) {}

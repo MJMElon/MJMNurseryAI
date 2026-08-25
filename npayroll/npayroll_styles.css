@@ -63,9 +63,6 @@ body { font-family: 'Outfit', system-ui, sans-serif; background: var(--bg); colo
 .month-ctrl input { height: 32px; padding: 0 10px; border: 1.5px solid var(--border); border-radius: var(--r-sm);
                     font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-head); outline: none; }
 .month-ctrl input:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
-.who { font-size: 11px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
-/* Same as the ops page: the name goes below md rather than crowd the row. */
-@media (max-width: 767px) { .who { display: none; } }
 @media (max-width: 560px) {
   .topbar-inner { padding: 10px 14px; }
   .month-ctrl span { display: none; }
