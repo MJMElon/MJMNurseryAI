@@ -60,22 +60,34 @@
   stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
 }
 
-/* Wordmark, three lines. "MJM Nursery" names the company, "555" is the
-   loud line the brand is actually known by, "AUDITOR PORTAL" the quiet
-   green caption saying which of its surfaces this is. The company line
-   is deliberately the smallest and softest of the three — it is context
-   for the 555 below it, not competition for it. */
-.fcr-brand{min-width:0;line-height:1.05;justify-self:center;text-align:center}
-.fcr-brand-top{
-  font-size:10px;font-weight:700;color:#8298a6;letter-spacing:.6px;
-  margin-bottom:1px;white-space:nowrap;
-}
+/* Wordmark, three lines, in the FC portal's order: the 555 leads, the
+   company name sits under it, and the green caption at the foot says
+   which surface this is.
+
+   It used to run the other way, with a small "MJM Nursery" above the
+   555 — which read as a company page that happened to be branded 555,
+   rather than as 555's auditor portal. The FC portal had already
+   settled the question; this follows it, so the two read as one family
+   of surfaces rather than two designs that share a number.
+
+   The 555 is a heavy italic: it is a logotype here, not a heading, and
+   the slant is the whole of its character. Both the weight and the
+   slant come from the font file — see the ital axis in each page's
+   Google Fonts request — rather than being synthesised. */
+.fcr-brand{min-width:0;justify-self:center;text-align:center;line-height:1}
 .fcr-brand-name{
-  font-size:26px;font-weight:900;color:#16323f;letter-spacing:.4px;
+  font-size:34px;font-weight:1000;font-style:italic;
+  color:#1b6b3a;letter-spacing:-.5px;line-height:.92;
+}
+.fcr-brand-org{
+  font-size:15px;font-weight:800;color:#16323f;
+  text-transform:uppercase;letter-spacing:2.2px;
+  margin-top:3px;white-space:nowrap;
 }
 .fcr-brand-sub{
   font-size:10px;font-weight:800;color:#22a34a;
-  text-transform:uppercase;letter-spacing:2px;margin-top:3px;
+  text-transform:uppercase;letter-spacing:3px;margin-top:2px;
+  white-space:nowrap;
 }
 
 /* The right-hand cluster is one grid cell, pushed to the far end and
@@ -148,14 +160,16 @@
   .fcr-right{gap:8px}
   .fcr-welcome{display:none}
   .fcr-signout-label{display:none}
-  .fcr-brand-top{font-size:9px;letter-spacing:.4px}
-  .fcr-brand-name{font-size:21px}
-  .fcr-brand-sub{font-size:9px;letter-spacing:1.4px;margin-top:2px}
+  .fcr-brand-name{font-size:26px}
+  .fcr-brand-org{font-size:12px;letter-spacing:1.4px}
+  .fcr-brand-sub{font-size:8.5px;letter-spacing:2px}
   .fcr-lang,.fcr-signout{height:32px;padding:0 11px;font-size:9.5px;letter-spacing:1px}
 }
 
 @media (max-width:380px){
-  .fcr-brand-sub{letter-spacing:1px}
+  .fcr-brand-name{font-size:23px}
+  .fcr-brand-org{font-size:11px;letter-spacing:1px}
+  .fcr-brand-sub{letter-spacing:1.2px}
   .fcr-lang,.fcr-signout{padding:0 9px}
   .fcr-back{width:32px;height:32px}
 }
@@ -165,5 +179,6 @@
    it gives up the tracking that makes it look like a caption before it
    gives up being readable. */
 @media (max-width:340px){
-  .fcr-brand-sub{font-size:8px;letter-spacing:.4px}
+  .fcr-brand-org{font-size:10px;letter-spacing:.6px}
+  .fcr-brand-sub{font-size:8px;letter-spacing:.6px}
 }
