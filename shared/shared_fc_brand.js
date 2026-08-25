@@ -23,16 +23,17 @@
    slot at all — a single space is enough, and it is that slot the mark
    goes into. It sits between two flex:1 siblings, so it is genuinely
    centred in the bar whatever the buttons on the right are doing.
-   data-logo="off" and an empty data-brand leave the left side as the
-   empty spacer that makes the centring work — which is where a back
-   link goes, if the page wants one:
+   data-logo="off" drops the [AI] square. The wordmark beside it needs
+   emptying HERE, not by the attribute: the ribbon reads
+   `d.brand || 'MJM Nursery AI'`, and an empty string is falsy, so
+   data-brand="" gets the default back and the page ends up wearing both
+   marks at once. The left slot is left in place as the empty spacer that
+   makes the centring work.
 
-       <script src="../shared/shared_fc_brand.js"
-               data-sub="Setting" data-back="scan_admin.html"></script>
-
-   Deliberately separate from the ribbon's own [← Portal] on the right:
-   that one leaves the FC Portal for the module selection, this one goes
-   back a step inside it.
+   Nothing else goes in it: a page that wants a back control puts it in
+   the page, beside its own title, where it reads as part of that page
+   rather than as a third thing in a bar that already has [← Portal] and
+   Sign Out.
 
    The colours are the login cover's own (--bk-green and its three
    shadow steps in AuthScreen.jsx). Keep them in step: this mark and
@@ -46,8 +47,7 @@
    ================================================================ */
 (function () {
   var me = document.currentScript;
-  var sub  = (me && me.dataset && me.dataset.sub)  || '';
-  var back = (me && me.dataset && me.dataset.back) || '';
+  var sub = (me && me.dataset && me.dataset.sub) || '';
 
   function esc(v) {
     return String(v == null ? '' : v)
@@ -60,19 +60,10 @@
     var slot = bar && bar.querySelector('.mjm-rb-centre');
     if (!slot) return false;
 
-    /* Into the empty left spacer, so it does not move the centred mark.
-       Anchored from #mjm-ribbon on purpose: scoped as 'div > div:first-child'
-       this also matched the ribbon BAR itself — the bar is the first child of
-       #mjm-ribbon, which is a div — and rewriting it wiped the whole ribbon,
-       centred mark and buttons included. */
+    // The default wordmark, out — see the note above on data-brand="".
     var left = document.querySelector('#mjm-ribbon > div > div:first-child');
-    if (back && left) {
-      left.innerHTML =
-        '<a href="' + esc(back) + '" title="Back" aria-label="Back" ' +
-           'style="display:grid;place-items:center;width:38px;height:38px;border-radius:999px;' +
-                  'background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;text-decoration:none;' +
-                  'font-size:17px;font-weight:900;line-height:1;flex-shrink:0;">&#8592;</a>';
-    }
+    if (left) left.innerHTML = '';
+
     slot.innerHTML =
       '<div style="line-height:1;">' +
         // The 555 of the exercise book: dark green, italic, stacked shadow.
