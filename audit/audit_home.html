@@ -19,13 +19,13 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
 
   <!-- Shared FC-style top ribbon (same file used by audit_admin +
        audit_nursery_select). Replaces the audit-specific header band
        that used to sit under the standardised #mjm-ribbon; the two
        were doing overlapping work. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824d"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260825a"/>
 
   <!-- Anti-flicker auth guard -->
   <script src="audit_login_guard.js?v=20260824a"></script>
@@ -472,7 +472,7 @@
       .ribbon-spacer{width:34px}
     }
     .sched-count{font-size:17px;font-weight:700;color:var(--fc-ink);margin-top:6px;
-                 line-height:1.3}
+                 line-height:1.3;text-align:center}
     .sched-count b{color:#2d7a2d}
 
     /* ── Month strip ── */
@@ -581,7 +581,11 @@
               overflow:hidden;position:relative}
     .tp-fill{height:100%;background:linear-gradient(90deg,#2d7a2d,#22a34a);
              border-radius:999px;transition:width .4s ease}
-    .tp-text{font-size:11.5px;font-weight:700;color:var(--fc-ink2);letter-spacing:.2px}
+    /* Centred with the count above it — the two are one block, and
+       leaving the bar's caption ranged left while the number it
+       describes sat centred read as a mistake. */
+    .tp-text{font-size:11.5px;font-weight:700;color:var(--fc-ink2);letter-spacing:.2px;
+             text-align:center}
 
     /* Congratulations banner — replaces the greeting text on days
        when every one of today's tasks is closed out. Kept soft-green
@@ -658,9 +662,26 @@
     .tl-item.overdue .tl-plot{border-color:#b91c1c;color:#b91c1c;
                               background:#fef2f2}
     .tl-item.overdue .tl-plot:hover{background:#b91c1c;color:#fff}
+    /* Opens the rest of the strip. Shaped like the circles it stands in
+       for, but filled with the row's tone rather than outlined in it, so
+       it reads as the odd one out — it is not a plot. */
+    .tl-plots-toggle{display:inline-flex;align-items:center;gap:3px;
+                     height:38px;min-width:38px;padding:0 9px;border-radius:19px;
+                     flex:0 0 auto;cursor:pointer;
+                     background:var(--tone,#2d7a2d);border:1.5px solid var(--tone,#2d7a2d);
+                     color:#fff;font-family:inherit;
+                     font-size:11px;font-weight:800;letter-spacing:.2px;
+                     -webkit-tap-highlight-color:transparent;
+                     transition:filter .14s,transform .14s}
+    .tl-plots-toggle:hover{filter:brightness(1.12)}
+    .tl-plots-toggle:active{transform:scale(.94)}
+    .tl-plots-toggle svg{width:13px;height:13px;stroke:currentColor;fill:none;
+                         stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .tl-item.overdue .tl-plots-toggle{background:#b91c1c;border-color:#b91c1c}
     @media (max-width:640px){
       .tl-plots{padding:8px 10px 10px 12px;gap:6px}
       .tl-plot{width:34px;height:34px;font-size:10px}
+      .tl-plots-toggle{height:34px;min-width:34px;padding:0 8px;font-size:10px}
     }
 
     .tl-card{display:block;border-radius:13px;background:var(--tint,#f4f7fa);
@@ -713,6 +734,27 @@
        when work was due). */
     .tl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
     .tl-date{font-weight:700;color:var(--fc-ink2)}
+
+    /* ── The deadline, at the end of the row ──
+       Ranged right and hard against the edge, so the four rows' dates
+       line up as a column the eye can run down instead of sitting
+       wherever each title happens to end. Tabular figures keep the
+       digits in that column from shifting between "5" and "15". */
+    .tl-due{flex:0 0 auto;text-align:right;line-height:1.25;
+            font-variant-numeric:tabular-nums}
+    .tl-due-date{font-size:12px;font-weight:800;color:var(--fc-ink);
+                 white-space:nowrap}
+    .tl-due-left{font-size:10.5px;font-weight:700;color:var(--fc-ink3);
+                 white-space:nowrap;margin-top:1px}
+    /* Only lateness earns colour. A row that is merely due is already
+       saying so in the badge beside its title. */
+    .tl-due.soon .tl-due-left{color:#92400e}
+    .tl-due.late .tl-due-date,
+    .tl-due.late .tl-due-left{color:#b91c1c}
+    @media (max-width:640px){
+      .tl-due-date{font-size:11px}
+      .tl-due-left{font-size:9.5px}
+    }
     .tl-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;
               white-space:nowrap;letter-spacing:.3px}
     .tl-caret{width:22px;height:22px;flex-shrink:0;color:var(--fc-ink3);
@@ -745,6 +787,7 @@
        can tell at a glance which round a card belongs to. Round 1 is
        green (start), Round 2 amber, Round 3 red-orange, Round 4 blue.
        Falls back to the ink defaults for unknown values. */
+    .tl-round i{font-style:normal;opacity:.55;margin:0 .5px}
     .tl-round{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
              padding:2px 7px;border-radius:20px;background:#e9edf1;color:#182018;
              border:1px solid rgba(0,0,0,.08)}
@@ -811,7 +854,7 @@
        from the portal tile or the ribbon's back arrow. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
     <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
     </a>
     <div class="fcr-brand">
       <div class="fcr-brand-name">555</div>
@@ -821,11 +864,11 @@
     <div class="fcr-right">
       <span class="fcr-welcome" id="fcr-welcome">Welcome</span>
       <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+        <span class="fcr-globe" aria-hidden="true">🌐</span>
         <span id="lang-toggle-label">BM</span>
       </button>
       <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" aria-label="Sign out" title="Sign out">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
         <span class="fcr-signout-label" data-t="signout">Sign Out</span>
       </button>
     </div>
@@ -848,7 +891,7 @@
              the list is for. The nursery bar used to float above it as a
              separate band, which read as a heading in its own right and
              left two competing titles stacked on one screen. -->
-        <div class="sched-kicker"><span>📋 Audit To-Do</span></div>
+        <div class="sched-kicker"><span>📋 To-Do List</span></div>
 
         <!-- Names the nursery this list is about, and the way to the other
              one. Reading the wrong nursery's schedule is the one mistake
@@ -967,7 +1010,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260824e"></script>
+<script src="audit_lang.js?v=20260825a"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
 <!-- Works out which plots still owe work, for the circles under each
@@ -1580,6 +1623,36 @@ function loadAuditTodo(){
     return o.start === o.end ? `${o.start} ${mn}` : `${o.start}–${o.end} ${mn}`;
   }
 
+  /* ── WHEN IT IS OWED BY ──
+     A window like "1–5 Aug" told the auditor when they were allowed to
+     start as well as when they had to finish, and the first half is not
+     a thing anyone acts on: the row only appears once the window is
+     open. What is left is the deadline, so that is all the row shows —
+     the window's last day.
+
+     Under it, the same date said the way it is actually thought about.
+     "5 Aug" needs counting on fingers against today; "3 days left" does
+     not, and "overdue 5 days" is the one number that should be
+     impossible to skim past.
+
+     Days are compared at local midnight on both sides so a window
+     closing today reads "due today" all day rather than flipping to
+     overdue at some hour of the afternoon. */
+  function dueInfo(o, oy, om){
+    const due   = new Date(oy, om, o.end);
+    const today = new Date(year, month, day);
+    const days  = Math.round((due - today) / 86400000);
+    const plural = n => n === 1 ? '' : 's';
+    return {
+      date: `${t('due_word')} ${o.end} ${MONTHS[om]}`,
+      left: days > 0 ? `${fmtNum(days)} ${t('day' + (days === 1 ? '' : 's') + '_left')}`
+          : days === 0 ? t('due_today')
+          : `${t('overdue_by')} ${fmtNum(-days)} ${t('day' + plural(-days))}`,
+      late: days < 0,
+      soon: days >= 0 && days <= 1
+    };
+  }
+
   /* ── Month strip ── */
   const clampWin = (y,m,d) => Math.max(1, Math.min(d, Math.max(1, daysIn(y,m) - WIN + 1)));
 
@@ -1742,11 +1815,17 @@ function loadAuditTodo(){
      codes carry their own nursery, so the grouping needs no headings
      to be legible.
 
-     Nothing is capped. An earlier version showed twelve and counted
-     the rest, which read fine on pre nursery but meant a main-nursery
-     auditor could never see past BNN into their own nursery's plots —
-     which is precisely what the grouping is for. The strip is as long
-     as the work is; that is the honest length for a to-do list. */
+     Ten are shown, and the rest fold into a toggle carrying the count
+     of what is hidden. A whole main-nursery window opens owing fifty-two
+     plots across four modules, which is six rows of circles per module
+     and a page nobody can scroll past — but the count keeps the size of
+     the job visible, and one tap opens the lot. Expanding is remembered
+     per row while the page is open, so a redraw (a month change, the
+     completions arriving) does not fold a row the auditor just opened. */
+  const PLOT_PREVIEW = 10;
+  const expandedPlots = new Set();
+  const _plotKey = (o, oy, om) =>
+    [o.mod, oy, om, o.start, o.end, o.round || 0].join('|');
   function _plotsHtml(o, oy, om, pending){
     if (!pending.length) return '';
     const fromISO = iso(oy, om, o.start);
@@ -1770,7 +1849,12 @@ function loadAuditTodo(){
     if (!shown.length) return '';
     const label = t(o.title);
 
-    const circles = shown.map(e => {
+    const key    = _plotKey(o, oy, om);
+    const open   = expandedPlots.has(key);
+    const visible = open ? shown : shown.slice(0, PLOT_PREVIEW);
+    const hidden  = shown.length - visible.length;
+
+    const circles = visible.map(e => {
       const nur = NURSERY_LABELS[e.nursery] || e.nursery;
       return `<a class="tl-plot"
                  href="${o.href}?nursery=${encodeURIComponent(e.nursery)}` +
@@ -1779,8 +1863,38 @@ function loadAuditTodo(){
                  aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
     }).join('');
 
-    return `<div class="tl-plots">${circles}</div>`;
+    /* Chevrons out to open, in to close — the count rides on the closed
+       state, where it is the only thing saying how much more there is. */
+    const OUT = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="9 6 4 12 9 18"/><polyline points="15 6 20 12 15 18"/></svg>';
+    const IN  = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="4 6 9 12 4 18"/><polyline points="20 6 15 12 20 18"/></svg>';
+
+    const toggle = shown.length > PLOT_PREVIEW
+      ? `<button type="button" class="tl-plots-toggle" data-plotkey="${key}"
+                 aria-expanded="${open}"
+                 title="${open ? 'Show fewer' : 'Show all ' + fmtNum(shown.length) + ' pending plots'}"
+                 aria-label="${label} — ${open
+                    ? 'show fewer plots'
+                    : 'show ' + fmtNum(hidden) + ' more pending plots'}">${
+          open ? IN : OUT + '<span>' + fmtNum(hidden) + '</span>'}</button>`
+      : '';
+
+    return `<div class="tl-plots">${circles}${toggle}</div>`;
   }
+
+  /* One delegated listener rather than a handler per button: the
+     timeline is rebuilt from scratch on every redraw, so anything bound
+     to a button dies with it. */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.tl-plots-toggle');
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.plotkey;
+    if (expandedPlots.has(key)) expandedPlots.delete(key);
+    else expandedPlots.add(key);
+    renderAll();
+  });
 
   function renderTimeline(occ){
     let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
@@ -1838,6 +1952,7 @@ function loadAuditTodo(){
          renders greyed and does not navigate, so plot shortcuts into
          it would be links to a screen with nothing to record. */
       const plotsHtml = live ? _plotsHtml(o, oy, om, pending) : '';
+      const due = dueInfo(o, oy, om);
 
       return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
         ${openTag}
@@ -1845,14 +1960,17 @@ function loadAuditTodo(){
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${
-                o.round ? `<span class="tl-round" data-round="${o.round}">Round ${o.round}</span> ` : ''
+                o.round ? `<span class="tl-round" data-round="${o.round}">R<i>•</i>${o.round}</span> ` : ''
               }${t(o.title)}${
                 o.fromY !== undefined
                   ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
               <div class="tl-meta">
                 <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
-                <span class="tl-date">${dateLabel(o, om)}</span>
               </div>
+            </div>
+            <div class="tl-due${due.late ? ' late' : due.soon ? ' soon' : ''}">
+              <div class="tl-due-date">${due.date}</div>
+              <div class="tl-due-left">${due.left}</div>
             </div>
           </div>
         ${closeTag}
@@ -2024,8 +2142,11 @@ function loadAuditTodo(){
           ? `<div class="today-congrats">🎉 ${t('today_congrats')}</div>`
         : todayN === 0
           ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅`
-          : `${t('hi_greeting')} 😊, ${t('you_have')} <span class="count-big">${fmtNum(todayN)} ${t('audit_word')}</span> ` +
-            `${t(todayN>1 ? 'tasks_today_many' : 'tasks_today_one')}`)
+          /* Was "Hi 😊, you have 47 audit tasks today". The greeting cost a
+             line every time the screen was opened and said nothing the
+             auditor did not know; the number and what it counts is the
+             whole message. */
+          : `<span class="count-big">${fmtNum(todayN)}</span> ${t('pending_word')}`)
       : (monthOcc.length === 0
           ? (beforeStart(viewY, viewM)
               ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
