@@ -391,7 +391,7 @@
        top-down and the action belongs with the heading it acts on —
        at the bottom it sat below however many rows happened to be
        pending, which is a different place every day. */
-    .nelos-todo-actions { display:flex; gap:8px; margin:-3px 0 11px; }
+    .nelos-todo-actions { display:flex; justify-content:flex-end; gap:8px; margin:-3px 0 11px; }
     .nelos-todo-actions .nelos-new { margin-top:0; }
     .nelos-new { display:inline-flex; align-items:center; gap:6px; margin-top:11px; padding:8px 15px; border-radius:10px;
                  background:#7c3aed; color:#fff; font-size:10px; font-weight:900; letter-spacing:.08em;

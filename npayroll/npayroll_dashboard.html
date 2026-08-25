@@ -11,7 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=6">
+<link rel="stylesheet" href="npayroll_styles.css?v=7">
 </head>
 <body>
 
@@ -19,22 +19,19 @@
 <div id="mjm-ribbon"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<!-- Page sub-header: keeps the module brand + month picker below the ribbon -->
+<!-- Page sub-header: the module's name, then the month it is showing, the
+     signed-in name and the module badge — the same strip, in the same
+     order, that Nursery Operation Management carries under the ribbon. -->
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="brand">
-      <div class="brand-mark">NP</div>
-      <div>
-        <div class="brand-name">Nursery Payroll System</div>
-        <div class="brand-sub">mjmnpayroll_</div>
-      </div>
-    </div>
+    <span class="topbar-title">Nursery Payroll System</span>
     <div class="topbar-right">
       <label class="month-ctrl">
         <span>Month</span>
         <input type="month" id="global-month">
       </label>
       <span id="who" class="who"></span>
+      <div class="topbar-badge">NP</div>
     </div>
   </div>
 </header>

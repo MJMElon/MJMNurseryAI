@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>555 Auditor Portal — Back End</title>
+  <title>MJM Nursery — Auditor Portal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
 
   <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
        arrow, language, sign-out. Also loaded by audit_home.html and
        audit_nursery_select.html so the three surfaces read as one. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824d"/>
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260825a"/>
 
   <!-- Signed in is enough to open this page now. It used to be admin
        only, but it has become the desktop half of the audit app: the
@@ -312,21 +312,21 @@
        page this style is used on. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
     <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
     </a>
     <div class="fcr-brand">
-      <div class="fcr-brand-top">MJM Nursery</div>
       <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
       <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
     <div class="fcr-right">
       <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
       <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+        <span class="fcr-globe" aria-hidden="true">🌐</span>
         <span id="lang-toggle-label">BM</span>
       </button>
       <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
         <span class="fcr-signout-label" data-t="signout">Sign Out</span>
       </button>
     </div>
@@ -486,7 +486,7 @@
 <!-- Language store + welcome-name fill for the shared FC ribbon. Admin
      has nothing to translate here, but persisting the toggle means the
      rest of the audit pages honour whatever was picked. -->
-<script src="audit_lang.js?v=20260824e"></script>
+<script src="audit_lang.js?v=20260825a"></script>
 <script src="audit_ribbon.js?v=20260824b"></script>
 
 <!-- The portal permission layer, for the User Access card only. An admin who

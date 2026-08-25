@@ -35,26 +35,41 @@ body { font-family: 'Outfit', system-ui, sans-serif; background: var(--bg); colo
 .hidden { display: none !important; }
 
 /* ── Top bar ── */
-.topbar { background: var(--white); border-bottom: 2px solid var(--ink); box-shadow: var(--shadow-sm);
+/* ── Module sub-header ──
+   The same strip Nursery Operation Management wears under the shared
+   ribbon: the module's name on the left in small caps, and on the right
+   whatever this page needs plus the name and the module's square badge.
+   Its values are that page's Tailwind, written out: px-6 py-3, a hairline
+   tint under it, a 14px/900 slate-800 title tracked at .1em, an 11px/700
+   slate-500 name, and a 32px rounded-lg badge. */
+.topbar { background: var(--white); border-bottom: 1px solid var(--ink-mid);
           position: sticky; top: 0; z-index: 40; }
-.topbar-inner { max-width: 1500px; margin: 0 auto; padding: 0 24px; height: 62px;
-                display: flex; align-items: center; gap: 18px; }
+.topbar-inner { max-width: 1500px; margin: 0 auto; padding: 12px 24px;
+                display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.topbar-title { font-size: 14px; font-weight: 900; color: var(--text-head);
+                text-transform: uppercase; letter-spacing: .1em; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; }
+.topbar-badge { width: 32px; height: 32px; border-radius: var(--r-sm);
+                background: var(--ink); color: #fff; flex-shrink: 0;
+                display: flex; align-items: center; justify-content: center;
+                font-weight: 900; font-size: 12px; }
 .back-link { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
              color: var(--text-muted); text-decoration: none; border: 1.5px solid #e2e8f0;
              border-radius: 99px; padding: 6px 14px; white-space: nowrap; transition: all .15s; }
 .back-link:hover { background: var(--ink-light); color: var(--ink-dark); border-color: var(--ink-mid); }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--ink); color: #fff;
-              display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; }
-.brand-name { font-size: 14px; font-weight: 900; color: var(--text-head); letter-spacing: .04em; }
-.brand-sub  { font-size: 10px; font-weight: 700; color: var(--ink-faint); letter-spacing: .1em; }
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-.month-ctrl { display: flex; align-items: center; gap: 8px; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.month-ctrl { display: flex; align-items: center; gap: 8px; margin-right: 6px; }
 .month-ctrl span { font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
-.month-ctrl input { height: 34px; padding: 0 10px; border: 1.5px solid var(--border); border-radius: var(--r-sm);
+.month-ctrl input { height: 32px; padding: 0 10px; border: 1.5px solid var(--border); border-radius: var(--r-sm);
                     font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-head); outline: none; }
 .month-ctrl input:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
-.who { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.who { font-size: 11px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+/* Same as the ops page: the name goes below md rather than crowd the row. */
+@media (max-width: 767px) { .who { display: none; } }
+@media (max-width: 560px) {
+  .topbar-inner { padding: 10px 14px; }
+  .month-ctrl span { display: none; }
+}
 
 .loading { max-width: 900px; margin: 0 auto; padding: 70px 24px; text-align: center;
            font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-faint); }

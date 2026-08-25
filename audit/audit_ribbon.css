@@ -5,6 +5,13 @@
    left, the "555 / AUDITOR PORTAL" wordmark centred, and the welcome
    text + language + sign-out pills on the right.
 
+   Every value here is the FC portal's bar (Barcode_Counter's TopNav in
+   its `book` layout), read off it and written out longhand: the same
+   padding, the same slate palette, the same type sizes and tracking,
+   the same Outfit. The two portals are meant to be indistinguishable
+   apart from the caption, so anything changed on one belongs on the
+   other in the same pass.
+
    The wordmark used to sit immediately after the back arrow, which
    read as a left-aligned logo rather than the name of the surface.
    A grid of 1fr auto 1fr centres it against the bar itself: the two
@@ -24,13 +31,15 @@
 .fcr{
   display:grid;
   grid-template-columns:1fr auto 1fr;
-  align-items:center;gap:12px;
-  padding:12px 20px;
+  align-items:center;gap:8px;
+  padding:10px 24px;
   background:#fff;
-  border-bottom:1px solid #e6ecf2;
-  font-family:'DM Sans','Outfit',system-ui,-apple-system,sans-serif;
+  border-bottom:1px solid #e2e8f0;
+  /* Outfit, because that is what the FC bar is set in — DM Sans here made
+     the same sizes read a shade wider and the two bars stopped matching. */
+  font-family:'Outfit','DM Sans',system-ui,-apple-system,sans-serif;
   position:sticky;top:0;z-index:60;
-  box-shadow:0 1px 3px rgba(16,40,60,.04);
+  box-shadow:0 1px 2px 0 rgba(0,0,0,.05);
 }
 
 /* Round back-arrow. Was a plain-text "Main Page" pill on the old
@@ -42,9 +51,9 @@
   width:36px;height:36px;
   border-radius:50%;
   background:#f1f5f9;
-  border:1px solid #e6ecf2;
+  border:1px solid #e2e8f0;
   display:flex;align-items:center;justify-content:center;
-  text-decoration:none;color:#16323f;
+  text-decoration:none;color:#64748b;
   flex-shrink:0;
   transition:background .15s,border-color .15s,color .15s;
   -webkit-tap-highlight-color:transparent;
@@ -52,30 +61,42 @@
   font-family:inherit;
   padding:0;
 }
-.fcr-back:hover{background:#e5edf5;border-color:#cbd7e2;color:#0d2635}
+.fcr-back:hover{background:#d1fae5;color:#047857}
 .fcr-back:active{transform:scale(.96)}
 .fcr-back svg{
-  width:15px;height:15px;
+  width:16px;height:16px;
   stroke:currentColor;fill:none;
-  stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+  stroke-width:3;stroke-linecap:round;stroke-linejoin:round;
 }
 
-/* Wordmark, three lines. "MJM Nursery" names the company, "555" is the
-   loud line the brand is actually known by, "AUDITOR PORTAL" the quiet
-   green caption saying which of its surfaces this is. The company line
-   is deliberately the smallest and softest of the three — it is context
-   for the 555 below it, not competition for it. */
-.fcr-brand{min-width:0;line-height:1.05;justify-self:center;text-align:center}
-.fcr-brand-top{
-  font-size:10px;font-weight:700;color:#8298a6;letter-spacing:.6px;
-  margin-bottom:1px;white-space:nowrap;
-}
+/* Wordmark, three lines, in the FC portal's order: the 555 leads, the
+   company name sits under it, and the green caption at the foot says
+   which surface this is.
+
+   It used to run the other way, with a small "MJM Nursery" above the
+   555 — which read as a company page that happened to be branded 555,
+   rather than as 555's auditor portal. The FC portal had already
+   settled the question; this follows it, so the two read as one family
+   of surfaces rather than two designs that share a number.
+
+   The 555 is a heavy italic: it is a logotype here, not a heading, and
+   the slant is the whole of its character. Outfit ships no italic, so
+   the slant is the browser's own oblique — which is exactly what the FC
+   bar renders, and the point here is to match it. */
+.fcr-brand{min-width:0;justify-self:center;text-align:center;line-height:1}
 .fcr-brand-name{
-  font-size:26px;font-weight:900;color:#16323f;letter-spacing:.4px;
+  font-size:34px;font-weight:900;font-style:italic;
+  color:#065f46;letter-spacing:-.85px;line-height:1;
+}
+.fcr-brand-org{
+  font-size:13px;font-weight:900;color:#1e293b;
+  text-transform:uppercase;letter-spacing:1.82px;line-height:1;
+  margin-top:4px;white-space:nowrap;
 }
 .fcr-brand-sub{
-  font-size:10px;font-weight:800;color:#22a34a;
-  text-transform:uppercase;letter-spacing:2px;margin-top:3px;
+  font-size:10px;font-weight:900;color:#059669;
+  text-transform:uppercase;letter-spacing:2.5px;line-height:1;margin-top:4px;
+  white-space:nowrap;
 }
 
 /* The right-hand cluster is one grid cell, pushed to the far end and
@@ -90,21 +111,20 @@
 .fcr-spacer{display:none}
 
 .fcr-welcome{
-  font-size:12px;font-weight:600;color:#5b7280;white-space:nowrap;
-  margin-right:2px;
+  font-size:11px;font-weight:700;color:#64748b;white-space:nowrap;
 }
 
 /* Language + sign-out pills share one shape so they read as a pair. */
 .fcr-lang,
 .fcr-signout{
-  height:34px;
-  padding:0 14px;
-  border-radius:20px;
-  background:#fff;
-  border:1px solid #e0e7ee;
-  color:#16323f;
-  font-size:10.5px;font-weight:800;
-  letter-spacing:1.4px;text-transform:uppercase;
+  height:33px;
+  padding:0 12px;
+  border-radius:999px;
+  background:#f8fafc;
+  border:1px solid #e2e8f0;
+  color:#64748b;
+  font-size:10px;font-weight:800;
+  letter-spacing:1px;text-transform:uppercase;
   font-family:inherit;
   cursor:pointer;
   display:inline-flex;align-items:center;gap:6px;
@@ -113,17 +133,14 @@
   -webkit-tap-highlight-color:transparent;
   text-decoration:none;
 }
-.fcr-lang:hover{background:#f4f7fa;border-color:#cbd7e2}
-.fcr-signout:hover{background:#fef2f2;border-color:#f5c9c9;color:#b91c1c}
+.fcr-lang:hover{color:#047857;border-color:#6ee7b7}
+.fcr-signout:hover{color:#ef4444}
 .fcr-lang:active,.fcr-signout:active{transform:scale(.98)}
 
-.fcr-lang svg,
-.fcr-signout svg{
-  width:14px;height:14px;
-  stroke:currentColor;fill:none;
-  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
-}
-.fcr-lang svg{width:13px;height:13px;stroke-width:1.8}
+.fcr-globe{font-size:11px;line-height:1;letter-spacing:0}
+/* On phones the sign-out word steps aside for a power glyph, exactly as the
+   FC bar does — it is what buys the wordmark its centre. */
+.fcr-signout-icon{display:none;font-size:13px;line-height:1;letter-spacing:0}
 
 /* ── PHONE ──
    The bar has more items than a phone width can hold at their full
@@ -143,19 +160,34 @@
    dropped below 380px; the space the sign-out word gave back pays
    for it, and "Auditor Portal" is the half that says what the bar
    is. */
+/* The welcome name goes first, and it has to go earlier than the phone
+   breakpoint now. The wordmark is wider than the old one, and centring
+   it needs room for the right-hand cluster TWICE over — the two grid
+   columns either side of it claim equal width. Measured: with the name
+   showing that comes to 771px, so anything under about 820 was pushing
+   the bar into a sideways scroll. Without it the same bar needs 584. */
+/* The welcome name goes first, and it has to go before the phone
+   breakpoint: centring the wordmark needs room for the right-hand
+   cluster TWICE over, since the two grid columns either side of it
+   claim equal width. Measured on this bar: 664px with the name
+   showing, 528 without. Below 680 it would push the bar into a
+   sideways scroll, so that is where it goes. */
+@media (max-width:680px){
+  .fcr-welcome{display:none}
+}
+
 @media (max-width:640px){
   .fcr{gap:8px;padding:10px 12px}
   .fcr-right{gap:8px}
-  .fcr-welcome{display:none}
   .fcr-signout-label{display:none}
-  .fcr-brand-top{font-size:9px;letter-spacing:.4px}
-  .fcr-brand-name{font-size:21px}
-  .fcr-brand-sub{font-size:9px;letter-spacing:1.4px;margin-top:2px}
-  .fcr-lang,.fcr-signout{height:32px;padding:0 11px;font-size:9.5px;letter-spacing:1px}
+  .fcr-signout-icon{display:inline}
+  .fcr-brand-name{font-size:27px}
+  .fcr-brand-org{font-size:11px;letter-spacing:1.54px}
+  .fcr-brand-sub{font-size:9px;letter-spacing:1.62px}
+  .fcr-signout{padding:0 10px}
 }
 
 @media (max-width:380px){
-  .fcr-brand-sub{letter-spacing:1px}
   .fcr-lang,.fcr-signout{padding:0 9px}
   .fcr-back{width:32px;height:32px}
 }
@@ -165,5 +197,5 @@
    it gives up the tracking that makes it look like a caption before it
    gives up being readable. */
 @media (max-width:340px){
-  .fcr-brand-sub{font-size:8px;letter-spacing:.4px}
+  .fcr-brand-sub{letter-spacing:1px}
 }

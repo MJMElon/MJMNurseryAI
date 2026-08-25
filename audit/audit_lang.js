@@ -123,6 +123,14 @@ const TRANSLATIONS = {
        was written, but the key was never added here — so the bar
        rendered the key itself, as AUDITOR_PORTAL, on every page
        except the back end (whose caption has no data-t). */
+    /* The deadline on each to-do row, and how far off it is. */
+    due_word:                'due',
+    due_today:               'due today',
+    days_left:               'days left',
+    day_left:                'day left',
+    overdue_by:              'overdue',
+    days:                    'days',
+    day:                     'day',
     auditor_portal:          'Auditor Portal',
     signout:                 'Sign Out',
     signout_msg:             'You will be returned to the login page.',
@@ -503,6 +511,13 @@ const TRANSLATIONS = {
     all_audited:             'semua diaudit',
     pending_word:            'belum audit',
     no_audit_required_a11y:  'audit tidak diperlukan',
+    due_word:                'tarikh akhir',
+    due_today:               'tarikh akhir hari ini',
+    days_left:               'hari lagi',
+    day_left:                'hari lagi',
+    overdue_by:              'lewat',
+    days:                    'hari',
+    day:                     'hari',
     auditor_portal:          'Portal Juruaudit',
     signout:                 'Log Keluar',
     signout_msg:             'Anda akan dikembalikan ke halaman log masuk.',
