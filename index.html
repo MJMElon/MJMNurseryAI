@@ -11,7 +11,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family: 'Outfit', system-ui, sans-serif; }
   body { background-color: #050a0e; margin: 0; overflow-x: hidden; }
@@ -97,6 +97,138 @@
   .user-chip{display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.1);border:1px solid rgba(52,211,153,.25);border-radius:999px;padding:7px 16px;font-size:11px;font-weight:700;color:#6ee7b7;letter-spacing:.04em;}
   .user-dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;animation:pulseGlow 2s infinite;flex-shrink:0;}
 
+  /* ══════════════════════════════════════════════════════════════════════
+     LOGIN — THE 555 EXERCISE BOOK COVER
+
+     Same cover as the Auditor Portal (pink) and the FC Scan Portal (blue);
+     this one is green. Only the three --bk-cover values differ between the
+     three — keep it that way.
+
+     Scoped to #auth-screen so the hub below is untouched: the book is the
+     door, the module hub behind it stays as it is.
+     ══════════════════════════════════════════════════════════════════════ */
+  #auth-screen{
+    --bk-cover:#a9cbaf; --bk-cover-2:#93b99b; --bk-cover-3:#83a88c;   /* Admin: green */
+    --bk-ink:#23303f; --bk-print:#9c1c2c; --bk-red:#e23b4b; --bk-red-dark:#a5121f;
+    --bk-hand:'Caveat','Bradley Hand','Segoe Script','Comic Sans MS',cursive;
+
+    position:relative; z-index:5;          /* over the scan beams, which the
+                                              hub keeps and the cover does not */
+    /* Stated here rather than left to the Tailwind classes on the element:
+       the CDN can fail, and a login that lands half-way up the page with
+       laser beams underneath is not a graceful degradation. */
+    min-height:100vh;
+    flex-direction:column; align-items:center; justify-content:center;
+    padding:26px 16px 20px;
+    background:radial-gradient(ellipse at 50% 34%,#3a322b 0%,#221d19 62%,#14100e 100%);
+  }
+  /* The CDN that supplies Tailwind's .hidden can fail; these three blocks
+     must stay hidden regardless or the login shows every field at once. */
+  #auth-screen .hidden{display:none !important;}
+
+  .bk-book{position:relative;width:100%;max-width:400px;animation:bkIn .5s ease both}
+  @keyframes bkIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+
+  /* the inside pages, showing past the cover */
+  .bk-edges{position:absolute;inset:0}
+  .bk-edges i{position:absolute;top:7px;bottom:5px;border-radius:0 3px 3px 0;
+              box-shadow:2px 2px 5px rgba(0,0,0,.35)}
+  .bk-edges i:nth-child(1){right:-13px;width:15px;background:#d7dfb8}
+  .bk-edges i:nth-child(2){right:-9px;width:13px;background:#f2ea9e;top:12px;bottom:10px}
+  .bk-edges i:nth-child(3){right:-5px;width:11px;background:#fdf9e6;top:17px;bottom:15px}
+
+  .bk-cover{
+    position:relative;
+    background:
+      radial-gradient(ellipse at 32% 62%,rgba(255,255,255,.18),transparent 46%),
+      radial-gradient(ellipse at 78% 18%,rgba(0,0,0,.05),transparent 52%),
+      repeating-linear-gradient(101deg,rgba(255,255,255,.045) 0 2px,transparent 2px 6px),
+      linear-gradient(160deg,var(--bk-cover) 0%,var(--bk-cover-2) 78%,var(--bk-cover-3) 100%);
+    border-radius:3px 6px 6px 3px;
+    padding:30px 26px 26px;
+    box-shadow:0 26px 60px rgba(0,0,0,.55),
+               inset 0 0 0 1px rgba(255,255,255,.16),
+               inset 3px 0 0 rgba(0,0,0,.10);
+    transform:rotate(-.4deg);
+  }
+  .bk-cover::before{content:'';position:absolute;left:0;top:0;bottom:0;width:9px;
+    background:linear-gradient(90deg,rgba(0,0,0,.16),transparent);border-radius:3px 0 0 3px}
+  .bk-smudge{position:absolute;left:26%;top:56%;width:46%;height:15%;
+    background:radial-gradient(ellipse,rgba(55,70,50,.13),transparent 68%);
+    transform:rotate(-7deg);pointer-events:none}
+
+  .bk-logo-wrap{text-align:center;margin-bottom:4px}
+  .bk-logo{
+    display:inline-block;
+    font-family:'Outfit',sans-serif;font-weight:900;font-style:italic;
+    font-size:74px;line-height:.9;letter-spacing:-.02em;
+    color:var(--bk-red);
+    -webkit-text-stroke:1.5px #fff5f6;paint-order:stroke fill;
+    text-shadow:
+      1px 1px 0 var(--bk-red-dark),2px 2px 0 var(--bk-red-dark),
+      3px 3px 0 var(--bk-red-dark),4px 4px 0 var(--bk-red-dark),
+      5px 5px 0 #8e0f1b,6px 6px 0 #8e0f1b,
+      7px 7px 0 #7a0c17,8px 8px 0 #7a0c17,
+      10px 12px 16px rgba(80,6,14,.4);
+    transform:rotate(-1.2deg);
+  }
+  .bk-portal{margin-top:12px;text-align:center;
+    font-size:12px;font-weight:900;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--bk-print)}
+  .bk-portal-sub{margin-top:5px;text-align:center;
+    font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(35,48,63,.45)}
+
+  /* the fill-in lines, the way the cover asks for your name */
+  .bk-lines{margin-top:34px}
+  .bk-row{display:flex;align-items:flex-end;gap:7px;
+    border-bottom:2px dotted rgba(35,48,63,.4);
+    padding-bottom:2px;margin-bottom:17px}
+  .bk-row:focus-within{border-bottom-color:rgba(35,48,63,.8)}
+  .bk-tag{flex:0 0 auto;
+    font-family:Georgia,'Times New Roman',serif;
+    font-size:15px;font-weight:700;color:var(--bk-print);
+    padding-bottom:5px;white-space:nowrap;text-transform:lowercase}
+  .bk-tag::first-letter{text-transform:uppercase}
+  .bk-write{flex:1 1 auto;min-width:0;height:34px;
+    border:0;background:transparent;outline:none;
+    font-family:var(--bk-hand);font-size:23px;color:var(--bk-ink);
+    padding:0 2px;border-radius:0;-webkit-appearance:none}
+
+  .bk-btn{width:100%;height:50px;margin-top:22px;
+    background:var(--bk-red-dark);color:#fff3f4;
+    border:2px solid rgba(90,6,14,.9);
+    border-radius:10px 7px 12px 6px / 7px 12px 6px 10px;
+    box-shadow:3px 3px 0 rgba(70,5,12,.35);
+    transform:rotate(-.5deg);
+    font-size:13px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
+    cursor:pointer;transition:transform .12s,box-shadow .12s,background .15s}
+  .bk-btn:hover{background:#bd1524}
+  .bk-btn:active{transform:rotate(-.5deg) translate(3px,3px);box-shadow:0 0 0}
+  .bk-btn:disabled{opacity:.65;cursor:default;transform:rotate(-.5deg)}
+
+  .bk-links{display:flex;align-items:baseline;margin-top:16px}
+  .bk-link{font-family:var(--bk-hand);font-size:18px;color:var(--bk-ink);
+    background:none;border:none;
+    border-bottom:1.5px dashed rgba(35,48,63,.4);
+    padding:0 1px;cursor:pointer}
+  .bk-link:hover{color:var(--bk-print);border-bottom-color:rgba(156,28,44,.6)}
+  .bk-link-right{margin-left:auto}
+
+  .bk-imprint{margin-top:20px;text-align:center;
+    font-size:8px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;
+    color:rgba(35,48,63,.35)}
+
+  @media (max-width:360px){
+    .bk-cover{padding:26px 20px 22px}
+    .bk-logo{font-size:64px}
+    .bk-portal{letter-spacing:.26em;font-size:11px}
+  }
+  @media (min-height:800px){
+    .bk-lines{margin-top:48px}
+    .bk-cover{padding-top:40px;padding-bottom:32px}
+  }
+
 </style>
 </head>
 <body>
@@ -108,37 +240,51 @@
 
 <!-- ═══════════════════════════════════════════════════════ LOGIN SCREEN -->
 <div id="auth-screen" style="display:flex" class="min-h-screen items-center justify-center p-4 relative">
-  <div class="auth-card rounded-[2.5rem] w-full max-w-md p-10 relative z-10">
-    <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
-    <div class="corner corner-bl"></div><div class="corner corner-br"></div>
-    <div class="flex flex-col items-center mb-10">
-      <div class="relative w-full flex items-center justify-center mb-6" style="height:110px;">
-        <div class="logo-cross-h"></div>
-        <div class="logo-cross-v"></div>
-        <div class="logo-title z-10 relative text-center px-4" style="line-height:1.2;">
-          <div style="font-size:clamp(2.8rem,7vw,4rem);font-weight:900;letter-spacing:.06em;">MJM</div>
-          <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:6px;">
-            <span class="ai-badge" style="font-size:1rem;padding:4px 12px;border-radius:8px;letter-spacing:.12em;">AI</span>
-            <span style="font-size:1.1rem;letter-spacing:0.3em;color:#34d399;font-weight:900;">SYSTEM</span>
+
+  <!-- the 555 exercise book, cover up -->
+  <div class="bk-book">
+    <div class="bk-edges" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <div class="bk-cover">
+      <div class="bk-smudge" aria-hidden="true"></div>
+
+      <div class="bk-logo-wrap"><div class="bk-logo">555</div></div>
+      <div class="bk-portal">MJM AI System</div>
+      <div class="bk-portal-sub">Admin Portal · The future is here</div>
+
+      <div class="bk-lines">
+        <div id="standard-auth-fields">
+          <div id="signup-fields" class="hidden">
+            <div class="bk-row">
+              <span class="bk-tag">Full Name</span>
+              <input type="text" id="user-name" class="bk-write" autocomplete="name">
+            </div>
+          </div>
+          <div class="bk-row">
+            <span class="bk-tag">Email</span>
+            <input type="email" id="email" class="bk-write" autocomplete="email" autocapitalize="none">
+          </div>
+          <div class="bk-row">
+            <span class="bk-tag">Password</span>
+            <input type="password" id="password" class="bk-write" autocomplete="current-password">
+          </div>
+          <button id="main-auth-btn" class="bk-btn">Login</button>
+          <div class="bk-links">
+            <button id="forgot-password-btn" class="bk-link">Forgot Password?</button>
+            <button id="toggle-auth-btn" class="bk-link bk-link-right">Create Account</button>
           </div>
         </div>
+
+        <div id="recovery-auth-fields" class="hidden">
+          <div class="bk-row">
+            <span class="bk-tag">New Password</span>
+            <input type="password" id="new-password" class="bk-write" autocomplete="new-password">
+          </div>
+          <button id="update-password-btn" class="bk-btn">Save Password</button>
+        </div>
       </div>
-      <p class="text-[11px] font-black text-emerald-500 uppercase tracking-[.3em] text-center">The future is here</p>
-    </div>
-    <div id="standard-auth-fields" class="space-y-3">
-      <div id="signup-fields" class="hidden"><input type="text" id="user-name" placeholder="Full Name" class="auth-input mb-3"></div>
-      <input type="email" id="email" placeholder="Email Address" class="auth-input">
-      <input type="password" id="password" placeholder="Password" class="auth-input">
-      <button id="main-auth-btn" class="auth-btn mt-2">Login</button>
-      <div class="flex justify-between items-center pt-2">
-        <button id="forgot-password-btn" class="text-[10px] font-bold text-emerald-600/70 hover:text-emerald-400 uppercase tracking-widest bg-transparent border-none cursor-pointer transition-colors">Forgot Password?</button>
-        <button id="toggle-auth-btn" class="text-[10px] font-bold text-slate-400 hover:text-emerald-400 uppercase tracking-widest bg-transparent border-none cursor-pointer transition-colors">Create Account</button>
-      </div>
-    </div>
-    <div id="recovery-auth-fields" class="hidden space-y-3">
-      <div class="text-center text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-4">Create New Password</div>
-      <input type="password" id="new-password" placeholder="Enter New Password" class="auth-input">
-      <button id="update-password-btn" class="auth-btn mt-2">Save Password</button>
+
+      <div class="bk-imprint">Mega Jutamas Sdn Bhd · Miri, Sarawak</div>
     </div>
   </div>
 </div>

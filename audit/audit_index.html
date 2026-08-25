@@ -31,9 +31,13 @@
       --cover-3:  #cf8ba3;
 
       --ink:      #23303f;   /* what you write with */
-      --print:    #9c1c2c;   /* what the book has printed on it */
-      --red:      #e23b4b;   /* the 555 red */
-      --red-dark: #a5121f;
+      --quiet:    rgba(35,48,63,.62);  /* both lines on the cover */
+      /* The logotype and every button on this page are MJM's dark green,
+         not the printer's red the books themselves are stamped with. */
+      --green:    #1f7a45;
+      --green-2:  #155c33;
+      --green-3:  #0f4a29;
+      --green-4:  #0b3d21;
       --hand:     'Caveat', 'Bradley Hand', 'Segoe Script', 'Comic Sans MS', cursive;
     }
 
@@ -117,71 +121,72 @@
       font-size: 74px; line-height: .9;
       letter-spacing: -.02em;
       font-style: italic;
-      color: var(--red);
-      -webkit-text-stroke: 1.5px #fff5f6;
+      color: var(--green);
+      -webkit-text-stroke: 1.5px #f4fbf6;
       paint-order: stroke fill;
       text-shadow:
-        1px 1px 0 var(--red-dark), 2px 2px 0 var(--red-dark),
-        3px 3px 0 var(--red-dark), 4px 4px 0 var(--red-dark),
-        5px 5px 0 #8e0f1b,        6px 6px 0 #8e0f1b,
-        7px 7px 0 #7a0c17,        8px 8px 0 #7a0c17,
-        10px 12px 16px rgba(80,6,14,.4);
-      transform: rotate(-1.2deg);
+        1px 1px 0 var(--green-2), 2px 2px 0 var(--green-2),
+        3px 3px 0 var(--green-2), 4px 4px 0 var(--green-2),
+        5px 5px 0 var(--green-3), 6px 6px 0 var(--green-3),
+        7px 7px 0 var(--green-4), 8px 8px 0 var(--green-4),
+        10px 12px 16px rgba(6,42,22,.4);
+      /* The glyph box is centred, but the shadow only falls down-RIGHT and
+         shadows take up no layout, so the INK lands right of centre.
+         Measured off a render: at 0 the centre of mass sits 8.4px right,
+         and 1px of translate moves it 1px. -7px puts centre of mass and
+         bounding box either side of zero. */
+      transform: translateX(-7px) rotate(-1.2deg);
     }
     .portal-name {
       margin-top: 12px;
       text-align: center;
       font-size: 12px; font-weight: 900;
       letter-spacing: .34em; text-transform: uppercase;
-      color: var(--print);
+      color: var(--quiet);
     }
     .portal-sub {
       margin-top: 5px;
       text-align: center;
       font-size: 9.5px; font-weight: 700;
       letter-spacing: .2em; text-transform: uppercase;
-      color: rgba(70,40,45,.5);
+      color: var(--quiet);
     }
 
-    /* ── the fill-in lines near the foot of the cover ── */
+    /* The cover asks for your name on a ruled line; a phone in a nursery
+       asks for a box big enough to hit with a thumb. Boxes win — drawn
+       freehand, so they still belong on the cover. */
     .lines { margin-top: 34px; }
 
-    .row {
-      display: flex; align-items: flex-end; gap: 7px;
-      border-bottom: 2px dotted rgba(80,35,45,.42);
-      padding-bottom: 2px;
-      margin-bottom: 17px;
-      position: relative;
-    }
-    .row-tag {
-      flex: 0 0 auto;
-      font-family: Georgia, 'Times New Roman', serif;
-      font-size: 15px; font-weight: 700;
-      color: var(--print);
-      padding-bottom: 5px;
-      white-space: nowrap;
-      text-transform: lowercase;
-    }
-    .row-tag::first-letter { text-transform: uppercase; }
+    .row { position: relative; margin-bottom: 13px; }
     .write {
-      flex: 1 1 auto; min-width: 0;
-      height: 34px;
-      border: 0; background: transparent; outline: none;
+      display: block; width: 100%; height: 54px;
+      padding: 0 15px;
+      /* room for the eye, when there is one */
+      padding-right: 44px;
+      background: rgba(255,255,255,.6);
+      border: 1.5px solid rgba(35,48,63,.32);
+      border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
       font-family: var(--hand);
       font-size: 23px; color: var(--ink);
-      padding: 0 2px;
-      border-radius: 0; -webkit-appearance: none;
+      outline: none; -webkit-appearance: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
     }
     .write::placeholder {
       font-family: 'DM Sans', sans-serif;
-      font-size: 12px; color: rgba(70,40,45,.32);
+      font-size: 13px; font-weight: 700; letter-spacing: .02em;
+      color: rgba(35,48,63,.42);
     }
-    .row:focus-within { border-bottom-color: rgba(35,48,63,.75); }
+    .write:focus {
+      background: rgba(255,255,255,.82);
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(31,122,69,.16);
+    }
+    /* the label is inside the box now, so the tag beside it is retired */
+    .row-tag { display: none; }
 
     .pw-toggle {
-      flex: 0 0 auto;
-      background: none; border: none;
-      padding: 4px 0 6px 4px; cursor: pointer;
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; padding: 4px; cursor: pointer;
     }
     .pw-toggle svg {
       width: 17px; height: 17px;
@@ -215,11 +220,11 @@
     .btn-login {
       width: 100%; height: 50px;
       margin-top: 22px;
-      background: var(--red-dark);
-      color: #fff3f4;
-      border: 2px solid rgba(90,6,14,.9);
+      background: var(--green-2);
+      color: #f2fbf5;
+      border: 2px solid rgba(9,58,32,.9);
       border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
-      box-shadow: 3px 3px 0 rgba(70,5,12,.35);
+      box-shadow: 3px 3px 0 rgba(7,45,25,.35);
       transform: rotate(-.5deg);
       font-family: 'DM Sans', sans-serif;
       font-size: 13px; font-weight: 900;
@@ -228,7 +233,7 @@
       display: flex; align-items: center; justify-content: center; gap: 9px;
       transition: transform .12s, box-shadow .12s, background .15s;
     }
-    .btn-login:hover { background: #bd1524; }
+    .btn-login:hover { background: var(--green); }
     .btn-login:active { transform: rotate(-.5deg) translate(3px,3px); box-shadow: 0 0 0; }
     .btn-login svg {
       width: 16px; height: 16px;
@@ -265,13 +270,6 @@
     }
     .auth-link:hover { color: var(--print); border-bottom-color: rgba(156,28,44,.6); }
 
-    .imprint {
-      margin-top: 20px;
-      text-align: center;
-      font-size: 8px; font-weight: 700;
-      letter-spacing: .28em; text-transform: uppercase;
-      color: rgba(70,40,45,.38);
-    }
 
     .demo-hint { display: none; }
 
@@ -289,7 +287,7 @@
       width: 100%; max-width: 440px;
       background: #fffdf3;
       color: var(--ink);
-      border-top: 6px solid var(--red-dark);
+      border-top: 6px solid var(--green-2);
       border-radius: 14px 14px 0 0;
       padding: 22px 22px 34px;
       transform: translateY(22px);
@@ -330,17 +328,17 @@
     }
     .modal-btn {
       width: 100%; height: 48px; margin-top: 10px;
-      background: var(--red-dark); color: #fff3f4;
-      border: 2px solid rgba(90,6,14,.9);
+      background: var(--green-2); color: #f2fbf5;
+      border: 2px solid rgba(9,58,32,.9);
       border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
-      box-shadow: 3px 3px 0 rgba(70,5,12,.3);
+      box-shadow: 3px 3px 0 rgba(7,45,25,.3);
       transform: rotate(-.5deg);
       font-family: 'DM Sans', sans-serif;
       font-size: 12px; font-weight: 900;
       letter-spacing: .18em; text-transform: uppercase;
       cursor: pointer;
     }
-    .modal-btn:hover { background: #bd1524; }
+    .modal-btn:hover { background: var(--green); }
     .modal-btn.loading { opacity: .6; pointer-events: none; }
     .modal-cancel {
       width: 100%; height: 40px; margin-top: 10px;
@@ -361,14 +359,6 @@
     .modal-success { color: #1a4d1a; border-bottom-color: rgba(26,77,26,.4); }
     .modal-error.show, .modal-success.show { display: block; }
 
-    .login-footer {
-      margin-top: 22px;
-      font-family: var(--hand);
-      font-size: 15px;
-      color: rgba(255,248,231,.3);
-      text-align: center;
-      animation: fadeUp .6s .25s ease both;
-    }
 
     @keyframes bookIn {
       from { opacity: 0; transform: translateY(16px) scale(.985); }
@@ -420,6 +410,7 @@
           <input
             class="write"
             id="email"
+            placeholder="Email Address"
             type="email"
             autocomplete="email"
             autocapitalize="none"
@@ -432,6 +423,7 @@
           <input
             class="write"
             id="password"
+            placeholder="Password"
             type="password"
             autocomplete="current-password"
             onkeydown="if(event.key==='Enter') doLogin()"
@@ -461,7 +453,6 @@
 
       </div>
 
-      <div class="imprint">MJM Nursery · Mega Jutamas Sdn Bhd</div>
     </div>
   </div>
 
@@ -474,7 +465,7 @@
       <div class="modal-success" id="forgot-success"></div>
       <div class="modal-field">
         <label class="modal-label" data-t="email_label">Email</label>
-        <input class="modal-input" id="forgot-email" type="email" autocomplete="email"/>
+        <input class="modal-input" id="forgot-email" type="email" placeholder="Email Address" autocomplete="email"/>
       </div>
       <button class="modal-btn" id="forgot-btn" onclick="doForgotPassword()" data-t="send_reset">Send Reset Link</button>
       <button class="modal-cancel" onclick="hideForgotPassword()" data-t="cancel">Cancel</button>
@@ -505,7 +496,6 @@
     </div>
   </div>
 
-  <div class="login-footer">© 2025 Mega Jutamas Sdn Bhd · Miri, Sarawak</div>
 
 </div>
 
