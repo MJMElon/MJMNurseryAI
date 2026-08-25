@@ -17,6 +17,7 @@
 --   8. migration_nelos_rls.sql      lock the tables down
 --   9. migration_nelos_grant.sql    add somebody to Nelos in one step
 --  10. migration_nelos_case_tools.sql  case photo; edit/solve/delete rights
+--  11. migration_nelos_tier.sql   short system names for the list
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -36,7 +37,7 @@
 -- ============================================================================
 
 -- ############################################################################
--- ##  PART 1 of 10 — migration_nelos.sql
+-- ##  PART 1 of 11 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -378,7 +379,7 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 -- Batch Detail's insert target is all that is needed to go back.
 
 -- ############################################################################
--- ##  PART 2 of 10 — migration_nelos_modules.sql
+-- ##  PART 2 of 11 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -681,7 +682,7 @@ SELECT m.key, m.label, count(mm.id) AS members
 --   DROP TABLE IF EXISTS nelos_module_members, nelos_modules;
 
 -- ############################################################################
--- ##  PART 3 of 10 — migration_nelos_routing.sql
+-- ##  PART 3 of 11 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1000,7 +1001,7 @@ SELECT m.key,
 -- nelos_module_members is untouched, so the old page would work again.
 
 -- ############################################################################
--- ##  PART 4 of 10 — migration_nelos_roles.sql
+-- ##  PART 4 of 11 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1349,7 +1350,7 @@ SELECT r.source_module AS raised_in,
 --   was never cleared, so the old section routing comes back with it.
 
 -- ############################################################################
--- ##  PART 5 of 10 — migration_nelos_seats.sql
+-- ##  PART 5 of 11 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1666,7 +1667,7 @@ SELECT m.label AS system,
 --   never cleared, so the old behaviour comes back with them.
 
 -- ############################################################################
--- ##  PART 6 of 10 — migration_nelos_hq.sql
+-- ##  PART 6 of 11 — migration_nelos_hq.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1768,7 +1769,7 @@ SELECT label AS system,
 --   nelos_my_scope().
 
 -- ############################################################################
--- ##  PART 7 of 10 — migration_nelos_category_system.sql
+-- ##  PART 7 of 11 — migration_nelos_category_system.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1863,7 +1864,7 @@ SELECT m.label AS system,
 --   ALTER TABLE nelos_categories ADD CONSTRAINT nelos_categories_name_key UNIQUE (name);
 
 -- ############################################################################
--- ##  PART 8 of 10 — migration_nelos_rls.sql
+-- ##  PART 8 of 11 — migration_nelos_rls.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2043,7 +2044,7 @@ SELECT tablename,
 --     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);
 
 -- ############################################################################
--- ##  PART 9 of 10 — migration_nelos_grant.sql
+-- ##  PART 9 of 11 — migration_nelos_grant.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2149,7 +2150,7 @@ SELECT p.proname, pg_get_function_result(p.oid) AS returns
 --   DROP FUNCTION IF EXISTS public.nelos_grant_access(UUID);
 
 -- ############################################################################
--- ##  PART 10 of 10 — migration_nelos_case_tools.sql
+-- ##  PART 10 of 11 — migration_nelos_case_tools.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2417,3 +2418,96 @@ SELECT policyname, cmd FROM pg_policies
 --   DROP FUNCTION IF EXISTS public.nelos_my_rights();
 --   DROP FUNCTION IF EXISTS public.nelos_may(TEXT);
 --   …then re-run migration_nelos_rls.sql to put the old case policies back.
+
+-- ############################################################################
+-- ##  PART 11 of 11 — migration_nelos_tier.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_tier.sql
+--
+-- NELOS — a short name for each system, for use in a narrow column.
+--
+-- The case list has a PIC column about 150px wide. "Seedling Stock System"
+-- and "FC Portal" do not fit in it, and a raw key ("fc_portal") fits but
+-- reads like a database. What belongs there is the tier somebody works at:
+--
+--     Auditor · FC · Admin · HQ
+--
+-- so nelos_modules gains tier_label, and the list prints that.
+--
+-- WHY NOT REUSE handler_label
+--   handler_label already holds a short name, but it is the one that names
+--   a seat — "Admin 1", "Auditor 2". Both the Seedling Stock System and
+--   Nursery Operation are HQ for this purpose, and folding them together
+--   there would give two different systems a seat called "HQ 1". The two
+--   names answer different questions, so they are two columns.
+--
+-- SEEDING BY PATTERN, NOT BY KEY
+--   The module keys were renamed once already (fc_portal, admin_portal,
+--   audit_portal, seedling_stock_system…), so matching an exact key would
+--   break the next time they change. This matches on the key OR the label,
+--   case-insensitively, and only fills a tier_label that is still empty —
+--   so anything set by hand afterwards survives a re-run.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_modules') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: The column
+-- ────────────────────────────────────────────────────────────────
+ALTER TABLE public.nelos_modules
+  ADD COLUMN IF NOT EXISTS tier_label TEXT;
+
+COMMENT ON COLUMN public.nelos_modules.tier_label IS
+  'Short name for this system in a narrow column — Auditor, FC, Admin, HQ.';
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: Fill in the ones we know
+-- ────────────────────────────────────────────────────────────────
+UPDATE public.nelos_modules m
+   SET tier_label = t.want
+  FROM (
+    SELECT k.key, k.want
+      FROM (VALUES
+        ('audit',     'Auditor'),
+        ('auditor',   'Auditor'),
+        ('scan',      'FC'),
+        ('fc',        'FC'),
+        ('mobile',    'Admin'),
+        ('admin',     'Admin'),
+        ('operation', 'HQ'),
+        ('stock',     'HQ'),
+        ('ops',       'HQ'),
+        ('nursery',   'HQ')
+      ) AS k(key, want)
+  ) AS t
+ WHERE COALESCE(m.tier_label, '') = ''
+   AND (lower(m.key) LIKE '%' || t.key || '%' OR lower(m.label) LIKE '%' || t.key || '%');
+
+-- Anything still blank gets the first word of its own label — better a
+-- shortened real name than an empty column.
+UPDATE public.nelos_modules
+   SET tier_label = split_part(label, ' ', 1)
+ WHERE COALESCE(tier_label, '') = ''
+   AND COALESCE(label, '') <> '';
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT key, label, tier_label, handler_label
+  FROM public.nelos_modules
+ ORDER BY sort_order;
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   ALTER TABLE public.nelos_modules DROP COLUMN IF EXISTS tier_label;

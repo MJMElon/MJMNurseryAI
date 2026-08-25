@@ -55,10 +55,10 @@
             text-transform:uppercase; color:#8b5cf6; background:#ede9fe;
             padding:3px 10px; border-radius:999px; }
 
-  /* Five columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 152px 1fr 126px; gap:13px; }
+  /* Six columns, the same grid for the header strip and every row. */
+  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 158px 1fr 126px; gap:14px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
-  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
+  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#6b7280; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
   .tr:last-child { border-bottom:none; }
   .tr:hover { background:#fdfcff; }
@@ -67,47 +67,45 @@
   .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
 
   /* Created date, leftmost. */
-  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
-  .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
+  .when-d { font-size:13px; font-weight:900; color:#111827; line-height:1.15; }
+  .when-y { font-size:10.5px; font-weight:700; color:#6b7280; }
 
   .st-word { font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
              padding:4px 10px; border-radius:7px; }
   .st-pending { background:#fef3c7; color:#a16207; }
   .st-solved  { background:#dcfce7; color:#15803d; }
 
-  .sys-line { font-size:13px; font-weight:900; color:#4c1d95; line-height:1.25; }
-  .pic-line { font-size:11.5px; font-weight:700; color:#475569; }
-  .pic-none { font-style:italic; color:#b45309; }
-  .by-line { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:2px; }
-  .by-line b { font-weight:800; color:#64748b; }
+  .sys-line { font-size:13px; font-weight:900; color:#111827; line-height:1.25; }
+  .pic-line { font-size:11.5px; font-weight:700; color:#374151; }
+  .pic-none { font-style:italic; color:#9ca3af; }
+  .by-line { font-size:10.5px; font-weight:600; color:#6b7280; margin-top:2px; }
+  .by-line b { font-weight:800; color:#374151; }
   /* Only for the stacked phone layout — on a wide screen the column
      heading already says what this is. */
   .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
-              text-transform:uppercase; color:#c4b5fd; }
+              text-transform:uppercase; color:#9ca3af; }
 
   .td-case { display:flex; gap:11px; min-width:0; }
   .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
            border:1.5px solid #ede9fe; background:#f8fafc; }
-  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#7c3aed;
+  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#111827;
              font-variant-numeric:tabular-nums; }
-  .case-title { font-size:14px; font-weight:800; color:#1e293b; line-height:1.35; }
-  .case-cat { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-              color:#8b5cf6; margin-top:2px; }
+  .case-title { font-size:14px; font-weight:800; color:#111827; line-height:1.35; }
 
   /* The detail lines, one per row: a label on the left and its value on the
      right, so figures line up down the column instead of running together
      in a paragraph. */
   .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; }
-  .d-row { display:grid; grid-template-columns:112px 1fr; gap:8px; align-items:baseline;
-           padding:2px 0; border-bottom:1px dotted #f1eafe; }
+  .d-row { display:grid; grid-template-columns:126px 1fr; gap:8px; align-items:baseline;
+           padding:2px 0; border-bottom:1px dotted #ececf1; }
   .d-row:last-child { border-bottom:none; }
   .d-row.d-free { grid-template-columns:1fr; }
   .d-lab { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-           color:#a78bfa; overflow-wrap:anywhere; }
-  .d-val { font-size:12px; font-weight:700; color:#334155; overflow-wrap:anywhere; }
-  .d-row.d-free .d-val { font-weight:600; color:#64748b; }
-  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
-  .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
+           color:#6b7280; overflow-wrap:anywhere; }
+  .d-val { font-size:12px; font-weight:700; color:#111827; overflow-wrap:anywhere; }
+  .d-row.d-free .d-val { font-weight:600; color:#374151; }
+  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#9ca3af; }
+  .due-line { font-size:10.5px; font-weight:800; color:#6b7280; margin-top:6px; }
   @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
 
   .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
@@ -123,11 +121,12 @@
      the column. The name is on the hover title instead. */
   .td-act { display:flex; flex-wrap:wrap; gap:6px; }
   .act { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
-         border-radius:8px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
-         font-size:15px; line-height:1; color:#6d28d9; text-decoration:none; padding:0; }
-  .act:hover { background:#f5f3ff; border-color:#c4b5fd; }
-  .act-solve  { color:#15803d; border-color:#bbf7d0; } .act-solve:hover  { background:#f0fdf4; border-color:#86efac; }
-  .act-del    { color:#b91c1c; border-color:#fecaca; } .act-del:hover    { background:#fef2f2; border-color:#fca5a5; }
+         border-radius:8px; border:1.5px solid #e5e7eb; background:#fff; cursor:pointer;
+         font-size:15px; line-height:1; color:#374151; text-decoration:none; padding:0; }
+  .act:hover { background:#f3f4f6; border-color:#9ca3af; }
+  /* Only the two that change something keep a colour, and only on hover. */
+  .act-solve:hover { background:#f0fdf4; border-color:#86efac; color:#15803d; }
+  .act-del:hover   { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; }
   .act:disabled { opacity:.5; cursor:wait; }
 
   .empty { text-align:center; padding:52px 16px; color:#a5b4c4; font-weight:700; font-size:13px; }
@@ -198,9 +197,9 @@
 <script src="../shared/shared_ribbon.js"></script>
 
 
-<div id="loading" class="max-w-[1240px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+<div id="loading" class="max-w-[1426px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1426px] mx-auto px-4 md:px-6 py-7 hidden">
 
   <!-- New Case is the one thing done from here often, so it leads on the
        right where the eye ends up, with the setting cog beside it. -->
@@ -385,6 +384,42 @@ function fmtDate(d) {
    to where it was raised. */
 const queueOf = c => c.assigned_module || c.source_module;
 
+/* The short name for a system in a narrow column — Auditor, FC, Admin, HQ —
+   rather than "Seedling Stock System", which does not fit, or the raw key
+   ("fc_portal"), which reads like a database.
+
+   It comes from nelos_modules.tier_label (migration_nelos_tier.sql). The
+   fallback below is the same rule the migration seeds with, so the column
+   reads properly on a database that has not run it yet, and matches on the
+   key OR the label because the keys have been renamed once already. */
+const TIER_BY_WORD = [
+  ['audit',  'Auditor'], ['scan',  'FC'],    ['fc',      'FC'],
+  ['mobile', 'Admin'],   ['admin', 'Admin'],
+  ['operation', 'HQ'],   ['stock', 'HQ'],    ['ops',     'HQ'], ['nursery', 'HQ']
+];
+
+function tierOf(key) {
+  if (!key) return '';
+  const m = modules.find(x => x.key === key);
+  if (m && m.tier_label) return m.tier_label;
+
+  const hay = ((key || '') + ' ' + ((m && m.label) || '')).toLowerCase();
+  const hit = TIER_BY_WORD.find(([word]) => hay.includes(word));
+  if (hit) return hit[1];
+  // Nothing matched: the label's first word beats printing a key.
+  return (m && m.label) ? m.label.split(' ')[0] : key;
+}
+
+/* Somebody's name with the tier they work at after it — "Coco (HQ)". The
+   tier comes from their handler row; without one there is nothing to add,
+   so the name stands alone. */
+function withTier(name, userId) {
+  if (!name) return '';
+  const h = userId && handlers.find(x => x.user_id === userId);
+  const tier = h && tierOf(h.primary_module);
+  return tier ? `${name} (${tier})` : name;
+}
+
 
 /* The lines under a case's title, one per row. The three place columns come
    first, then whatever the description holds.
@@ -450,8 +485,8 @@ function rowHtml(c) {
     : '';
 
   const queue = queueOf(c);
-  const raisedIn = MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '';
-  const queueIn  = MJMNelos.SOURCE_LABEL[queue] || queue || '';
+  const raisedIn = tierOf(c.source_module);
+  const queueIn  = tierOf(queue);
 
   const when = new Date(c.created_at);
   const rows = detailRows(c);
@@ -488,7 +523,7 @@ function rowHtml(c) {
           ? esc(c.assignee_name)
           : '<span class="pic-none">no PIC yet</span>'}</span>
         <span class="by-line">Created by
-          <b>${c.raised_by ? esc(c.raised_by) : 'unknown'}</b></span>
+          <b>${c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b></span>
         ${queue !== c.source_module ? `<span class="by-line">Raised in ${esc(raisedIn)}</span>` : ''}
       </div>
 
@@ -496,7 +531,9 @@ function rowHtml(c) {
         ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
         <div class="min-w-0 flex-1">
           <div class="case-title">${esc(c.title)}</div>
-          ${c.category ? `<div class="case-cat">${esc(c.category)}</div>` : ''}
+          <!-- No category line: the problem chosen when the case is raised
+               becomes both its title and its category, so printing the
+               category here was printing the title twice. -->
           <div class="d-rows">
             ${shown.map(([lab, val]) => lab
               ? `<div class="d-row"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`
