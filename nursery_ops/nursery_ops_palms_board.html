@@ -10,6 +10,7 @@
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_palms.js"></script>
+<script src="../shared/shared_plot_map.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -42,27 +43,19 @@
 </head>
 <body>
 
-<div id="mjm-ribbon"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
-  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">PALMS — Monitoring Board</span>
-  <div class="flex items-center gap-2">
-    <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
-  </div>
-</div>
 
 <div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1280px] mx-auto px-4 md:px-6 py-7 hidden palms-frame">
 
-  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-    <div id="palms-nav" data-page="board"></div>
-    <script src="../shared/shared_palms_nav.js"></script>
-    <div class="flex items-center gap-2">
-      <select id="f-nursery" class="pick"></select>
-    </div>
-  </div>
+  <aside id="palms-nav" data-page="board" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body">
 
   <div class="card p-5 mb-5">
     <div class="flex items-baseline justify-between gap-3 flex-wrap mb-1">
@@ -80,13 +73,23 @@
     </div>
   </div>
 
+  <!-- The map, and the same plots as a table under it — the Life of Plot
+       layout, because that is how the office already reads a nursery. -->
+  <div id="plot-map" class="card overflow-hidden mb-5"></div>
+
   <div class="card overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
+        🪴 Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
+      </h2>
+      <span class="text-[11px] font-bold text-slate-400">updated from the 555 FC Portal</span>
+    </div>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th>Plot</th><th>Activity now</th><th>Started</th><th>Due</th>
-            <th class="text-right">Days</th><th>Recorded by</th>
+            <th>Plot</th><th>Current Status</th><th>Expected Completion</th>
+            <th class="text-right">Days Left / Over</th><th>Last Update</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -94,14 +97,15 @@
     </div>
     <div id="empty" class="hidden px-6 py-14 text-center">
       <div class="text-3xl mb-3">🪴</div>
-      <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plot activity on the server yet</p>
+      <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plots registered for this nursery</p>
       <p class="text-[12px] text-slate-500 mt-2 max-w-[440px] mx-auto leading-relaxed">
-        Plot status is recorded on the 555 FC Portal and reaches this page when a Field Conductor
-        opens PALMS or saves a day. If nothing appears, the tables may not have been created —
-        run <code class="bg-slate-100 px-1.5 py-0.5 rounded">shared/create_palms_tables.sql</code>.
+        Plots are kept in Seedling Stock Management → System Settings, and their status is
+        recorded on the 555 FC Portal.
       </p>
     </div>
   </div>
+
+</div>
 
   <p class="text-[11px] text-slate-400 text-center mt-7">
     Page access is granted on this module's
@@ -115,50 +119,97 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
-let SCOPE = 'all';   // 'all', or a nursery key, or a list of keys the user may see
+let MAP = null;
+let LINES = new Map();   // plot key → the line boardLines() built for it
+let SCOPE = 'all';       // 'all', or a nursery key, or the list the user may see
 
-/* Worst first. A board is read to find what needs chasing, so the most
-   overdue plot is the first line and the idle ones sink to the bottom. */
-function boardRows() {
-  const rank = { overdue: 0, ontrack: 1, none: 2 };
-  return MJMPalms.unitsOf(LOGS, SCOPE)
-    .map((key) => ({ key: key, st: MJMPalms.computeStatus(LOGS, key),
-                     open: MJMPalms.openActivities(LOGS, key),
-                     entries: MJMPalms.currentEntries(LOGS, key) }))
-    .sort((a, b) => (rank[a.st.state] - rank[b.st.state])
-                 || ((a.st.left == null ? 1e9 : a.st.left) - (b.st.left == null ? 1e9 : b.st.left))
-                 || String(a.key).localeCompare(String(b.key)));
+/* PALMS logs work against a UNIT, which is the plot while it is whole ("B2")
+   and "B2#A" once it is split into areas. The map has one polygon per plot,
+   so a split plot's areas are rolled back up to their plot for the map and
+   the table: the office asks "how is B2 doing", and the worst of its areas is
+   the honest answer. */
+const rankOf = (st) => (st === 'overdue' ? 0 : st === 'ontrack' ? 1 : 2);
+
+function lineForPlot(plot) {
+  const want = String(plot).toUpperCase();
+  let best = null;
+  LINES.forEach((ln, key) => {
+    if (MJMPalms.plotOf(key).toUpperCase() !== want) return;
+    if (!best || rankOf(ln.state) < rankOf(best.state)
+        || (rankOf(ln.state) === rankOf(best.state)
+            && (ln.left == null ? 1e9 : ln.left) < (best.left == null ? 1e9 : best.left))) {
+      best = ln;
+    }
+  });
+  return best;
 }
 
-function render() {
-  const rows = boardRows();
-  const late = rows.filter((r) => r.st.state === 'overdue').length;
-  const idle = rows.filter((r) => r.st.state === 'none').length;
+/* What the map paints. 'over' is red, 'ok' green, anything else grey. */
+function mapStatusOf(plot) {
+  const ln = lineForPlot(plot);
+  if (!ln || ln.state === 'none') return { tone: 'none', line: 'no status' };
+  const days = ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left';
+  return {
+    tone: ln.state === 'overdue' ? 'over' : 'ok',
+    line: (ln.status || '—') + ' · ' + days,
+  };
+}
+
+/* Every plot the nursery has, not only the ones with a log. A plot nobody has
+   keyed in is exactly what the office is looking for, so it gets a row saying
+   so rather than being left out of the table. */
+function renderTable() {
+  const nursery = MAP ? MAP.active() : null;
+  $('tbl-nursery').textContent = nursery || '—';
+  const plots = MAP ? MAP.plotsOf(nursery) : [];
+
+  $('empty').classList.toggle('hidden', plots.length > 0);
+  if (!plots.length) { $('rows').innerHTML = ''; return; }
+
+  const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }))
+    .sort((a, b) => {
+      const ra = a.ln ? rankOf(a.ln.state) : 3, rb = b.ln ? rankOf(b.ln.state) : 3;
+      if (ra !== rb) return ra - rb;
+      const la = a.ln && a.ln.left != null ? a.ln.left : 1e9;
+      const lb = b.ln && b.ln.left != null ? b.ln.left : 1e9;
+      return la - lb || String(a.plot).localeCompare(String(b.plot));
+    });
+
+  const late = rows.filter((r) => r.ln && r.ln.state === 'overdue').length;
+  const idle = rows.filter((r) => !r.ln || r.ln.state === 'none').length;
   $('n-late').textContent = late;
   $('n-ok').textContent = rows.length - late - idle;
   $('n-idle').textContent = idle;
 
-  $('empty').classList.toggle('hidden', rows.length > 0);
-  $('rows').innerHTML = rows.map(function (r) {
-    if (r.st.state === 'none') {
-      return '<tr><td class="font-black text-slate-800">' + esc(MJMPalms.keyLabel(r.key)) + '</td>' +
-             '<td colspan="4"><span class="pill p-idle">Nothing running</span></td><td>—</td></tr>';
+  $('rows').innerHTML = rows.map((r) => {
+    const ln = r.ln;
+    if (!ln || ln.state === 'none') {
+      const seen = ln
+        ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
+        : '<span class="text-slate-300">—</span>';
+      return '<tr>' +
+        '<td class="font-black text-slate-800">' + esc(r.plot) + '</td>' +
+        '<td colspan="3"><span class="pill p-idle">Nothing running</span></td>' +
+        '<td class="text-slate-500">' + seen + '</td></tr>';
     }
-    // Two activities can run at once; both are named, because "what is this
-    // plot on" has two answers and showing one of them hides work.
-    const names = r.open.map(function (a) { return esc(a.name); }).join('<br>');
-    const isLate = r.st.state === 'overdue';
-    const days = isLate ? (-r.st.left) + 'd over' : r.st.left + 'd left';
-    const by = r.entries.map(function (e) { return e.by; }).filter(Boolean);
+    const over = ln.state === 'overdue';
+    const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
     return '<tr>' +
-      '<td class="font-black text-slate-800">' + esc(MJMPalms.keyLabel(r.key)) + '</td>' +
-      '<td>' + names + '</td>' +
-      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.st.start)) + '</td>' +
-      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.st.due)) + '</td>' +
-      '<td class="text-right"><span class="pill ' + (isLate ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
-      '<td class="text-slate-500">' + esc(by.length ? by[0] : '—') + '</td>' +
+      '<td class="font-black text-slate-800">' + esc(ln.label) + '</td>' +
+      '<td>' + esc(ln.status || '—') + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
+      '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
+        (ln.lastBy ? ' · ' + esc(ln.lastBy) : '') + '</td>' +
       '</tr>';
   }).join('');
+}
+
+function render() {
+  LINES = new Map();
+  MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
+  if (MAP) MAP.refresh();
+  renderTable();
 }
 
 (async () => {
@@ -170,7 +221,6 @@ function render() {
       window.location.href = '../index.html';
       return;
     }
-    const u = MJMAccess.user();
 
     /* The dashboard hides the button, but a URL is typeable and a bookmark
        outlives a permission. Fails OPEN when shared_access.js is an older
@@ -193,15 +243,22 @@ function render() {
       ? KEYS.filter((k) => allowed.some((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase() === k))
       : KEYS;
     SCOPE = allowed ? visible : 'all';
-    $('f-nursery').innerHTML =
-      '<option value="__all">All nurseries</option>' +
-      visible.map((k) => '<option value="' + k + '">' + k + '</option>').join('');
-    $('f-nursery').addEventListener('change', (e) => {
-      SCOPE = e.target.value === '__all' ? (allowed ? visible : 'all') : e.target.value;
-      render();
-    });
 
+    /* Stages BEFORE logs, always: logsFromRows falls back to the activity's
+       ideal days for a row that did not store its own, so the office's list
+       has to be in place by the time the log is parsed or the due dates are
+       computed against the built-in eleven. */
+    await MJMPalms.loadStages(_supabase);
     LOGS = await MJMPalms.loadLogs(_supabase);
+
+    MAP = MJMPlotMap.create({
+      mount: $('plot-map'),
+      title: '🗺️ Plot Status Map',
+      statusOf: mapStatusOf,
+      onNurseryChange: renderTable,
+    });
+    await MAP.load(_supabase, allowed ? { nurseries: visible } : {});
+
     $('asof').textContent = 'as at ' + new Date().toLocaleString('en-MY',
       { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     render();
