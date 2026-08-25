@@ -147,6 +147,38 @@
 
   .empty { text-align:center; padding:52px 16px; color:#a5b4c4; font-weight:700; font-size:13px; }
 
+  /* ── Pager ──────────────────────────────────────────────────── */
+  /* Ten to a page. A long list is not more readable for being longer, and
+     the filters above are how you find one case — this is how you walk the
+     rest. */
+  .pager { display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+           padding:13px 18px; border-top:1.5px solid #ede9fe; background:#fdfcff; }
+  .pager:empty { display:none; }
+  .pg { min-width:32px; height:32px; padding:0 9px; border-radius:9px; cursor:pointer;
+        border:1.5px solid #e5e7eb; background:#fff; color:#374151;
+        font-size:12px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .pg:hover:not(:disabled) { background:#f3f4f6; border-color:#9ca3af; }
+  .pg.on { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+  .pg:disabled { opacity:.35; cursor:not-allowed; }
+  .pg-gap { color:#9ca3af; font-weight:900; padding:0 2px; }
+  .pg-of { margin-left:auto; display:flex; align-items:center; gap:7px;
+           font-size:11px; font-weight:700; color:#6b7280; }
+  .pg-jump { width:56px; height:32px; border-radius:9px; border:1.5px solid #e5e7eb;
+             background:#fff; color:#111827; font-size:12px; font-weight:800;
+             text-align:center; outline:none; }
+  .pg-jump:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+
+  /* ── The two doors under the list ───────────────────────────── */
+  .doors { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .door { display:flex; flex-direction:column; justify-content:center; gap:3px;
+          min-width:210px; padding:16px 20px; border-radius:16px;
+          border:1.5px solid #ddd6fe; background:#fff; color:#4c1d95;
+          text-decoration:none; box-shadow:0 4px 16px rgba(124,58,237,.06); }
+  .door:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  .door-ico { font-size:24px; line-height:1; color:#7c3aed; }
+  .door-name { font-size:14px; font-weight:900; letter-spacing:.02em; }
+  .door-note { font-size:11px; font-weight:600; color:#94a3b8; }
+
   /* ── Page tabs, under the list ──────────────────────────────── */
   .tabs { display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; }
   .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
@@ -245,8 +277,6 @@
   <div class="toolbar">
     <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">
       <span class="plus">+</span> New Case</button>
-    <a class="cog hidden" id="user-setting-btn" href="nelos_user_setting.html"
-       title="User Setting" aria-label="User Setting">&#x2699;</a>
   </div>
 
   <!-- One list, filtered. Overdue is a filter rather than a separate block:
@@ -290,6 +320,22 @@
       <span>Actions</span>
     </div>
     <div id="list"></div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <!-- The two other places to go, under the list rather than above it: the
+       list is what the page is for, and these are what you do afterwards. -->
+  <div class="doors" id="doors">
+    <a class="door hidden" id="user-setting-btn" href="nelos_user_setting.html">
+      <span class="door-ico">&#x2699;</span>
+      <span class="door-name">User Setting</span>
+      <span class="door-note">Handlers, access and routing</span>
+    </a>
+    <a class="door hidden" id="automation-btn" href="nelos_automation.html">
+      <span class="door-ico">&#x21BB;</span>
+      <span class="door-name">Automation Cases</span>
+      <span class="door-note">Work that repeats, raised on schedule</span>
+    </a>
   </div>
 
 </div>
@@ -687,18 +733,33 @@ function visibleCases() {
   });
 }
 
+/* Ten to a page. `page` is 1-based and survives a re-render, but not a
+   change of filter — narrowing the list while standing on page 7 of the old
+   one lands you somewhere arbitrary, so filters reset it (see the wiring). */
+const PER_PAGE = 10;
+let page = 1;
+
 function render() {
   // Overdue first, then the rest — one list, worst at the top, rather than
   // an overdue block sitting apart from the queue it belongs to.
   const rows = visibleCases().sort((a, b) => (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0));
+
+  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+  // Deleting the last case on the last page would otherwise leave you on a
+  // page that no longer exists, looking at nothing.
+  if (page > pages) page = pages;
+  const from = (page - 1) * PER_PAGE;
+  const shown = rows.slice(from, from + PER_PAGE);
 
   const overdue = rows.filter(isOverdue).length;
   $('count').textContent = rows.length
     ? `${rows.length} case${rows.length === 1 ? '' : 's'}${overdue ? ` · ${overdue} overdue` : ''}`
     : 'none';
 
-  $('list').innerHTML = rows.length
-    ? rows.map(rowHtml).join('')
+  renderPager(rows.length, pages, from, shown.length);
+
+  $('list').innerHTML = shown.length
+    ? shown.map(rowHtml).join('')
     : `<div class="empty">No cases match this filter.<br>
          <span class="text-[11px] font-semibold text-slate-400">
            ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “New Case”.'}
@@ -712,6 +773,67 @@ function render() {
       if (b.dataset.act === 'solve') return openSolve(c);
       if (b.dataset.act === 'del')   return deleteCase(c, b);
     }));
+}
+
+/* Which page numbers to draw. All of them while there are few; otherwise
+   the first, the last, and a window around where you are, with … standing
+   in for the rest. Thirty pages of buttons is not navigation. */
+function pageNumbers(pages, at) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const near = [at - 1, at, at + 1].filter(n => n > 1 && n < pages);
+  const out = [1, ...near, pages];
+  const withGaps = [];
+  out.forEach((n, i) => {
+    if (i && n - out[i - 1] > 1) withGaps.push('…');
+    withGaps.push(n);
+  });
+  return withGaps;
+}
+
+function renderPager(total, pages, from, count) {
+  if (total <= PER_PAGE) { $('pager').innerHTML = ''; return; }
+
+  const btn = (label, to, opts) => `
+    <button class="pg ${opts && opts.on ? 'on' : ''}" data-page="${to}"
+            ${opts && opts.off ? 'disabled' : ''}
+            ${opts && opts.title ? `title="${esc(opts.title)}"` : ''}>${label}</button>`;
+
+  $('pager').innerHTML =
+    btn('&lsaquo;', page - 1, { off: page === 1, title: 'Previous page' }) +
+    pageNumbers(pages, page).map(n =>
+      n === '…' ? '<span class="pg-gap">…</span>' : btn(n, n, { on: n === page })).join('') +
+    btn('&rsaquo;', page + 1, { off: page === pages, title: 'Next page' }) +
+    `<span class="pg-of">
+       <span>${from + 1}–${from + count} of ${total}</span>
+       <span>Go to</span>
+       <input class="pg-jump" id="pg-jump" type="number" min="1" max="${pages}"
+              placeholder="${page}" aria-label="Jump to page">
+     </span>`;
+
+  $('pager').querySelectorAll('[data-page]').forEach(b =>
+    b.addEventListener('click', () => goPage(Number(b.dataset.page), pages)));
+
+  // Typing a number and pressing enter, which is the whole point of the box
+  // — a change event alone would jump on every keystroke of "14".
+  const jump = $('pg-jump');
+  jump.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    goPage(Number(jump.value), pages);
+  });
+  jump.addEventListener('blur', () => { if (jump.value) goPage(Number(jump.value), pages); });
+}
+
+function goPage(to, pages) {
+  if (!Number.isFinite(to)) return;
+  const want = Math.min(Math.max(1, Math.round(to)), pages);
+  if (want === page) return;
+  page = want;
+  render();
+  // The list is below the fold on a long page; jumping without this leaves
+  // you looking at the pager of a page you have already left.
+  const box = document.querySelector('.list-box');
+  if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ── Solve and delete ──────────────────────────────────────────── */
@@ -1375,9 +1497,12 @@ $('s-photo').addEventListener('change', function () {
 $('new-scrim').addEventListener('click', e => { if (e.target === $('new-scrim')) closeNew(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNew(); });
 
+/* Any filter change starts at the top again: page 7 of the old list is
+   nowhere in particular in the new one. */
+const refilter = () => { page = 1; render(); };
 ['f-status', 'f-source', 'f-priority', 'f-mine', 'f-overdue'].forEach(id =>
-  $(id).addEventListener('change', render));
-$('f-q').addEventListener('input', render);
+  $(id).addEventListener('change', refilter));
+$('f-q').addEventListener('input', refilter);
 
 (async () => {
   try {
@@ -1396,10 +1521,18 @@ $('f-q').addEventListener('input', render);
     // admin (or a portal admin who manages users) may open it.
     if (MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers()) {
       $('user-setting-btn').classList.remove('hidden');
+      $('automation-btn').classList.remove('hidden');
     }
 
     // What this person may press, before the first render draws buttons.
     await loadRights();
+
+    // Anything a schedule owes gets raised before the list is read, so a
+    // case that came due overnight is on the screen rather than waiting for
+    // whoever next opens the page after it. Fails quiet: on a database
+    // without migration_nelos_automation.sql there is nothing to run, and a
+    // schedule that cannot fire must not stop the list from loading.
+    await _supabase.rpc('nelos_run_automations').then(r => r, () => ({}));
 
     // Modules first: the problem list, the destination list and the PIC
     // list all read from it, so the drawer's steps have nothing to draw
