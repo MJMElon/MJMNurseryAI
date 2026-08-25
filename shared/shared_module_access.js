@@ -13,7 +13,7 @@
      <script>
        MJMModuleAccess.init({
          module:  'nursery_ops',
-         title:   'Nursery Operation Management',
+         title:   'Nursery Operation Manage',
          icon:    '🌿',
          accent:  'teal',                       // see ACCENTS below
          back:    { href:'nursery_ops_dashboard.html', label:'Back to Main Page' },
