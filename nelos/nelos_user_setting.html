@@ -111,6 +111,16 @@
   .seat-add:hover { background:#f5f3ff; border-style:solid; }
   .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
 
+  /* ── What they may do to a case ─────────────────────────────── */
+  .rights { display:flex; flex-direction:column; gap:5px; }
+  .right-row { display:flex; align-items:flex-start; gap:9px; padding:8px 11px; border-radius:10px;
+               border:1.5px solid #e9e3fb; background:#fff; cursor:pointer; }
+  .right-row:hover { border-color:#c4b5fd; }
+  .right-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; margin-top:2px; }
+  .right-ico { font-size:14px; flex-shrink:0; }
+  .right-name { display:block; font-size:12.5px; font-weight:800; color:#1e293b; }
+  .right-note { display:block; font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:1px; line-height:1.45; }
+
   .btn { padding:9px 17px; border-radius:10px; border:none; cursor:pointer; font-size:10px;
          font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
   .btn-save { background:#7c3aed; color:#fff; } .btn-save:hover { background:#6d28d9; }
@@ -188,7 +198,7 @@
 </head>
 <body>
 
-<div id="mjm-ribbon" data-brand="MJM Nursery" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
 <div class="backbar">
@@ -225,6 +235,10 @@ const $ = id => document.getElementById(id);
 const esc = MJMNelos.esc;
 
 let people = [];       // nelos_people() rows
+/* True once nelos_people() carries the three case rights — i.e. once
+   migration_nelos_case_tools.sql has run. Until then the ticks are not
+   drawn and the columns are not saved, rather than saved as false. */
+let hasRights = false;
 let modules = [];      // nelos_modules rows
 let categories = [];   // active nelos_categories rows: { name, module_key }
 let routes = [];       // nelos_routes rows
@@ -247,6 +261,17 @@ function toast(msg, ok) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3600);
 }
+
+/* The three buttons that appear beside a case, and who gets to see them.
+   Order matters only in that it is the order they are drawn in. */
+const RIGHTS = [
+  { key:'may_solve',  icon:'✅', name:'Solve a case',
+    note:'Mark it resolved and say what was done.' },
+  { key:'may_edit',   icon:'✏️', name:'Edit a case',
+    note:'Change the title, detail, photo, PIC or due date after it was raised.' },
+  { key:'may_delete', icon:'🗑', name:'Delete a case',
+    note:'Remove it for good. Solving keeps the record; this does not.' }
+];
 
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || '';
@@ -360,6 +385,23 @@ function panelHtml(p) {
 
       <label class="lbl">Person in charge #</label>
       <div class="seat-list" id="rl-${esc(p.id)}">${seatRows(p)}</div>
+
+      ${!hasRights ? '' : `
+      <label class="lbl">What they may do to a case</label>
+      ${admin
+        ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all three whatever is ticked here.</p>'
+        : ''}
+      <div class="rights">
+        ${RIGHTS.map(r => `
+          <label class="right-row">
+            <input type="checkbox" data-right="${r.key}" ${p[r.key] ? 'checked' : ''}>
+            <span class="right-ico">${r.icon}</span>
+            <span class="min-w-0">
+              <span class="right-name">${esc(r.name)}</span>
+              <span class="right-note">${esc(r.note)}</span>
+            </span>
+          </label>`).join('')}
+      </div>`}
 
       <div class="flex gap-2 mt-4">
         <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
@@ -521,7 +563,7 @@ async function savePerson(userId) {
 
   // upsert on user_id: one handler row per person, so re-saving edits it
   // rather than stacking a second.
-  const { error } = await _supabase.from('nelos_handlers').upsert([{
+  const row = {
     user_id: userId,
     email: p.email,
     full_name: p.full_name,
@@ -529,7 +571,16 @@ async function savePerson(userId) {
     seat_no: seatNo,
     updated_at: new Date().toISOString(),
     updated_by: me.name
-  }], { onConflict: 'user_id' });
+  };
+  // The three rights arrive with migration_nelos_case_tools.sql. On a
+  // database without it the boxes are not drawn, and the columns are not
+  // sent — so the save still goes through.
+  RIGHTS.forEach(r => {
+    const box = panel.querySelector(`input[data-right="${r.key}"]`);
+    if (box) row[r.key] = box.checked;
+  });
+
+  const { error } = await _supabase.from('nelos_handlers').upsert([row], { onConflict: 'user_id' });
 
   if (error) { toast('Could not save — ' + error.message, false); return; }
   toast(primary
@@ -885,6 +936,7 @@ async function load() {
   }
 
   people = pplRes.data;
+  hasRights = people.some(p => p.may_solve !== undefined);
   renderPeople();
   renderRouting();
 }

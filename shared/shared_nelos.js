@@ -257,6 +257,10 @@
         raised_by:     me.name,
         raised_by_id:  me.id
       };
+      // photo_url arrives with migration_nelos_case_tools.sql. Only send the
+      // column when there is actually a photo, so a database that has not
+      // run that file yet still takes the insert.
+      if (opts.photoUrl) row.photo_url = opts.photoUrl;
 
       const { data, error } = await supa.from('nelos_cases').insert([row]).select().single();
       if (error) return { data: null, error };

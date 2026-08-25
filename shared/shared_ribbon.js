@@ -78,10 +78,10 @@
     var middle = centre
       ? '<div class="mjm-rb-centre" style="text-align:center;padding:0 12px;min-width:0;">' +
           '<div class="mjm-rb-title" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
-                     'letter-spacing:.3em;font-size:23px;line-height:1.05;white-space:nowrap;">' +
+                     'letter-spacing:.3em;font-size:30px;line-height:1.05;white-space:nowrap;">' +
             _esc(centre) + '</div>' +
           (sub
-            ? '<div class="mjm-rb-sub" style="font-size:10.5px;font-weight:700;color:#94a3b8;' +
+            ? '<div class="mjm-rb-sub" style="font-size:13.5px;font-weight:700;color:#94a3b8;' +
                          'letter-spacing:.08em;white-space:nowrap;margin-top:3px;">' +
                 _esc(sub) + '</div>'
             : '') +
@@ -111,8 +111,8 @@
       '#mjm-ribbon button#logout-btn:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}' +
       '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
                               '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
-                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:16px;}' +
-                              '#mjm-ribbon .mjm-rb-sub{font-size:9px;}}' +
+                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:21px;}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:11.5px;}}' +
     '</style>';
   }
 

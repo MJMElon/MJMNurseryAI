@@ -65,7 +65,7 @@
 </head>
 <body>
 
-<div id="mjm-ribbon" data-brand="MJM Nursery" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
 <div class="backbar">
@@ -88,6 +88,14 @@
     <h1 id="c-title" class="text-[19px] font-black text-slate-800 leading-snug"></h1>
     <div id="c-subject" class="text-[12px] font-bold text-slate-500 mt-1.5"></div>
     <a id="c-back-link" class="hidden inline-block mt-2.5 text-[10.5px] font-black uppercase tracking-widest text-violet-600 hover:underline"></a>
+
+    <!-- The photo the case was raised with, full width — the list shows a
+         thumbnail, this is where it is actually looked at. Opens the
+         original in a new tab for a closer look. -->
+    <a id="c-photo-link" class="hidden block mt-4" target="_blank" rel="noopener">
+      <img id="c-photo" alt="Photo attached to this case"
+           style="width:100%;max-height:340px;object-fit:cover;border-radius:12px;border:1.5px solid #ede9fe;">
+    </a>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-4 border-t border-dashed border-violet-100">
       <div><span class="lbl">Raised by</span><span class="val" id="c-raised"></span></div>
@@ -175,6 +183,16 @@ function renderCase() {
 
   $('c-no').textContent = c.case_no || '';
   $('c-title').textContent = c.title;
+
+  // photo_url arrives with migration_nelos_case_tools.sql; older rows and
+  // older databases simply have none.
+  if (c.photo_url) {
+    $('c-photo').src = c.photo_url;
+    $('c-photo-link').href = c.photo_url;
+    $('c-photo-link').classList.remove('hidden');
+  } else {
+    $('c-photo-link').classList.add('hidden');
+  }
 
   $('c-priority').textContent = MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '';
   $('c-priority').className = 'pill pi-' + (c.priority || 'normal');

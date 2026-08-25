@@ -20,7 +20,8 @@ migration_nelos_seats.sql
 migration_nelos_hq.sql
 migration_nelos_category_system.sql
 migration_nelos_rls.sql
-migration_nelos_grant.sql"
+migration_nelos_grant.sql
+migration_nelos_case_tools.sql"
 
 n=$(printf '%s\n' $PARTS | wc -l | tr -d ' ')
 OUT=migration_nelos_all.sql
@@ -45,6 +46,7 @@ cat <<HEADER
 --   7. migration_nelos_category_system.sql  case titles belong to a system
 --   8. migration_nelos_rls.sql      lock the tables down
 --   9. migration_nelos_grant.sql    add somebody to Nelos in one step
+--  10. migration_nelos_case_tools.sql  case photo; edit/solve/delete rights
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -57,6 +59,9 @@ cat <<HEADER
 -- rebuild it rather than editing here, or the two will drift:
 --
 --   sh shared/build_nelos_all.sh
+--
+-- NOT INCLUDED: migration_nelos_sample_case.sql. That one inserts a test
+-- case to try the list with and is run by hand when it is wanted.
 --
 -- ============================================================================
 HEADER
