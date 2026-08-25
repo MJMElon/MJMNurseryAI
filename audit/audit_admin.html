@@ -9,9 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
 
-  <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
-       arrow, language, sign-out. Also loaded by audit_home.html and
-       audit_nursery_select.html so the three surfaces read as one. -->
+  <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, welcome
+       name, back to portal, sign out. Also loaded by audit_home.html and
+       audit_nursery_select.html so the three surfaces read as one — the
+       .fcr-lang pill it styles is theirs, not this page's. -->
   <link rel="stylesheet" href="audit_ribbon.css?v=20260825a"/>
 
   <!-- Signed in is enough to open this page now. It used to be admin
@@ -112,7 +113,6 @@
       .header-logo-text{font-size:12.5px}
       .header-logo-sub{display:none}
       .hbtn{padding:0 7px}
-      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
     }
     @media (max-width:640px){
       .header-top{height:54px;gap:8px}
@@ -125,7 +125,6 @@
       /* Icon-only, the way the ribbon shows a bare back arrow. */
       .hbtn{height:30px;padding:0 9px;font-size:11px}
       .hbtn span{display:none}
-      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
       .avatar{width:26px;height:26px;font-size:11px}
       .user-chip{padding:4px}
       .uname{display:none}
@@ -359,11 +358,7 @@
     <div class="fcr-brand">
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-org">MJM Nursery</div>
-      <!-- data-t stays on the portal name alone: the language file has a
-           key for that and not for the page, so BM swaps the half it
-           knows and leaves "Manage" standing. Reads the same way as the
-           FC page's "FC Portal Manage". -->
-      <div class="fcr-brand-sub"><span data-t="auditor_portal">Auditor Portal</span> Manage</div>
+      <div class="fcr-brand-sub">Auditor Portal Manage</div>
     </div>
     <div class="fcr-right">
       <!-- Welcome first, then the way out: the same order FC Manage's bar
@@ -376,13 +371,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         <span class="fcr-portal-label">Portal</span>
       </a>
-      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-        <span class="fcr-globe" aria-hidden="true">🌐</span>
-        <span id="lang-toggle-label">BM</span>
-      </button>
       <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
         <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
-        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
+        <span class="fcr-signout-label">Sign Out</span>
       </button>
     </div>
   </nav>
@@ -442,7 +433,7 @@
          about what was due. On a desktop there is no such list, so
          this is where the four modules are reachable directly. -->
     <div class="section-row">
-      <div class="section-head" data-t="home_modules_title">Audit Modules</div>
+      <div class="section-head">Audit Modules</div>
       <button type="button" class="order-reset" id="order-reset" hidden
               onclick="resetModuleOrder()">Reset order</button>
     </div>
@@ -456,7 +447,7 @@
         <div class="fc-ico" style="background:#e8f5e9">
           <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#2d7a2d" data-t="home_plot">Plot Condition Audit</div>
+        <div class="fc-ttl" style="color:#2d7a2d">Plot Condition Audit</div>
         <div class="fc-desc">Pest, animal damage, disease and leaf colour, recorded batch by batch across every plot.</div>
         <div class="fc-enter" style="color:#2d7a2d">
           <span>Enter Module</span>
@@ -472,7 +463,7 @@
         <div class="fc-ico" style="background:#e0f2fe">
           <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#0369a1" data-t="home_height">Seedling Height Audit</div>
+        <div class="fc-ttl" style="color:#0369a1">Seedling Height Audit</div>
         <div class="fc-desc">Three sample heights per batch and the average they give, plot by plot.</div>
         <div class="fc-enter" style="color:#0369a1">
           <span>Enter Module</span>
@@ -488,7 +479,7 @@
         <div class="fc-ico" style="background:#fff1e6">
           <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#c2410c" data-t="home_papan">Papan Tanda Audit</div>
+        <div class="fc-ttl" style="color:#c2410c">Papan Tanda Audit</div>
         <div class="fc-desc">Whether each batch sign is there, carries the right information and is still standing properly.</div>
         <div class="fc-enter" style="color:#c2410c">
           <span>Enter Module</span>
@@ -504,7 +495,7 @@
         <div class="fc-ico" style="background:#e8eefc">
           <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#1e3a8a" data-t="home_maintenance">Maintenance Audit</div>
+        <div class="fc-ttl" style="color:#1e3a8a">Maintenance Audit</div>
         <div class="fc-desc">Manuring, weeding and interrow spraying checked against what the field recorded.</div>
         <div class="fc-enter" style="color:#1e3a8a">
           <span>Enter Module</span>
@@ -556,10 +547,16 @@
 <!-- Which plots still owe work — the same helper the auditor to-do uses,
      so this page and that one count progress the same way. -->
 <script src="audit_pending.js?v=20260825a"></script>
-<!-- Language store + welcome-name fill for the shared FC ribbon. Admin
-     has nothing to translate here, but persisting the toggle means the
-     rest of the audit pages honour whatever was picked. -->
-<script src="audit_lang.js?v=20260825a"></script>
+<!-- Welcome-name fill for the shared FC ribbon.
+
+     audit_lang.js is deliberately NOT loaded here. This page had the
+     BM/EN toggle and the translation pass without having anything of
+     its own to translate — the four module titles and two captions
+     below carried a data-t each, and that was the whole of it. The
+     toggle is the phone app's, and it stays there; a back-office page
+     is not where a field auditor changes language. The other audit
+     pages keep both, and the stored mjm_lang key is untouched, so
+     nothing they do changes. -->
 <script src="audit_ribbon.js?v=20260824b"></script>
 
 <!-- The portal permission layer, for the Settings card only. An admin who
