@@ -15,10 +15,10 @@
   * { font-family:'Outfit', system-ui, sans-serif; }
   body { background:#faf5ff; margin:0; }
   .hidden { display:none !important; }
-  .backbar { max-width:980px; margin:0 auto; padding:14px 20px 0; }
-  .backbar a { font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-               color:#7c3aed; text-decoration:none; }
-  .backbar a:hover { text-decoration:underline; }
+  .page-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .backlink { margin-left:auto; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+              color:#7c3aed; text-decoration:none; }
+  .backlink:hover { text-decoration:underline; }
 
   .tabs { display:flex; gap:7px; margin-bottom:18px; flex-wrap:wrap; }
   .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
@@ -55,12 +55,11 @@
   /* Always on the page and always open, whether or not anybody is waiting —
      it is where somebody is brought into Nelos, not a leftovers pile. */
   .pend-block { border-color:#fde68a; background:#fffbeb; }
-  .pend-head { display:flex; align-items:center; gap:10px; padding:15px 18px 6px; }
+  .pend-head { display:flex; align-items:center; gap:10px; padding:15px 18px 10px; }
   .pend-ico { font-size:17px; }
   .pend-name { font-size:14px; font-weight:900; color:#92400e; }
   .pend-n { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
             text-transform:uppercase; color:#b45309; }
-  .pend-note { padding:0 18px 10px; font-size:11.5px; font-weight:600; color:#a16207; line-height:1.55; }
   .find { padding:0 18px 16px; }
   .find .inp { border-color:#fde68a; background:#fff; }
   .find .inp:focus { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.18); }
@@ -201,16 +200,15 @@
 <div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<div class="backbar">
-  <a href="nelos_dashboard.html">&lsaquo; Back to Cases</a>
-</div>
-
-
 <div id="loading" class="max-w-[880px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="max-w-[880px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <h1 class="text-[18px] font-black text-slate-800 mb-4">User Setting</h1>
+  <!-- The way back sits on the title's own row, at the far end of it. -->
+  <div class="page-head">
+    <h1 class="text-[18px] font-black text-slate-800">User Setting</h1>
+    <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Cases</a>
+  </div>
 
   <div class="tabs">
     <button class="tab on" data-tab="people">👤 Case Handlers</button>
@@ -441,12 +439,14 @@ function renderPeople() {
       </div>`;
   }).join('');
 
-  $('people').innerHTML = blocks + pendingHtml();
+  // Pending Allocation leads: it is where somebody is brought into Nelos,
+  // which comes before deciding which system they sit in.
+  $('people').innerHTML = pendingHtml() + blocks;
   wirePeople();
 }
 
-/* Pending Allocation — the way somebody joins Nelos. It is a fixed part of
-   the page rather than a group that appears when the list is non-empty,
+/* User Pending Allocation — the way somebody joins Nelos. It is a fixed part
+   of the page rather than a group that appears when the list is non-empty,
    because it holds the search that puts people INTO the list. */
 function pendingHtml() {
   const waiting = people.filter(p => !p.primary_module);
@@ -454,13 +454,9 @@ function pendingHtml() {
     <div class="card pend-block">
       <div class="pend-head">
         <span class="pend-ico">⏳</span>
-        <span class="pend-name">Pending Allocation</span>
+        <span class="pend-name">User Pending Allocation</span>
         <span class="pend-n">${waiting.length ? waiting.length + ' waiting' : 'nobody waiting'}</span>
       </div>
-      <p class="pend-note">
-        Search anybody in the company by name or email. Adding them opens Nelos
-        for them on the main portal and puts them here, ready to be tagged to a system.
-      </p>
       <div class="find">
         <input class="inp" id="find" type="search" autocomplete="off"
                placeholder="Search name or email…" value="${esc(findQ)}">
