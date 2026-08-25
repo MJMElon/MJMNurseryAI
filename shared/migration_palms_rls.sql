@@ -110,8 +110,36 @@ AS $$
     false)
 $$;
 
+-- The addressee of a request is not necessarily an FC.
+--
+-- fcportal_palms_requests is the one PALMS table whose whole purpose is to
+-- reach somebody OUTSIDE the FC Portal: a Culling request is raised for the
+-- Site Auditor, who may hold the Audit module and nothing else. Under
+-- palms_has_access() alone that person cannot read the request addressed to
+-- them, and the feature is no better than it was on one phone.
+--
+-- So requests get their own reader: anyone who can already see PALMS, plus
+-- anyone holding the Audit module. It is deliberately not folded into
+-- palms_has_access() — an auditor has no business reading the daily activity
+-- log, and widening that function would hand it to them everywhere.
+CREATE OR REPLACE FUNCTION public.palms_can_read_requests()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT COALESCE(p.permissions->'modules'->>'scan',  'none') <> 'none'
+          OR COALESCE(p.permissions->'modules'->>'audit', 'none') <> 'none'
+          OR COALESCE((p.permissions->>'manage_users')::boolean, false)
+       FROM public.shared_profiles p WHERE p.id = auth.uid()),
+    false)
+$$;
+
 GRANT EXECUTE ON FUNCTION public.palms_has_access() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.palms_is_admin()  TO authenticated;
+GRANT EXECUTE ON FUNCTION public.palms_can_read_requests() TO authenticated;
 
 
 -- ────────────────────────────────────────────────────────────────
@@ -155,6 +183,23 @@ BEGIN
       'CREATE POLICY "palms delete" ON public.%I FOR DELETE TO authenticated
          USING (public.palms_is_admin())', tbl);
   END LOOP;
+
+  -- Requests, re-done: the addressee reads them and answers them.
+  --
+  -- Only SELECT and UPDATE are widened. An auditor reads the request and
+  -- sets its status; raising one stays with the FC Portal, because a
+  -- request is a thing the field asks for.
+  IF to_regclass('public.fcportal_palms_requests') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "palms read"   ON public.fcportal_palms_requests';
+    EXECUTE 'DROP POLICY IF EXISTS "palms update" ON public.fcportal_palms_requests';
+    EXECUTE 'CREATE POLICY "palms read" ON public.fcportal_palms_requests
+               FOR SELECT TO authenticated
+               USING (public.palms_can_read_requests())';
+    EXECUTE 'CREATE POLICY "palms update" ON public.fcportal_palms_requests
+               FOR UPDATE TO authenticated
+               USING (public.palms_can_read_requests())
+               WITH CHECK (public.palms_can_read_requests())';
+  END IF;
 
   -- The nursery's rules: everyone reads them, admins change them.
   IF to_regclass('public.fcportal_palms_settings') IS NOT NULL THEN
