@@ -39,9 +39,32 @@
 
   var PORTAL = _portalHref();
 
-  // ── Ribbon markup — inline styles so it renders identically on
-  //    Tailwind and non-Tailwind pages ────────────────────────────
-  var RIBBON_HTML =
+  /* ── Ribbon markup — inline styles so it renders identically on
+        Tailwind and non-Tailwind pages ────────────────────────────
+
+     A page may name itself by putting data-title on the mount point:
+
+         <div id="mjm-ribbon" data-title="Nursery Operation Management"></div>
+
+     The module name then leads the bar and "MJM Nursery AI System" sits
+     small beside it, so a module does not need a second header strip under
+     this one just to say what it is. Left out, the bar is exactly what it
+     has always been — five other pages mount this and none of them change. */
+  function ribbonHtml(moduleTitle) {
+    var brand = moduleTitle
+      ? '<span style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;' +
+                    'letter-spacing:.14em;white-space:nowrap;" class="mjm-rb-hide-sm">MJM Nursery AI System</span>' +
+        '<span style="color:#cbd5e1;" class="mjm-rb-hide-sm">|</span>' +
+        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
+                    'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          String(moduleTitle).replace(/[<>&]/g, '') +
+        '</span>'
+      : '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
+                    'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MJM Nursery AI</span>';
+    return RIBBON_SHELL.replace('<!--BRAND-->', brand);
+  }
+
+  var RIBBON_SHELL =
     '<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
               'display:flex;justify-content:space-between;align-items:center;position:sticky;' +
               'top:0;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.06);' +
@@ -50,8 +73,7 @@
         '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
                     'display:flex;align-items:center;justify-content:center;color:#fff;' +
                     'font-weight:900;font-size:11px;flex-shrink:0;">AI</div>' +
-        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
-                     'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MJM Nursery AI</span>' +
+        '<!--BRAND-->' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">' +
         '<span id="welcome-text" style="font-size:12px;font-weight:700;color:#94a3b8;white-space:nowrap;" class="mjm-rb-hide-sm"></span>' +
@@ -77,7 +99,7 @@
     if (!host) return;                            // page didn't ask for the ribbon
     if (host.dataset.mjmRbMounted === '1') return; // idempotent
     host.dataset.mjmRbMounted = '1';
-    host.innerHTML = RIBBON_HTML;
+    host.innerHTML = ribbonHtml(host.getAttribute('data-title'));
     // Portal click: replace() (fresh navigator-lock context) instead of an
     // in-place navigation that could keep the auth mutex held.
     var link = host.querySelector('#portal-link');
