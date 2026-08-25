@@ -17,7 +17,9 @@
 --   8. migration_nelos_rls.sql      lock the tables down
 --   9. migration_nelos_grant.sql    add somebody to Nelos in one step
 --  10. migration_nelos_case_tools.sql  case photo; edit/solve/delete rights
---  11. migration_nelos_tier.sql   short system names for the list
+--  11. migration_nelos_close_right.sql  may_create / may_close rights
+--  12. migration_nelos_solve_photo.sql  the photo of the fix
+--  13. migration_nelos_tier.sql   short system names for the list
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -37,7 +39,7 @@
 -- ============================================================================
 
 -- ############################################################################
--- ##  PART 1 of 11 — migration_nelos.sql
+-- ##  PART 1 of 13 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -379,7 +381,7 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 -- Batch Detail's insert target is all that is needed to go back.
 
 -- ############################################################################
--- ##  PART 2 of 11 — migration_nelos_modules.sql
+-- ##  PART 2 of 13 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -682,7 +684,7 @@ SELECT m.key, m.label, count(mm.id) AS members
 --   DROP TABLE IF EXISTS nelos_module_members, nelos_modules;
 
 -- ############################################################################
--- ##  PART 3 of 11 — migration_nelos_routing.sql
+-- ##  PART 3 of 13 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1001,7 +1003,7 @@ SELECT m.key,
 -- nelos_module_members is untouched, so the old page would work again.
 
 -- ############################################################################
--- ##  PART 4 of 11 — migration_nelos_roles.sql
+-- ##  PART 4 of 13 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1350,7 +1352,7 @@ SELECT r.source_module AS raised_in,
 --   was never cleared, so the old section routing comes back with it.
 
 -- ############################################################################
--- ##  PART 5 of 11 — migration_nelos_seats.sql
+-- ##  PART 5 of 13 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1667,7 +1669,7 @@ SELECT m.label AS system,
 --   never cleared, so the old behaviour comes back with them.
 
 -- ############################################################################
--- ##  PART 6 of 11 — migration_nelos_hq.sql
+-- ##  PART 6 of 13 — migration_nelos_hq.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1769,7 +1771,7 @@ SELECT label AS system,
 --   nelos_my_scope().
 
 -- ############################################################################
--- ##  PART 7 of 11 — migration_nelos_category_system.sql
+-- ##  PART 7 of 13 — migration_nelos_category_system.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1864,7 +1866,7 @@ SELECT m.label AS system,
 --   ALTER TABLE nelos_categories ADD CONSTRAINT nelos_categories_name_key UNIQUE (name);
 
 -- ############################################################################
--- ##  PART 8 of 11 — migration_nelos_rls.sql
+-- ##  PART 8 of 13 — migration_nelos_rls.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2044,7 +2046,7 @@ SELECT tablename,
 --     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);
 
 -- ############################################################################
--- ##  PART 9 of 11 — migration_nelos_grant.sql
+-- ##  PART 9 of 13 — migration_nelos_grant.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2150,7 +2152,7 @@ SELECT p.proname, pg_get_function_result(p.oid) AS returns
 --   DROP FUNCTION IF EXISTS public.nelos_grant_access(UUID);
 
 -- ############################################################################
--- ##  PART 10 of 11 — migration_nelos_case_tools.sql
+-- ##  PART 10 of 13 — migration_nelos_case_tools.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2420,7 +2422,180 @@ SELECT policyname, cmd FROM pg_policies
 --   …then re-run migration_nelos_rls.sql to put the old case policies back.
 
 -- ############################################################################
--- ##  PART 11 of 11 — migration_nelos_tier.sql
+-- ##  PART 11 of 13 — migration_nelos_close_right.sql
+-- ############################################################################
+
+-- ================================================================
+-- NELOS — who may raise a case, and who may close one
+-- Run in the Supabase SQL Editor (project kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+--
+-- What this adds
+-- --------------
+-- migration_nelos_case_tools.sql gave each handler three ticks:
+-- may_solve, may_edit, may_delete. Two of the five things a person
+-- actually does with a case had no tick of their own:
+--
+--   may_create — raise a new case
+--   may_close  — close one that has been solved
+--
+-- Closing is the one that matters. Solving says "I did the work";
+-- closing says "and it was done properly" — the second is somebody
+-- else's judgement of the first, which is exactly why it wants its own
+-- right rather than riding along with may_solve. Until now only a Nelos
+-- admin could close, which made every foreman's finished work wait on
+-- one person.
+--
+-- Defaults are chosen so running this changes nobody's day:
+--   may_create true  — anybody holding Nelos could already raise a case
+--                      from the dock and every module's To-Do widget.
+--   may_close  false — nobody but an admin could close before this, and
+--                      quietly handing it out would be a surprise. Tick
+--                      the people who should have it in User Setting.
+-- ================================================================
+
+ALTER TABLE public.nelos_handlers
+  ADD COLUMN IF NOT EXISTS may_create BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS may_close  BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN public.nelos_handlers.may_create IS
+  'May raise a new case. Default true — this was already open to anyone holding Nelos.';
+COMMENT ON COLUMN public.nelos_handlers.may_close IS
+  'May close a solved case. Default false — before this only a Nelos admin could.';
+
+
+-- ────────────────────────────────────────────────────────────────
+-- nelos_my_rights() answers with the two new ticks as well
+--
+-- Same shape as before, two columns wider. Every line keeps the "holds
+-- Nelos at all" test first: an absent handler row means "a Nelos holder
+-- whose ticks were never set", not "anybody", so a default of true must
+-- never reach somebody with no Nelos.
+--
+-- Callers that only read four columns keep working — a REST call to an
+-- RPC takes the columns it asks for.
+-- ────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.nelos_my_rights();
+
+CREATE FUNCTION public.nelos_my_rights()
+RETURNS TABLE (
+  is_admin   BOOLEAN,
+  may_solve  BOOLEAN,
+  may_edit   BOOLEAN,
+  may_delete BOOLEAN,
+  may_create BOOLEAN,
+  may_close  BOOLEAN
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    lvl = 'admin' AS is_admin,
+    lvl = 'admin' OR (lvl <> 'none' AND COALESCE(h.may_solve,  true))  AS may_solve,
+    lvl = 'admin' OR (lvl <> 'none' AND COALESCE(h.may_edit,   false)) AS may_edit,
+    lvl = 'admin' OR (lvl <> 'none' AND COALESCE(h.may_delete, false)) AS may_delete,
+    lvl = 'admin' OR (lvl <> 'none' AND COALESCE(h.may_create, true))  AS may_create,
+    lvl = 'admin' OR (lvl <> 'none' AND COALESCE(h.may_close,  false)) AS may_close
+    FROM public.shared_profiles p
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(p.permissions->'modules'->>'nelos', 'none') AS lvl) AS a
+    LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
+   WHERE p.id = auth.uid()
+$$;
+
+REVOKE ALL ON FUNCTION public.nelos_my_rights() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.nelos_my_rights() TO authenticated;
+
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT 'nelos_handlers.may_create' AS what,
+       EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='nelos_handlers'
+                  AND column_name='may_create') AS ok
+UNION ALL
+SELECT 'nelos_handlers.may_close',
+       EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='nelos_handlers'
+                  AND column_name='may_close')
+UNION ALL
+SELECT 'nelos_my_rights() returns 6 columns',
+       (SELECT count(*) FROM information_schema.parameters
+         WHERE specific_schema='public'
+           AND specific_name = (SELECT specific_name FROM information_schema.routines
+                                 WHERE routine_schema='public'
+                                   AND routine_name='nelos_my_rights' LIMIT 1)
+           AND parameter_mode='TABLE') = 6;
+
+-- ############################################################################
+-- ##  PART 12 of 13 — migration_nelos_solve_photo.sql
+-- ############################################################################
+
+-- ================================================================
+-- NELOS — a photo on the SOLVE, separate from the photo on the case
+-- Run in the Supabase SQL Editor (project kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+--
+-- Why a second column
+-- -------------------
+-- migration_nelos_case_tools.sql gave a case one picture, nelos_cases
+-- .photo_url — the photo of the PROBLEM, attached by whoever raised it.
+--
+-- Solving a case from the floating to-do dock attaches a photo too, but
+-- it is a different picture answering a different question: proof the
+-- work was done. Writing it into photo_url would overwrite the evidence
+-- the case was raised on, and the before/after pair is the whole value
+-- of photographing either of them.
+--
+-- So: one column for the problem, one for the fix. Both land in the
+-- same nelos-photos bucket, which case_tools already created and made
+-- publicly readable — nothing about storage changes here.
+--
+-- The dock works without this column: it retries the save without the
+-- photo if the column is missing, keeping the remark and the status
+-- change. Run this and the photo starts sticking too.
+-- ================================================================
+
+ALTER TABLE public.nelos_cases
+  ADD COLUMN IF NOT EXISTS resolution_photo_url TEXT;
+
+COMMENT ON COLUMN public.nelos_cases.resolution_photo_url IS
+  'Public URL of the photo attached when the case was solved — the fix, '
+  'not the problem. Lives in the nelos-photos bucket alongside photo_url, '
+  'which stays the photo the case was raised with.';
+
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT 'nelos_cases.resolution_photo_url' AS what,
+       EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name   = 'nelos_cases'
+            AND column_name  = 'resolution_photo_url'
+       ) AS ok
+;
+
+-- The bucket is case_tools' job; this only reports whether it is there,
+-- because the solve photo has nowhere to go without it.
+--
+-- It has to ask through EXECUTE. A plain SELECT cannot: storage.buckets is
+-- resolved when the statement is PARSED, so a to_regclass guard around it
+-- never gets the chance to run and the whole file aborts on a database with
+-- no storage schema — which is where this gets tested, and which took the
+-- parts after this one down with it.
+DO $bucket$
+DECLARE present BOOLEAN := false;
+BEGIN
+  IF to_regclass('storage.buckets') IS NOT NULL THEN
+    EXECUTE $q$ SELECT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'nelos-photos') $q$
+      INTO present;
+  END IF;
+  RAISE NOTICE 'nelos-photos bucket present: %', present;
+END $bucket$;
+
+-- ############################################################################
+-- ##  PART 13 of 13 — migration_nelos_tier.sql
 -- ############################################################################
 
 -- ============================================================================

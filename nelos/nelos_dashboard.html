@@ -55,10 +55,10 @@
             text-transform:uppercase; color:#8b5cf6; background:#ede9fe;
             padding:3px 10px; border-radius:999px; }
 
-  /* Six columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 158px 1fr 126px; gap:14px; }
+  /* Five columns, the same grid for the header strip and every row. */
+  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 158px 1fr 142px; gap:14px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
-  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#6b7280; }
+  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
   .tr:last-child { border-bottom:none; }
   .tr:hover { background:#fdfcff; }
@@ -67,45 +67,52 @@
   .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
 
   /* Created date, leftmost. */
-  .when-d { font-size:13px; font-weight:900; color:#111827; line-height:1.15; }
-  .when-y { font-size:10.5px; font-weight:700; color:#6b7280; }
+  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
+  .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
 
   .st-word { font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
              padding:4px 10px; border-radius:7px; }
   .st-pending { background:#fef3c7; color:#a16207; }
   .st-solved  { background:#dcfce7; color:#15803d; }
 
-  .sys-line { font-size:13px; font-weight:900; color:#111827; line-height:1.25; }
-  .pic-line { font-size:11.5px; font-weight:700; color:#374151; }
-  .pic-none { font-style:italic; color:#9ca3af; }
-  .by-line { font-size:10.5px; font-weight:600; color:#6b7280; margin-top:2px; }
-  .by-line b { font-weight:800; color:#374151; }
+  /* ── Content is black ──
+     The case number, the PIC block and the case details all read as
+     content, and colour was doing no work on any of them — a violet
+     case number is not a different kind of case, and a grey "created
+     by" is not less true than the name beside it. Size and weight
+     carry the hierarchy instead. Status keeps its colour, because
+     there the colour IS the information. */
+  .sys-line { font-size:13px; font-weight:900; color:#0f172a; line-height:1.25; }
+  .pic-line { font-size:11.5px; font-weight:700; color:#0f172a; }
+  .pic-none { font-style:italic; color:#0f172a; }
+  .by-line { font-size:10.5px; font-weight:600; color:#0f172a; margin-top:2px; }
+  .by-line b { font-weight:800; color:#0f172a; }
   /* Only for the stacked phone layout — on a wide screen the column
      heading already says what this is. */
   .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
-              text-transform:uppercase; color:#9ca3af; }
+              text-transform:uppercase; color:#c4b5fd; }
 
   .td-case { display:flex; gap:11px; min-width:0; }
   .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
            border:1.5px solid #ede9fe; background:#f8fafc; }
-  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#111827;
+  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#0f172a;
              font-variant-numeric:tabular-nums; }
-  .case-title { font-size:14px; font-weight:800; color:#111827; line-height:1.35; }
+  .case-title { font-size:14px; font-weight:800; color:#0f172a; line-height:1.35; }
 
   /* The detail lines, one per row: a label on the left and its value on the
      right, so figures line up down the column instead of running together
      in a paragraph. */
   .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; }
-  .d-row { display:grid; grid-template-columns:126px 1fr; gap:8px; align-items:baseline;
-           padding:2px 0; border-bottom:1px dotted #ececf1; }
+  .d-row { display:grid; grid-template-columns:112px 1fr; gap:8px; align-items:baseline;
+           padding:2px 0; border-bottom:1px dotted #f1eafe; }
   .d-row:last-child { border-bottom:none; }
   .d-row.d-free { grid-template-columns:1fr; }
   .d-lab { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-           color:#6b7280; overflow-wrap:anywhere; }
-  .d-val { font-size:12px; font-weight:700; color:#111827; overflow-wrap:anywhere; }
-  .d-row.d-free .d-val { font-weight:600; color:#374151; }
-  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#9ca3af; }
-  .due-line { font-size:10.5px; font-weight:800; color:#6b7280; margin-top:6px; }
+           color:#8a93a3; overflow-wrap:anywhere; }
+  .d-val { font-size:12px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
+  .d-row.d-free .d-val { font-weight:600; color:#0f172a; }
+  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
+  .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
   @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
 
   .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
@@ -119,14 +126,23 @@
      nelos_my_rights() — see migration_nelos_case_tools.sql. */
   /* Symbols only — four of these on every row, so the words were most of
      the column. The name is on the hover title instead. */
-  .td-act { display:flex; flex-wrap:wrap; gap:6px; }
+  /* nowrap, and a column wide enough to mean it: 4 x 28px + 3 x 6px is
+     130, against a column that was 126. One pixel short of the fourth
+     button put it on its own line on every row in the table. */
+  .td-act { display:flex; flex-wrap:nowrap; gap:6px; align-items:flex-start; }
   .act { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
-         border-radius:8px; border:1.5px solid #e5e7eb; background:#fff; cursor:pointer;
-         font-size:15px; line-height:1; color:#374151; text-decoration:none; padding:0; }
-  .act:hover { background:#f3f4f6; border-color:#9ca3af; }
-  /* Only the two that change something keep a colour, and only on hover. */
-  .act-solve:hover { background:#f0fdf4; border-color:#86efac; color:#15803d; }
-  .act-del:hover   { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; }
+         border-radius:8px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
+         font-size:15px; line-height:1; color:#6d28d9; text-decoration:none; padding:0; }
+  .act:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  /* The other three actions are typographic glyphs; this one is drawn,
+     because no character in the set reads as a magnifying glass — the
+     nearest, ⊚, read as a dot. */
+  .act-view svg, .act-close svg { width:15px; height:15px; fill:none; stroke:currentColor;
+                  stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .act-close { color:#065f46; border-color:#a7f3d0; }
+  .act-close:hover { background:#ecfdf5; border-color:#6ee7b7; }
+  .act-solve  { color:#15803d; border-color:#bbf7d0; } .act-solve:hover  { background:#f0fdf4; border-color:#86efac; }
+  .act-del    { color:#b91c1c; border-color:#fecaca; } .act-del:hover    { background:#fef2f2; border-color:#fca5a5; }
   .act:disabled { opacity:.5; cursor:wait; }
 
   .empty { text-align:center; padding:52px 16px; color:#a5b4c4; font-weight:700; font-size:13px; }
@@ -153,6 +169,29 @@
   .f-sel:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
 
   /* ── New-case drawer ────────────────────────────────────────── */
+  /* ── Solve sheet ── */
+  .s-case { border:1.5px solid #ede9fe; background:#faf8ff; border-radius:13px;
+            padding:12px 13px; margin-bottom:15px; }
+  .s-case-no { font-size:11px; font-weight:900; letter-spacing:.05em; color:#0f172a;
+               font-variant-numeric:tabular-nums; }
+  .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; margin-top:2px; }
+  .s-case-g { margin-top:9px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
+              font-size:11.5px; }
+  .s-case-k { color:#8a93a3; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+  .s-case-v { color:#0f172a; font-weight:700; overflow-wrap:anywhere; }
+  .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
+            display:block; border:1.5px solid #ede9fe; }
+  .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
+           padding:9px 11px; font-size:12px; font-weight:700; margin-top:12px; }
+  .s-foot { display:flex; gap:8px; margin-top:18px; }
+  .s-btn { flex:1; padding:11px 12px; border-radius:11px; border:none; cursor:pointer;
+           font-family:inherit; font-size:12.5px; font-weight:900; letter-spacing:.03em; }
+  .s-btn:disabled { opacity:.6; cursor:progress; }
+  .s-btn-a { background:#7c3aed; color:#fff; }  .s-btn-a:hover:not(:disabled) { background:#6d28d9; }
+  .s-btn-c { background:#f8fafc; color:#64748b; border:1.5px solid #e2e8f0; flex:0 0 96px; }
+  .s-btn-c:hover:not(:disabled) { background:#f1f5f9; }
+  .s-btn-x { background:#065f46; color:#fff; }  .s-btn-x:hover:not(:disabled) { background:#047857; }
+
   .scrim { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:60; display:flex;
            align-items:flex-end; justify-content:center; }
   @media (min-width:768px) { .scrim { align-items:center; } }
@@ -253,6 +292,46 @@
     <div id="list"></div>
   </div>
 
+</div>
+
+<!-- ── Solve sheet ─────────────────────────────────────────────
+     What the tick opens. The case is restated at the top because
+     solving is a judgement about it, and a prompt() box asking "what
+     was done?" over a list showed none of it. Below, the two things
+     the field can add: a photo of the fix and a line about it. -->
+<div id="solve-scrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="flex items-center justify-between mb-4">
+      <span class="font-black text-slate-800 uppercase tracking-widest text-xs"
+            id="s-heading">Solve Case</span>
+      <button id="solve-close"
+              class="text-slate-400 hover:text-slate-700 text-2xl leading-none font-bold">&times;</button>
+    </div>
+
+    <div id="s-case" class="s-case"></div>
+
+    <div class="step">
+      <div class="step-h"><span class="step-n">1</span>Photo of the fix</div>
+      <input id="s-photo" class="inp" type="file" accept="image/*" capture="environment">
+      <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
+    </div>
+
+    <div class="step">
+      <div class="step-h"><span class="step-n">2</span>What was done?</div>
+      <textarea id="s-remark" class="inp" rows="3"
+                placeholder="Enough that the person closing it can tell it was done properly."></textarea>
+    </div>
+
+    <div id="s-err" class="s-err hidden"></div>
+
+    <div class="s-foot">
+      <button id="s-cancel" class="s-btn s-btn-c">Cancel</button>
+      <button id="s-save" class="s-btn s-btn-a">Save &amp; Solve</button>
+      <!-- Only for somebody whose ticks include closing. Solving says the
+           work is done; closing accepts it — usually a different person. -->
+      <button id="s-close-case" class="s-btn s-btn-x hidden">Close Case</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── New case drawer ─────────────────────────────────────────── -->
@@ -356,7 +435,8 @@ let me = { id: null, name: null };
    fallback is what everybody could do before that function existed, so a
    database that has not run migration_nelos_case_tools.sql still works —
    with Edit and Delete simply absent, which is what they were. */
-let rights = { is_admin: false, may_solve: true, may_edit: false, may_delete: false };
+let rights = { is_admin: false, may_solve: true, may_edit: false, may_delete: false,
+               may_create: true, may_close: false };
 
 let editingId = null;   // case being edited, or null when raising a new one
 let photoUrl  = null;   // the photo on the case in the drawer, once uploaded
@@ -549,13 +629,28 @@ function rowHtml(c) {
       <!-- Symbols, not words and not emoji: four of these on every row, and
            the label is on the hover title where it does not cost a column. -->
       <div class="td-act">
-        <a class="act" title="View" aria-label="View"
-           href="nelos_case.html?id=${encodeURIComponent(c.id)}">&#x229A;</a>
+        <a class="act act-view" title="View" aria-label="View"
+           href="nelos_case.html?id=${encodeURIComponent(c.id)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>
+        </a>
         ${rights.may_edit  ? `<button class="act act-edit" title="Edit" aria-label="Edit"
            data-act="edit" data-id="${esc(c.id)}">&#x270E;</button>` : ''}
-        ${rights.may_solve && pending
-                           ? `<button class="act act-solve" title="Solve" aria-label="Solve"
-           data-act="solve" data-id="${esc(c.id)}">&#x2713;</button>` : ''}
+        ${pending && rights.may_solve
+          ? `<button class="act act-solve" title="Solve" aria-label="Solve"
+           data-act="solve" data-id="${esc(c.id)}">&#x2713;</button>`
+          : ''}
+        <!-- A solved case has nothing left to solve, so the tick is replaced
+             by the padlock for whoever may close it. Same sheet either way:
+             it restates the case and offers what is actually available. -->
+        ${!pending && rights.may_close
+          ? `<button class="act act-close" title="Close" aria-label="Close"
+           data-act="solve" data-id="${esc(c.id)}">
+             <svg viewBox="0 0 24 24" aria-hidden="true">
+               <rect x="4" y="10.5" width="16" height="10" rx="2"/>
+               <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+           </button>`
+          : ''}
         ${rights.may_delete ? `<button class="act act-del" title="Delete" aria-label="Delete"
            data-act="del" data-id="${esc(c.id)}">&#x2715;</button>` : ''}
       </div>
@@ -614,38 +709,138 @@ function render() {
       const c = allCases.find(x => String(x.id) === b.dataset.id);
       if (!c) return;
       if (b.dataset.act === 'edit')  return openEdit(c);
-      if (b.dataset.act === 'solve') return solveCase(c, b);
+      if (b.dataset.act === 'solve') return openSolve(c);
       if (b.dataset.act === 'del')   return deleteCase(c, b);
     }));
 }
 
 /* ── Solve and delete ──────────────────────────────────────────── */
 
-/* Marking a case solved asks what was done. The answer is the resolution —
-   a closed case with no account of how is a case nobody can learn from. */
-async function solveCase(c, btn) {
-  const what = prompt(`Solve ${c.case_no || 'this case'} — what was done?`, '');
-  if (what === null) return;                       // Cancel
-  if (!what.trim()) { toast('Say what was done, in a line.', false); return; }
+/* Solving is a judgement about a case, so the sheet restates the case
+   before it asks anything. This used to be a prompt() box — one line of
+   text over a list, with nothing of the case in it, and no way to attach
+   the photo that is usually the whole evidence. */
+let solving = null;                                // the case in the sheet
 
-  // Only disabled, never re-labelled: the button is a 28px symbol now and a
-  // word would burst it.
-  btn.disabled = true;
-  const { error } = await _supabase.from('nelos_cases').update({
+function sErr(msg) {
+  const box = $('s-err');
+  box.classList.toggle('hidden', !msg);
+  box.textContent = msg || '';
+}
+
+function openSolve(c) {
+  solving = c;
+  sErr('');
+  /* Heading set below, once the sheet knows whether there is anything
+     left to solve. */
+  $('s-remark').value = '';
+  $('s-photo').value = '';
+  $('s-photo-prev').classList.add('hidden');
+  $('s-photo-prev').removeAttribute('src');
+
+  const bits = [
+    ['Status',   c.status === 'resolved' ? 'Solved' : 'Pending'],
+    ['Priority', MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || 'Normal'],
+    ['Category', c.category],
+    ['Where',    [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
+                   .filter(Boolean).join(' · ')],
+    ['PIC',      c.assignee_name],
+    ['Raised by', c.raised_by],
+    ['Due',      c.due_date]
+  ].filter(([, v]) => v);
+
+  $('s-case').innerHTML =
+    `<div class="s-case-no">${esc(c.case_no || '')}</div>` +
+    `<div class="s-case-t">${esc(c.title || '')}</div>` +
+    (c.description ? `<div class="s-case-v" style="margin-top:7px;font-weight:600">${esc(c.description)}</div>` : '') +
+    `<div class="s-case-g">` +
+      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
+    `</div>`;
+
+  /* Already solved → nothing to save, and the only move left is closing
+     it, for somebody whose ticks allow that. */
+  const done = c.status === 'resolved';
+  $('s-heading').textContent = (done ? 'Close ' : 'Solve ') + (c.case_no || 'Case');
+  $('s-save').classList.toggle('hidden', done);
+  $('s-remark').closest('.step').classList.toggle('hidden', done);
+  $('s-photo').closest('.step').classList.toggle('hidden', done);
+  $('s-close-case').classList.toggle('hidden', !(rights.may_close && done));
+
+  $('solve-scrim').classList.remove('hidden');
+}
+
+function closeSolve() { $('solve-scrim').classList.add('hidden'); solving = null; }
+
+/* Uploads whatever is in the solve sheet's file box. Separate from
+   uploadPhoto() because that one reads the new-case drawer's box, and
+   both sheets can be filled in the same session. */
+async function uploadSolvePhoto() {
+  const file = $('s-photo').files && $('s-photo').files[0];
+  if (!file) return undefined;
+  if (file.size > 8 * 1024 * 1024) throw new Error('That photo is over 8 MB — take a smaller one.');
+  const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `solve/${new Date().toISOString().slice(0, 10)}/${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await _supabase.storage.from('nelos-photos')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error('Photo upload failed — ' + error.message);
+  return _supabase.storage.from('nelos-photos').getPublicUrl(path).data.publicUrl;
+}
+
+async function saveSolve() {
+  if (!solving) return;
+  const what = $('s-remark').value.trim();
+  if (!what) { sErr('Say what was done, in a line.'); $('s-remark').focus(); return; }
+
+  const btn = $('s-save');
+  btn.disabled = true; sErr('');
+  let url;
+  try { url = await uploadSolvePhoto(); }
+  catch (e) { btn.disabled = false; sErr(e.message); return; }
+
+  const patch = {
     status: 'resolved',
-    resolution: what.trim(),
+    resolution: what,
     resolved_by: me.name,
     resolved_at: new Date().toISOString(),
     updated_by: me.name,
     updated_at: new Date().toISOString()
-  }).eq('id', c.id);
+  };
+  if (url) patch.resolution_photo_url = url;
 
-  if (error) {
-    btn.disabled = false;
-    toast('Could not solve it — ' + error.message, false);
-    return;
+  let { error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id);
+  /* No resolution_photo_url column → this database has not run
+     shared/migration_nelos_solve_photo.sql. The remark and the status
+     matter more than the picture, so save them. */
+  if (error && url && /resolution_photo_url/.test(error.message || '')) {
+    delete patch.resolution_photo_url;
+    ({ error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id));
+    if (!error) toast('Solved — run migration_nelos_solve_photo.sql to keep the photo.', false);
   }
-  toast(`${c.case_no || 'Case'} solved.`);
+  btn.disabled = false;
+  if (error) { sErr('Could not solve it — ' + error.message); return; }
+
+  const no = solving.case_no || 'Case';
+  closeSolve();
+  toast(`${no} solved.`);
+  await loadCases();
+}
+
+async function closeCase() {
+  if (!solving) return;
+  const btn = $('s-close-case');
+  btn.disabled = true; sErr('');
+  const { error } = await _supabase.from('nelos_cases').update({
+    status: 'closed',
+    closed_by: me.name,
+    closed_at: new Date().toISOString(),
+    updated_by: me.name,
+    updated_at: new Date().toISOString()
+  }).eq('id', solving.id);
+  btn.disabled = false;
+  if (error) { sErr('Could not close it — ' + error.message); return; }
+  const no = solving.case_no || 'Case';
+  closeSolve();
+  toast(`${no} closed.`);
   await loadCases();
 }
 
@@ -678,7 +873,8 @@ async function loadRights() {
   const row = data && data[0];
   if (error || !row) {
     const admin = MJMAccess.isAdminOf('nelos');
-    rights = { is_admin: admin, may_solve: true, may_edit: admin, may_delete: admin };
+    rights = { is_admin: admin, may_solve: true, may_edit: admin, may_delete: admin,
+               may_create: true, may_close: admin };
     return;
   }
   rights = row;
@@ -1156,6 +1352,26 @@ $('c-save').addEventListener('click', async () => {
 
 $('new-case-btn').addEventListener('click', () => openNew());
 $('new-close').addEventListener('click', closeNew);
+
+/* ── Solve sheet ── */
+$('solve-close').addEventListener('click', closeSolve);
+$('s-cancel').addEventListener('click', closeSolve);
+$('s-save').addEventListener('click', saveSolve);
+$('s-close-case').addEventListener('click', closeCase);
+/* Tapping the dimmed area behind the sheet closes it, the way the eye
+   expects — but only the area, not a click that started inside. */
+$('solve-scrim').addEventListener('click', e => {
+  if (e.target === $('solve-scrim')) closeSolve();
+});
+/* Show the picture before it is sent, so a thumb over the lens is
+   caught here rather than by whoever closes the case. */
+$('s-photo').addEventListener('change', function () {
+  const f = this.files && this.files[0];
+  const img = $('s-photo-prev');
+  if (!f) { img.classList.add('hidden'); return; }
+  img.src = URL.createObjectURL(f);
+  img.classList.remove('hidden');
+});
 $('new-scrim').addEventListener('click', e => { if (e.target === $('new-scrim')) closeNew(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNew(); });
 

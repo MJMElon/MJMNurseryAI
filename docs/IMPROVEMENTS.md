@@ -288,12 +288,9 @@ names. A stranger with `USING (true)` reads your payroll.
 
 ## C. PALMS is half-migrated [needs a decision]
 
-`sync.js` moves the **plot log** and the **daily report** to the server. Three
+`sync.js` moves the **plot log** and the **daily report** to the server. Two
 of the five tables are still unused, so this data is still one-device-only:
 
-- `fcportal_palms_requests` — a drone request raised for the Site Auditor is
-  still visible only on the phone that raised it. This is the one that is
-  actually broken in daily use: the request is *for somebody else*.
 - `fcportal_palms_culling` — Pokok Inang amounts keyed in the field.
 - `fcportal_palms_settings` — plot layout, attention thresholds and the
   incentive floor. These are the nursery's rules, and every device currently
@@ -303,6 +300,25 @@ of the five tables are still unused, so this data is still one-device-only:
 Settings is the one to do next: it is one row, it is read at startup, and the
 office pages currently cannot honour a plot split at all because they cannot
 see `MULTI`.
+
+### C1. `fcportal_palms_requests` is dead — do not build on it
+
+This table was going to carry the Culling handoff: a request raised in the
+field *for somebody else* — the Site Auditor to re-count a plot, HQ to rule on
+a rate — which until then reached only the phone that raised it. It was the
+one part of PALMS genuinely broken in daily use.
+
+**It was solved a different way and better.** The Culling Calculator now
+raises a **Nelos case** (`src/lib/nelos.js` in the field app → `nelos_cases`),
+so the handoff lands in the case system that already has an office screen, a
+duplicate check, a priority and a status somebody owns. A fifth PALMS table
+with its own bespoke queue would have been a second, worse copy of all of
+that.
+
+So `create_palms_tables.sql` still creates `fcportal_palms_requests` and
+nothing writes to it. Leave it empty; if it is ever dropped, drop it from the
+RLS migration in the same breath. Anything that looks like "a request from the
+field" belongs in Nelos.
 
 ## D. The Culling Calculator now reads real figures — check them against the office
 

@@ -122,6 +122,25 @@
     return false;
   }
 
+  /* ── IS A LOGIN ON SCREEN? ───────────────────────────────────────
+     A stored session is not the same as being signed in to the page.
+     The hub shows its sign-in over the same URL as the module grid —
+     it gates on a per-tab flag, not on the Supabase session — so a
+     returning visitor with a live token still meets the login screen,
+     and a floating to-do circle over it looks like a bug.
+
+     Any page can say so by marking its login element
+     data-login-screen; #auth-screen is recognised too, because that is
+     what the hub already calls it. */
+  function loginOnScreen() {
+    var el = document.querySelector('[data-login-screen]') ||
+             document.getElementById('auth-screen');
+    if (!el || el.hidden) return false;
+    var cs;
+    try { cs = getComputedStyle(el); } catch (_) { return false; }
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && el.offsetParent !== null;
+  }
+
   /* ── Supabase config ─────────────────────────────────────────── */
 
   /* shared_supabase.js and audit_supabase.js both declare their config
@@ -227,7 +246,8 @@
      that has not run the migrations yet still gets its To-Do list; it
      simply does not get queue routing until the SQL is run. */
   var BASE_COLS   = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
-                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at';
+                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at,' +
+                    'resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
   var _cols = ROUTED_COLS;      // narrowed to BASE_COLS on the first 400
 
@@ -294,11 +314,10 @@
 
   async function loadScope(token) {
     if (_scope) return _scope;
-    var open = { unrestricted: true, home: null, cats: null, userId: null };
+    var u = me();
+    var open = { unrestricted: true, home: null, cats: null, userId: u.id || null };
 
     if (await isNelosAdmin(token)) return (_scope = open);
-
-    var u = me();
     if (!u.id) return (_scope = open);
 
     try {
@@ -334,22 +353,42 @@
 
   function queueOf(c) { return c.assigned_module || c.source_module; }
 
-  function inScope(c, sc) {
-    if (!sc || sc.unrestricted) return true;
-    // Assigned to me — mine wherever it sits, and never category-filtered.
-    if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
+  /* ── IS THIS MINE? ───────────────────────────────────────────────
+     The dock is one person's to-do list, not their module's queue.
+     That distinction only started mattering when the panel gained a
+     Solve button: a list you can act on has to be a list of work that
+     is actually yours, or the first thing it invites you to do is
+     close somebody else's case.
+
+     Two ways a case is yours:
+       • it is assigned to you by name; or
+       • nobody has taken it and it is routed to your seat, in your
+         module, in a category you handle.
+
+     A case assigned to somebody ELSE is never yours, however it is
+     routed. And "sees everything" — a Nelos admin, an HQ system — is a
+     permission, not a workload: it makes every case visible on the
+     Nelos page, and none of them personally owed. Without that last
+     rule an admin's to-do list is the whole company's. */
+  function isMine(c, sc) {
+    var uid = sc && sc.userId;
+    if (c.assignee_id) return !!uid && String(c.assignee_id) === String(uid);
+    if (!sc || sc.unrestricted) return false;
     if (queueOf(c) !== sc.home) return false;
-    // Routed to one numbered handler: only that person. No number on the
-    // case means anyone in the system may take it.
-    if (c.assigned_seat_no && c.assigned_seat_no !== sc.seatNo) return false;
-    if (!sc.cats) return true;                                     // every category
+    if (c.assigned_seat_no != null && c.assigned_seat_no !== sc.seatNo) return false;
+    if (!sc.cats) return true;
     return !!c.category && !!sc.cats[c.category];
   }
 
   /* Returns { rows, error }. A 404 (table missing, migration not run yet)
      and a 401 (session gone stale) both come back as errors, and an error
      means the dock hides rather than shouting at the user. */
-  async function fetchPending() {
+  /* statusIn: which statuses to ask for. The to-do list wants what is
+     still owed; the history view wants what this person solved and
+     nobody has closed yet. Everything else about the read — the column
+     fallback, the priority sort, whose cases these are — is identical,
+     so it is one function with one argument rather than two that drift. */
+  async function fetchCases(statusIn, order) {
     var token = await accessToken();
     if (!token) return { rows: [], error: 'no-session' };
 
@@ -358,8 +397,8 @@
     var query = function (cols) {
       var q = CFG.url + '/rest/v1/nelos_cases' +
               '?select=' + encodeURIComponent(cols) +
-              '&status=in.(open,in_progress)' +
-              '&order=due_date.asc.nullslast,created_at.asc' +
+              '&status=in.(' + statusIn + ')' +
+              '&order=' + (order || 'due_date.asc.nullslast,created_at.asc') +
               '&limit=' + LIMIT;
       if (OPT_SOURCE) q += '&source_module=eq.' + encodeURIComponent(OPT_SOURCE);
       return fetch(q, { headers: authHeaders(token) });
@@ -387,12 +426,17 @@
       });
       // Narrow to what this person is set up to see (User Setting page).
       var sc = await loadScope(token);
-      if (!sc.unrestricted) rows = rows.filter(function (c) { return inScope(c, sc); });
+      rows = rows.filter(function (c) { return isMine(c, sc); });
       return { rows: rows, error: null };
     } catch (e) {
       return { rows: [], error: 'network' };
     }
   }
+
+  function fetchPending()  { return fetchCases('open,in_progress'); }
+  /* Solved most recently first — the useful order for "did mine land?",
+     where the oldest resolved case is the least interesting row. */
+  function fetchResolved() { return fetchCases('resolved', 'resolved_at.desc.nullslast'); }
 
   /* ── Look ────────────────────────────────────────────────────── */
 
@@ -446,11 +490,9 @@
 
   .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px;
              background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; flex-shrink:0; }
-  .nd-head-mark { width:29px; height:29px; border-radius:9px; background:rgba(255,255,255,.2);
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
   .nd-head-t  { font-size:13px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; line-height:1.1; }
-  .nd-head-s  { font-size:9px; font-weight:700; letter-spacing:.08em; opacity:.82; margin-top:1px; }
   .nd-min { margin-left:auto; width:28px; height:28px; border-radius:8px; border:none; cursor:pointer;
             background:rgba(255,255,255,.18); color:#fff; font-size:15px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -465,8 +507,13 @@
   .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
                  border-bottom:1px solid #fee2e2; padding:7px 14px; }
 
+  /* A button, not a link: the case opens in this panel. The reset is
+     what a <button> needs to keep looking like the row it replaced. */
   .nd-row { display:flex; align-items:flex-start; gap:9px; padding:10px 14px;
-            border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit; }
+            border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit;
+            width:100%; text-align:left; background:none; border-left:none;
+            border-right:none; border-top:none; font-family:inherit;
+            cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .nd-row:last-child { border-bottom:none; }
   .nd-row:hover { background:#faf5ff; }
   .nd-row-over { background:#fffbfb; }
@@ -525,6 +572,71 @@
   .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
   .nd-done a:hover { text-decoration:underline; }
 
+  .nd-hist { width:26px; height:26px; margin-left:auto; margin-right:2px; padding:0;
+             border:none; border-radius:8px; background:rgba(255,255,255,.16); color:#fff;
+             cursor:pointer; display:flex; align-items:center; justify-content:center;
+             flex-shrink:0; }
+  .nd-hist:hover { background:rgba(255,255,255,.28); }
+  .nd-hist svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.1;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .nd-hist.on { background:#fff; color:#6d28d9; }
+
+  /* ── The solve block ──
+     Under the case, not beside it: read what is being asked, then do
+     it. A photo and a line of remark is the whole of what the field
+     can add, and both are optional except the remark — a resolution
+     nobody described is one nobody can check. */
+  .nd-solve { margin-top:16px; border-top:1px solid #e9e3fb; padding-top:13px; }
+  .nd-solve-h { font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+                color:#6d28d9; margin-bottom:9px; }
+  .nd-shot { display:flex; gap:8px; align-items:stretch; }
+  .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
+                   justify-content:center; gap:3px; min-height:64px; cursor:pointer;
+                   border:1.5px dashed #ddd6fe; border-radius:11px; background:#faf8ff;
+                   color:#7c3aed; font-size:11px; font-weight:800; }
+  .nd-shot label:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  .nd-shot input[type=file] { display:none; }
+  .nd-shot svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.9;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .nd-shot-prev { position:relative; flex:1; min-height:64px; border-radius:11px;
+                  overflow:hidden; background:#f1f5f9; }
+  .nd-shot-prev img { width:100%; height:100%; object-fit:cover; display:block; }
+  .nd-shot-x { position:absolute; top:4px; right:4px; width:22px; height:22px; border:none;
+               border-radius:50%; background:rgba(15,23,42,.62); color:#fff; cursor:pointer;
+               font-size:13px; line-height:1; display:flex; align-items:center;
+               justify-content:center; }
+  .nd-solve textarea { width:100%; margin-top:9px; border:1px solid #e2e8f0; border-radius:10px;
+                       padding:9px 10px; font-family:inherit; font-size:12.5px; color:#0f172a;
+                       resize:vertical; min-height:64px; }
+  .nd-solve textarea:focus { outline:none; border-color:#c4b5fd; box-shadow:0 0 0 3px #ede9fe; }
+  .nd-solved-card { margin-top:14px; border:1px solid #bbf7d0; background:#f0fdf4;
+                    border-radius:11px; padding:11px 12px; }
+  .nd-solved-h { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+                 color:#15803d; }
+  .nd-solved-b { font-size:12.5px; font-weight:600; color:#334155; margin-top:5px;
+                 white-space:pre-wrap; }
+  .nd-solved-m { font-size:10.5px; font-weight:700; color:#15803d; margin-top:6px; }
+  .nd-solved-card img { width:100%; border-radius:8px; margin-top:8px; display:block; }
+
+  .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
+  .nd-detail[hidden] { display:none; }
+  .nd-d-title { font-size:15px; font-weight:800; color:#0f172a; line-height:1.35; }
+  .nd-d-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+  .nd-d-chip { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+               padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; }
+  .nd-d-chip.hot  { background:#fee2e2; color:#b91c1c; }
+  .nd-d-chip.due  { background:#fef3c7; color:#92400e; }
+  .nd-d-body { margin-top:12px; font-size:12.5px; line-height:1.55; color:#334155;
+               white-space:pre-wrap; word-break:break-word; }
+  .nd-d-none { margin-top:12px; font-size:12px; color:#94a3b8; font-style:italic; }
+  .nd-d-grid { margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px;
+               display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:11.5px; }
+  .nd-d-k { color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+  .nd-d-v { color:#334155; font-weight:600; word-break:break-word; }
+  .nd-d-open { display:inline-block; margin-top:14px; font-size:11px; font-weight:800;
+               color:#6d28d9; text-decoration:none; letter-spacing:.03em; }
+  .nd-d-open:hover { text-decoration:underline; }
+
   .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; flex-shrink:0; }
   .nd-foot[hidden] { display:none; }
   .nd-btn  { flex:1; text-align:center; padding:9px 10px; border-radius:10px; text-decoration:none;
@@ -534,6 +646,10 @@
   .nd-btn-b:hover { background:#ede9fe; }
   .nd-btn-c { background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; }
   .nd-btn-c:hover { background:#f1f5f9; }
+  /* Roughly 70/30 — the primary action earns the room. Declared after
+     .nd-btn, whose flex:1 would otherwise win on source order. */
+  .nd-btn-wide   { flex:7 1 0; }
+  .nd-btn-narrow { flex:3 1 0; font-size:11px; }
   button.nd-btn { font-family:inherit; cursor:pointer; }
   button.nd-btn:disabled { opacity:.6; cursor:progress; }
 
@@ -570,6 +686,17 @@
   var todayISO = function () { return new Date().toISOString().slice(0, 10); };
   var isOverdue = function (c) { return !!c.due_date && c.due_date < todayISO(); };
 
+  /* Same wording as dueText, without the markup — for places that need
+     the words rather than a styled span. */
+  function dueLabel(d) {
+    if (!d) return '';
+    var label;
+    try {
+      label = new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+    } catch (_) { label = d; }
+    return (d < todayISO() ? 'overdue ' : 'due ') + label;
+  }
+
   function dueText(d) {
     if (!d) return '';
     var label;
@@ -594,7 +721,8 @@
                       : '<em>unassigned</em>',
       dueText(c.due_date)
     ].filter(Boolean);
-    return '<a class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') + '" href="' + esc(caseHref(c.id)) + '">' +
+    return '<button type="button" class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') +
+           '" data-case="' + esc(c.id) + '">' +
              '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
                    'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
              '<span class="nd-main">' +
@@ -604,10 +732,10 @@
                  bits.join(' · ') +
                '</span>' +
              '</span>' +
-           '</a>';
+           '</button>';
   }
 
-  var dock, fab, badge, panel, listEl, formEl, grip;
+  var dock, fab, badge, panel, listEl, formEl, detailEl, grip;
   var rows = [], open = false;
   var view = 'list';           // 'list' | 'form' | 'done'
 
@@ -623,12 +751,18 @@
     dock.innerHTML =
       '<div id="nelos-dock-panel" hidden role="dialog" aria-label="My Nelos to-do list">' +
         '<div class="nd-grip" title="Drag to resize"></div>' +
+        /* Title alone. The NL square repeated the badge on the circle
+           that opened this panel, and the "Nelos · Pending on me"
+           line under it repeated the title — three pieces of chrome
+           for one idea, in a panel that is mostly list. */
         '<div class="nd-head">' +
-          '<div class="nd-head-mark">NL</div>' +
-          '<div>' +
-            '<div class="nd-head-t">My To-Do</div>' +
-            '<div class="nd-head-s">Nelos · Pending on me</div>' +
-          '</div>' +
+          '<div class="nd-head-t">My To Do Nelos</div>' +
+          '<button class="nd-hist" type="button" title="Solved, not yet closed" ' +
+                  'aria-label="Solved, not yet closed">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+              '<path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/>' +
+              '<polyline points="12 7 12 12 15 14"/></svg>' +
+          '</button>' +
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
@@ -665,13 +799,21 @@
           '</div>' +
           '<div class="nd-from"></div>' +
         '</div>' +
+        /* Raising a case is what this panel is for; leaving for the full
+           Nelos page is the exception. The split says so — roughly 70/30
+           rather than two buttons of equal weight. */
         '<div class="nd-foot nd-foot-list">' +
-          '<a class="nd-btn nd-btn-b" href="' + esc(homeHref()) + '">Open Nelos →</a>' +
-          '<button type="button" class="nd-btn nd-btn-a nd-new">➕ Raise a Case</button>' +
+          '<a class="nd-btn nd-btn-b nd-btn-narrow" href="' + esc(homeHref()) + '">Open Nelos →</a>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-btn-wide nd-new">+ New Case</button>' +
         '</div>' +
+        '<div class="nd-detail" hidden></div>' +
         '<div class="nd-foot nd-foot-form" hidden>' +
           '<button type="button" class="nd-btn nd-btn-c nd-cancel">Cancel</button>' +
           '<button type="button" class="nd-btn nd-btn-a nd-save">Raise Case</button>' +
+        '</div>' +
+        '<div class="nd-foot nd-foot-detail" hidden>' +
+          '<button type="button" class="nd-btn nd-btn-c nd-btn-narrow nd-back">&#8592; Back</button>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-btn-wide nd-solve-go">Save &amp; Solve</button>' +
         '</div>' +
       '</div>' +
       '<button id="nelos-dock-fab" type="button" title="Nelos — my to-do (drag to move)" ' +
@@ -686,6 +828,7 @@
     panel  = dock.querySelector('#nelos-dock-panel');
     listEl = dock.querySelector('.nd-list');
     formEl = dock.querySelector('.nd-form');
+    detailEl = dock.querySelector('.nd-detail');
     grip   = dock.querySelector('.nd-grip');
     wireForm();
 
@@ -1018,23 +1161,265 @@
     box.textContent = msg || '';
   }
 
+  /* One place decides which of the three panes is on screen, so a new
+     pane cannot half-appear over another. */
+  function showPane(which) {
+    listEl.hidden   = which !== 'list';
+    formEl.hidden   = which !== 'form';
+    detailEl.hidden = which !== 'detail';
+    panel.querySelector('.nd-foot-list').hidden   = which !== 'list';
+    panel.querySelector('.nd-foot-form').hidden   = which !== 'form';
+    panel.querySelector('.nd-foot-detail').hidden = which !== 'detail';
+  }
+
   function showList() {
     view = 'list';
-    listEl.hidden = false; formEl.hidden = true;
-    panel.querySelector('.nd-foot-list').hidden = false;
-    panel.querySelector('.nd-foot-form').hidden = true;
-    panel.querySelector('.nd-head-t').textContent = 'My To-Do';
-    panel.querySelector('.nd-head-s').textContent = 'Nelos · Pending on me';
+    showPane('list');
+    panel.querySelector('.nd-head-t').textContent = 'My To Do Nelos';
+    panel.querySelector('.nd-hist').classList.remove('on');
     paint();
+  }
+
+  /* ── ONE CASE, IN THE PANEL ──────────────────────────────────────
+     Tapping a row used to leave the page for nelos_case.html, which
+     threw away whatever the person was in the middle of — the dock
+     floats over a page they were working on, and the case is usually
+     something they want to read, not somewhere they want to go.
+
+     The list already carries everything but the description, so the
+     panel paints from the row it has and fills the description in when
+     it arrives. A failed fetch is not an error state: the case is
+     still readable, minus one field. */
+  var _detailCache = {};
+
+  async function fetchCase(id) {
+    if (_detailCache[id]) return _detailCache[id];
+    var token = await accessToken();
+    if (!token) return null;
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?select=*&limit=1&id=eq.' +
+                            encodeURIComponent(id), { headers: authHeaders(token) });
+      if (!res.ok) return null;
+      var out = await res.json();
+      var one = Array.isArray(out) ? out[0] : null;
+      if (one) _detailCache[id] = one;
+      return one || null;
+    } catch (_) { return null; }
+  }
+
+  function detailHtml(c, full) {
+    var subject = [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
+      .filter(Boolean).join(' · ');
+    var due = dueLabel(c.due_date);
+    var chips =
+      '<span class="nd-d-chip">' + esc(SOURCE_LABEL[c.source_module] || c.source_module || 'Nelos') + '</span>' +
+      '<span class="nd-d-chip' + (c.priority === 'urgent' || c.priority === 'high' ? ' hot' : '') + '">' +
+        esc(PRIORITY_LABEL[c.priority] || c.priority || 'normal') + '</span>' +
+      (c.status ? '<span class="nd-d-chip">' + esc(String(c.status).replace('_', ' ')) + '</span>' : '') +
+      (due ? '<span class="nd-d-chip' + (isOverdue(c) ? ' hot' : ' due') + '">' + esc(due) + '</span>' : '');
+
+    var rowsOut = [];
+    var put = function (k, v) { if (v) rowsOut.push(
+      '<div class="nd-d-k">' + esc(k) + '</div><div class="nd-d-v">' + esc(v) + '</div>'); };
+    put('Case', c.case_no);
+    put('Subject', subject);
+    put('Category', c.category);
+    put('Queue', SOURCE_LABEL[c.assigned_module] || c.assigned_module);
+    put('Assignee', c.assignee_name || 'Unassigned');
+    put('Raised', (c.created_at || '').slice(0, 10));
+
+    var body = full === null
+      ? '<div class="nd-d-none">Could not load the detail — the case above is what the list knows.</div>'
+      : full && full.description
+        ? '<div class="nd-d-body">' + esc(full.description) + '</div>'
+        : full
+          ? '<div class="nd-d-none">No further detail was written.</div>'
+          : '<div class="nd-d-none">Loading detail…</div>';
+
+    var solved = (full && full.status === 'resolved') || c.status === 'resolved';
+    return '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
+           '<div class="nd-d-chips">' + chips + '</div>' +
+           body +
+           (rowsOut.length ? '<div class="nd-d-grid">' + rowsOut.join('') + '</div>' : '') +
+           '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>' +
+           (solved ? solvedCardHtml(full || c) : solveBlockHtml());
+  }
+
+  /* ── SOLVING ─────────────────────────────────────────────────────
+     Upload first, then patch. That order matters: a failed upload
+     leaves the case exactly as it was, whereas patching first would
+     mark work solved and then lose the picture of it. */
+  var _shot = null;                    // the File chosen for this case
+
+  async function uploadShot(caseId, file) {
+    var token = await accessToken();
+    if (!token) return null;
+    var ext  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var path = 'solve/' + caseId + '-' + Date.now() + '.' + (ext || 'jpg');
+    try {
+      var res = await fetch(CFG.url + '/storage/v1/object/nelos-photos/' + path, {
+        method: 'POST',
+        headers: { apikey: CFG.key, Authorization: 'Bearer ' + token,
+                   'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      });
+      if (!res.ok) return null;
+      return CFG.url + '/storage/v1/object/public/nelos-photos/' + path;
+    } catch (_) { return null; }
+  }
+
+  async function patchCase(id, body) {
+    var token = await accessToken();
+    if (!token) return { ok: false, status: 0 };
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?id=eq.' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                               authHeaders(token)),
+        body: JSON.stringify(body)
+      });
+      return { ok: res.ok, status: res.status };
+    } catch (_) { return { ok: false, status: 0 }; }
+  }
+
+  var _solving = false;
+  async function solveCase(id) {
+    if (_solving) return;
+    var note = detailEl.querySelector('.nd-solve-note');
+    var text = note ? note.value.trim() : '';
+    if (!text) {
+      if (note) { note.focus(); note.style.borderColor = '#fca5a5'; }
+      return;
+    }
+    var btn = panel.querySelector('.nd-solve-go');
+    _solving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    var url = _shot ? await uploadShot(id, _shot) : null;
+    var body = {
+      status: 'resolved',
+      resolution: text,
+      resolved_by: me().name || me().email || 'unknown',
+      resolved_at: new Date().toISOString()
+    };
+    if (url) body.resolution_photo_url = url;
+
+    var out = await patchCase(id, body);
+    /* 400 = this database has not run migration_nelos_solve_photo.sql.
+       The remark and the status matter more than the picture, so save
+       them rather than failing the whole thing. */
+    if (!out.ok && out.status === 400 && url) {
+      warn('nelos_cases has no resolution_photo_url — run ' +
+           'shared/migration_nelos_solve_photo.sql. Saving the remark without the photo.');
+      delete body.resolution_photo_url;
+      out = await patchCase(id, body);
+    }
+
+    _solving = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Save & Solve'; }
+    if (!out.ok) {
+      if (note) note.style.borderColor = '#fca5a5';
+      warn('could not save the resolution (http-' + out.status + ').');
+      return;
+    }
+    _shot = null;
+    delete _detailCache[id];
+    showList();
+    refresh();
+  }
+
+  function solveBlockHtml() {
+    return '<div class="nd-solve">' +
+             '<div class="nd-solve-h">Solve</div>' +
+             '<div class="nd-shot">' +
+               '<label>' +
+                 '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+                 '<span>Add photo</span>' +
+                 '<input type="file" accept="image/*" capture="environment" class="nd-shot-in">' +
+               '</label>' +
+             '</div>' +
+             '<textarea class="nd-solve-note" maxlength="2000" ' +
+                       'placeholder="What did you do? — this is what the person closing it reads"></textarea>' +
+           '</div>';
+  }
+
+  function solvedCardHtml(c) {
+    return '<div class="nd-solved-card">' +
+             '<div class="nd-solved-h">&#10003; Solved</div>' +
+             '<div class="nd-solved-b">' + esc(c.resolution || '') + '</div>' +
+             (c.resolution_photo_url
+               ? '<img src="' + esc(c.resolution_photo_url) + '" alt="Photo of the fix">' : '') +
+             '<div class="nd-solved-m">' + esc(c.resolved_by || 'unknown') +
+               (c.resolved_at ? ' · ' + esc(String(c.resolved_at).slice(0, 10)) : '') +
+               ' · waiting to be closed</div>' +
+           '</div>';
+  }
+
+  var openCaseId = null;
+
+  function syncSolveBtn(c) {
+    var btn = panel.querySelector('.nd-solve-go');
+    if (!btn) return;
+    /* Already solved → there is nothing to save; the card explains it. */
+    btn.hidden = (c.status === 'resolved' || c.status === 'closed');
+    panel.querySelector('.nd-back').classList.toggle('nd-btn-narrow', !btn.hidden);
+  }
+
+  async function showDetail(id) {
+    var c = (rows.concat(doneRows)).filter(function (r) {
+      return String(r.id) === String(id);
+    })[0];
+    if (!c) return;
+    view = 'detail';
+    openCaseId = String(id);
+    _shot = null;
+    showPane('detail');
+    panel.querySelector('.nd-head-t').textContent = c.case_no || 'Case';
+    detailEl.innerHTML = detailHtml(c, undefined);
+    detailEl.scrollTop = 0;
+    syncSolveBtn(c);
+
+    var full = await fetchCase(id);
+    /* They may have gone back, or into another case, while that was in
+       flight — only paint if this is still the case on screen. */
+    if (view !== 'detail' || openCaseId !== String(id)) return;
+    detailEl.innerHTML = detailHtml(c, full);
+    syncSolveBtn(full || c);
+  }
+
+  /* ── SOLVED, NOT YET CLOSED ──────────────────────────────────────
+     Where a solved case goes. It leaves the to-do list the moment it
+     is saved, and without this it would simply vanish — which reads as
+     "did that save?" rather than "that is done and waiting on
+     somebody". Closing is still the Nelos page's job. */
+  var doneRows = [];
+  var doneBusy = false;
+  var _cameFromHistory = false;
+
+  async function showHistory() {
+    view = 'done-list';
+    showPane('list');
+    panel.querySelector('.nd-foot-list').hidden = false;
+    panel.querySelector('.nd-head-t').textContent = 'Solved';
+    panel.querySelector('.nd-hist').classList.add('on');
+    listEl.innerHTML = '<div class="nd-empty">loading…</div>';
+    if (doneBusy) return;
+    doneBusy = true;
+    var out = await fetchResolved();
+    doneBusy = false;
+    if (view !== 'done-list') return;
+    doneRows = out.error ? [] : out.rows;
+    listEl.innerHTML = doneRows.length
+      ? doneRows.map(rowHtml).join('')
+      : '<div class="nd-empty">' + (out.error
+          ? 'Could not read the solved cases.'
+          : 'Nothing solved and waiting to be closed.') + '</div>';
   }
 
   async function showForm() {
     view = 'form';
-    listEl.hidden = true; formEl.hidden = false;
-    panel.querySelector('.nd-foot-list').hidden = true;
-    panel.querySelector('.nd-foot-form').hidden = false;
-    panel.querySelector('.nd-head-t').textContent = 'Raise a Case';
-    panel.querySelector('.nd-head-s').textContent = 'Nelos · From where you are';
+    showPane('form');
+    panel.querySelector('.nd-head-t').textContent = 'New Case';
     formError('');
     formEl.querySelector('.nd-from').innerHTML =
       'Raised from <b>' + esc(pageName()) + '</b> — the case links back here.';
@@ -1051,9 +1436,11 @@
 
   function showDone(c) {
     view = 'done';
-    listEl.hidden = true; formEl.hidden = false;
-    panel.querySelector('.nd-foot-list').hidden = false;
+    showPane('form');
+    /* The done card sits in the form pane but is finished with, so it
+       takes the LIST footer — the way on is a new case or the list. */
     panel.querySelector('.nd-foot-form').hidden = true;
+    panel.querySelector('.nd-foot-list').hidden = false;
     formEl.innerHTML =
       '<div class="nd-done">' +
         '<div class="nd-done-t">✓ ' + esc(c.case_no || 'Case') + ' raised</div>' +
@@ -1177,6 +1564,46 @@
       showForm();
     });
     panel.querySelector('.nd-cancel').addEventListener('click', function () { showList(); });
+    panel.querySelector('.nd-back').addEventListener('click', function () {
+      /* Back from a case reached through history goes back to history,
+         not to the to-do list it is deliberately not on. */
+      if (_cameFromHistory) { _cameFromHistory = false; showHistory(); }
+      else showList();
+    });
+    panel.querySelector('.nd-solve-go').addEventListener('click', function () {
+      if (openCaseId) solveCase(openCaseId);
+    });
+    panel.querySelector('.nd-hist').addEventListener('click', function () {
+      if (view === 'done-list') showList(); else showHistory();
+    });
+
+    /* Photo picking and clearing live in the detail pane, which is
+       rebuilt on every open — so both are delegated. */
+    detailEl.addEventListener('change', function (e) {
+      var inp = e.target.closest('.nd-shot-in');
+      if (!inp || !inp.files || !inp.files[0]) return;
+      _shot = inp.files[0];
+      var wrap = detailEl.querySelector('.nd-shot');
+      if (!wrap) return;
+      var url = URL.createObjectURL(_shot);
+      wrap.innerHTML = '<div class="nd-shot-prev"><img alt="Photo of the fix" src="' + url + '">' +
+                       '<button type="button" class="nd-shot-x" aria-label="Remove photo">&times;</button></div>';
+    });
+    detailEl.addEventListener('click', function (e) {
+      if (!e.target.closest('.nd-shot-x')) return;
+      _shot = null;
+      var wrap = detailEl.querySelector('.nd-shot');
+      if (wrap) wrap.innerHTML =
+        '<label><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+        '<span>Add photo</span><input type="file" accept="image/*" capture="environment" class="nd-shot-in"></label>';
+    });
+    /* Delegated: the list is repainted on every refresh. */
+    listEl.addEventListener('click', function (e) {
+      var row = e.target.closest('.nd-row');
+      if (!row || !row.dataset.case) return;
+      _cameFromHistory = (view === 'done-list');
+      showDetail(row.dataset.case);
+    });
     panel.querySelector('.nd-save').addEventListener('click', function () { submitCase(); });
   }
 
@@ -1234,12 +1661,25 @@
 
   /* ── Boot ────────────────────────────────────────────────────── */
 
+  var _booted = false;
+
   async function boot() {
-    if (unwanted()) return;
+    if (_booted || unwanted()) return;
+
+    /* Sign-in swaps the screen without navigating, so this waits rather
+       than giving up — the dock appears the moment the grid does, with
+       no reload. Polling rather than observing: the login element is
+       often replaced wholesale, not just hidden, and an observer bound
+       to the old node would never fire. */
+    if (loginOnScreen()) {
+      setTimeout(boot, 700);
+      return;
+    }
 
     CFG = await loadConfig();
     if (!CFG) { warn('no Supabase config on this page and shared_supabase.js would not load.'); return; }
     if (!storedSession()) return;           // signed out: login pages get no dock, and say nothing
+    _booted = true;
 
     build();
 
