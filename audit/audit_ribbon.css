@@ -117,7 +117,7 @@
 /* Language + sign-out pills share one shape so they read as a pair. */
 .fcr-lang,
 .fcr-signout{
-  height:32px;
+  height:33px;
   padding:0 12px;
   border-radius:999px;
   background:#f8fafc;
