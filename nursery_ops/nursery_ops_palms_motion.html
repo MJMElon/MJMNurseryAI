@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PALMS Motion Study — Nursery Operation Management</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f0fdfa; margin:0; }
+  .card { background:white; border:1px solid #ccfbf1; border-radius:20px; box-shadow:0 4px 16px rgba(13,148,136,.07); }
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #99f6e4; color:#0f766e; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s; }
+  .tool-btn:hover { background:#ccfbf1; }
+  .pick { appearance:none; -webkit-appearance:none; padding:9px 34px 9px 14px; border-radius:12px; border:1.5px solid #99f6e4;
+          background:white; color:#0f766e; font-weight:900; font-size:12px; cursor:pointer; outline:none;
+          background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%230f766e' d='M5 6L0 0h10z'/></svg>");
+          background-repeat:no-repeat; background-position:right 12px center; background-size:10px; max-width:100%; }
+  .stat { border-radius:16px; padding:14px 16px; border:1.5px solid #e2e8f0; background:#f8fafc; }
+  .stat-n { font-size:24px; font-weight:900; line-height:1; color:#0f172a; }
+  .stat-l { font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; margin-top:5px; color:#64748b; }
+  .stat-s { font-size:11px; font-weight:700; color:#94a3b8; margin-top:3px; }
+  th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
+       padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
+  td { padding:10px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:900; }
+  .muted { color:#cbd5e1; font-weight:900; }
+  .fast { color:#047857; }
+  .slow { color:#b91c1c; }
+  .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+          border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
+  .p-win  { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .p-miss { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
+  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">PALMS — Motion Study</span>
+  <div class="flex items-center gap-2">
+    <span id="who" class="hidden md:inline text-[11px] font-bold text-slate-500"></span>
+    <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
+  </div>
+</div>
+
+<div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <a class="tool-btn" href="nursery_ops_dashboard.html">← Back to Module</a>
+    <div class="flex flex-wrap items-center gap-2">
+      <a class="tool-btn" href="nursery_ops_palms_board.html">🪴 Monitoring Board</a>
+      <select id="f-nursery" class="pick"></select>
+      <select id="f-month" class="pick"></select>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-5">
+    <h1 class="text-base font-black text-slate-800 uppercase tracking-widest mb-1">What the work actually costs in days</h1>
+    <p class="text-[12px] text-slate-500 leading-relaxed">
+      Read off the plot log recorded in the field, not off the ideal-day table. The unit of measurement is a
+      <strong>cycle</strong> — Saringan Anak Bibit through to Pengambilan, one intake worked from start to sale —
+      so a plot that has gone round three times contributes three figures, and the shortest and the longest of
+      them are what a motion study is after. A measurement counts in the month it <strong>finished</strong>.
+    </p>
+  </div>
+
+  <!-- ── A run of activities, and how long it takes ── -->
+  <div class="card p-5 mb-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h2 class="text-[13px] font-black text-slate-700 uppercase tracking-widest">A run of activities</h2>
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="f-from" class="pick"></select>
+        <span class="text-[11px] font-black text-slate-400">→</span>
+        <select id="f-to" class="pick"></select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="stat"><div class="stat-n fast" id="s-min">—</div><div class="stat-l">Shortest</div><div class="stat-s" id="s-min-w">&nbsp;</div></div>
+      <div class="stat"><div class="stat-n" id="s-avg">—</div><div class="stat-l">Average</div><div class="stat-s" id="s-n">&nbsp;</div></div>
+      <div class="stat"><div class="stat-n slow" id="s-max">—</div><div class="stat-l">Longest</div><div class="stat-s" id="s-max-w">&nbsp;</div></div>
+      <div class="stat"><div class="stat-n" id="s-ideal">—</div><div class="stat-l">Ideal</div><div class="stat-s">added from the table</div></div>
+    </div>
+    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+      A run is measured from the first activity's start to the last one's end. Two activities that ran on the
+      same days are therefore counted once, which adding their durations up would not do.
+    </p>
+  </div>
+
+  <!-- ── Runs inside the incentive target ── -->
+  <div class="card overflow-hidden mb-5">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-baseline justify-between gap-3 flex-wrap">
+      <h2 class="text-[13px] font-black text-slate-700 uppercase tracking-widest">Completed runs</h2>
+      <span class="text-[11px] font-bold text-slate-400">
+        target <strong id="target-days">15</strong> days — one row per finished run, fastest first
+      </span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead><tr><th>Plot</th><th>Started</th><th>Finished</th><th class="num">Days</th><th>Target</th></tr></thead>
+        <tbody id="runs"></tbody>
+      </table>
+    </div>
+    <div id="runs-empty" class="hidden px-5 py-10 text-center text-[12px] font-bold text-slate-400">
+      No completed run of these activities in this period.
+    </div>
+  </div>
+
+  <!-- ── Every activity ── -->
+  <div class="card overflow-hidden mb-5">
+    <div class="px-5 py-4 border-b border-slate-100">
+      <h2 class="text-[13px] font-black text-slate-700 uppercase tracking-widest">Every activity</h2>
+      <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+        An activity keyed in twice in one cycle — stopped and picked up again — counts the days worked, not the
+        calendar span, so the idle time in between is not charged to it.
+      </p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr><th>Activity</th><th class="num">Ideal</th><th class="num">Shortest</th>
+              <th class="num">Average</th><th class="num">Longest</th><th class="num">Cycles</th></tr>
+        </thead>
+        <tbody id="acts"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Which plots are slowest at one activity ── -->
+  <div class="card overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-[13px] font-black text-slate-700 uppercase tracking-widest">Slowest plots at one activity</h2>
+      <select id="f-act" class="pick"></select>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead><tr><th>Plot</th><th class="num">Shortest</th><th class="num">Average</th>
+                   <th class="num">Longest</th><th class="num">Cycles</th></tr></thead>
+        <tbody id="units"></tbody>
+      </table>
+    </div>
+    <div id="units-empty" class="hidden px-5 py-10 text-center text-[12px] font-bold text-slate-400">
+      Nothing finished for this activity in this period.
+    </div>
+  </div>
+
+  <div id="empty" class="hidden card px-6 py-14 text-center mt-5">
+    <div class="text-3xl mb-3">⏱️</div>
+    <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plot activity on the server yet</p>
+    <p class="text-[12px] text-slate-500 mt-2 max-w-[460px] mx-auto leading-relaxed">
+      The motion study reads the plot log recorded on the 555 FC Portal. Nothing can be measured until a cycle
+      has been logged there. If the portal is in use and this is still empty, the tables may not have been
+      created — run <code class="bg-slate-100 px-1.5 py-0.5 rounded">shared/create_palms_tables.sql</code>.
+    </p>
+  </div>
+
+  <p class="text-[11px] text-slate-400 text-center mt-7">
+    Page access is granted on this module's
+    <a href="nursery_ops_user_access.html" class="text-teal-700 font-bold underline underline-offset-2">User Access</a>.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monthLabel = (m) => { const p = String(m).split('-'); return MONTHS[Number(p[1]) - 1] + ' ' + p[0]; };
+
+let LOGS = {};
+let SCOPE = 'all';
+let MONTH = '';        // '' = every month
+let FROM = 1, TO = 9;  // Saringan Anak Bibit → Transplanting, the incentive run
+let ACT = 1;
+
+const days = (n) => (n == null ? '<span class="muted">—</span>' : n + 'd');
+
+function renderSpan() {
+  const st = MJMPalms.spanStats(LOGS, SCOPE, FROM, TO, MONTH);
+  $('s-ideal').textContent = MJMPalms.idealSpan(FROM, TO) + 'd';
+  if (!st) {
+    ['s-min', 's-avg', 's-max'].forEach((id) => { $(id).textContent = '—'; });
+    $('s-min-w').innerHTML = '&nbsp;'; $('s-max-w').innerHTML = '&nbsp;'; $('s-n').innerHTML = '&nbsp;';
+    return;
+  }
+  $('s-min').textContent = st.min.days + 'd';
+  $('s-avg').textContent = st.avg + 'd';
+  $('s-max').textContent = st.max.days + 'd';
+  // Named, because "somebody once managed 12 days" is only useful if you can
+  // go and ask which plot and when.
+  $('s-min-w').textContent = st.min.label + ' · ' + MJMPalms.prettyD(st.min.end);
+  $('s-max-w').textContent = st.max.label + ' · ' + MJMPalms.prettyD(st.max.end);
+  $('s-n').textContent = st.n + (st.n === 1 ? ' cycle' : ' cycles');
+}
+
+function renderRuns() {
+  const runs = MJMPalms.incentiveRuns(LOGS, SCOPE, FROM, TO, MONTH);
+  $('runs-empty').classList.toggle('hidden', runs.length > 0);
+  $('runs').innerHTML = runs.map((r) =>
+    '<tr>' +
+      '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.start)) + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.end)) + '</td>' +
+      '<td class="num ' + (r.withinTarget ? 'fast' : 'slow') + '">' + r.days + '</td>' +
+      '<td><span class="pill ' + (r.withinTarget ? 'p-win' : 'p-miss') + '">' +
+        (r.withinTarget ? 'within ' + MJMPalms.TARGET_DAYS + 'd' : 'over') + '</span></td>' +
+    '</tr>').join('');
+}
+
+function renderActs() {
+  $('acts').innerHTML = MJMPalms.perActivityStats(LOGS, SCOPE, MONTH).map((row) => {
+    const s = row.stats;
+    return '<tr>' +
+      '<td class="font-bold text-slate-800">' + esc(row.act.name) + '</td>' +
+      '<td class="num text-slate-400">' + row.act.days + 'd</td>' +
+      '<td class="num fast">' + days(s && s.min.days) + '</td>' +
+      '<td class="num">' + days(s && s.avg) + '</td>' +
+      '<td class="num slow">' + days(s && s.max.days) + '</td>' +
+      '<td class="num text-slate-400">' + (s ? s.n : '<span class="muted">—</span>') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderUnits() {
+  const rows = MJMPalms.perUnitActivityStats(LOGS, SCOPE, ACT, MONTH);
+  $('units-empty').classList.toggle('hidden', rows.length > 0);
+  $('units').innerHTML = rows.map((r) =>
+    '<tr>' +
+      '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
+      '<td class="num fast">' + days(r.stats.min.days) + '</td>' +
+      '<td class="num">' + days(r.stats.avg) + '</td>' +
+      '<td class="num slow">' + days(r.stats.max.days) + '</td>' +
+      '<td class="num text-slate-400">' + r.stats.n + '</td>' +
+    '</tr>').join('');
+}
+
+function renderAll() { renderSpan(); renderRuns(); renderActs(); renderUnits(); }
+
+function fillMonths() {
+  const months = MJMPalms.monthsWithData(LOGS, SCOPE);
+  // Only months with something behind them, so the picker never offers an
+  // empty answer.
+  $('f-month').innerHTML = '<option value="">Every month</option>' +
+    months.map((m) => '<option value="' + m + '">' + monthLabel(m) + '</option>').join('');
+  if (months.indexOf(MONTH) === -1) MONTH = '';
+  $('f-month').value = MONTH;
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nursery_ops')) {
+      alert('You do not have access to Nursery Operation Management.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    $('who').textContent = u.full_name || u.email || '';
+
+    /* The dashboard hides the button, but a URL is typeable and a bookmark
+       outlives a permission. Fails OPEN when shared_access.js is an older
+       cached copy without canOpenPage: a stale script must not lock somebody
+       out of a page they are entitled to. */
+    if (typeof MJMAccess.canOpenPage === 'function' &&
+        !MJMAccess.canOpenPage('nursery_ops', 'palms_motion')) {
+      alert('You do not have access to this page. Ask an admin to grant it in User Access.');
+      window.location.href = 'nursery_ops_dashboard.html';
+      return;
+    }
+
+    /* The same nursery scope the field app obeys, from the main portal's User
+       Access. Someone narrowed to BNN must not read UNN's figures here just
+       because the office page is a different screen. */
+    const perms = MJMAccess.permissions() || {};
+    const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
+    const KEYS = ['BNN', 'UNN1', 'UNN2'];
+    const visible = allowed
+      ? KEYS.filter((k) => allowed.some((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase() === k))
+      : KEYS;
+    SCOPE = allowed ? visible : 'all';
+    $('f-nursery').innerHTML = '<option value="__all">All nurseries</option>' +
+      visible.map((k) => '<option value="' + k + '">' + k + '</option>').join('');
+
+    const actOptions = MJMPalms.ACTIVITIES
+      .map((a) => '<option value="' + a.n + '">' + esc(a.name) + '</option>').join('');
+    $('f-from').innerHTML = actOptions; $('f-from').value = String(FROM);
+    $('f-to').innerHTML = actOptions;   $('f-to').value = String(TO);
+    $('f-act').innerHTML = actOptions;  $('f-act').value = String(ACT);
+    $('target-days').textContent = MJMPalms.TARGET_DAYS;
+
+    $('f-nursery').addEventListener('change', (e) => {
+      SCOPE = e.target.value === '__all' ? (allowed ? visible : 'all') : e.target.value;
+      fillMonths(); renderAll();
+    });
+    $('f-month').addEventListener('change', (e) => { MONTH = e.target.value; renderAll(); });
+    $('f-from').addEventListener('change', (e) => { FROM = Number(e.target.value); renderSpan(); renderRuns(); });
+    $('f-to').addEventListener('change', (e) => { TO = Number(e.target.value); renderSpan(); renderRuns(); });
+    $('f-act').addEventListener('change', (e) => { ACT = Number(e.target.value); renderUnits(); });
+
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    if (!Object.keys(LOGS).length) $('empty').classList.remove('hidden');
+    fillMonths();
+    renderAll();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    // The tables may simply not exist yet. That is a message, not a bounce —
+    // sending an admin back to the module selection tells them nothing.
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+    $('empty').classList.remove('hidden');
+  }
+})();
+</script>
+</body>
+</html>

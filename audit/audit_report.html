@@ -291,11 +291,11 @@ function buildModTable(mod, rows){
   if(mod==='plot'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Pest</th><th>Animal</th><th>Disease</th><th>Leaf</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.pest||'—'}</td><td>${r.tikus||'—'}</td><td>${r.disease||'—'}</td><td>${r.warna_daun||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="8">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   } else if(mod==='height'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>S1 (cm)</th><th>S2 (cm)</th><th>S3 (cm)</th><th>Avg (cm)</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.sample_1||'—'}</td><td>${r.sample_2||'—'}</td><td>${r.sample_3||'—'}</td><td><b>${r.avg_height||'—'}</b></td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
+    body+=`<tr class="total-row"><td colspan="8">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
   } else if(mod==='papan'){
     head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Presence</th><th>Info</th><th>Height</th></tr>`;
     rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch_no||'—'}</td><td>${r.presence||'—'}</td><td>${r.info_correct||'—'}</td><td>${r.condition||'—'}</td></tr>`;});

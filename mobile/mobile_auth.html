@@ -205,9 +205,11 @@ async function loginEmailPassword() {
   if (isSignUp) {
     var name = document.getElementById('signup-name').value.trim();
     showStatus('Creating account...', 'success');
+    // user_type must be stamped at signup: handle_new_user() defaults a
+    // missing one to 'system', which is what _mjm_is_staff() reads as staff.
     var { error } = await _supabase.auth.signUp({
       email: email, password: pw,
-      options: { data: { full_name: name } }
+      options: { data: { full_name: name, user_type: 'customer' } }
     });
     if (error) { showStatus(error.message, 'error'); return; }
     showStatus('Account created! You can now log in.', 'success');
