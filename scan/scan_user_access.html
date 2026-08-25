@@ -207,7 +207,7 @@ function pageBlockHtml(pg) {
           ${nurseries.map((n) => `
             <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
               <input type="checkbox" data-npage="${pg.key}" data-nname="${esc(n)}"
-                     ${!all && chosen.has(n) ? 'checked' : ''} ${all ? 'disabled' : ''}>
+                     ${!all && chosen.has(n) ? 'checked' : ''}>
               ${esc(n)}
             </label>`).join('')}
         </div>
@@ -292,6 +292,22 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.npage) {
     const key = t.dataset.npage;
+
+    /* Coming out of "All" by picking a nursery: that nursery becomes the
+       whole selection, there and then.
+
+       These boxes used to be disabled while All was on, so narrowing to one
+       nursery meant unticking All — which selected every nursery — and then
+       unticking the other two. Three clicks, and a state in between that said
+       something nobody meant. Ticking the one you want now says it directly.
+
+       Only the ticking case exists: under All every box renders unticked, so
+       a click here is always a tick. */
+    if (!Array.isArray(draft.scan_nurseries[key])) {
+      draft.scan_nurseries[key] = [t.dataset.nname];
+      return render();
+    }
+
     draft.scan_nurseries[key] = [...document.querySelectorAll('[data-npage="' + key + '"]')]
       .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
     return render();
