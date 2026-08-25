@@ -16,12 +16,12 @@
 
   .card { background:white; border:1px solid #e2e8f0; border-radius:20px; box-shadow:0 4px 16px rgba(0,0,0,.06); }
 
-  /* Access summary chip on the list */
+  /* The one chip left on a row: "Customer · no system access", in the All
+     Accounts view where customers and staff sit together. A row's MODULES are
+     not shown here — nine of them against every name turned the list into a
+     wall to read past on the way to the button. Edit Access answers that. */
   .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
-  .chip-admin  { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
-  .chip-normal { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
   .chip-none   { background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; }
-  .chip-manage { background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; }
 
   .edit-btn { display:inline-flex; align-items:center; gap:6px; padding:10px 16px; border-radius:12px; font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; cursor:pointer; box-shadow:0 6px 14px -4px rgba(16,185,129,.4); transition:all .15s; }
   .edit-btn:hover { transform:translateY(-1px); box-shadow:0 10px 18px -4px rgba(16,185,129,.5); }
@@ -56,8 +56,6 @@
   .preset-normal:hover { background:#eff6ff; border-color:#bfdbfe; color:#1e3a8a; }
   .preset-none:hover   { background:#f1f5f9; border-color:#cbd5e1; color:#475569; }
 
-  .mod-access-link { display:inline-flex; align-items:center; gap:7px; padding:9px 15px; border-radius:12px; border:1.5px solid #e2e8f0; background:white; color:#334155; font-size:12px; font-weight:800; text-decoration:none; transition:all .15s; }
-  .mod-access-link:hover { border-color:#94a3b8; background:#f8fafc; transform:translateY(-1px); }
   .user-row { padding:18px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid #f1f5f9; transition:background .15s; }
   .user-row:hover { background:#f8fafc; }
   .user-row:last-child { border-bottom:none; }
@@ -87,28 +85,6 @@
 
 <div id="main" class="max-w-[900px] mx-auto px-6 py-8 space-y-6 hidden">
 
-  <!-- Intro -->
-  <div class="card p-6 space-y-4">
-    <div class="flex items-center gap-3">
-      <span class="text-2xl">👥</span>
-      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">User Access</h1>
-    </div>
-    <p class="text-[13px] text-slate-600 leading-relaxed">
-      This page answers one question, for the whole AI System: <strong>which modules may this person open?</strong>
-      Find them in the list below and open them — every module is shown, set to <strong>None</strong> until somebody
-      here turns it on, and what is turned on is exactly what they see on the module-selection page.
-      <br><br>
-      What a person can do <em>inside</em> a module — which pages, which buttons, which nurseries — is that module's
-      own question, and is set on that module's own User Access, linked below. Only staff who signed up through the
-      AI System appear here; Salesweb customers are kept out of the list to keep it clean.
-    </p>
-    <ul class="text-[12px] text-slate-700 leading-relaxed space-y-1.5 pl-4 list-disc marker:text-slate-300">
-      <li><strong>Edit Access</strong> on a row — set each module's level and toggle <em>Manage Users</em>. Finer settings (which pages inside a module, batch verifier…) are managed inside each module's own User Access page.</li>
-      <li><strong>+ Add User</strong> — pull a customer in from the Salesweb list and promote them to a system user.</li>
-      <li>Inside the panel, <strong>Move to customer</strong> sends them back out (their access is cleared).</li>
-    </ul>
-  </div>
-
   <!-- Search + add -->
   <div class="flex flex-col md:flex-row gap-3 items-stretch">
     <input id="search" type="text" placeholder="🔎 Search system users by email or name…" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
@@ -132,23 +108,6 @@
     Looking for someone who isn't listed? Switch to <strong>All Accounts</strong> — Salesweb customer sign-ups are there, with an <strong>Open Access</strong> button to promote them.
   </p>
 
-  <!-- This page opens and closes whole modules. What somebody may DO inside
-       one is set on that module's own User Access, linked here so every one
-       of them is reachable from a single place. -->
-  <div class="card p-6 space-y-3">
-    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Inside Each Module</div>
-    <p class="text-[12px] text-slate-500 leading-relaxed">
-      Everything below the module switch lives in the module. Open its own User Access to set which pages a person
-      sees, which buttons work, and — for the 555 FC Portal — which nurseries they are shown:
-    </p>
-    <div class="flex flex-wrap gap-2">
-      <a href="operation/operation_user_access.html"     class="mod-access-link">🌱 Nursery Seedling Stock</a>
-      <a href="nursery_ops/nursery_ops_user_access.html" class="mod-access-link">🌿 Nursery Operation</a>
-      <a href="audit/audit_user_access.html"             class="mod-access-link">📋 555 Audit Portal — Settings</a>
-      <a href="npayroll/npayroll_user_access.html"       class="mod-access-link">💵 Nursery Payroll</a>
-      <a href="scan/scan_user_access.html"               class="mod-access-link">🔖 555 FC Portal <span class="text-[10px] text-slate-400">(incl. nurseries)</span></a>
-    </div>
-  </div>
 
 </div>
 
@@ -352,20 +311,6 @@ function initials(p) {
   return src.split(/\s+/).map(s => s[0]).slice(0,2).join('').toUpperCase() || '?';
 }
 
-const MODULE_LABEL = {
-  operation: 'operation', nursery_ops: 'nursery ops', reports: 'reports', audit_trail: 'audit trail',
-  npayroll: 'nursery payroll',
-  salesweb: 'salesweb', audit: '555 audit', mobile: '555 admin', training: 'training', scan: '555 fc'
-};
-function summaryHtml(perms) {
-  const chips = MODULES
-    .filter(m => perms.modules[m] !== 'none')
-    .map(m => `<span class="chip chip-${perms.modules[m]}">${MODULE_LABEL[m] || m} · ${LEVEL_LABEL[perms.modules[m]]}</span>`)
-    .join(' ');
-  const noneChip = !chips ? '<span class="chip chip-none">No module access</span>' : '';
-  const manageChip = perms.manage_users ? '<span class="chip chip-manage">Manage Users</span>' : '';
-  return `<div class="flex flex-wrap gap-1.5">${chips}${noneChip}${manageChip}</div>`;
-}
 
 function customerRowHtml(p) {
   return `
@@ -391,7 +336,6 @@ function rowHtml(p) {
       <div class="flex-1 min-w-0">
         <div class="font-black text-slate-800 text-sm leading-tight truncate">${p.full_name || '<span class="text-slate-400">(no name)</span>'}</div>
         <div class="text-[12px] text-slate-500 font-semibold truncate">${p.email || '—'}</div>
-        <div class="mt-2">${summaryHtml(p.permissions)}</div>
       </div>
       <button class="edit-btn shrink-0" data-action="edit" data-uid="${p.id}">
         Edit Access

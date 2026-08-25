@@ -15,7 +15,6 @@
   * { font-family:'Outfit', system-ui, sans-serif; }
   body { background:#f0fdfa; margin:0; }
 
-  /* Small tool buttons */
   /* Square tiles, laid out on a grid that fits as many as the width allows
      and never fewer than two, so the set still reads as a set on a phone. */
   .tool-grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); }
@@ -88,36 +87,13 @@
      data-sub="Seeds · Plots · Maintenance" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<<<<<<< HEAD
-<!-- Page sub-header: keeps the old module title + user chip below the ribbon -->
-<div class="bg-white border-b border-teal-100 px-6 py-3 flex items-center justify-between">
-  <span class="font-black text-slate-800 uppercase tracking-widest text-sm">Nursery Operation Management</span>
-  <div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div>
-</div>
-=======
 <!-- The module names itself in the ribbon now, the way the Nelos pages do,
      so the strip that used to repeat it under the bar has gone. -->
->>>>>>> claude/fc-mobile-barcode-z130j8
 
 <div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-8 hidden">
 
-<<<<<<< HEAD
-  <!-- Small tool buttons -->
-  <div class="flex flex-wrap items-center justify-center gap-3 mb-7">
-    <a class="tool-btn" data-page="seeds"       href="nursery_ops_seeds.html">🌰 Seeds Management</a>
-    <a class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html">🌱 Life of Plot</a>
-    <a class="tool-btn" data-page="maintenance" href="nursery_ops_maintenance.html">🛠️ Work Maintenance</a>
-    <a class="tool-btn" data-page="motion"      href="nursery_ops_settings.html">⏱️ Motion Study Settings</a>
-    <a class="tool-btn" data-page="palms_board"  href="nursery_ops_palms_board.html">🪴 PALMS Board</a>
-    <a class="tool-btn" data-page="palms_motion" href="nursery_ops_palms_motion.html">⏱️ PALMS Motion Study</a>
-    <!-- Shown only to users who may change other people's access. -->
-    <a class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html">🔐 User Access</a>
-  </div>
-
-=======
->>>>>>> claude/fc-mobile-barcode-z130j8
   <!-- Nelos To-Do: cases raised against nursery operations that are still
        open. shared_nelos.js removes the strip if Nelos is unreachable or
        nothing is pending, so the chalkboard below is never pushed down for
@@ -160,6 +136,8 @@
     <a draggable="false" class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html"><span class="ti">🌱</span><span class="tl">Life of Plot</span></a>
     <a draggable="false" class="tool-btn" data-page="maintenance" href="nursery_ops_maintenance.html"><span class="ti">🛠️</span><span class="tl">Work Maintenance</span></a>
     <a draggable="false" class="tool-btn" data-page="motion"      href="nursery_ops_settings.html"><span class="ti">⏱️</span><span class="tl">Motion Study Settings</span></a>
+    <a draggable="false" class="tool-btn" data-page="palms_board"  href="nursery_ops_palms_board.html"><span class="ti">🪴</span><span class="tl">PALMS Board</span></a>
+    <a draggable="false" class="tool-btn" data-page="palms_motion" href="nursery_ops_palms_motion.html"><span class="ti">⏱️</span><span class="tl">PALMS Motion Study</span></a>
     <!-- Shown only to users who may change other people's access. -->
     <a draggable="false" class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html"><span class="ti">🔐</span><span class="tl">User Access</span></a>
   </div>
@@ -346,10 +324,7 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
       return;
     }
     const u = MJMAccess.user();
-<<<<<<< HEAD
-=======
     // The ribbon greets the user by name, so nothing to fill here now.
->>>>>>> claude/fc-mobile-barcode-z130j8
     // Per-page access, set on this module's own User Access. A page the user
     // may not open should not be offered to them.
     // Fails OPEN if shared_access.js is an older cached copy without these
