@@ -164,6 +164,22 @@ UPDATE nelos_handlers h SET seat_no = numbered.n
 -- ────────────────────────────────────────────────────────────────
 -- PART 4: Routing, by number
 -- ────────────────────────────────────────────────────────────────
+-- ── Superseded by migration_nelos_hq.sql ────────────────────────
+-- That file widens nelos_my_scope() with a sees_all column for HQ systems.
+-- Re-running THIS file afterwards would drop the wider function and put the
+-- narrower one back, silently switching HQ off — so when
+-- nelos_modules.sees_all_cases exists, the later migration owns these
+-- objects and this block stands down.
+DO $guard$
+BEGIN
+IF EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='nelos_modules'
+              AND column_name='sees_all_cases') THEN
+  RAISE NOTICE 'sees_all_cases present — migration_nelos_hq.sql owns nelos_my_scope(); leaving it as it is.';
+  RETURN;
+END IF;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_route_case()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -192,19 +208,28 @@ BEGIN
   END IF;
 
   RETURN NEW;
-END $$;
+END $$
+$fn$;
 
-DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases;
+EXECUTE $fn$
+DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases
+$fn$;
+
+EXECUTE $fn$
 CREATE TRIGGER nelos_cases_route
   BEFORE INSERT ON nelos_cases
-  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case();
+  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case()
+$fn$;
 
--- ────────────────────────────────────────────────────────────────
--- PART 5: Scope, by number
--- ────────────────────────────────────────────────────────────────
-DROP FUNCTION IF EXISTS public.nelos_my_scope();
-DROP FUNCTION IF EXISTS public.nelos_people();
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_my_scope()
+$fn$;
 
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_people()
+$fn$;
+
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_my_scope()
 RETURNS TABLE (primary_module TEXT, seat_no INT, categories TEXT[], is_admin BOOLEAN)
 LANGUAGE sql
@@ -219,10 +244,14 @@ AS $$
     FROM public.shared_profiles p
     LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
    WHERE p.id = auth.uid()
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated
+$fn$;
 
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_people()
 RETURNS TABLE (
   id             UUID,
@@ -255,9 +284,13 @@ AS $$
                OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
      )
    ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated
+$fn$;
+END $guard$;
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 6: Check it landed

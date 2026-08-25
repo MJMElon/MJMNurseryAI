@@ -58,8 +58,9 @@
    person is pinned on nelos/nelos_user_setting.html to a home system and
    numbered inside it, and sees that system's queue plus anything assigned
    to them personally, minus anything routed to a different number.
-   Not pinned means no restriction, and a Nelos admin always sees
-   everything. Re-implemented here rather than imported for the same
+   Not tagged means no restriction, a Nelos admin always sees everything,
+   and so does anyone tagged to an HQ system (nelos_modules.sees_all_cases
+   — Nursery Operation by default). Re-implemented here rather than imported for the same
    reason as the query above; shared_nelos.js scope() is the authority on
    the rule, so keep the two in step.
 
@@ -313,7 +314,8 @@
       var row = Array.isArray(rows) ? rows[0] : rows;
       if (!row) return (_scope = open);
       if (row.is_admin) return (_scope = open);
-      if (!row.primary_module) return (_scope = open);     // not pinned yet
+      if (row.sees_all) return (_scope = open);            // HQ system
+      if (!row.primary_module) return (_scope = open);     // not tagged yet
 
       var list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
       var cats = null;

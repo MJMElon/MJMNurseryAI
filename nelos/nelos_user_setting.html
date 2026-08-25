@@ -45,6 +45,10 @@
               margin:20px 2px 8px; padding-bottom:6px; border-bottom:2px solid #ede9fe; }
   .grp-head:first-child { margin-top:2px; }
   .grp-title { font-size:12.5px; font-weight:900; color:#4c1d95; letter-spacing:.02em; }
+  .hq-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+            padding:2px 8px; border-radius:999px; background:#dcfce7; color:#15803d; }
+  .sw-hq { margin-left:0; color:#15803d; }
+  .sw-hq input { accent-color:#16a34a; }
   .grp-n { margin-left:auto; font-size:9.5px; font-weight:900; letter-spacing:.07em;
            padding:2px 9px; border-radius:999px; background:#ede9fe; color:#6d28d9; }
   .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:6px 4px 10px; }
@@ -291,7 +295,7 @@ function panelHtml(p) {
         ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
       </select>
 
-      <label class="lbl">Number</label>
+      <label class="lbl">Person in charge #</label>
       <div class="seat-list" id="rl-${esc(p.id)}">${seatRows(p)}</div>
 
       <div class="flex gap-2 mt-4">
@@ -315,6 +319,9 @@ function renderPeople() {
   const groups = modules.map(m => ({
     key: m.key,
     title: `${m.icon || '📦'} ${m.label}`,
+    // An HQ system's people oversee everything, so say so where the tag is
+    // set rather than only on the routing page.
+    hq: !!m.sees_all_cases,
     rows: peopleIn(m.key)
   }));
 
@@ -330,6 +337,7 @@ function renderPeople() {
   $('people').innerHTML = groups.map(g => `
     <div class="grp-head">
       <span class="grp-title">${esc(g.title)}</span>
+      ${g.hq ? '<span class="hq-tag">HQ · sees every case</span>' : ''}
       <span class="grp-n">${g.rows.length}</span>
     </div>
     ${g.rows.length ? g.rows.map(personHtml).join('')
@@ -480,6 +488,10 @@ function renderRouting() {
           <input type="checkbox" class="r-create" data-mod="${esc(m.key)}" ${m.can_create ? 'checked' : ''}>
           Can raise cases
         </label>
+        <label class="sw sw-hq" title="Its people oversee every queue instead of working one">
+          <input type="checkbox" class="r-hq" data-mod="${esc(m.key)}" ${m.sees_all_cases ? 'checked' : ''}>
+          HQ — sees every case
+        </label>
       </div>`;
 
     categories.forEach(cat => {
@@ -509,6 +521,9 @@ function renderRouting() {
 
   $('routing').querySelectorAll('.r-create').forEach(el =>
     el.addEventListener('change', e => saveModule(el.dataset.mod, { can_create: e.target.checked })));
+
+  $('routing').querySelectorAll('.r-hq').forEach(el =>
+    el.addEventListener('change', e => saveModule(el.dataset.mod, { sees_all_cases: e.target.checked })));
 
   $('routing').querySelectorAll('.solve').forEach(cell => {
     const mod = cell.dataset.rule;

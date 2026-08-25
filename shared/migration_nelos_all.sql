@@ -1,38 +1,41 @@
 -- ============================================================================
 -- MJM AI POWERED SYSTEM — migration_nelos_all.sql
 --
--- ALL FIVE NELOS MIGRATIONS, IN ORDER, IN ONE PASTE.
+-- EVERY NELOS MIGRATION, IN ORDER, IN ONE PASTE.
 --
 -- Run THIS in the Supabase SQL Editor and ordering stops being something
--- you have to get right. It is the five files below concatenated, nothing
--- added and nothing removed:
+-- you have to get right. It is the files below concatenated, nothing added
+-- and nothing removed:
 --
 --   1. migration_nelos.sql          cases, comments, categories
 --   2. migration_nelos_modules.sql  the linked systems
 --   3. migration_nelos_routing.sql  handlers, queues
 --   4. migration_nelos_roles.sql    per-category routing rules
 --   5. migration_nelos_seats.sql    handler numbers (Admin 1, Auditor 2…)
+--   6. migration_nelos_hq.sql       HQ systems that see every case
+--   7. migration_nelos_rls.sql      lock the tables down
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
 -- already set up on the User Setting page is overwritten.
 --
--- Each part also still works on its own, and now refuses with a readable
+-- Each part also still works on its own, and refuses with a readable
 -- message if run before something it needs.
 --
--- KEEPING THIS IN STEP: this file is a concatenation. Edit one of the five
+-- KEEPING THIS IN STEP: this file is a concatenation. Edit one of the parts
 -- and rebuild it rather than editing here, or the two will drift:
 --
 --   cd shared && { for f in migration_nelos.sql migration_nelos_modules.sql \
 --       migration_nelos_routing.sql migration_nelos_roles.sql \
---       migration_nelos_seats.sql; do echo; echo "-- >>> $f"; cat "$f"; done; }
+--       migration_nelos_seats.sql migration_nelos_hq.sql \
+--       migration_nelos_rls.sql; do echo; echo "-- >>> $f"; cat "$f"; done; }
 --
 -- ============================================================================
 
 
 
 -- ############################################################################
--- ##  PART 1 of 5 — migration_nelos.sql
+-- ##  PART 1 of 7 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -365,7 +368,7 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 
 
 -- ############################################################################
--- ##  PART 2 of 5 — migration_nelos_modules.sql
+-- ##  PART 2 of 7 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -669,7 +672,7 @@ SELECT m.key, m.label, count(mm.id) AS members
 
 
 -- ############################################################################
--- ##  PART 3 of 5 — migration_nelos_routing.sql
+-- ##  PART 3 of 7 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -989,7 +992,7 @@ SELECT m.key,
 
 
 -- ############################################################################
--- ##  PART 4 of 5 — migration_nelos_roles.sql
+-- ##  PART 4 of 7 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1339,7 +1342,7 @@ SELECT r.source_module AS raised_in,
 
 
 -- ############################################################################
--- ##  PART 5 of 5 — migration_nelos_seats.sql
+-- ##  PART 5 of 7 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1508,6 +1511,22 @@ UPDATE nelos_handlers h SET seat_no = numbered.n
 -- ────────────────────────────────────────────────────────────────
 -- PART 4: Routing, by number
 -- ────────────────────────────────────────────────────────────────
+-- ── Superseded by migration_nelos_hq.sql ────────────────────────
+-- That file widens nelos_my_scope() with a sees_all column for HQ systems.
+-- Re-running THIS file afterwards would drop the wider function and put the
+-- narrower one back, silently switching HQ off — so when
+-- nelos_modules.sees_all_cases exists, the later migration owns these
+-- objects and this block stands down.
+DO $guard$
+BEGIN
+IF EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='nelos_modules'
+              AND column_name='sees_all_cases') THEN
+  RAISE NOTICE 'sees_all_cases present — migration_nelos_hq.sql owns nelos_my_scope(); leaving it as it is.';
+  RETURN;
+END IF;
+
+EXECUTE $fn$
 CREATE OR REPLACE FUNCTION public.nelos_route_case()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1536,19 +1555,28 @@ BEGIN
   END IF;
 
   RETURN NEW;
-END $$;
+END $$
+$fn$;
 
-DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases;
+EXECUTE $fn$
+DROP TRIGGER IF EXISTS nelos_cases_route ON nelos_cases
+$fn$;
+
+EXECUTE $fn$
 CREATE TRIGGER nelos_cases_route
   BEFORE INSERT ON nelos_cases
-  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case();
+  FOR EACH ROW EXECUTE FUNCTION public.nelos_route_case()
+$fn$;
 
--- ────────────────────────────────────────────────────────────────
--- PART 5: Scope, by number
--- ────────────────────────────────────────────────────────────────
-DROP FUNCTION IF EXISTS public.nelos_my_scope();
-DROP FUNCTION IF EXISTS public.nelos_people();
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_my_scope()
+$fn$;
 
+EXECUTE $fn$
+DROP FUNCTION IF EXISTS public.nelos_people()
+$fn$;
+
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_my_scope()
 RETURNS TABLE (primary_module TEXT, seat_no INT, categories TEXT[], is_admin BOOLEAN)
 LANGUAGE sql
@@ -1563,10 +1591,14 @@ AS $$
     FROM public.shared_profiles p
     LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
    WHERE p.id = auth.uid()
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated
+$fn$;
 
+EXECUTE $fn$
 CREATE FUNCTION public.nelos_people()
 RETURNS TABLE (
   id             UUID,
@@ -1599,9 +1631,13 @@ AS $$
                OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
      )
    ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
-$$;
+$$
+$fn$;
 
-GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated;
+EXECUTE $fn$
+GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated
+$fn$;
+END $guard$;
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 6: Check it landed
@@ -1621,3 +1657,286 @@ SELECT m.label AS system,
 --   then re-run migration_nelos_roles.sql to restore its trigger and the
 --   role-shaped functions. nelos_roles and every *_role_id column were
 --   never cleared, so the old behaviour comes back with them.
+
+
+-- ############################################################################
+-- ##  PART 6 of 7 — migration_nelos_hq.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_hq.sql
+--
+-- NELOS — a system whose people see every case (HQ).
+--
+-- Nursery Operation is HQ: the people tagged there are not working one
+-- queue, they are overseeing all of them. They need to see every case
+-- raised anywhere, whichever system it was routed to.
+--
+-- That is a property of the SYSTEM, not of each person, so it is a flag on
+-- nelos_modules rather than something to set on every handler. Any system
+-- can be made HQ — the flag is a toggle on the Case Routing page, and more
+-- than one may carry it.
+--
+-- WHAT IT CHANGES
+--   Somebody tagged to an HQ system sees every case, exactly as an unpinned
+--   person or a Nelos admin does. Everyone else is unaffected: their home
+--   queue, plus anything with their name on it, minus anything routed to a
+--   different number.
+--
+--   Routing is untouched. An HQ system can still be a routing destination
+--   and still has its own queue; the flag only widens what its people SEE.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run: every statement is guarded.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_modules') IS NULL
+     OR to_regclass('public.nelos_handlers') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: The flag
+-- ────────────────────────────────────────────────────────────────
+ALTER TABLE nelos_modules
+  ADD COLUMN IF NOT EXISTS sees_all_cases BOOLEAN NOT NULL DEFAULT false;
+
+-- Nursery Operation is HQ. Applied once: a later UPDATE to false on the
+-- Case Routing page must survive a re-run of this file, so this only fires
+-- while no system carries the flag at all.
+UPDATE nelos_modules SET sees_all_cases = true
+ WHERE key = 'nursery_ops'
+   AND NOT EXISTS (SELECT 1 FROM nelos_modules WHERE sees_all_cases);
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: Scope carries it
+--
+-- The column is added to nelos_my_scope so the app asks one question and
+-- gets the whole answer. CREATE OR REPLACE cannot widen a return type, so
+-- the function is dropped first.
+-- ────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.nelos_my_scope();
+
+CREATE FUNCTION public.nelos_my_scope()
+RETURNS TABLE (primary_module TEXT, seat_no INT, categories TEXT[],
+               is_admin BOOLEAN, sees_all BOOLEAN)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT h.primary_module,
+         h.seat_no,
+         h.categories,
+         COALESCE(p.permissions->'modules'->>'nelos', 'none') = 'admin',
+         COALESCE(m.sees_all_cases, false)
+    FROM public.shared_profiles p
+    LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
+    LEFT JOIN public.nelos_modules  m ON m.key = h.primary_module
+   WHERE p.id = auth.uid()
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 3: Check it landed
+-- ────────────────────────────────────────────────────────────────
+SELECT label AS system,
+       CASE WHEN sees_all_cases THEN 'HQ — sees every case'
+            ELSE 'sees its own queue' END AS visibility,
+       (SELECT count(*) FROM nelos_handlers h WHERE h.primary_module = m.key) AS people
+  FROM nelos_modules m
+ ORDER BY sort_order;
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   ALTER TABLE nelos_modules DROP COLUMN IF EXISTS sees_all_cases;
+--   then re-run migration_nelos_seats.sql to restore the four-column
+--   nelos_my_scope().
+
+
+-- ############################################################################
+-- ##  PART 7 of 7 — migration_nelos_rls.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_rls.sql
+--
+-- NELOS — close the row-level security holes.
+--
+-- WHY THIS EXISTS
+--
+-- Every nelos_* table shipped with the same two policies:
+--
+--     FOR SELECT TO authenticated USING (true)
+--     FOR ALL    TO authenticated USING (true) WITH CHECK (true)
+--
+-- "authenticated" means ANY signed-in account, not any account with Nelos.
+-- So today a Salesweb customer, an FC with only the scan module, anybody
+-- who can log in at all, can open devtools and:
+--
+--   • read every case in the company, including ones deliberately scoped
+--     away from them on the User Setting page,
+--   • rewrite nelos_routes so every new case is routed to themselves,
+--   • delete nelos_cases rows outright.
+--
+-- The app never offers any of that, which is exactly the point: the UI is
+-- not a security boundary. The anon key is public by design and sits in
+-- shared/shared_supabase.js, so anybody can call PostgREST directly.
+-- RLS is the only thing standing between a signed-in account and the data,
+-- and USING (true) is not standing anywhere.
+--
+-- WHAT THIS CHANGES
+--
+--   Config tables — nelos_modules, nelos_routes, nelos_roles,
+--   nelos_categories, nelos_handlers:
+--       read   any account holding Nelos
+--       write  Nelos admins and portal user-managers only
+--   These decide who sees what. A normal handler had no business
+--   rewriting them and the app never asked to.
+--
+--   Work tables — nelos_cases, nelos_case_comments:
+--       read   any account holding Nelos
+--       write  any account holding Nelos      (raising, commenting,
+--              claiming and resolving are everyone's job)
+--       delete Nelos admins only              (a case is a record; the
+--              way to retire one is to close it)
+--
+-- Reading is still deliberately not narrowed to a person's own scope. The
+-- To-Do lists filter in the app, and pushing that into a policy would mean
+-- a case moving queue could vanish from the raiser's own screen. What
+-- matters here is that somebody with no Nelos at all now gets nothing.
+--
+-- Requires the nelos tables to exist — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run: policies are dropped and recreated by name.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_cases') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: Two questions every policy asks
+--
+-- SECURITY DEFINER so the policy can read shared_profiles without the
+-- caller needing to, and without recursing into that table's own policies.
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.nelos_has_access()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT COALESCE(p.permissions->'modules'->>'nelos', 'none') <> 'none'
+       FROM public.shared_profiles p WHERE p.id = auth.uid()),
+    false)
+$$;
+
+CREATE OR REPLACE FUNCTION public.nelos_is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT COALESCE(p.permissions->'modules'->>'nelos', 'none') = 'admin'
+         OR COALESCE((p.permissions->>'manage_users')::boolean, false)
+       FROM public.shared_profiles p WHERE p.id = auth.uid()),
+    false)
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_has_access() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.nelos_is_admin()  TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: Replace the open policies
+-- ────────────────────────────────────────────────────────────────
+DO $$
+DECLARE
+  cfg  TEXT[] := ARRAY['nelos_modules','nelos_routes','nelos_roles',
+                       'nelos_categories','nelos_handlers','nelos_module_members'];
+  work TEXT[] := ARRAY['nelos_cases','nelos_case_comments'];
+  t    TEXT;
+  pol  RECORD;
+BEGIN
+  FOREACH t IN ARRAY cfg || work LOOP
+    IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
+
+    -- Drop whatever is there by name, including the old open pair, so this
+    -- is re-runnable and leaves exactly one set behind.
+    FOR pol IN SELECT policyname FROM pg_policies
+                WHERE schemaname = 'public' AND tablename = t
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, t);
+    END LOOP;
+
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+
+    -- Everyone holding Nelos may read.
+    EXECUTE format($p$
+      CREATE POLICY "nelos read" ON public.%I
+        FOR SELECT TO authenticated
+        USING (public.nelos_has_access())$p$, t);
+
+    IF t = ANY(cfg) THEN
+      -- Settings: admins only.
+      EXECUTE format($p$
+        CREATE POLICY "nelos admin write" ON public.%I
+          FOR ALL TO authenticated
+          USING (public.nelos_is_admin())
+          WITH CHECK (public.nelos_is_admin())$p$, t);
+    ELSE
+      -- Casework: anybody with Nelos may add and change; only an admin
+      -- may delete, so a case cannot be made to disappear.
+      EXECUTE format($p$
+        CREATE POLICY "nelos insert" ON public.%I
+          FOR INSERT TO authenticated
+          WITH CHECK (public.nelos_has_access())$p$, t);
+      EXECUTE format($p$
+        CREATE POLICY "nelos update" ON public.%I
+          FOR UPDATE TO authenticated
+          USING (public.nelos_has_access())
+          WITH CHECK (public.nelos_has_access())$p$, t);
+      EXECUTE format($p$
+        CREATE POLICY "nelos delete" ON public.%I
+          FOR DELETE TO authenticated
+          USING (public.nelos_is_admin())$p$, t);
+    END IF;
+
+    RAISE NOTICE 'Locked down %', t;
+  END LOOP;
+END $$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 3: Check it landed
+-- ────────────────────────────────────────────────────────────────
+SELECT tablename,
+       string_agg(policyname || ' (' || cmd || ')', ', ' ORDER BY policyname) AS policies
+  FROM pg_policies
+ WHERE schemaname = 'public' AND tablename LIKE 'nelos%'
+ GROUP BY tablename
+ ORDER BY tablename;
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   Re-running migration_nelos_all.sql does NOT restore the old open
+--   policies, because its CREATE POLICY blocks are guarded on the policy
+--   name and these are named differently. To go back, drop the policies
+--   created above and recreate the pair by hand:
+--     CREATE POLICY "Authenticated read <x>"  ON <t> FOR SELECT TO authenticated USING (true);
+--     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);

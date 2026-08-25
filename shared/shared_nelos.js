@@ -121,6 +121,9 @@
          with your name on it is never hidden by that narrowing — somebody
          has already decided it is yours.
 
+       • tagged to an HQ system → sees everything. Nursery Operation is
+         HQ: its people oversee every queue rather than working one. The
+         flag is nelos_modules.sees_all_cases, so any system can be HQ.
        • not pinned yet → sees everything. Somebody who has just been
          granted Nelos must not find an empty screen.
        • Nelos admin    → sees everything regardless, so an admin cannot
@@ -163,7 +166,8 @@
       const row = (data && data[0]) || null;
       if (error || !row) return (_scope = open);
       if (row.is_admin) return (_scope = open);
-      if (!row.primary_module) return (_scope = open);   // not pinned yet
+      if (row.sees_all) return (_scope = open);          // HQ system
+      if (!row.primary_module) return (_scope = open);   // not tagged yet
 
       const list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
       return (_scope = {
