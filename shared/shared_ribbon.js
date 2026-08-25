@@ -88,9 +88,24 @@
         '</div>'
       : '';
 
+    /* With a centred mark the bar becomes a three-column grid with equal
+       flexible columns either side, so the mark lands on the bar's real
+       centre line rather than the middle of whatever space the buttons
+       leave over. Flex could not do it here: the button group is
+       flex-shrink:0 and the left spacer is min-width:0, so on a phone the
+       left side gave way, the right side did not, and the "centred" slot
+       ended up ~90px left. The phone app's own TopNav centres its wordmark
+       the same way — same portal, same bar, same method.
+
+       Only when there IS a centred mark. Every other page keeps the
+       original two-ended flex bar untouched. */
+    var barLayout = centre
+      ? 'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;'
+      : 'display:flex;justify-content:space-between;align-items:center;';
+
     return '' +
     '<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
-              'display:flex;justify-content:space-between;align-items:center;position:sticky;' +
+              barLayout + 'position:sticky;' +
               'top:0;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.06);' +
               'font-family:Outfit,system-ui,-apple-system,sans-serif;">' +
       left + middle +
@@ -141,12 +156,30 @@
     _fillWelcome();
   }
 
-  // ── Welcome text — best-effort read from Supabase session.
-  //    Pages load shared_supabase.js at different points in the body
-  //    (audit_home.html, for instance, loads it after this script), so
-  //    poll for it briefly before giving up. ─────────────────────
+  // ── Welcome text ───────────────────────────────────────────────
+  //    The name every module writes to localStorage at sign-in comes
+  //    first: it is the profile's own full_name, it is there before any
+  //    network call, and it is what the module pages used to print in
+  //    their own sub-headers. The Supabase session is the fallback, and
+  //    is polled for a few seconds because pages load shared_supabase.js
+  //    at different points in the body (audit_home.html loads it after
+  //    this script).
+  function _say(name) {
+    var el = document.getElementById('welcome-text');
+    if (el && name) { el.innerText = 'Welcome, ' + name; return true; }
+    return false;
+  }
+
   async function _fillWelcome(retries) {
     if (retries === undefined) retries = 20;   // ~4 s of grace
+    try {
+      var u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+      // First two words at most: a five-word name would push the buttons
+      // off the row on a phone.
+      var stored = String(u.full_name || u.name || '').split(' ').slice(0, 2).join(' ');
+      if (_say(stored)) return;
+    } catch (_) { /* fall through to the session */ }
+
     if (!window._supabase) {
       if (retries > 0) return setTimeout(function () { _fillWelcome(retries - 1); }, 200);
       return;
@@ -158,8 +191,7 @@
       var name = (sess.user && sess.user.user_metadata && sess.user.user_metadata.full_name)
               || (sess.user && sess.user.email)
               || '';
-      var el = document.getElementById('welcome-text');
-      if (el && name) el.innerText = 'Welcome, ' + name;
+      _say(String(name).split(' ').slice(0, 2).join(' '));
     } catch (_) { /* silent */ }
   }
 

@@ -10,18 +10,21 @@
 
 ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS pin TEXT;
 
--- 4 to 6 digits, or nothing at all. Text, not a number: a PIN of 0412 has
--- to keep its leading zero.
+-- Digits, any number of them, or nothing at all. Text, not a number: a PIN
+-- of 0412 has to keep its leading zero.
+--
+-- This used to be capped at 4 to 6 digits. A database already carrying that
+-- older constraint is loosened by shared/relax_npayroll_worker_pin.sql.
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
      WHERE conrelid = 'mjmnpayroll_workers'::regclass
-       AND conname  = 'mjmnpayroll_workers_pin_format'
+       AND conname  = 'mjmnpayroll_workers_pin_digits'
   ) THEN
     ALTER TABLE mjmnpayroll_workers
-      ADD CONSTRAINT mjmnpayroll_workers_pin_format
-      CHECK (pin IS NULL OR pin ~ '^[0-9]{4,6}$');
+      ADD CONSTRAINT mjmnpayroll_workers_pin_digits
+      CHECK (pin IS NULL OR pin ~ '^[0-9]+$');
   END IF;
 END $$;
 
