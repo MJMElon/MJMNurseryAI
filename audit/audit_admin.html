@@ -366,11 +366,16 @@
       <div class="fcr-brand-sub"><span data-t="auditor_portal">Auditor Portal</span> Manage</div>
     </div>
     <div class="fcr-right">
+      <!-- Welcome first, then the way out: the same order FC Manage's bar
+           runs in, and the same order the other two auditor pages already
+           had. Portal was sitting ahead of the name here, which put the
+           only difference between the two bars in the one place a reader
+           checks first. -->
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
       <a class="fcr-portal" href="../index.html" aria-label="Back to portal" title="Back to portal">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         <span class="fcr-portal-label">Portal</span>
       </a>
-      <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
       <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
         <span class="fcr-globe" aria-hidden="true">🌐</span>
         <span id="lang-toggle-label">BM</span>
