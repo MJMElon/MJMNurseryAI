@@ -56,7 +56,7 @@
             padding:3px 10px; border-radius:999px; }
 
   /* Five columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 152px 1fr 142px; gap:13px; }
+  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 158px 1fr 142px; gap:14px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
   .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
@@ -98,8 +98,6 @@
   .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#0f172a;
              font-variant-numeric:tabular-nums; }
   .case-title { font-size:14px; font-weight:800; color:#0f172a; line-height:1.35; }
-  .case-cat { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-              color:#0f172a; margin-top:2px; }
 
   /* The detail lines, one per row: a label on the left and its value on the
      right, so figures line up down the column instead of running together
@@ -238,9 +236,9 @@
 <script src="../shared/shared_ribbon.js"></script>
 
 
-<div id="loading" class="max-w-[1240px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+<div id="loading" class="max-w-[1426px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1426px] mx-auto px-4 md:px-6 py-7 hidden">
 
   <!-- New Case is the one thing done from here often, so it leads on the
        right where the eye ends up, with the setting cog beside it. -->
@@ -466,6 +464,42 @@ function fmtDate(d) {
    to where it was raised. */
 const queueOf = c => c.assigned_module || c.source_module;
 
+/* The short name for a system in a narrow column — Auditor, FC, Admin, HQ —
+   rather than "Seedling Stock System", which does not fit, or the raw key
+   ("fc_portal"), which reads like a database.
+
+   It comes from nelos_modules.tier_label (migration_nelos_tier.sql). The
+   fallback below is the same rule the migration seeds with, so the column
+   reads properly on a database that has not run it yet, and matches on the
+   key OR the label because the keys have been renamed once already. */
+const TIER_BY_WORD = [
+  ['audit',  'Auditor'], ['scan',  'FC'],    ['fc',      'FC'],
+  ['mobile', 'Admin'],   ['admin', 'Admin'],
+  ['operation', 'HQ'],   ['stock', 'HQ'],    ['ops',     'HQ'], ['nursery', 'HQ']
+];
+
+function tierOf(key) {
+  if (!key) return '';
+  const m = modules.find(x => x.key === key);
+  if (m && m.tier_label) return m.tier_label;
+
+  const hay = ((key || '') + ' ' + ((m && m.label) || '')).toLowerCase();
+  const hit = TIER_BY_WORD.find(([word]) => hay.includes(word));
+  if (hit) return hit[1];
+  // Nothing matched: the label's first word beats printing a key.
+  return (m && m.label) ? m.label.split(' ')[0] : key;
+}
+
+/* Somebody's name with the tier they work at after it — "Coco (HQ)". The
+   tier comes from their handler row; without one there is nothing to add,
+   so the name stands alone. */
+function withTier(name, userId) {
+  if (!name) return '';
+  const h = userId && handlers.find(x => x.user_id === userId);
+  const tier = h && tierOf(h.primary_module);
+  return tier ? `${name} (${tier})` : name;
+}
+
 
 /* The lines under a case's title, one per row. The three place columns come
    first, then whatever the description holds.
@@ -531,8 +565,8 @@ function rowHtml(c) {
     : '';
 
   const queue = queueOf(c);
-  const raisedIn = MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '';
-  const queueIn  = MJMNelos.SOURCE_LABEL[queue] || queue || '';
+  const raisedIn = tierOf(c.source_module);
+  const queueIn  = tierOf(queue);
 
   const when = new Date(c.created_at);
   const rows = detailRows(c);
@@ -569,7 +603,7 @@ function rowHtml(c) {
           ? esc(c.assignee_name)
           : '<span class="pic-none">no PIC yet</span>'}</span>
         <span class="by-line">Created by
-          <b>${c.raised_by ? esc(c.raised_by) : 'unknown'}</b></span>
+          <b>${c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b></span>
         ${queue !== c.source_module ? `<span class="by-line">Raised in ${esc(raisedIn)}</span>` : ''}
       </div>
 
@@ -577,7 +611,9 @@ function rowHtml(c) {
         ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
         <div class="min-w-0 flex-1">
           <div class="case-title">${esc(c.title)}</div>
-          ${c.category ? `<div class="case-cat">${esc(c.category)}</div>` : ''}
+          <!-- No category line: the problem chosen when the case is raised
+               becomes both its title and its category, so printing the
+               category here was printing the title twice. -->
           <div class="d-rows">
             ${shown.map(([lab, val]) => lab
               ? `<div class="d-row"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`

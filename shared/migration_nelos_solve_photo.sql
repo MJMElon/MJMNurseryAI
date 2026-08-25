@@ -40,10 +40,22 @@ SELECT 'nelos_cases.resolution_photo_url' AS what,
             AND table_name   = 'nelos_cases'
             AND column_name  = 'resolution_photo_url'
        ) AS ok
-UNION ALL
+;
+
 -- The bucket is case_tools' job; this only reports whether it is there,
 -- because the solve photo has nowhere to go without it.
-SELECT 'nelos-photos bucket',
-       CASE WHEN to_regclass('storage.buckets') IS NULL THEN false
-            ELSE EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'nelos-photos')
-       END;
+--
+-- It has to ask through EXECUTE. A plain SELECT cannot: storage.buckets is
+-- resolved when the statement is PARSED, so a to_regclass guard around it
+-- never gets the chance to run and the whole file aborts on a database with
+-- no storage schema — which is where this gets tested, and which took the
+-- parts after this one down with it.
+DO $bucket$
+DECLARE present BOOLEAN := false;
+BEGIN
+  IF to_regclass('storage.buckets') IS NOT NULL THEN
+    EXECUTE $q$ SELECT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'nelos-photos') $q$
+      INTO present;
+  END IF;
+  RAISE NOTICE 'nelos-photos bucket present: %', present;
+END $bucket$;
