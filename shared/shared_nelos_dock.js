@@ -334,14 +334,23 @@
       if (!row) return (_scope = open);
       if (row.is_admin) return (_scope = open);
       if (row.sees_all) return (_scope = open);            // HQ system
-      if (!row.primary_module) return (_scope = open);     // not tagged yet
+
+      // Kept in step with shared_nelos.js: never set up at all still sees
+      // everything, but once there IS a handler row it governs, empty or
+      // not. row.has_row arrives with migration_nelos_access.sql.
+      if (row.has_row === false || (row.has_row === undefined && !row.primary_module)) {
+        return (_scope = open);
+      }
 
       var list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
       var cats = null;
       if (list.length) { cats = {}; list.forEach(function (c) { cats[c] = true; }); }
+      // access_modules is deliberately NOT read here. A ticked system says
+      // somebody may WORK in that queue; it does not hand them its cases.
+      // The dock is one person's to-do list — see isMine() below.
       return (_scope = {
         unrestricted: false,
-        home: row.primary_module,
+        home: row.primary_module || null,
         seatNo: (row.seat_no === undefined ? null : row.seat_no),
         cats: cats,
         userId: u.id
@@ -374,7 +383,7 @@
     var uid = sc && sc.userId;
     if (c.assignee_id) return !!uid && String(c.assignee_id) === String(uid);
     if (!sc || sc.unrestricted) return false;
-    if (queueOf(c) !== sc.home) return false;
+    if (!sc.home || queueOf(c) !== sc.home) return false;
     if (c.assigned_seat_no != null && c.assigned_seat_no !== sc.seatNo) return false;
     if (!sc.cats) return true;
     return !!c.category && !!sc.cats[c.category];

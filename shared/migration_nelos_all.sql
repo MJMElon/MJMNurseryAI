@@ -20,6 +20,9 @@
 --  11. migration_nelos_close_right.sql  may_create / may_close rights
 --  12. migration_nelos_solve_photo.sql  the photo of the fix
 --  13. migration_nelos_tier.sql   short system names for the list
+--  14. migration_nelos_access.sql which systems a person may use Nelos in
+--  15. migration_nelos_automation.sql  work that repeats, raised on schedule
+--  16. migration_nelos_directory_staff.sql  the search finds staff, not customers
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -39,7 +42,7 @@
 -- ============================================================================
 
 -- ############################################################################
--- ##  PART 1 of 13 — migration_nelos.sql
+-- ##  PART 1 of 16 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -381,7 +384,7 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 -- Batch Detail's insert target is all that is needed to go back.
 
 -- ############################################################################
--- ##  PART 2 of 13 — migration_nelos_modules.sql
+-- ##  PART 2 of 16 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -684,7 +687,7 @@ SELECT m.key, m.label, count(mm.id) AS members
 --   DROP TABLE IF EXISTS nelos_module_members, nelos_modules;
 
 -- ############################################################################
--- ##  PART 3 of 13 — migration_nelos_routing.sql
+-- ##  PART 3 of 16 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1003,7 +1006,7 @@ SELECT m.key,
 -- nelos_module_members is untouched, so the old page would work again.
 
 -- ############################################################################
--- ##  PART 4 of 13 — migration_nelos_roles.sql
+-- ##  PART 4 of 16 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1352,7 +1355,7 @@ SELECT r.source_module AS raised_in,
 --   was never cleared, so the old section routing comes back with it.
 
 -- ############################################################################
--- ##  PART 5 of 13 — migration_nelos_seats.sql
+-- ##  PART 5 of 16 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1669,7 +1672,7 @@ SELECT m.label AS system,
 --   never cleared, so the old behaviour comes back with them.
 
 -- ############################################################################
--- ##  PART 6 of 13 — migration_nelos_hq.sql
+-- ##  PART 6 of 16 — migration_nelos_hq.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1771,7 +1774,7 @@ SELECT label AS system,
 --   nelos_my_scope().
 
 -- ############################################################################
--- ##  PART 7 of 13 — migration_nelos_category_system.sql
+-- ##  PART 7 of 16 — migration_nelos_category_system.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1866,7 +1869,7 @@ SELECT m.label AS system,
 --   ALTER TABLE nelos_categories ADD CONSTRAINT nelos_categories_name_key UNIQUE (name);
 
 -- ############################################################################
--- ##  PART 8 of 13 — migration_nelos_rls.sql
+-- ##  PART 8 of 16 — migration_nelos_rls.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2046,7 +2049,7 @@ SELECT tablename,
 --     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);
 
 -- ############################################################################
--- ##  PART 9 of 13 — migration_nelos_grant.sql
+-- ##  PART 9 of 16 — migration_nelos_grant.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2152,7 +2155,7 @@ SELECT p.proname, pg_get_function_result(p.oid) AS returns
 --   DROP FUNCTION IF EXISTS public.nelos_grant_access(UUID);
 
 -- ############################################################################
--- ##  PART 10 of 13 — migration_nelos_case_tools.sql
+-- ##  PART 10 of 16 — migration_nelos_case_tools.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2422,7 +2425,7 @@ SELECT policyname, cmd FROM pg_policies
 --   …then re-run migration_nelos_rls.sql to put the old case policies back.
 
 -- ############################################################################
--- ##  PART 11 of 13 — migration_nelos_close_right.sql
+-- ##  PART 11 of 16 — migration_nelos_close_right.sql
 -- ############################################################################
 
 -- ================================================================
@@ -2529,7 +2532,7 @@ SELECT 'nelos_my_rights() returns 6 columns',
            AND parameter_mode='TABLE') = 6;
 
 -- ############################################################################
--- ##  PART 12 of 13 — migration_nelos_solve_photo.sql
+-- ##  PART 12 of 16 — migration_nelos_solve_photo.sql
 -- ############################################################################
 
 -- ================================================================
@@ -2595,7 +2598,7 @@ BEGIN
 END $bucket$;
 
 -- ############################################################################
--- ##  PART 13 of 13 — migration_nelos_tier.sql
+-- ##  PART 13 of 16 — migration_nelos_tier.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2686,3 +2689,616 @@ SELECT key, label, tier_label, handler_label
 
 -- ── Rollback (manual, if ever needed) ───────────────────────────
 --   ALTER TABLE public.nelos_modules DROP COLUMN IF EXISTS tier_label;
+
+-- ############################################################################
+-- ##  PART 14 of 16 — migration_nelos_access.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_access.sql
+--
+-- NELOS — which systems a person may use Nelos in.
+--
+-- Somebody's HOME system says whose queue they work — "this person handles
+-- Audit's cases". It has been doing a second job as well: deciding the only
+-- queue they may see. That is too narrow for how people actually work. An
+-- auditor needs their own queue, and also to see FC Portal cases while
+-- standing in a plot, and Admin Portal cases when the office asks.
+--
+-- So the two questions come apart:
+--
+--   primary_module + seat_no   which queue they HANDLE, and as which number
+--                              — set on Case Handlers, system by system
+--   access_modules             which systems they may USE Nelos in
+--                              — ticked on User Access, person by person
+--
+-- access_modules is ADDITIVE. Their home queue is theirs whatever is ticked,
+-- and every case assigned to them personally follows them everywhere. Ticks
+-- only ever open a door.
+--
+-- A CHANGE IN BEHAVIOUR WORTH KNOWING
+--   Until now, somebody holding Nelos with no home system saw EVERY case —
+--   the rule was "not tagged yet must not find an empty screen". Everybody
+--   in User Pending Allocation was in exactly that state, so the waiting
+--   room was also the widest access in the system. From here, nothing
+--   ticked means nothing shown, which is what "all off by default" has to
+--   mean to be worth ticking. Anybody who was relying on that accident will
+--   find their list empty until somebody ticks a system for them.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_handlers') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: The ticks
+-- ────────────────────────────────────────────────────────────────
+ALTER TABLE public.nelos_handlers
+  ADD COLUMN IF NOT EXISTS access_modules TEXT[] NOT NULL DEFAULT '{}';
+
+COMMENT ON COLUMN public.nelos_handlers.access_modules IS
+  'nelos_modules keys this person may use Nelos in, on top of their home queue. Ticked on User Access.';
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: What the signed-in person may see
+--
+-- Facts only — who they are and what is ticked. Which cases that adds up to
+-- is shared/shared_nelos.js's job, so the rule lives in one place and the
+-- To-Do widgets, the dock and the case list cannot drift apart on it.
+-- ────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.nelos_my_scope();
+
+CREATE FUNCTION public.nelos_my_scope()
+RETURNS TABLE (primary_module TEXT, seat_no INT, categories TEXT[],
+               is_admin BOOLEAN, sees_all BOOLEAN, access_modules TEXT[],
+               has_row BOOLEAN)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT h.primary_module,
+         h.seat_no,
+         h.categories,
+         COALESCE(p.permissions->'modules'->>'nelos', 'none') = 'admin',
+         COALESCE(m.sees_all_cases, false),
+         COALESCE(h.access_modules, '{}'::text[]),
+         -- Whether this person has been set up at all. Somebody with no
+         -- handler row has never been through User Access, so the old
+         -- "sees everything" still applies to them and nothing breaks for
+         -- anybody the new screen has not reached yet.
+         (h.user_id IS NOT NULL)
+    FROM public.shared_profiles p
+    LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
+    LEFT JOIN public.nelos_modules  m ON m.key = h.primary_module
+   WHERE p.id = auth.uid()
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_my_scope() TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 3: The people list, with the ticks on it
+-- ────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.nelos_people();
+
+CREATE FUNCTION public.nelos_people()
+RETURNS TABLE (
+  id             UUID,
+  full_name      TEXT,
+  email          TEXT,
+  nelos_level    TEXT,
+  primary_module TEXT,
+  seat_no        INT,
+  categories     TEXT[],
+  access_modules TEXT[],
+  may_solve      BOOLEAN,
+  may_edit       BOOLEAN,
+  may_delete     BOOLEAN,
+  may_create     BOOLEAN,
+  may_close      BOOLEAN
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id,
+         p.full_name,
+         p.email,
+         COALESCE(p.permissions->'modules'->>'nelos', 'none') AS nelos_level,
+         h.primary_module,
+         h.seat_no,
+         h.categories,
+         COALESCE(h.access_modules, '{}'::text[]) AS access_modules,
+         COALESCE(h.may_solve,  true)  AS may_solve,
+         COALESCE(h.may_edit,   false) AS may_edit,
+         COALESCE(h.may_delete, false) AS may_delete,
+         COALESCE(h.may_create, true)  AS may_create,
+         COALESCE(h.may_close,  false) AS may_close
+    FROM public.shared_profiles p
+    LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
+   WHERE COALESCE(p.permissions->'modules'->>'nelos', 'none') <> 'none'
+     AND EXISTS (
+       SELECT 1 FROM public.shared_profiles me
+        WHERE me.id = auth.uid()
+          AND (COALESCE((me.permissions->>'manage_users')::boolean, false)
+               OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
+     )
+   ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_people() TO authenticated;
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT 'nelos_handlers.access_modules' AS what,
+       EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'nelos_handlers' AND column_name = 'access_modules') AS ok
+UNION ALL
+SELECT 'nelos_my_scope() has access_modules',
+       EXISTS (SELECT 1 FROM information_schema.routines r
+                JOIN information_schema.parameters pa ON pa.specific_name = r.specific_name
+               WHERE r.routine_name = 'nelos_my_scope' AND pa.parameter_name = 'access_modules')
+UNION ALL
+SELECT 'nelos_people() has access_modules',
+       EXISTS (SELECT 1 FROM information_schema.routines r
+                JOIN information_schema.parameters pa ON pa.specific_name = r.specific_name
+               WHERE r.routine_name = 'nelos_people' AND pa.parameter_name = 'access_modules');
+
+-- Who can see what, as it stands.
+SELECT COALESCE(NULLIF(h.full_name, ''), h.email) AS person,
+       COALESCE(m.label, '— no home system —')    AS handles,
+       h.seat_no,
+       CASE WHEN COALESCE(array_length(h.access_modules, 1), 0) = 0
+            THEN '— home queue only —'
+            ELSE array_to_string(h.access_modules, ', ') END AS also_uses
+  FROM public.nelos_handlers h
+  LEFT JOIN public.nelos_modules m ON m.key = h.primary_module
+ ORDER BY m.sort_order NULLS LAST, h.seat_no NULLS LAST;
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   ALTER TABLE public.nelos_handlers DROP COLUMN IF EXISTS access_modules;
+--   …then re-run migration_nelos_hq.sql and migration_nelos_case_tools.sql
+--   to put the narrower nelos_my_scope() and nelos_people() back.
+
+-- ############################################################################
+-- ##  PART 15 of 16 — migration_nelos_automation.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_automation.sql
+--
+-- NELOS — work that repeats, raised on schedule.
+--
+-- Some cases are not raised because something went wrong. They are raised
+-- because it is Monday, or because it is the first of the month: walk the
+-- plots and record their condition, measure the seedlings, check the papan
+-- tanda. Somebody has been remembering to open Nelos and type those in.
+--
+-- An automation is that standing instruction written down once:
+--
+--     what        a work type — plot condition, seedling height, papan tanda
+--     where       a nursery, and a plot or all of them
+--     who         which system deals with it, and which numbered handler
+--     how often   every week, or every month, on a chosen day
+--
+-- and from then on Nelos raises the case itself.
+--
+-- HOW IT ACTUALLY FIRES
+--   nelos_run_automations() raises whatever is due and moves each schedule
+--   on. The Nelos page calls it when it loads, which is enough on its own:
+--   somebody opens Nelos most days, and a case raised late is still raised.
+--   For it to fire with nobody watching, schedule the same function — the
+--   Supabase dashboard's Integrations → Cron, once a day, is the whole
+--   setup:
+--
+--     select cron.schedule('nelos-automations', '0 1 * * *',
+--                          $$ select public.nelos_run_automations() $$);
+--
+--   It is safe either way. Due-ness is a date on the row, and raising
+--   advances it, so calling it fifty times in one day raises one case.
+--
+-- THE LINK BACK TO THE AUDITOR PORTAL
+--   Each work type knows which Auditor Portal module records it, and every
+--   case carries source_ref — a deep link straight to that module, on that
+--   plot (audit_deeplink.js has understood ?nursery=&plot= since the to-do
+--   circles). So the auditor opens the case, presses through to the module,
+--   does the audit where the audit belongs, and comes back to solve it. The
+--   case does not copy the audit; it points at where it is done.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_cases') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: The work types
+--
+-- A table rather than a CHECK constraint, because this list grows: adding
+-- a fourth kind of recurring audit should be one INSERT, not a migration
+-- that rewrites a constraint and a dropdown.
+-- ────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nelos_work_types (
+  key          TEXT PRIMARY KEY,
+  label        TEXT NOT NULL,
+  icon         TEXT,
+  -- The Auditor Portal page that records this, as seen from nelos/. It is
+  -- written with ../ because nelos/nelos_case.html is what follows it.
+  audit_href   TEXT,
+  title_tpl    TEXT NOT NULL,     -- {plot} and {nursery} are filled in
+  default_priority TEXT NOT NULL DEFAULT 'normal',
+  default_days INT  NOT NULL DEFAULT 7,
+  sort_order   INT  NOT NULL DEFAULT 100,
+  active       BOOLEAN NOT NULL DEFAULT true
+);
+
+INSERT INTO nelos_work_types (key, label, icon, audit_href, title_tpl, default_priority, default_days, sort_order)
+SELECT v.key, v.label, v.icon, v.href, v.tpl, v.pri, v.days, v.so
+  FROM (VALUES
+    ('plot_condition', 'Plot Condition',  '🌿', '../audit/audit_plot_audit.html',
+     'Audit plot condition at plot "{plot}"',        'normal', 7,  10),
+    ('seedling_height','Seedling Height', '📏', '../audit/audit_height_index.html',
+     'Measure seedling height at plot "{plot}"',     'normal', 7,  20),
+    ('papan_tanda',    'Papan Tanda',     '🪧', '../audit/audit_papan_index.html',
+     'Check papan tanda at plot "{plot}"',           'normal', 7,  30),
+    ('maintenance',    'Maintenance',     '🧰', '../audit/audit_maintenance_index.html',
+     'Maintenance audit at plot "{plot}"',           'normal', 7,  40)
+  ) AS v(key, label, icon, href, tpl, pri, days, so)
+ WHERE NOT EXISTS (SELECT 1 FROM nelos_work_types w WHERE w.key = v.key);
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: The standing instructions
+-- ────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nelos_automations (
+  id            BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  work_type     TEXT NOT NULL REFERENCES nelos_work_types(key) ON UPDATE CASCADE,
+
+  -- Where. plot_name NULL means every plot in the nursery, and that is the
+  -- common case: "measure every plot in Nursery 1 monthly" is one row, not
+  -- fifty-two.
+  nursery_name  TEXT NOT NULL,
+  plot_name     TEXT,
+
+  -- Who deals with it. Same two questions the New Case drawer asks.
+  to_module     TEXT REFERENCES nelos_modules(key) ON UPDATE CASCADE,
+  to_seat_no    INT,
+  assignee_id   UUID REFERENCES shared_profiles(id) ON DELETE SET NULL,
+  assignee_name TEXT,
+
+  -- How often. weekly → on_day is 0–6, Sunday first, matching extract(dow).
+  --            monthly → on_day is 1–28, capped so February always has one.
+  repeat_every  TEXT NOT NULL DEFAULT 'monthly',
+  on_day        INT  NOT NULL DEFAULT 1,
+
+  priority      TEXT NOT NULL DEFAULT 'normal',
+  due_days      INT  NOT NULL DEFAULT 7,
+  note          TEXT,
+
+  active        BOOLEAN NOT NULL DEFAULT true,
+  next_run_on   DATE NOT NULL DEFAULT CURRENT_DATE,
+  last_run_on   DATE,
+  last_raised   INT NOT NULL DEFAULT 0,
+
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by    TEXT,
+  updated_at    TIMESTAMPTZ,
+  updated_by    TEXT,
+
+  CONSTRAINT nelos_automations_repeat_chk CHECK (repeat_every IN ('weekly', 'monthly')),
+  CONSTRAINT nelos_automations_day_chk    CHECK (on_day BETWEEN 0 AND 28),
+  CONSTRAINT nelos_automations_pri_chk    CHECK (priority IN ('low','normal','high','urgent'))
+);
+
+CREATE INDEX IF NOT EXISTS nelos_automations_due_idx
+  ON nelos_automations (next_run_on) WHERE active;
+
+-- Which automation raised a case, so a repeat can tell whether the last one
+-- is still open and not pile a second on top of it.
+ALTER TABLE nelos_cases
+  ADD COLUMN IF NOT EXISTS automation_id BIGINT REFERENCES nelos_automations(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS nelos_cases_automation_idx ON nelos_cases (automation_id);
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 3: When is it next due
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.nelos_next_run(p_from DATE, p_every TEXT, p_day INT)
+RETURNS DATE
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+  d DATE;
+BEGIN
+  IF p_every = 'weekly' THEN
+    -- The next p_day (0 = Sunday) strictly after p_from, so a run today
+    -- schedules next week rather than looping on the same date.
+    d := p_from + (((p_day - EXTRACT(dow FROM p_from)::int) + 7 - 1) % 7 + 1);
+    RETURN d;
+  END IF;
+
+  -- Monthly: the chosen day of next month. Days are capped at 28 by the
+  -- table's constraint, so there is no month this cannot land in.
+  d := date_trunc('month', p_from)::date + INTERVAL '1 month';
+  RETURN (date_trunc('month', d)::date + (LEAST(GREATEST(p_day, 1), 28) - 1));
+END $$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 4: Raise whatever is due
+--
+-- SECURITY DEFINER: it writes cases on behalf of a schedule rather than a
+-- person, and has to work the same whether it was called by the page or by
+-- cron with no session at all.
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.nelos_run_automations()
+RETURNS TABLE (automation_id BIGINT, raised INT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  a         RECORD;
+  w         RECORD;
+  plot      TEXT;
+  made      INT;
+  case_title TEXT;
+BEGIN
+  FOR a IN
+    SELECT * FROM nelos_automations
+     WHERE active AND next_run_on <= CURRENT_DATE
+     ORDER BY id
+     FOR UPDATE SKIP LOCKED          -- two callers at once raise one case
+  LOOP
+    SELECT * INTO w FROM nelos_work_types WHERE key = a.work_type;
+    made := 0;
+
+    FOR plot IN
+      SELECT CASE WHEN a.plot_name IS NOT NULL THEN a.plot_name ELSE p.plot_name END
+        FROM (SELECT 1) AS one
+        LEFT JOIN shared_plots p
+               ON a.plot_name IS NULL AND p.nursery_name = a.nursery_name
+       WHERE a.plot_name IS NOT NULL OR p.plot_name IS NOT NULL
+    LOOP
+      -- Last time's case still open? Then this plot is not behind on the
+      -- work, it is behind on somebody doing it, and a second case says
+      -- nothing the first did not.
+      IF EXISTS (
+        SELECT 1 FROM nelos_cases c
+         WHERE c.automation_id = a.id
+           AND c.plot_name IS NOT DISTINCT FROM plot
+           AND c.status IN ('open', 'in_progress')
+      ) THEN
+        CONTINUE;
+      END IF;
+
+      case_title := replace(replace(w.title_tpl, '{plot}', COALESCE(plot, a.nursery_name)),
+                            '{nursery}', a.nursery_name);
+
+      INSERT INTO nelos_cases (
+        title, description, category, priority, status,
+        source_module, source_ref, nursery_name, plot_name,
+        assigned_module, assigned_seat_no, assignee_id, assignee_name,
+        due_date, raised_by, automation_id
+      ) VALUES (
+        case_title,
+        a.note,
+        w.label,
+        a.priority,
+        'open',
+        COALESCE(a.to_module, 'nelos'),
+        -- Straight to the Auditor Portal module that records this, on this
+        -- plot. audit_deeplink.js reads ?nursery= and ?plot=.
+        CASE WHEN w.audit_href IS NULL THEN NULL
+             ELSE w.audit_href || '?nursery=' || a.nursery_name ||
+                  CASE WHEN plot IS NULL THEN '' ELSE '&plot=' || plot END
+        END,
+        a.nursery_name,
+        plot,
+        a.to_module,
+        a.to_seat_no,
+        a.assignee_id,
+        a.assignee_name,
+        CURRENT_DATE + a.due_days,
+        'Automation',
+        a.id
+      );
+      made := made + 1;
+    END LOOP;
+
+    UPDATE nelos_automations
+       SET last_run_on = CURRENT_DATE,
+           last_raised = made,
+           next_run_on = public.nelos_next_run(CURRENT_DATE, a.repeat_every, a.on_day)
+     WHERE id = a.id;
+
+    automation_id := a.id;
+    raised := made;
+    RETURN NEXT;
+  END LOOP;
+END $$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_run_automations() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.nelos_next_run(DATE, TEXT, INT) TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 5: Who may change a schedule
+--
+-- The same rule the other settings tables use: everybody holding Nelos may
+-- read, only an admin may change. A standing instruction that raises work
+-- for other people is a setting, not casework.
+-- ────────────────────────────────────────────────────────────────
+DO $$
+DECLARE t TEXT; pol RECORD;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['nelos_automations', 'nelos_work_types'] LOOP
+    FOR pol IN SELECT policyname FROM pg_policies
+                WHERE schemaname = 'public' AND tablename = t
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, t);
+    END LOOP;
+
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format($p$
+      CREATE POLICY "nelos read" ON public.%I
+        FOR SELECT TO authenticated USING (public.nelos_has_access())$p$, t);
+    EXECUTE format($p$
+      CREATE POLICY "nelos admin write" ON public.%I
+        FOR ALL TO authenticated
+        USING (public.nelos_is_admin()) WITH CHECK (public.nelos_is_admin())$p$, t);
+  END LOOP;
+END $$;
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT key, label, audit_href, title_tpl FROM nelos_work_types ORDER BY sort_order;
+
+SELECT 'weekly, Monday'  AS rule, public.nelos_next_run(CURRENT_DATE, 'weekly', 1)  AS next_run
+UNION ALL
+SELECT 'monthly, 1st',        public.nelos_next_run(CURRENT_DATE, 'monthly', 1)
+UNION ALL
+SELECT 'monthly, 28th',       public.nelos_next_run(CURRENT_DATE, 'monthly', 28);
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   ALTER TABLE nelos_cases DROP COLUMN IF EXISTS automation_id;
+--   DROP FUNCTION IF EXISTS public.nelos_run_automations();
+--   DROP FUNCTION IF EXISTS public.nelos_next_run(DATE, TEXT, INT);
+--   DROP TABLE IF EXISTS nelos_automations;
+--   DROP TABLE IF EXISTS nelos_work_types;
+
+-- ############################################################################
+-- ##  PART 16 of 16 — migration_nelos_directory_staff.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_directory_staff.sql
+--
+-- NELOS — the Add-somebody search finds staff, not customers.
+--
+-- shared_profiles holds everybody with a login to anything: the people who
+-- work here, and every Salesweb customer who has ever booked a collection.
+-- nelos_directory() was returning all of them, so searching "ah" on User
+-- Access offered a dozen customers nobody could ever give Nelos to.
+--
+-- The rest of the portal already draws this line. Every staff gate in the
+-- database reads
+--
+--     COALESCE(user_type, 'system') <> 'customer'
+--
+-- and the main portal's own User Access screen lists exactly
+-- (user_type || 'system') === 'system' (shared/shared_module_access.js).
+-- This makes nelos_directory() agree with them, so the two screens that
+-- hand out access are looking at one list of people.
+--
+-- WHY COALESCE, AND WHAT IT DOES NOT CATCH
+--   handle_new_user() defaults a missing user_type to 'system', so a NULL
+--   means staff — that is why every gate coalesces rather than testing
+--   equality. The signup pages stamp 'customer' now, but any customer who
+--   registered before that landed with the default and still reads as
+--   staff. Those accounts will keep appearing here, as they do on every
+--   other staff screen; the fix is the same backfill for all of them:
+--
+--     UPDATE shared_profiles SET user_type = 'customer'
+--      WHERE id IN (…the customer accounts…);
+--
+--   It is deliberately not run from here. Which old accounts are customers
+--   is a question about the data, not about Nelos, and a migration should
+--   not guess at it.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.shared_profiles') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'shared_profiles does not exist.',
+      HINT    = 'This is the main portal database — check the project.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- The company list, staff only
+--
+-- Same shape as before (id, full_name, email) and the same admin gate, so
+-- nothing that calls it has to change. Only the population is narrower.
+--
+-- Through EXECUTE because user_type may not exist on an older database: a
+-- plain CREATE FUNCTION naming a missing column is rejected when the body
+-- is checked, taking the file with it. Dynamic SQL is planned when it is
+-- reached, so the column can be looked for first.
+-- ────────────────────────────────────────────────────────────────
+DO $$
+DECLARE has_type BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'shared_profiles'
+       AND column_name = 'user_type'
+  ) INTO has_type;
+
+  IF NOT has_type THEN
+    RAISE NOTICE 'shared_profiles has no user_type — leaving nelos_directory() as it is. '
+                 'There is nothing here to tell staff and customers apart.';
+    RETURN;
+  END IF;
+
+  EXECUTE $fn$
+    CREATE OR REPLACE FUNCTION public.nelos_directory()
+    RETURNS TABLE (id UUID, full_name TEXT, email TEXT)
+    LANGUAGE sql
+    STABLE
+    SECURITY DEFINER
+    SET search_path = public
+    AS $body$
+      SELECT p.id, p.full_name, p.email
+        FROM public.shared_profiles p
+       WHERE p.email IS NOT NULL
+         AND p.email <> ''
+         -- Staff only. A missing user_type is staff, because that is what
+         -- handle_new_user() leaves behind.
+         AND COALESCE(p.user_type, 'system') <> 'customer'
+         AND EXISTS (
+           SELECT 1 FROM public.shared_profiles me
+            WHERE me.id = auth.uid()
+              AND (COALESCE((me.permissions->>'manage_users')::boolean, false)
+                   OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
+         )
+       ORDER BY COALESCE(NULLIF(p.full_name, ''), p.email)
+    $body$
+  $fn$;
+
+  EXECUTE 'GRANT EXECUTE ON FUNCTION public.nelos_directory() TO authenticated';
+  RAISE NOTICE 'nelos_directory() now returns staff only.';
+END $$;
+
+-- ── Check it landed ─────────────────────────────────────────────
+-- How many the search would have offered, and how many it will now.
+SELECT count(*)                                                            AS everybody,
+       count(*) FILTER (WHERE COALESCE(user_type, 'system') <> 'customer')  AS staff,
+       count(*) FILTER (WHERE COALESCE(user_type, 'system')  = 'customer')  AS customers_now_hidden
+  FROM public.shared_profiles
+ WHERE email IS NOT NULL AND email <> '';
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   Re-run migration_nelos_modules.sql, which defines the unfiltered one.
