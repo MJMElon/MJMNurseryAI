@@ -211,6 +211,9 @@ const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || 
 const handlerCount = key => people.filter(p => p.primary_module === key).length;
 /* What one handler in a system is called, e.g. 'Admin' — always shown with
    their number after it, so "Admin 1". */
+/* A system's name as it reads in a picker. HQ is marked so it is obvious in
+   the list that everyone there oversees every case, not just this queue. */
+const pickLabel = m => m.label + (m.sees_all_cases ? '  (HQ)' : '');
 const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
 const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
 /* The numbers already taken in a system, so the picker never offers a clash. */
@@ -306,7 +309,7 @@ function panelHtml(p) {
       <label class="lbl" for="pm-${esc(p.id)}">System</label>
       <select class="inp" id="pm-${esc(p.id)}">
         <option value="">— none —</option>
-        ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
+        ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(pickLabel(m))}</option>`).join('')}
       </select>
 
       <label class="lbl">Person in charge #</label>
@@ -394,27 +397,44 @@ function wirePeople() {
 
   if (pm && rl) {
     pm.addEventListener('change', () => {
+      // A number belongs to one system, so moving somebody starts them
+      // unnumbered in the system they are moving to.
       extraSeats = 0;
-      rl.innerHTML = seatRows({ id: person.id, seat_no: null }, pm.value || null);
+      rl.innerHTML = seatRows(Object.assign({}, person, { seat_no: null }), pm.value || null);
       wireSeats(rl, pm, person);
     });
     wireSeats(rl, pm, person);
   }
 }
 
-/* The + button just offers one more number than the system currently uses.
-   Nothing is written until Save, so pressing it repeatedly costs nothing. */
+/* The number list is redrawn on every interaction, so both handlers have to
+   put it back together and re-wire it.
+
+   `+` offers exactly one more number than is showing. Picking a number
+   TRIMS back to it — otherwise pressing + and then choosing a lower number
+   left the spare row sitting there, which is what made choosing #2 leave a
+   #3 behind. Nothing is written until Save either way. */
 function wireSeats(rl, pm, person) {
+  const redraw = seat => {
+    // Carry the whole person through: seatRows names whoever holds a row,
+    // so an object missing full_name/email would render a blank one.
+    rl.innerHTML = seatRows(Object.assign({}, person, { seat_no: seat }), pm.value || null);
+    wireSeats(rl, pm, person);
+  };
+
+  rl.querySelectorAll('input[name="seat"]').forEach(r =>
+    r.addEventListener('change', () => {
+      extraSeats = 0;                       // drop any spare row the + left
+      redraw(Number(r.value));
+    }));
+
   const add = rl.querySelector('[data-act="add-seat"]');
   if (!add) return;
   add.addEventListener('click', e => {
     e.preventDefault();
     const picked = rl.querySelector('input[name="seat"]:checked');
     extraSeats = rl.querySelectorAll('.seat-row').length + 1;
-    rl.innerHTML = seatRows(
-      { id: person.id, seat_no: picked ? Number(picked.value) : (person.seat_no || null) },
-      pm.value || null);
-    wireSeats(rl, pm, person);
+    redraw(picked ? Number(picked.value) : (person.seat_no || null));
   });
 }
 
@@ -463,7 +483,7 @@ function solveCells(mod, cat, rule, isDefault) {
     <div class="cell" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}">
       <select class="inp r-dest">
         ${modules.map(x =>
-          `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+          `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(pickLabel(x))}</option>`).join('')}
       </select>
       ${inherited ? '<span class="cell-note"><em>following the default</em></span>'
         : n ? '' : '<span class="cell-note warn-txt">⚠ nobody tagged there</span>'}
