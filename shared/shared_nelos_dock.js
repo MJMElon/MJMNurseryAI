@@ -1179,8 +1179,8 @@
      they stand, in the order that table seeds them, under the short names
      nelos_modules.handler_label already carries. */
   var FALLBACK_MODULES = [
-    { key: 'operation',   label: 'Stock' },
-    { key: 'nursery_ops', label: 'HQ' },
+    { key: 'operation',   label: 'Seedling Stock' },
+    { key: 'nursery_ops', label: 'HQ Operation' },
     { key: 'scan',        label: 'FC' },
     { key: 'mobile',      label: 'Admin' },
     { key: 'audit',       label: 'Auditor' }
@@ -1211,8 +1211,8 @@
     var token = await accessToken();
     if (!token) return (_mods = FALLBACK_MODULES);
     try {
-      /* handler_label is the short name — Stock, HQ, FC, Admin, Auditor —
-         and it already exists: migration_nelos_seats.sql seeded it as the
+      /* handler_label is the short name — Seedling Stock, HQ Operation, FC,
+         Admin, Auditor — and it already exists: migration_nelos_seats.sql seeded it as the
          half of "Admin 1" that is not the number. "Assign to" wants the
          same five words, so it reads them rather than inventing a second
          set that could drift. `label` is the fallback for a system added
