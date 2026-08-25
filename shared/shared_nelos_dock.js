@@ -551,6 +551,23 @@
   .nd-fld { margin-bottom:11px; }
   .nd-2   { display:flex; gap:8px; }
   .nd-2 > * { flex:1; min-width:0; }
+  /* The date the case is being raised, under the panel's own heading. */
+  .nd-today { font-size:10.5px; font-weight:800; letter-spacing:.04em; color:#94a3b8;
+              margin:-2px 0 10px; }
+  .nd-photo-pick { display:flex; align-items:center; justify-content:center; gap:8px;
+                   padding:16px 12px; border:1.5px dashed #cbd5e1; border-radius:11px;
+                   font-size:12px; font-weight:800; color:#64748b; cursor:pointer;
+                   background:#f8fafc; }
+  .nd-photo-pick:hover { border-color:#a78bfa; color:#6d28d9; }
+  /* display:flex on the class outranks the browser's [hidden]{display:none},
+     so hiding the picker behind a chosen photo needs saying explicitly. */
+  .nd-photo-pick[hidden], .nd-photo[hidden] { display:none; }
+  .nd-photo { position:relative; }
+  .nd-photo img { width:100%; max-height:180px; object-fit:cover; border-radius:11px; display:block; }
+  .nd-photo-x { position:absolute; top:7px; right:7px; width:26px; height:26px; border-radius:999px;
+                border:none; background:rgba(15,23,42,.72); color:#fff; font-size:11px;
+                font-weight:900; cursor:pointer; line-height:1; }
+  .nd-in:disabled { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
   .nd-pri { display:flex; gap:5px; }
   .nd-pri button { flex:1; padding:8px 2px; border-radius:9px; border:1.5px solid #e2e8f0; background:#fff;
                    font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.05em; text-transform:uppercase;
@@ -766,21 +783,45 @@
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
+        /* The form asks its questions in the order the person answering
+           them thinks: who works this, what the work is, who by name,
+           where, a picture, then anything else. Same shape as the Admin
+           Portal's (Mobile/src/components/NelosNewCase.jsx) — one form on
+           every surface, so keep the two in step.
+
+           No date box. The date a case is raised is today, it is printed
+           under the heading, and asking somebody to confirm the current
+           date is asking them to do the computer's job. The due date is
+           still set — from the chosen work's default_days. */
         '<div class="nd-form" hidden>' +
           '<div class="nd-err" hidden></div>' +
+          '<div class="nd-today"></div>' +
           '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-title">What needs doing?</label>' +
+            '<label class="nd-lbl" for="nd-f-to">Assign to</label>' +
+            '<select class="nd-in" id="nd-f-to">' +
+              '<option value="">— choose a system —</option></select>' +
+          '</div>' +
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-work">Work</label>' +
+            '<select class="nd-in" id="nd-f-work" hidden>' +
+              '<option value="">— choose the work —</option></select>' +
             '<input class="nd-in" id="nd-f-title" maxlength="300" autocomplete="off" ' +
-                   'placeholder="One line — what is wrong">' +
+                   'placeholder="Choose a system first" disabled>' +
+          '</div>' +
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-pic">PIC</label>' +
+            '<select class="nd-in" id="nd-f-pic" disabled>' +
+              '<option value="">Anyone in that system</option></select>' +
           '</div>' +
           '<div class="nd-fld nd-2">' +
             '<div>' +
-              '<label class="nd-lbl" for="nd-f-cat">Category</label>' +
-              '<select class="nd-in" id="nd-f-cat"><option value="">— none —</option></select>' +
+              '<label class="nd-lbl" for="nd-f-nursery">Nursery</label>' +
+              '<select class="nd-in" id="nd-f-nursery"><option value="">— none —</option></select>' +
             '</div>' +
             '<div>' +
-              '<label class="nd-lbl" for="nd-f-due">Due</label>' +
-              '<input class="nd-in" id="nd-f-due" type="date">' +
+              '<label class="nd-lbl" for="nd-f-plot">Plot</label>' +
+              '<select class="nd-in" id="nd-f-plot" disabled>' +
+                '<option value="">Nursery first</option></select>' +
             '</div>' +
           '</div>' +
           '<div class="nd-fld">' +
@@ -793,9 +834,20 @@
             '</div>' +
           '</div>' +
           '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-desc">Detail <span style="text-transform:none;letter-spacing:0">(optional)</span></label>' +
+            '<span class="nd-lbl">Photo</span>' +
+            /* capture="environment" opens the camera straight onto the back
+               lens on a phone and is ignored on a desktop, where the same
+               control is a file picker. One control, both jobs. */
+            '<label class="nd-photo-pick"><input type="file" id="nd-f-photo" ' +
+                   'accept="image/*" capture="environment" hidden>' +
+              '<span>&#128247; Take or upload a photo</span></label>' +
+            '<div class="nd-photo" hidden><img alt=""><button type="button" ' +
+                 'class="nd-photo-x" aria-label="Remove photo">&#10005;</button></div>' +
+          '</div>' +
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-desc">Remarks <span style="text-transform:none;letter-spacing:0">(optional)</span></label>' +
             '<textarea class="nd-in" id="nd-f-desc" rows="3" ' +
-                      'placeholder="Anything the person picking this up will need"></textarea>' +
+                      'placeholder="What you saw"></textarea>' +
           '</div>' +
           '<div class="nd-from"></div>' +
         '</div>' +
@@ -809,7 +861,7 @@
         '<div class="nd-detail" hidden></div>' +
         '<div class="nd-foot nd-foot-form" hidden>' +
           '<button type="button" class="nd-btn nd-btn-c nd-cancel">Cancel</button>' +
-          '<button type="button" class="nd-btn nd-btn-a nd-save">Raise Case</button>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-save">Create New Case</button>' +
         '</div>' +
         '<div class="nd-foot nd-foot-detail" hidden>' +
           '<button type="button" class="nd-btn nd-btn-c nd-btn-narrow nd-back">&#8592; Back</button>' +
@@ -1128,7 +1180,33 @@
     return (location.pathname || '').split('/').pop() || 'this page';
   }
 
-  var _cats = null;          // [{name, default_priority, default_days}]
+  /* The four nurseries and the plots each one has, copied from
+     audit/audit_pending.js — which itself copies the module scripts,
+     deliberately, because each runs on its own page. If a nursery gains
+     plots there, it gains them here. */
+  var NURSERY_PLOTS = {
+    PN:   pad('P', 52), BNN: pad('B', 14), UNN1: pad('U', 18), UNN2: pad('N', 20)
+  };
+  var NURSERY_LABEL = { PN: 'Pre Nursery', BNN: 'BNN', UNN1: 'UNN1', UNN2: 'UNN2' };
+  function pad(letter, n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) out.push(letter + (i < 10 ? '0' + i : String(i)));
+    return out;
+  }
+
+  /* Shown only when nelos_modules cannot be read — the five systems as
+     they stand, in the order that table seeds them. */
+  var FALLBACK_MODULES = [
+    { key: 'operation',   label: 'Seedling Stock System' },
+    { key: 'nursery_ops', label: 'Nursery Operation (HQ)' },
+    { key: 'scan',        label: 'FC Portal' },
+    { key: 'mobile',      label: 'Admin Portal' },
+    { key: 'audit',       label: 'Audit Portal' }
+  ];
+
+  var _mods = null;          // [{key, label}]
+  var _people = null;        // [{user_id, full_name, email, primary_module}]
+  var _cats = null;          // [{name, module_key, default_priority, default_days}]
 
   async function loadCategories() {
     if (_cats) return _cats;
@@ -1136,12 +1214,65 @@
     if (!token) return (_cats = []);
     try {
       var res = await fetch(CFG.url + '/rest/v1/nelos_categories' +
-                            '?select=name,default_priority,default_days&active=is.true' +
+                            '?select=name,module_key,default_priority,default_days&active=is.true' +
                             '&order=sort_order.asc,name.asc', { headers: authHeaders(token) });
       if (!res.ok) return (_cats = []);
       var rows = await res.json();
       return (_cats = Array.isArray(rows) ? rows : []);
     } catch (_) { return (_cats = []); }
+  }
+
+  /* The systems a case can be sent to. Read rather than hardcoded: the
+     User Setting page can rename or add one, and this follows. */
+  async function loadModules() {
+    if (_mods) return _mods;
+    var token = await accessToken();
+    if (!token) return (_mods = FALLBACK_MODULES);
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_modules' +
+                            '?select=key,label&active=is.true&order=sort_order.asc',
+                            { headers: authHeaders(token) });
+      if (!res.ok) return (_mods = FALLBACK_MODULES);
+      var rows = await res.json();
+      return (_mods = (Array.isArray(rows) && rows.length) ? rows : FALLBACK_MODULES);
+    } catch (_) { return (_mods = FALLBACK_MODULES); }
+  }
+
+  /* Who can be named as PIC. nelos_handlers, not the nelos_people() RPC:
+     that one is admin-only (it checks manage_users or nelos admin), and
+     anybody entitled to raise a case needs to be able to name who should
+     get it. The table is readable by any authenticated user and carries
+     the pin this needs. */
+  async function loadPeople() {
+    if (_people) return _people;
+    var token = await accessToken();
+    if (!token) return (_people = []);
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_handlers' +
+                            '?select=user_id,full_name,email,primary_module',
+                            { headers: authHeaders(token) });
+      if (!res.ok) return (_people = []);
+      var rows = await res.json();
+      return (_people = Array.isArray(rows) ? rows : []);
+    } catch (_) { return (_people = []); }
+  }
+
+  /* That system's own case titles. nelos_categories.module_key scopes
+     them, which is the whole point of that column — the Audit Portal
+     should not be offering "Height Shortfall". */
+  function worksFor(moduleKey) {
+    if (!moduleKey) return [];
+    return (_cats || []).filter(function (c) { return c.module_key === moduleKey; });
+  }
+
+  /* Sorted by name inside the system: the pin decides who is in the list,
+     the name decides the order. */
+  function picsFor(moduleKey) {
+    if (!moduleKey) return [];
+    return (_people || [])
+      .filter(function (p) { return p.primary_module === moduleKey; })
+      .map(function (p) { return { id: p.user_id, name: p.full_name || p.email || 'Unnamed' }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
 
   function priority() {
@@ -1416,22 +1547,118 @@
           : 'Nothing solved and waiting to be closed.') + '</div>';
   }
 
+  function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
+
   async function showForm() {
     view = 'form';
     showPane('form');
-    panel.querySelector('.nd-head-t').textContent = 'New Case';
+    panel.querySelector('.nd-head-t').textContent = 'Add New Case';
     formError('');
+    // The date, said rather than asked.
+    formEl.querySelector('.nd-today').textContent =
+      new Date().toLocaleDateString('en-MY',
+        { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     formEl.querySelector('.nd-from').innerHTML =
       'Raised from <b>' + esc(pageName()) + '</b> — the case links back here.';
     formEl.scrollTop = 0;
-    setTimeout(function () { formEl.querySelector('#nd-f-title').focus(); }, 60);
 
-    var cats = await loadCategories();
-    var sel = formEl.querySelector('#nd-f-cat');
-    if (sel.options.length <= 1 && cats.length) {
-      sel.innerHTML = '<option value="">— none —</option>' +
-        cats.map(function (c) { return '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>'; }).join('');
+    var nurs = formEl.querySelector('#nd-f-nursery');
+    if (nurs.options.length <= 1) {
+      nurs.innerHTML = opt('', '— none —') +
+        Object.keys(NURSERY_PLOTS).map(function (n) { return opt(n, NURSERY_LABEL[n]); }).join('');
     }
+
+    /* Three reads, each failing on its own terms: no modules leaves the
+       five as they stand, no case titles turns Work into a typed line, no
+       people leaves the case with the system rather than a person. None of
+       them is allowed to block the form. */
+    var all = await Promise.all([loadModules(), loadCategories(), loadPeople()]);
+    var to = formEl.querySelector('#nd-f-to');
+    if (to.options.length <= 1) {
+      to.innerHTML = opt('', '— choose a system —') +
+        all[0].map(function (m) { return opt(m.key, m.label); }).join('');
+    }
+    setTimeout(function () { to.focus(); }, 60);
+  }
+
+  /* Changing the system invalidates the two answers that hang off it. */
+  function onAssignTo() {
+    var key = formEl.querySelector('#nd-f-to').value;
+    var works = worksFor(key), pics = picsFor(key);
+
+    var sel = formEl.querySelector('#nd-f-work');
+    var typed = formEl.querySelector('#nd-f-title');
+    if (works.length) {
+      sel.innerHTML = opt('', '— choose the work —') +
+        works.map(function (c) { return opt(c.name, c.name); }).join('');
+      sel.hidden = false;
+      typed.hidden = true;
+      typed.value = '';
+    } else {
+      // Either nothing chosen yet, or that system has no titles set up.
+      // Both are answered by saying so rather than by an empty dropdown
+      // that looks broken.
+      sel.hidden = true;
+      sel.value = '';
+      typed.hidden = false;
+      typed.disabled = !key;
+      typed.placeholder = key ? 'No set titles for this system — type one'
+                              : 'Choose a system first';
+    }
+
+    var pic = formEl.querySelector('#nd-f-pic');
+    pic.disabled = !key;
+    pic.innerHTML = opt('', key && !pics.length ? 'Nobody pinned to this system yet'
+                                                : 'Anyone in that system') +
+      pics.map(function (p) { return opt(p.id, p.name); }).join('');
+  }
+
+  function onNursery() {
+    var n = formEl.querySelector('#nd-f-nursery').value;
+    var plot = formEl.querySelector('#nd-f-plot');
+    plot.disabled = !n;
+    plot.innerHTML = opt('', n ? '— none —' : 'Nursery first') +
+      (NURSERY_PLOTS[n] || []).map(function (p) { return opt(p, p); }).join('');
+  }
+
+  /* The due date the chosen work normally gets, counted from today. No
+     default_days means no due date, which is honest — a case nobody set a
+     deadline for does not get an invented one. */
+  function dueFromWork() {
+    var key = formEl.querySelector('#nd-f-to').value;
+    var name = formEl.querySelector('#nd-f-work').value;
+    var c = worksFor(key).filter(function (x) { return x.name === name; })[0];
+    if (!c || c.default_days == null) return null;
+    var d = new Date();
+    d.setDate(d.getDate() + Number(c.default_days));
+    return d.toISOString().slice(0, 10);
+  }
+
+  /* One picture, into the public nelos-photos bucket, on the path
+     nelos_dashboard.html already uses. Throws with a readable message so
+     the save handler can show it and leave the form filled in — better
+     than a case that quietly lost its photo. */
+  var MAX_PHOTO = 8 * 1024 * 1024;
+  async function uploadPhoto(token) {
+    var input = formEl.querySelector('#nd-f-photo');
+    var file = input && input.files && input.files[0];
+    if (!file) return undefined;
+    if (file.size > MAX_PHOTO) throw new Error('that photo is over 8 MB — take a smaller one');
+
+    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var path = new Date().toISOString().slice(0, 10) + '/' +
+               Math.random().toString(36).slice(2) + '.' + ext;
+    var res = await fetch(CFG.url + '/storage/v1/object/nelos-photos/' + path, {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': file.type || 'image/jpeg' }, authHeaders(token)),
+      body: file
+    });
+    if (!res.ok) {
+      var detail = '';
+      try { var e = await res.json(); detail = e.message || e.error || ''; } catch (_) {}
+      throw new Error('photo upload failed — ' + (detail || res.status));
+    }
+    return CFG.url + '/storage/v1/object/public/nelos-photos/' + path;
   }
 
   function showDone(c) {
@@ -1462,29 +1689,69 @@
   }
 
   async function submitCase() {
-    var title = formEl.querySelector('#nd-f-title').value.trim();
-    if (!title) { formError('A case needs a title.'); formEl.querySelector('#nd-f-title').focus(); return; }
+    var assignTo = formEl.querySelector('#nd-f-to').value;
+    var works    = worksFor(assignTo);
+    /* The chosen work IS the case's title — that is what "choose work"
+       means. A system with no case titles set up yet falls back to a typed
+       line, so an empty nelos_categories cannot make this form unusable. */
+    var title = (works.length ? formEl.querySelector('#nd-f-work').value
+                              : formEl.querySelector('#nd-f-title').value.trim());
+
+    if (!assignTo) return formError('Choose who this is for.');
+    if (!title) {
+      if (works.length) return formError('Choose the work.');
+      formError('Say what the case is.');
+      formEl.querySelector('#nd-f-title').focus();
+      return;
+    }
 
     var btn = panel.querySelector('.nd-save');
-    btn.disabled = true; btn.textContent = 'Raising…';
+    var reset = function () { btn.disabled = false; btn.textContent = 'Create New Case'; };
+    btn.disabled = true; btn.textContent = 'Creating…';
     formError('');
 
     var token = await accessToken();
-    if (!token) { btn.disabled = false; btn.textContent = 'Raise Case'; return formError('Your session has expired — sign in again.'); }
+    if (!token) { reset(); return formError('Your session has expired — sign in again.'); }
+
+    /* Photo first. If it fails the case is not raised and the form stays
+       filled in, which beats a case that quietly lost its picture. */
+    var photoUrl;
+    try {
+      photoUrl = await uploadPhoto(token);
+    } catch (e) {
+      reset();
+      return formError('Could not add the photo — ' + (e && e.message ? e.message : 'try again') + '.');
+    }
+
+    var picSel = formEl.querySelector('#nd-f-pic');
+    var picId  = picSel.value || null;
+    var picName = picId ? picSel.options[picSel.selectedIndex].text : null;
 
     var u = me();
     var row = {
-      title:         title.slice(0, 300),
-      description:   formEl.querySelector('#nd-f-desc').value.trim() || null,
-      category:      formEl.querySelector('#nd-f-cat').value || null,
-      priority:      priority(),
-      status:        'open',
-      source_module: sourceModule(),
-      source_ref:    sourceRef(),
-      due_date:      formEl.querySelector('#nd-f-due').value || null,
-      raised_by:     u.name,
-      raised_by_id:  u.id
+      title:           title.slice(0, 300),
+      description:     formEl.querySelector('#nd-f-desc').value.trim() || null,
+      category:        works.length ? title : null,
+      priority:        priority(),
+      status:          'open',
+      source_module:   sourceModule(),
+      /* Where it was raised stays source_module; assigned_module is what
+         was chosen, and nelos_route_case() honours an explicit one —
+         "routing is the default, not a rule". */
+      assigned_module: assignTo,
+      source_ref:      sourceRef(),
+      nursery_name:    formEl.querySelector('#nd-f-nursery').value || null,
+      plot_name:       formEl.querySelector('#nd-f-plot').value || null,
+      assignee_id:     picId,
+      assignee_name:   picName,
+      due_date:        dueFromWork(),
+      raised_by:       u.name,
+      raised_by_id:    u.id
     };
+    // photo_url arrives with migration_nelos_case_tools.sql. Only send the
+    // column when there is a photo, so a database without it still takes
+    // the insert.
+    if (photoUrl) row.photo_url = photoUrl;
 
     try {
       var res = await fetch(CFG.url + '/rest/v1/nelos_cases', {
@@ -1519,7 +1786,7 @@
       showDone(made || { title: title });
       refresh();
     } catch (err) {
-      btn.disabled = false; btn.textContent = 'Raise Case';
+      reset();
       formError('Could not raise it — ' + (err && err.message ? err.message : 'try again') + '.');
     }
   }
@@ -1531,26 +1798,49 @@
       if (b) setPriority(b.getAttribute('data-p'));
     });
 
-    // A category carries its house defaults — the priority it is usually
-    // raised at and the due date it is usually given. Both stay editable;
-    // this only saves typing.
-    formEl.querySelector('#nd-f-cat').addEventListener('change', function () {
-      var picked = this.value;
-      var cat = (_cats || []).filter(function (c) { return c.name === picked; })[0];
-      if (!cat) return;
-      if (cat.default_priority) setPriority(cat.default_priority);
-      var due = formEl.querySelector('#nd-f-due');
-      if (cat.default_days != null && !due.value) {
-        var d = new Date();
-        d.setDate(d.getDate() + Number(cat.default_days));
-        due.value = d.toISOString().slice(0, 10);
-      }
+    formEl.querySelector('#nd-f-to').addEventListener('change', function () {
+      onAssignTo();
+      formError('');
+    });
+    formEl.querySelector('#nd-f-nursery').addEventListener('change', onNursery);
+
+    // The chosen work carries the priority that kind of case is usually
+    // raised at. It stays editable; this only saves a tap.
+    formEl.querySelector('#nd-f-work').addEventListener('change', function () {
+      var key = formEl.querySelector('#nd-f-to').value;
+      var c = worksFor(key).filter(function (x) { return x.name === this.value; }, this)[0];
+      if (c && c.default_priority) setPriority(c.default_priority);
+      if (this.value) formError('');
+    });
+
+    var photo = formEl.querySelector('#nd-f-photo');
+    photo.addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      var box = formEl.querySelector('.nd-photo');
+      var pick = formEl.querySelector('.nd-photo-pick');
+      if (!f) return;
+      if (f.size > MAX_PHOTO) { this.value = ''; return formError('That photo is over 8 MB — take a smaller one.'); }
+      formError('');
+      var img = box.querySelector('img');
+      if (img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src);
+      img.src = URL.createObjectURL(f);
+      box.hidden = false;
+      pick.hidden = true;
+    });
+    formEl.querySelector('.nd-photo-x').addEventListener('click', function () {
+      var box = formEl.querySelector('.nd-photo');
+      var img = box.querySelector('img');
+      if (img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src);
+      img.removeAttribute('src');
+      box.hidden = true;
+      formEl.querySelector('.nd-photo-pick').hidden = false;
+      photo.value = '';
     });
 
     formEl.querySelector('#nd-f-title').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); submitCase(); }
     });
-    // Typing is an answer to "a case needs a title" — stop shouting.
+    // Typing is an answer to "say what the case is" — stop shouting.
     formEl.querySelector('#nd-f-title').addEventListener('input', function () {
       if (this.value.trim()) formError('');
     });
