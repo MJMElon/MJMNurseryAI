@@ -269,16 +269,35 @@ function toast(msg, ok) {
   setTimeout(() => t.remove(), 3600);
 }
 
-/* The three buttons that appear beside a case, and who gets to see them.
-   Order matters only in that it is the order they are drawn in. */
+/* What a person may do with a case, and so which buttons they are shown.
+   Drawn in the order a case actually moves through them: raised, edited,
+   solved, closed — and delete last, apart, because it is the only one
+   that destroys rather than advances.
+
+   may_create and may_close arrive with shared/migration_nelos_close_right
+   .sql. Closing is deliberately its own tick rather than part of solving:
+   solving says "I did the work", closing says "and it was done properly",
+   and the second is somebody else's judgement of the first. */
 const RIGHTS = [
-  { key:'may_solve',  icon:'✅', name:'Solve a case',
-    note:'Mark it resolved and say what was done.' },
+  { key:'may_create', icon:'➕', name:'Add a new case',
+    note:'Raise a case from any module, or from the floating to-do window.' },
   { key:'may_edit',   icon:'✏️', name:'Edit a case',
     note:'Change the title, detail, photo, PIC or due date after it was raised.' },
+  { key:'may_solve',  icon:'✅', name:'Solve a case',
+    note:'Attach a photo of the fix, say what was done, and send it to be closed.' },
+  { key:'may_close',  icon:'🔒', name:'Close a case',
+    note:'Accept somebody else\'s solved case as finished. This ends the case.' },
   { key:'may_delete', icon:'🗑', name:'Delete a case',
     note:'Remove it for good. Solving keeps the record; this does not.' }
 ];
+
+/* Only the ticks this database actually has a column for. may_create and
+   may_close arrive with a migration that may not have been run yet, and a
+   checkbox for a column that does not exist would save into a 400. The
+   save already skips any right whose box was never drawn, so filtering
+   here is the whole guard. */
+const liveRights = () =>
+  RIGHTS.filter(r => people.some(p => p[r.key] !== undefined));
 
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || '';
@@ -397,10 +416,10 @@ function panelHtml(p) {
       ${!hasRights ? '' : `
       <label class="lbl">What they may do to a case</label>
       ${admin
-        ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all three whatever is ticked here.</p>'
+        ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all of these whatever is ticked here.</p>'
         : ''}
       <div class="rights">
-        ${RIGHTS.map(r => `
+        ${liveRights().map(r => `
           <label class="right-row">
             <input type="checkbox" data-right="${r.key}" ${p[r.key] ? 'checked' : ''}>
             <span class="right-ico">${r.icon}</span>
@@ -578,9 +597,10 @@ async function savePerson(userId) {
     updated_at: new Date().toISOString(),
     updated_by: me.name
   };
-  // The three rights arrive with migration_nelos_case_tools.sql. On a
-  // database without it the boxes are not drawn, and the columns are not
-  // sent — so the save still goes through.
+  // The rights arrive with migration_nelos_case_tools.sql and
+  // migration_nelos_close_right.sql. On a database missing either, those
+  // boxes are not drawn (see liveRights) and their columns are not sent —
+  // so the save still goes through.
   RIGHTS.forEach(r => {
     const box = panel.querySelector(`input[data-right="${r.key}"]`);
     if (box) row[r.key] = box.checked;

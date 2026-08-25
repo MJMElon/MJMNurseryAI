@@ -51,6 +51,7 @@
             data-brand="MJM Nursery"     left-hand wordmark
             data-center="NELOS"          centred module title, optional
             data-sub="Nursery Case Log"   line under it, optional
+            data-center-scale="0.7"       shrink the centred title, optional
             data-logo="off"></div>       drop the square badge
 
      With no attributes it renders exactly as it always did. */
@@ -67,6 +68,16 @@
     var centre = d.center || '';
     var sub    = d.sub    || '';
     var logo   = d.logo !== 'off';
+
+    /* A module with a long name needs it set smaller than "NELOS" does.
+       One scale rather than a size, because the title has two sizes — the
+       desk one and the phone one — and a module that set only the first
+       would be back to a title too big to fit a phone. Both move together.
+       Absent, nothing changes: every page that does not ask for this
+       renders at exactly the sizes it always did. */
+    var scale = parseFloat(d.centerScale);
+    if (!(scale > 0)) scale = 1;
+    var px = function (n) { return (Math.round(n * scale * 10) / 10) + 'px'; };
 
     var left =
       '<div class="mjm-rb-left" style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
@@ -85,10 +96,10 @@
     var middle = centre
       ? '<div class="mjm-rb-centre" style="text-align:center;padding:0 12px;min-width:0;">' +
           '<div class="mjm-rb-title" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
-                     'letter-spacing:.3em;font-size:30px;line-height:1.05;white-space:nowrap;">' +
+                     'letter-spacing:.3em;font-size:' + px(30) + ';line-height:1.05;white-space:nowrap;">' +
             _esc(centre) + '</div>' +
           (sub
-            ? '<div class="mjm-rb-sub" style="font-size:13.5px;font-weight:700;color:#94a3b8;' +
+            ? '<div class="mjm-rb-sub" style="font-size:' + px(13.5) + ';font-weight:700;color:#94a3b8;' +
                          'letter-spacing:.08em;white-space:nowrap;margin-top:3px;">' +
                 _esc(sub) + '</div>'
             : '') +
@@ -134,8 +145,14 @@
       '#mjm-ribbon button#logout-btn:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}' +
       '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
                               '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
-                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:21px;}' +
-                              '#mjm-ribbon .mjm-rb-sub{font-size:11.5px;}' +
+                              /* !important for the same reason the layout rules below carry it:
+                                 the title's size and tracking are written inline, and an
+                                 inline declaration outranks a stylesheet one whatever its
+                                 selector. Without it neither of these ever applied, so the
+                                 phone kept the 30px desk title — measured at 412px, a
+                                 867px-wide title clipped into 372px of bar. */
+                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em !important;font-size:' + px(21) + ' !important;}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:' + px(11.5) + ' !important;}' +
       /* The centred mark takes its own row on a phone. Three columns of
          1fr auto 1fr can only hold the mark on the bar's centre line
          while BOTH side columns fit the same width — and the button

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nursery Operation Management</title>
+<title>Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -83,8 +83,8 @@
 <body>
 
 <!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
-<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="Nursery Operation Management"
-     data-sub="Seeds · Plots · Maintenance" data-logo="off"></div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="Nursery Operation Manage"
+     data-center-scale="0.7" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
 <!-- The module names itself in the ribbon now, the way the Nelos pages do,
@@ -133,11 +133,12 @@
        the database. -->
   <div id="tools" class="tool-grid mt-7">
     <a draggable="false" class="tool-btn" data-page="seeds"       href="nursery_ops_seeds.html"><span class="ti">🌰</span><span class="tl">Seeds Management</span></a>
-    <a draggable="false" class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html"><span class="ti">🌱</span><span class="tl">Life of Plot</span></a>
     <a draggable="false" class="tool-btn" data-page="maintenance" href="nursery_ops_maintenance.html"><span class="ti">🛠️</span><span class="tl">Work Maintenance</span></a>
-    <a draggable="false" class="tool-btn" data-page="motion"      href="nursery_ops_settings.html"><span class="ti">⏱️</span><span class="tl">Motion Study Settings</span></a>
-    <a draggable="false" class="tool-btn" data-page="palms_board"  href="nursery_ops_palms_board.html"><span class="ti">🪴</span><span class="tl">PALMS Board</span></a>
-    <a draggable="false" class="tool-btn" data-page="palms_motion" href="nursery_ops_palms_motion.html"><span class="ti">⏱️</span><span class="tl">PALMS Motion Study</span></a>
+    <!-- One way into PALMS. Life of Plot, the motion study and its settings
+         are all readings of the same plot log, so they live behind this tile
+         rather than as four separate ones that gave no hint they belonged
+         together. The PALMS pages carry their own tab strip. -->
+    <a draggable="false" class="tool-btn" data-page="palms_board"  href="nursery_ops_palms_board.html"><span class="ti">🪴</span><span class="tl">PALMS</span></a>
     <!-- Shown only to users who may change other people's access. -->
     <a draggable="false" class="tool-btn tool-btn-access hidden" id="user-access-btn" href="nursery_ops_user_access.html"><span class="ti">🔐</span><span class="tl">User Access</span></a>
   </div>
@@ -244,6 +245,12 @@ function applySavedToolOrder() {
     const el = box.querySelector(`.tool-btn[data-page="${CSS.escape(page)}"]`);
     if (el) box.appendChild(el);
   });
+  // User Access is not draggable and carries no data-page, so it is never in
+  // the saved list — which means every tile above got appended past it and it
+  // ended up FIRST. It is the odd one out on this row (a permission screen,
+  // not a place the work happens) and belongs at the end, so put it back.
+  const access = document.getElementById('user-access-btn');
+  if (access) box.appendChild(access);
 }
 
 function saveToolOrder() {
@@ -319,7 +326,7 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
     if (!MJMAccess.canAccess('nursery_ops')) {
-      alert('You do not have access to Nursery Operation Management.');
+      alert('You do not have access to Nursery Operation Manage.');
       window.location.href = '../index.html';
       return;
     }

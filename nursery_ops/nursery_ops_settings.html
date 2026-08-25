@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Settings · Motion Study — Nursery Operation Management</title>
+<title>Settings · Motion Study — Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -42,7 +42,7 @@
 <body>
 
 <div class="bg-white border-b border-teal-100 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
-  <a href="nursery_ops_dashboard.html" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-teal-600 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; Back</a>
+  <span class="justify-self-start"></span>
   <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Settings — Motion Study</span>
   <div class="justify-self-end"><div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div></div>
 </div>
@@ -50,6 +50,9 @@
 <div id="loading" class="max-w-[1000px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
 
 <div id="main" class="max-w-[1000px] mx-auto px-4 md:px-6 py-8 space-y-6 hidden">
+
+  <div id="palms-nav" data-page="settings" class="mb-6"></div>
+  <script src="../shared/shared_palms_nav.js"></script>
 
   <div class="card p-5 md:p-7">
     <div class="flex items-center justify-between gap-3 mb-2">
@@ -253,7 +256,7 @@ document.addEventListener('keydown', e => {
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
     if (!MJMAccess.canAccess('nursery_ops')) {
-      alert('You do not have access to Nursery Operation Management.');
+      alert('You do not have access to Nursery Operation Manage.');
       window.location.href = '../index.html';
       return;
     }

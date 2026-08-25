@@ -245,7 +245,7 @@ const _supabase = (typeof supabase !== 'undefined' && typeof SHARED_SUPA_URL !==
   ? supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY)
   : null;
 let dbStateCache = {};   // `${nursery}_${month}` → saved schedule payload
-/* Admin of the "Nursery Operation Management" module in User Access.
+/* Admin of the "Nursery Operation Manage" module in User Access.
    Only admins may edit a record once it has been marked Checked. */
 let isNopsAdmin = false;
 /* Plots added by the user via a schedule's "Add Row" (or Setting).
@@ -3101,7 +3101,7 @@ function persistRecords() {
   }, 400);
 }
 /* A checked row is locked to everyone except an admin of the
-   Nursery Operation Management module (User Access). */
+   Nursery Operation Manage module (User Access). */
 function _recLocked(r){ return !!(r && r.checked) && !isNopsAdmin; }
 function _denyLocked(){ alert('This record is Checked. Only an admin can edit it.'); }
 
