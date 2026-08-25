@@ -346,3 +346,37 @@ so anything showing `—` is a batch-naming mismatch worth chasing.
   the server has nothing either, and demo entries are flagged and never synced
   — but the flag is the only thing standing between generated data and the
   office board. Worth a look before the tables go live.
+
+
+## F. The office now reads what the train writes (Aug 2026)
+
+Three things were quietly wrong and are fixed together, because they were the
+same fault seen from three angles.
+
+**`nops_plot_status_entries` was dead.** Life of Plot's map, status table,
+alert board, plot popup and plot-view status line all read it. The Plot Status
+module that wrote it was retired when PALMS replaced it, and nothing has
+written it since — so every polygon was grey and every row said "no status
+reported", whatever the Field Conductors keyed in. All five now read the PALMS
+plot log through `shared_palms.js`. The table is no longer queried anywhere.
+
+**`shared_palms.js` had the eleven activities hardcoded.** The phone has read
+the office's stage list (`nops_plot_status_stages`) since `officeConfig.js` was
+written; this side had not. A stage renamed, reordered or given different ideal
+days in the office showed the OLD name and OLD duration on the office's own
+pages while the phone showed the new one. `MJMPalms.loadStages()` fixes it, and
+**must be called before `loadLogs()`** — `logsFromRows` falls back to the
+activity's ideal days for a row that did not store its own, so the list has to
+be right by the time the log is parsed.
+
+**The map was trapped inside one page.** It is now
+`shared/shared_plot_map.js`, mounted by both Life of Plot and the PALMS board.
+It does not know what a status means: the page passes `statusOf(plot)` and gets
+polygons painted. That is what lets two pages colour the same shapes from
+different reasoning without either explaining itself to the map.
+
+One thing to keep in mind: PALMS logs against a **unit**, which is the plot
+while it is whole (`B2`) and `B2#A` once split into areas. Both pages roll a
+split plot's areas back up and let the worst one stand for the plot, because
+the map has one polygon per plot. If per-area colouring is ever wanted, that
+is the assumption to revisit.

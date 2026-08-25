@@ -25,7 +25,7 @@
      `days` is the ideal duration of the stage — what the motion study
      measures the real one against. Keep in step with ACTIVITIES in the
      FC Portal's src/modules/palms/data.js. */
-  const ACTIVITIES = [
+  let ACTIVITIES = [
     { n: 1,  name: 'Saringan Anak Bibit',        days: 2 },
     { n: 2,  name: 'Tunggu buat culling',        days: 3 },
     { n: 3,  name: 'Culling',                    days: 2 },
@@ -39,11 +39,65 @@
     { n: 11, name: 'Pengambilan',                days: 30 },
   ];
 
-  const FIRST_ACT = 1;   // Saringan Anak Bibit
-  const LAST_ACT = 11;   // Pengambilan
+  let FIRST_ACT = 1;    // Saringan Anak Bibit
+  let LAST_ACT = 11;    // Pengambilan
   const TARGET_DAYS = 15; // the speed incentive: Saringan → Transplanting
 
   const actByN = (n) => ACTIVITIES.find((a) => a.n === n) || null;
+
+  /* ---------- the office's stage list ----------
+     The eleven above are a FALLBACK, not the truth. The stages a Field
+     Conductor picks from are kept by the office on Nursery Operation
+     Management → Life of Plot → Status Stages, and the phone has read them
+     since officeConfig.js was written. This side had not, which meant a
+     stage renamed, reordered or given a different ideal_days in the office
+     showed the OLD name and the OLD duration on these pages while the phone
+     showed the new one — the two disagreeing about the same plot.
+
+     Mapping is copied from the field app's officeConfig.js and must stay in
+     step with it: a stage's number is its sort_order, NOT its database id,
+     because the plot log stores act_n and the whole point of the number is
+     that stage 1 comes before stage 2. */
+  function applyStages(rows) {
+    const stages = (rows || [])
+      .filter((r) => r && r.name)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)
+                   || String(a.name).localeCompare(String(b.name)));
+    if (!stages.length) return false;   // never configured — the fallback stands
+    ACTIVITIES = stages.map((r, i) => ({
+      n: r.sort_order || i + 1,
+      name: String(r.name).trim(),
+      days: r.ideal_days == null ? 1 : Number(r.ideal_days),
+      stageId: r.id,
+    }));
+    FIRST_ACT = ACTIVITIES[0].n;
+    LAST_ACT = ACTIVITIES[ACTIVITIES.length - 1].n;
+    if (global.MJMPalms) {
+      global.MJMPalms.ACTIVITIES = ACTIVITIES;
+      global.MJMPalms.FIRST_ACT = FIRST_ACT;
+      global.MJMPalms.LAST_ACT = LAST_ACT;
+    }
+    return true;
+  }
+
+  /* Read them. Call this BEFORE loadLogs: logsFromRows falls back to the
+     activity's ideal days for a row that did not store its own, so the list
+     has to be right by the time the log is parsed.
+
+     Best effort — a table that does not exist yet, or a read a policy
+     refuses, leaves the fallback in place rather than emptying the page. */
+  async function loadStages(supa) {
+    try {
+      const res = await supa.from('nops_plot_status_stages')
+        .select('id, name, sort_order, ideal_days')
+        .order('sort_order');
+      if (res.error) throw res.error;
+      return applyStages(res.data);
+    } catch (e) {
+      console.warn('[palms] office stages not read, using the built-in list:', (e && e.message) || e);
+      return false;
+    }
+  }
 
   /* ---------- dates ---------- */
   const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
@@ -122,6 +176,78 @@
 
   const openActivities = (logs, key) =>
     currentEntries(logs, key).map((e) => actByN(e.actN)).filter(Boolean).sort((a, b) => a.n - b.n);
+
+  /* ---------- one line per plot, for the board ----------
+     What the office actually reads: where the plot is now, when that stage
+     is due to finish, how many days that leaves, and who last touched it.
+
+     `last` is the newest entry in the log whether it is open or closed —
+     "when did anybody last say anything about this plot" is a different
+     question from "what is running", and a plot sitting with nothing open is
+     exactly the case where the answer matters. */
+  function plotLine(logs, key) {
+    const all = logs[key] || [];
+    if (!all.length) return null;
+    const st = computeStatus(logs, key);
+    const last = all.slice().sort((a, b) =>
+      String(a.start).localeCompare(String(b.start)) || (a.no - b.no))[all.length - 1];
+    const open = openActivities(logs, key);
+    return {
+      key: key,
+      label: keyLabel(key),
+      state: st.state,                                   // overdue | ontrack | none
+      status: open.length ? open.map((a) => a.name).join(' + ') : null,
+      due: st.state === 'none' ? null : st.due,          // expected completion
+      left: st.state === 'none' ? null : st.left,        // <0 = days over
+      start: st.state === 'none' ? null : st.start,
+      lastDate: last.start,
+      lastBy: last.by || null,
+    };
+  }
+
+  /** Every plot's line, worst first — a board is read to find what to chase. */
+  function boardLines(logs, nursery) {
+    const rank = { overdue: 0, ontrack: 1, none: 2 };
+    return unitsOf(logs, nursery).map((k) => plotLine(logs, k)).filter(Boolean)
+      .sort((a, b) => (rank[a.state] - rank[b.state])
+                   || ((a.left == null ? 1e9 : a.left) - (b.left == null ? 1e9 : b.left))
+                   || String(a.key).localeCompare(String(b.key)));
+  }
+
+  /* ---------- one plot's record of stage changes, for the motion study ----
+     Every stage this plot has FINISHED: when it started, the date it was
+     completed, how long that took, and whether that beat the stage's ideal
+     or ran past it.
+
+     Only closed entries. An activity still running has no completion date,
+     and guessing one from today would make an unfinished stage look measured.
+     It is reported separately by the caller as "still running". */
+  function plotHistory(logs, key) {
+    return (logs[key] || []).filter((e) => e.end)
+      .slice()
+      .sort((a, b) => String(b.end).localeCompare(String(a.end)) || (b.no - a.no))
+      .map((e) => {
+        const act = actByN(e.actN);
+        const ideal = e.ideal == null ? null : Number(e.ideal);
+        const actual = diffDays(e.start, e.end);
+        // due is start + ideal, so end === due is exactly on time. Positive
+        // variance is days OVER, negative is days ahead — one number, and the
+        // sign carries the meaning rather than a second column.
+        const due = ideal == null ? null : addDays(e.start, ideal);
+        return {
+          key: key,
+          actN: e.actN,
+          name: act ? act.name : 'Stage ' + e.actN,
+          start: e.start,
+          done: e.end,
+          actual: actual,
+          ideal: ideal,
+          due: due,
+          variance: due == null ? null : diffDays(due, e.end),
+          by: e.by || null,
+        };
+      });
+  }
 
   /** Every unit with anything logged, narrowed to a nursery.
       `nursery` is one key, 'all', or a list — a list is how somebody
@@ -326,10 +452,15 @@
     plotOf: plotOf,
     nurseryOfPlot: nurseryOfPlot,
     loadLogs: loadLogs,
+    loadStages: loadStages,
+    applyStages: applyStages,
     logsFromRows: logsFromRows,
     unitsOf: unitsOf,
     currentEntries: currentEntries,
     computeStatus: computeStatus,
+    plotLine: plotLine,
+    boardLines: boardLines,
+    plotHistory: plotHistory,
     openActivities: openActivities,
     cyclesOf: cyclesOf,
     activityStats: activityStats,

@@ -76,6 +76,39 @@
     </p>
   </div>
 
+  <!-- ── One plot's record of stage changes ──
+       Asked for directly: for each plot, when each status change completed
+       and whether that beat the stage's ideal or ran past it. The aggregates
+       further down answer "what does this work cost in general"; this one
+       answers "what happened to THIS plot", which is the question asked when
+       somebody is chasing a specific one. -->
+  <div class="card overflow-hidden mb-5">
+    <div class="p-5 pb-3 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-[13px] font-black text-slate-700 uppercase tracking-widest">This plot's stage record</h2>
+        <p class="text-[12px] text-slate-500 mt-1 leading-relaxed">
+          Every stage this plot has finished, newest first — the date it was completed, how long it
+          took, and how that compares with the stage's ideal days set in
+          <strong>Life of Plot → Status Stages</strong>.
+        </p>
+      </div>
+      <select id="f-plot" class="pick"></select>
+    </div>
+    <div id="rec-running" class="mx-5 mb-3"></div>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr><th>Stage</th><th>Started</th><th>Completed</th><th class="num">Days taken</th>
+              <th class="num">Ideal</th><th class="num">Ahead / Over</th><th>Recorded by</th></tr>
+        </thead>
+        <tbody id="rec-rows"></tbody>
+      </table>
+    </div>
+    <div id="rec-empty" class="hidden px-5 py-10 text-center text-[12px] font-bold text-slate-400">
+      Nothing finished on this plot yet.
+    </div>
+  </div>
+
   <!-- ── A run of activities, and how long it takes ── -->
   <div class="card p-5 mb-5">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -184,6 +217,7 @@ let SCOPE = 'all';
 let MONTH = '';        // '' = every month
 let FROM = 1, TO = 9;  // Saringan Anak Bibit → Transplanting, the incentive run
 let ACT = 1;
+let PLOT = '';        // the plot the stage record is showing
 
 const days = (n) => (n == null ? '<span class="muted">—</span>' : n + 'd');
 
@@ -246,7 +280,59 @@ function renderUnits() {
     '</tr>').join('');
 }
 
-function renderAll() { renderSpan(); renderRuns(); renderActs(); renderUnits(); }
+/* ── One plot's stage record ───────────────────────────────────────────
+   Variance is one signed number rather than two columns: positive is days
+   OVER the ideal, negative is days ahead of it. The sign is the finding, so
+   it is coloured rather than explained. */
+function renderPlotRecord() {
+  const units = MJMPalms.unitsOf(LOGS, SCOPE).sort((a, b) =>
+    String(a).localeCompare(String(b), undefined, { numeric: true }));
+  if (units.indexOf(PLOT) === -1) PLOT = units[0] || '';
+  $('f-plot').innerHTML = units.length
+    ? units.map((u) => `<option value="${esc(u)}"${u === PLOT ? ' selected' : ''}>${esc(MJMPalms.keyLabel(u))}</option>`).join('')
+    : '<option value="">No plots with a log</option>';
+
+  // What is running now sits above the finished list — it has no completion
+  // date, and dating it "today" would make an unfinished stage look measured.
+  const open = PLOT ? MJMPalms.currentEntries(LOGS, PLOT) : [];
+  $('rec-running').innerHTML = open.length
+    ? open.map((e) => {
+        const act = MJMPalms.actByN(e.actN);
+        const due = MJMPalms.addDays(e.start, e.ideal == null ? 0 : e.ideal);
+        const left = MJMPalms.diffDays(MJMPalms.todayStr(), due);
+        const over = left < 0;
+        return `<div class="flex flex-wrap items-center gap-2 text-[12px] rounded-xl px-3 py-2 ${over ? 'bg-rose-50' : 'bg-emerald-50'}">
+            <span class="font-black uppercase tracking-wider text-[10px] ${over ? 'text-rose-700' : 'text-emerald-700'}">Running now</span>
+            <span class="font-bold text-slate-700">${esc(act ? act.name : 'Stage ' + e.actN)}</span>
+            <span class="text-slate-500">since ${esc(MJMPalms.prettyD(e.start))}</span>
+            <span class="ml-auto font-black ${over ? 'text-rose-600' : 'text-emerald-600'}">
+              ${over ? (-left) + 'd over' : left + 'd left'}</span>
+          </div>`;
+      }).join('')
+    : '';
+
+  const rows = PLOT ? MJMPalms.plotHistory(LOGS, PLOT) : [];
+  $('rec-empty').classList.toggle('hidden', rows.length > 0);
+  $('rec-rows').innerHTML = rows.map((r) => {
+    let v = '<span class="muted">—</span>';
+    if (r.variance != null) {
+      if (r.variance > 0)      v = `<span class="text-rose-600 font-black">${r.variance}d over</span>`;
+      else if (r.variance < 0) v = `<span class="text-emerald-600 font-black">${-r.variance}d ahead</span>`;
+      else                     v = '<span class="text-slate-500 font-bold">on time</span>';
+    }
+    return `<tr>
+        <td class="font-black text-slate-800">${esc(r.name)}</td>
+        <td class="text-slate-500">${esc(MJMPalms.prettyD(r.start))}</td>
+        <td class="text-slate-700 font-bold">${esc(MJMPalms.prettyD(r.done))}</td>
+        <td class="num">${r.actual}d</td>
+        <td class="num text-slate-500">${r.ideal == null ? '—' : r.ideal + 'd'}</td>
+        <td class="num">${v}</td>
+        <td class="text-slate-500">${r.by ? esc(r.by) : '—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderAll() { renderPlotRecord(); renderSpan(); renderRuns(); renderActs(); renderUnits(); }
 
 function fillMonths() {
   const months = MJMPalms.monthsWithData(LOGS, SCOPE);
@@ -305,10 +391,18 @@ function fillMonths() {
       fillMonths(); renderAll();
     });
     $('f-month').addEventListener('change', (e) => { MONTH = e.target.value; renderAll(); });
+    // The stage record is one plot at a time and is not filtered by month:
+    // a plot's history reads as a sequence, and hiding the stages either side
+    // of a month boundary breaks the very thing it is read for.
+    $('f-plot').addEventListener('change', (e) => { PLOT = e.target.value; renderPlotRecord(); });
     $('f-from').addEventListener('change', (e) => { FROM = Number(e.target.value); renderSpan(); renderRuns(); });
     $('f-to').addEventListener('change', (e) => { TO = Number(e.target.value); renderSpan(); renderRuns(); });
     $('f-act').addEventListener('change', (e) => { ACT = Number(e.target.value); renderUnits(); });
 
+    /* Stages BEFORE logs: logsFromRows falls back to the activity's ideal
+       days for a row that did not store its own, so the office's list has to
+       be in place by the time the log is parsed. */
+    await MJMPalms.loadStages(_supabase);
     LOGS = await MJMPalms.loadLogs(_supabase);
     if (!Object.keys(LOGS).length) $('empty').classList.remove('hidden');
     fillMonths();
