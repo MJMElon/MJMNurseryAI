@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Audit Back End — MJM Nursery</title>
+  <title>555 Auditor Portal — Back End</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 
   <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
        arrow, language, sign-out. Also loaded by audit_home.html and
@@ -156,8 +156,14 @@
        Scaled up to match the module cards on the other dashboards: room to
        say what the thing does, and an explicit way in rather than a chevron
        you have to know is a link. */
-    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-    .fc-card{display:flex;flex-direction:column;background:var(--card);
+    /* grid-auto-rows:1fr makes every ROW the height of the tallest card in
+       the grid, not just of its own row — so all four modules match even
+       though their descriptions differ in length. .fc-desc already carries
+       flex:1, which keeps every "Enter Module" line on the same baseline
+       once the boxes are equal. */
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+           grid-auto-rows:1fr;gap:16px}
+    .fc-card{position:relative;display:flex;flex-direction:column;background:var(--card);
              border:1px solid var(--line);border-radius:18px;padding:24px 24px 22px;
              text-decoration:none;box-shadow:0 1px 3px rgba(16,40,60,.05);
              transition:box-shadow .18s,transform .18s;min-height:210px}
@@ -174,6 +180,56 @@
     .fc-enter svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
                   stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
     .fc-card:hover .fc-enter svg{transform:translateX(4px)}
+
+    /* ── REORDERING THE MODULES ──
+       The grip is a separate target rather than the whole card, for two
+       reasons. The card is a link, so a press that turns out to be a drag
+       would otherwise have to be untangled from a press that was a click.
+       And on a phone the cards fill the screen: claiming the whole card
+       for dragging (touch-action:none) would stop the page scrolling
+       under a thumb that happened to land on one. Only the grip gives up
+       its scrolling, and it is small. */
+    .fc-grip{position:absolute;top:12px;right:12px;
+             width:30px;height:30px;border-radius:9px;
+             display:flex;align-items:center;justify-content:center;
+             color:var(--ink3);background:transparent;border:none;padding:0;
+             cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
+             opacity:.45;transition:opacity .15s,background .15s,color .15s}
+    .fc-card:hover .fc-grip{opacity:1;background:#f1f5f9}
+    .fc-grip:focus-visible{opacity:1;background:#f1f5f9;
+                           outline:2px solid var(--green);outline-offset:2px}
+    .fc-grip:active{cursor:grabbing}
+    .fc-grip svg{width:15px;height:15px;stroke:currentColor;fill:none;
+                 stroke-width:2.4;stroke-linecap:round}
+
+    /* The card being carried. Lifted and slightly transparent so the gap
+       it will drop into stays readable underneath it. */
+    .fc-card.is-dragging{
+      box-shadow:0 14px 34px rgba(16,40,60,.20);
+      transform:scale(1.02);opacity:.9;z-index:5;cursor:grabbing;
+    }
+    /* While a drag is live nothing else should respond to the pointer —
+       the hover lift on the cards being pushed past is pure noise. */
+    .cards.is-reordering .fc-card:not(.is-dragging){transition:transform .16s ease}
+    .cards.is-reordering .fc-card:hover{box-shadow:0 1px 3px rgba(16,40,60,.05);transform:none}
+    .cards.is-reordering .fc-grip{opacity:1}
+
+    /* Section head becomes a row so the reset control can sit opposite the
+       label. The button only exists once an order has actually been saved. */
+    .section-row{display:flex;align-items:center;justify-content:space-between;
+                 gap:12px;margin-bottom:10px}
+    .section-row .section-head{margin-bottom:0}
+    .order-reset{background:none;border:none;padding:0;cursor:pointer;
+                 font-family:inherit;font-size:10px;font-weight:700;
+                 letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);
+                 text-decoration:underline;text-underline-offset:3px}
+    .order-reset:hover{color:var(--ink)}
+    .order-reset[hidden]{display:none}
+
+    @media (prefers-reduced-motion:reduce){
+      .fc-card,.cards.is-reordering .fc-card:not(.is-dragging){transition:none}
+      .fc-card.is-dragging{transform:none}
+    }
 
     /* ── ALERTS ──
        Moved off the plot audit page, where only the auditor recording that
@@ -259,9 +315,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </a>
     <div class="fcr-brand">
-      <div class="fcr-brand-top">MJM Nursery</div>
       <div class="fcr-brand-name">555</div>
-      <div class="fcr-brand-sub">Auditor Portal</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
     </div>
     <div class="fcr-right">
       <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
@@ -271,7 +327,7 @@
       </button>
       <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span class="fcr-signout-label">Sign Out</span>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
       </button>
     </div>
   </nav>
@@ -289,6 +345,27 @@
     </a>
 
 
+    <!-- ── WHAT NEEDS ATTENTION ──
+         Above the modules, because it is the reason to open one. The
+         module cards are only ever four fixed doors; what changes day to
+         day is the case list and the alerts, and those were sitting below
+         the doors where somebody had to scroll past to find them. -->
+    <!-- Nelos To-Do: audit cases still open. This sits on the back end and
+         NOT on audit_home.html on purpose — the auditor view was stripped of
+         MJMAccess and the Supabase CDN so it loads on nursery signal, and
+         Nelos is not worth putting that back. -->
+    <div id="nelos-todo" class="alert-wrap admin-only"></div>
+
+    <!-- No section heading here: every group already announces itself as
+         "Alerts — <nursery>", and stacking the two just repeated the word. -->
+    <div class="alert-wrap admin-only">
+      <div class="alert-month" id="alert-month">Checking this month's audits…</div>
+      <div id="alert-section">
+        <div class="alert-loading">Checking the latest audit data…</div>
+      </div>
+    </div>
+
+
     <!-- ── AUDIT MODULES ──
          Moved here from audit_home.html. On the phone the portal's
          to-do list is the way into a module — it names the plots that
@@ -296,10 +373,18 @@
          repeated the same four destinations without saying anything
          about what was due. On a desktop there is no such list, so
          this is where the four modules are reachable directly. -->
-    <div class="section-head" data-t="home_modules_title">Audit Modules</div>
-    <div class="cards" style="margin-bottom:26px">
+    <div class="section-row">
+      <div class="section-head" data-t="home_modules_title">Audit Modules</div>
+      <button type="button" class="order-reset" id="order-reset" hidden
+              onclick="resetModuleOrder()">Reset order</button>
+    </div>
+    <div class="cards" id="module-cards" style="margin-bottom:26px">
 
-      <a class="fc-card" href="audit_plot_audit.html">
+      <a class="fc-card" href="audit_plot_audit.html" data-mod="plot" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Plot Condition Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
         <div class="fc-ico" style="background:#e8f5e9">
           <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
@@ -311,7 +396,11 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_height_index.html">
+      <a class="fc-card" href="audit_height_index.html" data-mod="height" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Seedling Height Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
         <div class="fc-ico" style="background:#e0f2fe">
           <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
         </div>
@@ -323,7 +412,11 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_papan_index.html">
+      <a class="fc-card" href="audit_papan_index.html" data-mod="papan" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Papan Tanda Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
         <div class="fc-ico" style="background:#fff1e6">
           <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
         </div>
@@ -335,7 +428,11 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_maintenance_index.html">
+      <a class="fc-card" href="audit_maintenance_index.html" data-mod="maint" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Maintenance Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
         <div class="fc-ico" style="background:#e8eefc">
           <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
         </div>
@@ -348,20 +445,6 @@
       </a>
     </div>
 
-    <!-- No section heading here: every group already announces itself as
-         "Alerts — <nursery>", and stacking the two just repeated the word. -->
-    <div class="alert-wrap admin-only">
-      <div class="alert-month" id="alert-month">Checking this month's audits…</div>
-      <div id="alert-section">
-        <div class="alert-loading">Checking the latest audit data…</div>
-      </div>
-    </div>
-
-    <!-- Nelos To-Do: audit cases still open. This sits on the back end and
-         NOT on audit_home.html on purpose — the auditor view was stripped of
-         MJMAccess and the Supabase CDN so it loads on nursery signal, and
-         Nelos is not worth putting that back. -->
-    <div id="nelos-todo" class="alert-wrap admin-only"></div>
 
     <div class="section-head admin-only">Administration</div>
     <div class="cards admin-only">
@@ -645,20 +728,181 @@ setInterval(function(){
     if (MJMAccess.user() && MJMAccess.canManageUsers()) {
       document.getElementById('card-user-access').style.display = 'flex';
     }
-    // Open audit cases, for people who hold Nelos. hideIfEmpty so a clean
-    // month leaves the alerts above sitting where they always did.
+    // Open audit cases, for people who hold Nelos.
     if (MJMAccess.canAccess('nelos')) {
       MJMNelos.init(supa, { root: '../' });
+      /* Shown even when empty. It used to remove itself on a clean month
+         so the alerts below did not appear to jump — but it now sits at
+         the top as the page's to-do list, and a to-do list that is absent
+         when there is nothing to do cannot be trusted to be absent for
+         that reason. Empty, it reads "clear". */
       MJMNelos.mountTodo('#nelos-todo', {
-        module: 'audit',
-        title:  'Nelos — Cases For This Module',
-        hideIfEmpty: true
+        module:       'audit',
+        title:        'Auditor NELOS',
+        newCase:      'top',        /* own row under the heading */
+        newCaseLabel: '+ Case',
+        openLink:     false,        /* was "Open Nelos →" */
+        hideIfEmpty:  false
       });
     }
   } catch (e) { /* no portal session — card stays hidden */ }
 })();
 
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   MODULE CARD ORDER
+   ══════════════════════════════════════════════════════════════════
+   Four people use this page for four different jobs, and each of them
+   opens one module far more than the other three. The order is theirs
+   to set: drag a card by its grip, and where it lands is where it
+   stays.
+
+   Stored per account in localStorage, keyed the same way the auditor
+   portal keys the chosen nursery — the office machine is shared, and a
+   flat key would hand the next person to sign in the last person's
+   layout. It does not follow anyone to a second device; that would
+   need a column on shared_profiles, and this is a preference, not a
+   record.
+
+   A module missing from a saved order — a fifth one added later —
+   lands at the end rather than vanishing or jumping to the front.
+   ══════════════════════════════════════════════════════════════════ */
+(function moduleOrder(){
+  const grid  = document.getElementById('module-cards');
+  const reset = document.getElementById('order-reset');
+  if (!grid) return;
+
+  const cards = () => Array.prototype.slice.call(grid.querySelectorAll('.fc-card'));
+
+  function storeKey(){
+    let u = {};
+    try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
+    return 'mjm_audit_module_order:' + (u.id || u.email || 'anon');
+  }
+
+  function save(){
+    try {
+      localStorage.setItem(storeKey(),
+        JSON.stringify(cards().map(c => c.dataset.mod)));
+    } catch (e) {}
+    if (reset) reset.hidden = false;
+  }
+
+  function restore(){
+    let order = [];
+    try { order = JSON.parse(localStorage.getItem(storeKey()) || '[]'); } catch (e) {}
+    if (!Array.isArray(order) || !order.length) return;
+    /* Work out the strangers BEFORE moving anything, then append the
+       known ones in the saved order and the strangers after them. */
+    const tail = cards().filter(c => order.indexOf(c.dataset.mod) === -1);
+    order.forEach(mod => {
+      const el = grid.querySelector('.fc-card[data-mod="' + mod + '"]');
+      if (el) grid.appendChild(el);
+    });
+    tail.forEach(el => grid.appendChild(el));
+    if (reset) reset.hidden = false;
+  }
+  /* Stamp the authored positions BEFORE restore() moves anything, or
+     "reset" would sort the cards back into whatever order was last
+     saved — which is what it is meant to undo. */
+  cards().forEach((c, i) => { c.dataset.order = i; });
+  restore();
+
+  window.resetModuleOrder = function(){
+    try { localStorage.removeItem(storeKey()); } catch (e) {}
+    /* data-order holds the order the page was authored in, so resetting
+       does not depend on reloading. */
+    cards().sort((a, b) => (+a.dataset.order || 0) - (+b.dataset.order || 0))
+           .forEach(el => grid.appendChild(el));
+    if (reset) reset.hidden = true;
+  };
+
+  /* ── DRAGGING ──
+     Pointer events, so a mouse and a finger take the same path. The
+     card follows nothing — it is moved in the DOM as the pointer
+     passes other cards, so the grid itself shows the result and there
+     is no floating clone to keep in sync. */
+  let drag = null;
+
+  grid.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('.fc-grip');
+    if (!grip || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const card = grip.closest('.fc-card');
+    if (!card) return;
+    e.preventDefault();                       /* no text selection, no link drag */
+    drag = { card: card, id: e.pointerId, moved: false };
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  grid.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.card.classList.add('is-dragging');
+      grid.classList.add('is-reordering');
+    }
+    /* Nearest other card by straight-line distance to its centre. A grid
+       wraps, so "before or after" cannot be decided on the x axis alone —
+       but once the nearest card is known, which side of ITS centre the
+       pointer sits on is the whole answer. */
+    let best = null, bestDist = Infinity;
+    cards().forEach(c => {
+      if (c === drag.card) return;
+      const r = c.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width  / 2);
+      const dy = e.clientY - (r.top  + r.height / 2);
+      const d  = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) { bestDist = d; best = c; }
+    });
+    if (!best) return;
+    const r = best.getBoundingClientRect();
+    const after = (e.clientY > r.top + r.height / 2)
+               || (e.clientY >= r.top && e.clientX > r.left + r.width / 2);
+    grid.insertBefore(drag.card, after ? best.nextSibling : best);
+  });
+
+  function endDrag(e){
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    const moved = drag.moved;
+    drag.card.classList.remove('is-dragging');
+    grid.classList.remove('is-reordering');
+    drag = null;
+    if (moved) save();
+  }
+  grid.addEventListener('pointerup', endDrag);
+  grid.addEventListener('pointercancel', endDrag);
+
+  /* ── KEYBOARD ──
+     Drag-only reordering cannot be done without a pointer, so the grip
+     is a real button and the arrow keys move the card it belongs to.
+     Focus rides along with it, or the next press would move whatever
+     card happened to take its place. */
+  grid.addEventListener('keydown', e => {
+    const grip = e.target.closest('.fc-grip');
+    if (!grip) return;
+    const card = grip.closest('.fc-card');
+    if (!card) return;
+    let moved = false;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (card.nextElementSibling) {
+        grid.insertBefore(card.nextElementSibling, card); moved = true;
+      }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      if (card.previousElementSibling) {
+        grid.insertBefore(card, card.previousElementSibling); moved = true;
+      }
+    } else return;
+    e.preventDefault();
+    if (moved) { save(); grip.focus(); }
+  });
+
+  /* A grip lives inside the card's <a>. Without this, releasing a drag —
+     or pressing the button at all — would follow the link. */
+  grid.addEventListener('click', e => {
+    if (e.target.closest('.fc-grip')) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
 </script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.

@@ -3,7 +3,10 @@
    ═══════════════════════════════════════════════════════════════
    Mounts the same header strip on every module page:
 
-       [AI] MJM NURSERY AI          Welcome, name   [← Portal]  [Sign Out]
+       [AI] MJM NURSERY AI    <title>    Welcome, name  [← Portal] [Sign Out]
+
+   The wordmark, an optional centred module title, and whether the square
+   badge shows are all read off the mount point — see ribbonHtml().
 
    Usage:
      <div id="mjm-ribbon"></div>                 <!-- where the ribbon renders -->
@@ -41,19 +44,57 @@
 
   // ── Ribbon markup — inline styles so it renders identically on
   //    Tailwind and non-Tailwind pages ────────────────────────────
-  var RIBBON_HTML =
+  /* The ribbon reads its wording off the mount point, so a module can put
+     its own name in the middle without forking this file:
+
+       <div id="mjm-ribbon"
+            data-brand="MJM Nursery"     left-hand wordmark
+            data-center="NELOS"          centred module title, optional
+            data-sub="Nursery Case Log"   line under it, optional
+            data-logo="off"></div>       drop the square badge
+
+     With no attributes it renders exactly as it always did. */
+  function ribbonHtml(host) {
+    var d = (host && host.dataset) || {};
+    var brand  = d.brand  || 'MJM Nursery AI';
+    var centre = d.center || '';
+    var sub    = d.sub    || '';
+    var logo   = d.logo !== 'off';
+
+    var left =
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
+        (logo
+          ? '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
+                        'display:flex;align-items:center;justify-content:center;color:#fff;' +
+                        'font-weight:900;font-size:11px;flex-shrink:0;">AI</div>'
+          : '') +
+        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
+                     'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          _esc(brand) + '</span>' +
+      '</div>';
+
+    // Centred by being its own flex child between two flex:1 siblings, so it
+    // stays put whatever the wordmark and the buttons are doing either side.
+    var middle = centre
+      ? '<div class="mjm-rb-centre" style="text-align:center;padding:0 12px;min-width:0;">' +
+          '<div class="mjm-rb-title" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
+                     'letter-spacing:.3em;font-size:23px;line-height:1.05;white-space:nowrap;">' +
+            _esc(centre) + '</div>' +
+          (sub
+            ? '<div class="mjm-rb-sub" style="font-size:10.5px;font-weight:700;color:#94a3b8;' +
+                         'letter-spacing:.08em;white-space:nowrap;margin-top:3px;">' +
+                _esc(sub) + '</div>'
+            : '') +
+        '</div>'
+      : '';
+
+    return '' +
     '<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
               'display:flex;justify-content:space-between;align-items:center;position:sticky;' +
               'top:0;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.06);' +
               'font-family:Outfit,system-ui,-apple-system,sans-serif;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;">' +
-        '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
-                    'display:flex;align-items:center;justify-content:center;color:#fff;' +
-                    'font-weight:900;font-size:11px;flex-shrink:0;">AI</div>' +
-        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
-                     'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MJM Nursery AI</span>' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">' +
+      left + middle +
+      '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex:1;justify-content:flex-end;">' +
         '<span id="welcome-text" style="font-size:12px;font-weight:700;color:#94a3b8;white-space:nowrap;" class="mjm-rb-hide-sm"></span>' +
         '<a id="portal-link" href="' + PORTAL + '" ' +
            'style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.15em;' +
@@ -68,8 +109,18 @@
     '<style>' +
       '#mjm-ribbon a#portal-link:hover{background:#ecfdf5;color:#059669;border-color:#a7f3d0;}' +
       '#mjm-ribbon button#logout-btn:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}' +
-      '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}}' +
+      '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
+                              '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
+                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em;font-size:16px;}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:9px;}}' +
     '</style>';
+  }
+
+  function _esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   // ── Mount ripple: render into the fixed mount point ────────────
   function mount() {
@@ -77,7 +128,7 @@
     if (!host) return;                            // page didn't ask for the ribbon
     if (host.dataset.mjmRbMounted === '1') return; // idempotent
     host.dataset.mjmRbMounted = '1';
-    host.innerHTML = RIBBON_HTML;
+    host.innerHTML = ribbonHtml(host);
     // Portal click: replace() (fresh navigator-lock context) instead of an
     // in-place navigation that could keep the auth mutex held.
     var link = host.querySelector('#portal-link');

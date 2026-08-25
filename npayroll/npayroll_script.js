@@ -206,12 +206,19 @@ function renderWorkers() {
       (showInactive || w.active !== false) &&
       (!q || `${w.full_name || ''} ${w.role || ''}`.toLowerCase().includes(q))
     );
+    const canEdit = may('workers', 'manage');
     const rows = list.length ? list.map((w, i) => `
       <tr>
-        <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
+        <td style="color:var(--text-faint);">${i + 1}</td>
         <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}</td>
         <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
           ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
+        <td><input class="pin-in" type="text" inputmode="numeric" autocomplete="off"
+                   maxlength="6" placeholder="––––" value="${esc(w.pin || '')}"
+                   ${(_pinCol && canEdit) ? '' : 'disabled'}
+                   title="${_pinCol ? 'PIN this worker signs in to the worker portal with' : 'Run shared/add_npayroll_worker_pin.sql to switch PINs on'}"
+                   onchange="savePin(${w.id}, this)"
+                   onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
         <td class="r" style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="openWorker(${w.id})">Edit</button>
@@ -221,8 +228,8 @@ function renderWorkers() {
       // While a search is running an empty section means "nothing matched",
       // not "nobody works here" — offering to add someone there would be wrong.
       : q
-        ? `<tr><td colspan="5" class="empty">No match in this section.</td></tr>`
-        : `<tr><td colspan="5" class="empty">No worker in this section yet.
+        ? `<tr><td colspan="6" class="empty">No match in this section.</td></tr>`
+        : `<tr><td colspan="6" class="empty">No worker in this section yet.
              <button class="btn btn-sm wsec-add-inline" onclick="openWorker(null,'${sec.code}')"
                      >+ Add to ${esc(sec.code)}</button></td></tr>`;
 
@@ -234,13 +241,60 @@ function renderWorkers() {
           <button class="btn btn-sm wsec-add" onclick="openWorker(null,'${sec.code}')"
                   title="Add a worker to ${esc(sec.name)}">+ Add Worker</button>
         </div>
-        <div class="wsec-body"><div class="tbl-wrap"><table>
-          <thead><tr><th style="width:44px;">No.</th><th class="l">Name</th><th class="l">Role</th>
-                     <th style="width:100px;">Status</th><th style="width:150px;"></th></tr></thead>
+        <div class="wsec-body"><div class="tbl-wrap"><table class="wsec-table">
+          <colgroup>
+            <col style="width:44px"><col><col style="width:210px">
+            <col style="width:120px"><col style="width:104px"><col style="width:150px">
+          </colgroup>
+          <thead><tr><th>No.</th><th class="l">Name</th><th class="l">Role</th>
+                     <th>PIN</th><th>Status</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div></div>
       </div>`;
   }).join('');
+}
+
+/* ── Worker PIN ─────────────────────────────────────────────────────────
+   The number a worker will key into the worker portal to sign in. Kept on
+   the register beside them so whoever hands it out can see and change it.
+
+   Rules: 4 to 6 digits, or blank for a worker who has not been given one;
+   and no two workers share a PIN, since a PIN is how the portal will tell
+   them apart. Both are checked here for a plain message, and again by the
+   database (see shared/add_npayroll_worker_pin.sql) so a second browser
+   cannot slip a duplicate past this one.
+   ─────────────────────────────────────────────────────────────────────── */
+function pinProblem(pin, id) {
+  if (!pin) return null;                                  // blank clears it
+  if (!/^\d{4,6}$/.test(pin)) return 'A PIN is 4 to 6 digits, numbers only.';
+  const clash = workers.find(x => x.id !== id && String(x.pin || '') === pin);
+  return clash ? `That PIN is already ${clash.full_name}'s. Give each worker a different one.` : null;
+}
+
+async function savePin(id, el) {
+  const w = workers.find(x => x.id === id);
+  if (!w) return;
+  const prev = w.pin || '';
+  const pin  = (el.value || '').replace(/\D/g, '');
+  const back = () => { el.value = prev; };
+
+  if (!mayDo('workers', 'manage',
+      'You do not have permission to set a worker PIN. Ask an admin to grant it in User Access.')) return back();
+  const bad = pinProblem(pin, id);
+  if (bad) { alert(bad); back(); el.focus(); return; }
+  if (pin === prev) { el.value = pin; return; }
+
+  el.disabled = true;
+  const { error } = await _supabase.from('mjmnpayroll_workers')
+    .update({ pin: pin || null, updated_at: new Date().toISOString(), updated_by: userEmail || null })
+    .eq('id', id);
+  el.disabled = false;
+  if (error) { alert('Could not save the PIN.\n\n' + (error.message || error)); back(); return; }
+
+  w.pin = pin || null;
+  el.value = pin;
+  el.classList.add('pin-saved');
+  setTimeout(() => el.classList.remove('pin-saved'), 900);
 }
 
 function fillSectionSelect(el, includeAll, selected) {
@@ -281,6 +335,8 @@ function openWorker(id, section) {
   $('wf-name').value   = w?.full_name || '';
   fillRoleSelect(w?.role || w?.job_title || '');
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
+  $('wf-pin').value    = w?.pin || '';
+  $('wf-pin').disabled = !_pinCol;
   $('wf-remark').value = w?.remark || '';
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
   $('wf-maint').checked = w ? onMaintSheet(w) : true;
@@ -349,6 +405,12 @@ async function saveWorker() {
   };
   // Writing a column the table does not have fails the whole save.
   if (_maintGeneralCol && MAINT_NURSERIES.includes(row.section)) row.maint_general = $('wf-maint').checked;
+  if (_pinCol) {
+    const pin = ($('wf-pin').value || '').replace(/\D/g, '');
+    const bad = pinProblem(pin, editWorkerId);
+    if (bad) { alert(bad); $('wf-pin').focus(); return; }
+    row.pin = pin || null;
+  }
   $('wf-save').disabled = true;
   try {
     let error;
@@ -1043,6 +1105,7 @@ function downloadMonthlyPDF() {
 
 /* ════════════ LOAD ════════════ */
 let _maintGeneralCol = true;
+let _pinCol = true;
 async function loadWorkers() {
   const { data, error } = await _supabase.from('mjmnpayroll_workers').select('*').order('full_name');
   if (error) { flagSetup(error.message); return; }
@@ -1052,6 +1115,11 @@ async function loadWorkers() {
   _maintGeneralCol = !probe.error;
   const w = $('worker-setup');
   if (w) w.classList.toggle('hidden', _maintGeneralCol);
+  // Same question for the PIN column, added later again.
+  const pinProbe = await _supabase.from('mjmnpayroll_workers').select('pin').limit(1);
+  _pinCol = !pinProbe.error;
+  const pw = $('pin-setup');
+  if (pw) pw.classList.toggle('hidden', _pinCol);
 }
 async function loadRates() {
   const { data, error } = await _supabase.from('mjmnpayroll_piece_rates')

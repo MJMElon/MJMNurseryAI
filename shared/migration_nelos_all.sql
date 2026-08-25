@@ -15,6 +15,7 @@
 --   6. migration_nelos_hq.sql       HQ systems that see every case
 --   7. migration_nelos_category_system.sql  case titles belong to a system
 --   8. migration_nelos_rls.sql      lock the tables down
+--   9. migration_nelos_grant.sql    add somebody to Nelos in one step
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -23,19 +24,15 @@
 -- Each part also still works on its own, and refuses with a readable
 -- message if run before something it needs.
 --
--- KEEPING THIS IN STEP: this file is a concatenation. Edit one of the parts
--- and rebuild it rather than editing here, or the two will drift:
+-- KEEPING THIS IN STEP: this file is generated. Edit one of the parts and
+-- rebuild it rather than editing here, or the two will drift:
 --
---   cd shared && { for f in migration_nelos.sql migration_nelos_modules.sql \
---       migration_nelos_routing.sql migration_nelos_roles.sql \
---       migration_nelos_seats.sql migration_nelos_hq.sql \
---       migration_nelos_rls.sql; do echo; echo "-- >>> $f"; cat "$f"; done; }
+--   sh shared/build_nelos_all.sh
 --
 -- ============================================================================
 
-
 -- ############################################################################
--- ##  PART 1 of 8 — migration_nelos.sql
+-- ##  PART 1 of 9 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -376,9 +373,8 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 -- operation_follow_up_cases is untouched by this migration, so reverting
 -- Batch Detail's insert target is all that is needed to go back.
 
-
 -- ############################################################################
--- ##  PART 2 of 8 — migration_nelos_modules.sql
+-- ##  PART 2 of 9 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -680,9 +676,8 @@ SELECT m.key, m.label, count(mm.id) AS members
 --   DROP FUNCTION IF EXISTS public.nelos_lookup_user(TEXT);
 --   DROP TABLE IF EXISTS nelos_module_members, nelos_modules;
 
-
 -- ############################################################################
--- ##  PART 3 of 8 — migration_nelos_routing.sql
+-- ##  PART 3 of 9 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1000,9 +995,8 @@ SELECT m.key,
 --   ALTER TABLE nelos_modules DROP COLUMN IF EXISTS can_create, DROP COLUMN IF EXISTS route_to;
 -- nelos_module_members is untouched, so the old page would work again.
 
-
 -- ############################################################################
--- ##  PART 4 of 8 — migration_nelos_roles.sql
+-- ##  PART 4 of 9 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1350,9 +1344,8 @@ SELECT r.source_module AS raised_in,
 --   the two-column nelos_my_scope()/nelos_people(). nelos_modules.route_to
 --   was never cleared, so the old section routing comes back with it.
 
-
 -- ############################################################################
--- ##  PART 5 of 8 — migration_nelos_seats.sql
+-- ##  PART 5 of 9 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1668,9 +1661,8 @@ SELECT m.label AS system,
 --   role-shaped functions. nelos_roles and every *_role_id column were
 --   never cleared, so the old behaviour comes back with them.
 
-
 -- ############################################################################
--- ##  PART 6 of 8 — migration_nelos_hq.sql
+-- ##  PART 6 of 9 — migration_nelos_hq.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1771,9 +1763,8 @@ SELECT label AS system,
 --   then re-run migration_nelos_seats.sql to restore the four-column
 --   nelos_my_scope().
 
-
 -- ############################################################################
--- ##  PART 7 of 8 — migration_nelos_category_system.sql
+-- ##  PART 7 of 9 — migration_nelos_category_system.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1867,9 +1858,8 @@ SELECT m.label AS system,
 --   ALTER TABLE nelos_categories DROP COLUMN IF EXISTS module_key;
 --   ALTER TABLE nelos_categories ADD CONSTRAINT nelos_categories_name_key UNIQUE (name);
 
-
 -- ############################################################################
--- ##  PART 8 of 8 — migration_nelos_rls.sql
+-- ##  PART 8 of 9 — migration_nelos_rls.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2047,3 +2037,109 @@ SELECT tablename,
 --   created above and recreate the pair by hand:
 --     CREATE POLICY "Authenticated read <x>"  ON <t> FOR SELECT TO authenticated USING (true);
 --     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);
+
+-- ############################################################################
+-- ##  PART 9 of 9 — migration_nelos_grant.sql
+-- ############################################################################
+
+-- ============================================================================
+-- MJM AI POWERED SYSTEM — migration_nelos_grant.sql
+--
+-- NELOS — adding somebody from Pending Allocation grants them Nelos.
+--
+-- Until now, putting a person to work in Nelos took two screens: grant them
+-- the module on the main portal's User Access, then come to Nelos and tag
+-- them to a system. Anybody who did only the second half was tagged but
+-- could not open the module, which reads on screen as "why can't they see
+-- their cases".
+--
+-- The Pending Allocation section now searches everybody in the company by
+-- name or email, and adding one of them does BOTH halves: it grants Nelos
+-- on shared_profiles.permissions and creates their handler row.
+--
+-- WHY THIS NEEDS A FUNCTION
+--   shared_profiles.permissions is writable only by somebody holding
+--   manage_users (migration_access_and_reviews.sql). A Nelos admin who does
+--   not also manage users could not make the grant. This function does it
+--   on their behalf, and checks for itself that the caller is one or the
+--   other before touching anything.
+--
+--   It grants 'normal', never 'admin', and never touches a person who
+--   already has some level of Nelos — so it can only open the door, never
+--   widen or narrow what somebody already has.
+--
+-- Requires the earlier nelos migrations — run migration_nelos_all.sql first.
+-- Run in Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+-- ============================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nelos_handlers') IS NULL THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Nelos tables do not exist yet.',
+      HINT    = 'Run migration_nelos_all.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- Grant Nelos to one person.
+--
+-- Returns the level they hold afterwards, so the page can say what it did:
+-- 'normal' when this call granted it, or whatever they already held.
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.nelos_grant_access(p_user_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_level TEXT;
+BEGIN
+  -- Only a Nelos admin or a portal user-manager may open the door. Checked
+  -- here rather than trusted from the page, because SECURITY DEFINER means
+  -- this runs with rights the caller does not have.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.shared_profiles me
+     WHERE me.id = auth.uid()
+       AND (COALESCE((me.permissions->>'manage_users')::boolean, false)
+            OR COALESCE(me.permissions->'modules'->>'nelos', 'none') = 'admin')
+  ) THEN
+    RAISE EXCEPTION 'Only a Nelos admin may grant Nelos access.';
+  END IF;
+
+  SELECT COALESCE(permissions->'modules'->>'nelos', 'none')
+    INTO current_level
+    FROM public.shared_profiles
+   WHERE id = p_user_id;
+
+  IF current_level IS NULL THEN
+    RAISE EXCEPTION 'No such user.';
+  END IF;
+
+  -- Already holds it at some level: leave it exactly as it is. This call
+  -- opens a door, it does not decide how wide.
+  IF current_level <> 'none' THEN
+    RETURN current_level;
+  END IF;
+
+  UPDATE public.shared_profiles
+     SET permissions = COALESCE(permissions, '{}'::jsonb)
+         || jsonb_build_object('modules',
+              COALESCE(permissions->'modules', '{}'::jsonb) || '{"nelos":"normal"}'::jsonb)
+   WHERE id = p_user_id;
+
+  RETURN 'normal';
+END $$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_grant_access(UUID) TO authenticated;
+
+-- ── Check it landed ─────────────────────────────────────────────
+SELECT p.proname, pg_get_function_result(p.oid) AS returns
+  FROM pg_proc p
+ WHERE p.proname = 'nelos_grant_access';
+
+-- ── Rollback (manual, if ever needed) ───────────────────────────
+--   DROP FUNCTION IF EXISTS public.nelos_grant_access(UUID);

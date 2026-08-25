@@ -153,6 +153,11 @@
       Run <code>shared/fix_npayroll_maint_general.sql</code> in the Supabase SQL Editor, then reload.
       Until then who appears on the Work Maintenance tick sheets is guessed from the role and cannot be set per worker.
     </div>
+    <div id="pin-setup" class="warn hidden">
+      <b>⚠️ Worker PINs are not switched on yet.</b>
+      Run <code>shared/add_npayroll_worker_pin.sql</code> in the Supabase SQL Editor, then reload.
+      Until then the PIN boxes below are read-only.
+    </div>
     <div id="worker-sections"></div>
   </section>
 
@@ -201,6 +206,14 @@
           <select id="wf-role" onchange="onWorkerRoleChange()"></select></div>
         <div class="frow"><label>Status</label>
           <select id="wf-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+      </div>
+      <!-- The number this worker will key into the worker portal to sign in.
+           Also settable straight from the register list. -->
+      <div class="frow"><label>Worker PIN</label>
+        <input type="text" id="wf-pin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4–6 digits">
+        <div style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:4px;">
+          For signing in to the worker portal. Leave blank if they have not been given one. No two workers share a PIN.
+        </div>
       </div>
       <!-- Decides whether this person gets a column on the Work Maintenance
            tick sheets. Guessed from the role until it is set here. -->
@@ -283,7 +296,7 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=9"></script>
+<script src="npayroll_script.js?v=10"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
