@@ -73,7 +73,8 @@
   .res-row:last-child { border-bottom:none; }
   .res-name { font-size:12.5px; font-weight:800; color:#1e293b; }
   .res-mail { font-size:10.5px; font-weight:600; color:#94a3b8; }
-  .res-add { margin-left:auto; flex-shrink:0; padding:6px 12px; border-radius:8px; border:none; cursor:pointer;
+  .res-add { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center; gap:6px;
+             padding:7px 14px; border-radius:999px; border:none; cursor:pointer;
              background:#7c3aed; color:#fff; font-size:9.5px; font-weight:900;
              letter-spacing:.08em; text-transform:uppercase; }
   .res-add:hover { background:#6d28d9; }
@@ -108,10 +109,14 @@
                 font-size:12px; font-weight:900; flex-shrink:0; }
   .seat-row.on .seat-badge { background:#7c3aed; color:#fff; }
   .seat-who { font-size:12.5px; font-weight:700; color:#475569; }
-  .seat-add { align-self:flex-start; margin-top:3px; padding:7px 13px; border-radius:9px; border:1.5px dashed #ddd6fe;
-              background:#fff; color:#6d28d9; font-size:10.5px; font-weight:900; letter-spacing:.06em;
+  /* A plain plus at the button's own weight — the full-width one drew thin
+     and pale, and these are the buttons people are looking for. */
+  .plus { font-size:15px; font-weight:900; line-height:0; }
+  .seat-add { align-self:flex-start; display:inline-flex; align-items:center; gap:6px;
+              margin-top:3px; padding:8px 14px; border-radius:999px; border:1.5px solid #7c3aed;
+              background:#7c3aed; color:#fff; font-size:10.5px; font-weight:900; letter-spacing:.06em;
               text-transform:uppercase; cursor:pointer; }
-  .seat-add:hover { background:#f5f3ff; border-style:solid; }
+  .seat-add:hover { background:#6d28d9; }
   .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
 
   /* ── What they may do to a case ─────────────────────────────── */
@@ -124,7 +129,8 @@
   .right-name { display:block; font-size:12.5px; font-weight:800; color:#1e293b; }
   .right-note { display:block; font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:1px; line-height:1.45; }
 
-  .btn { padding:9px 17px; border-radius:10px; border:none; cursor:pointer; font-size:10px;
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 17px; border-radius:10px;
+         border:none; cursor:pointer; font-size:10px;
          font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
   .btn-save { background:#7c3aed; color:#fff; } .btn-save:hover { background:#6d28d9; }
   .btn-ghost { background:#ede9fe; color:#6d28d9; }
@@ -366,7 +372,8 @@ function seatRows(p, moduleKey) {
       </label>`;
   }
   return rows +
-    '<button type="button" class="seat-add" data-act="add-seat">＋ add another number</button>';
+    '<button type="button" class="seat-add" data-act="add-seat">' +
+    '<span class="plus">+</span> add another number</button>';
 }
 
 function panelHtml(p) {
@@ -651,7 +658,7 @@ function renderFind(message) {
       </div>
       ${has.has(d.id)
         ? '<span class="res-has">already in Nelos</span>'
-        : `<button class="res-add" data-add="${esc(d.id)}">＋ Add</button>`}
+        : `<button class="res-add" data-add="${esc(d.id)}"><span class="plus">+</span> Add</button>`}
     </div>`).join('')}</div>`;
 
   out.querySelectorAll('[data-add]').forEach(b =>
@@ -751,7 +758,7 @@ function renderRouting() {
         <div class="rt-add">
           <input class="inp cat-new" data-mod="${esc(m.key)}" maxlength="60"
                  placeholder="Add a case category for ${esc(m.label)}…">
-          <button class="btn btn-ghost cat-add" data-mod="${esc(m.key)}">＋ Add</button>
+          <button class="btn btn-save cat-add" data-mod="${esc(m.key)}"><span class="plus">+</span> Add</button>
         </div>`;
 
       inner = titles.length ? `

@@ -25,6 +25,17 @@
   .tool-btn-primary:hover { background:#6d28d9; }
   .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
   .tool-btn-access:hover { background:#ffe4e6; }
+  /* A plain plus at the button's own weight, rather than the emoji one,
+     which drew at whatever size the font felt like. */
+  .plus { font-size:17px; font-weight:900; line-height:0; margin-top:-1px; }
+
+  /* User Setting, beside New Case. A cog is enough — the words were most of
+     the button. */
+  .cog { display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px;
+         border-radius:999px; background:#fff; border:1.5px solid #ddd6fe; color:#6d28d9;
+         font-size:18px; line-height:1; text-decoration:none;
+         box-shadow:0 3px 10px rgba(124,58,237,.10); }
+  .cog:hover { background:#ede9fe; }
 
   .toolbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
   .f-chk { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800;
@@ -45,7 +56,7 @@
             padding:3px 10px; border-radius:999px; }
 
   /* Five columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:74px 118px 160px 1fr 126px; gap:13px; }
+  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 152px 1fr 126px; gap:13px; }
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe; }
   .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
@@ -59,17 +70,11 @@
   .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
   .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
 
-  /* Case number sits to the left of the status word, on one line. */
-  .st-line { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .st-word { font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
              padding:4px 10px; border-radius:7px; }
   .st-pending { background:#fef3c7; color:#a16207; }
   .st-solved  { background:#dcfce7; color:#15803d; }
 
-  /* Where it is going. */
-  /* Shown on both layouts — it is this column's own caption, so it does
-     not also get a .cell-cap or the word lands twice. */
-  .to-lab { font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:#c4b5fd; }
   .sys-line { font-size:13px; font-weight:900; color:#4c1d95; line-height:1.25; }
   .pic-line { font-size:11.5px; font-weight:700; color:#475569; }
   .pic-none { font-style:italic; color:#b45309; }
@@ -83,7 +88,8 @@
   .td-case { display:flex; gap:11px; min-width:0; }
   .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
            border:1.5px solid #ede9fe; background:#f8fafc; }
-  .case-no { font-size:10px; font-weight:900; letter-spacing:.06em; color:#7c3aed; }
+  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#7c3aed;
+             font-variant-numeric:tabular-nums; }
   .case-title { font-size:14px; font-weight:800; color:#1e293b; line-height:1.35; }
   .case-cat { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
               color:#8b5cf6; margin-top:2px; }
@@ -192,14 +198,17 @@
 <script src="../shared/shared_ribbon.js"></script>
 
 
-<div id="loading" class="max-w-[980px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+<div id="loading" class="max-w-[1240px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[980px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-7 hidden">
 
   <!-- New Case is the one thing done from here often, so it leads on the
-       right where the eye ends up, on a row of its own. -->
+       right where the eye ends up, with the setting cog beside it. -->
   <div class="toolbar">
-    <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">➕ New Case</button>
+    <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">
+      <span class="plus">+</span> New Case</button>
+    <a class="cog hidden" id="user-setting-btn" href="nelos_user_setting.html"
+       title="User Setting" aria-label="User Setting">&#x2699;</a>
   </div>
 
   <!-- One list, filtered. Overdue is a filter rather than a separate block:
@@ -236,19 +245,13 @@
     </div>
     <div class="th">
       <span>Created</span>
+      <span>Case No</span>
       <span>Status</span>
-      <span>To</span>
+      <span>PIC</span>
       <span>Case Details</span>
       <span>Actions</span>
     </div>
     <div id="list"></div>
-  </div>
-
-  <!-- The page's own tabs sit under the list: the cases are the page, and
-       the setting is the other place to go from it. -->
-  <div class="tabs">
-    <span class="tab on">🗂️ Nursery Cases</span>
-    <a class="tab hidden" id="user-setting-btn" href="nelos_user_setting.html">⚙️ User Setting</a>
   </div>
 
 </div>
@@ -393,11 +396,33 @@ const queueOf = c => c.assigned_module || c.source_module;
    whole thing. */
 const DETAIL_CAP = 8;
 
+/* Labels the row already carries elsewhere. Who raised it is in the PIC
+   column, so a description repeating it would print it twice. */
+const DETAIL_SKIP = ['raised by', 'created by', 'reported by', 'raised from', 'nursery', 'plot', 'batch'];
+
+/* A count that shows its working — "88 (30+28+30)" — is the total plus the
+   arithmetic that got there. The list wants the total. Only a parenthetical
+   that is purely a sum is dropped; anything with words in it is kept,
+   because that is a note, not working. */
+function trimSum(v) {
+  return String(v).replace(/\s*\((?:\s*[\d.,]+\s*[+＋]\s*)+[\d.,]+\s*\)\s*$/, '').trim() || String(v);
+}
+
 function detailRows(c) {
   const rows = [];
-  if (c.nursery_name) rows.push(['Nursery', c.nursery_name]);
-  if (c.plot_name)    rows.push(['Plot',    c.plot_name]);
-  if (c.batch_name)   rows.push(['Batch',   c.batch_name]);
+  const seen = new Set();
+  const add = (lab, val) => {
+    const key = lab ? lab.toLowerCase().trim() : null;
+    // First one wins, so a description that names the plot itself is not
+    // printed again under the column's own value.
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    rows.push([lab, val]);
+  };
+
+  if (c.nursery_name) add('Nursery', c.nursery_name);
+  if (c.plot_name)    add('Plot',    c.plot_name);
+  if (c.batch_name)   add('Batch',   c.batch_name);
 
   String(c.description || '').split(/\r?\n/).forEach(line => {
     const t = line.trim();
@@ -405,7 +430,14 @@ function detailRows(c) {
     // A short leading label, then a colon — ASCII or the full-width one that
     // a phone keyboard set to Chinese produces.
     const m = t.match(/^([^:：]{1,40}?)\s*[:：]\s*(.+)$/);
-    rows.push(m ? [m[1].trim(), m[2].trim()] : [null, t]);
+    if (!m) { rows.push([null, t]); return; }
+    const lab = m[1].trim();
+    if (DETAIL_SKIP.includes(lab.toLowerCase())) {
+      // Still claim the label, so a later duplicate is dropped too.
+      seen.add(lab.toLowerCase());
+      return;
+    }
+    add(lab, trimSum(m[2]));
   });
   return rows;
 }
@@ -435,18 +467,22 @@ function rowHtml(c) {
       </div>
 
       <div class="td-stack">
-        <span class="cell-cap">Status</span>
-        <span class="st-line">
-          <span class="case-no">${esc(c.case_no || '')}</span>
-          <span class="st-word ${pending ? 'st-pending' : 'st-solved'}">${pending ? 'Pending' : 'Solved'}</span>
-        </span>
-        <span class="pill pi-${esc(c.priority || 'normal')}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '')}</span>
+        <span class="cell-cap">Case No</span>
+        <span class="case-no">${esc(c.case_no || '')}</span>
       </div>
 
-      <!-- Where it is going, not where it came from: a case raised in the FC
-           Portal and routed to the auditors is the auditors' work now. -->
       <div class="td-stack">
-        <span class="to-lab">To</span>
+        <span class="cell-cap">Status</span>
+        <span class="st-word ${pending ? 'st-pending' : 'st-solved'}">${pending ? 'Pending' : 'Solved'}</span>
+        ${c.priority && c.priority !== 'normal'
+          ? `<span class="pill pi-${esc(c.priority)}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority)}</span>`
+          : ''}
+      </div>
+
+      <!-- Who it is with now, not where it came from: a case raised in the FC
+           Portal and routed to the auditors is the auditors' work. -->
+      <div class="td-stack">
+        <span class="cell-cap">PIC</span>
         <span class="sys-line">${esc(queueIn)}</span>
         <span class="pic-line">${c.assignee_name
           ? esc(c.assignee_name)
