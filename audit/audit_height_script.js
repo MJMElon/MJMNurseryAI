@@ -108,12 +108,15 @@ const PLOT_TO_NURSERY=(function(){
 async function loadRecords(){
   setLoading(true);
   try{
+    // The ages being audited are read alongside everything else; a failure
+    // there leaves MJMAuditSettings on its defaults, which is every age.
+    try { await MJMAuditSettings.load(); } catch(_) {}
     const [aRows, tRows, abRows, balRows] = await Promise.all([
       sb.select('audit_height_records','select=*'),
       // Planted → PN, Transplanted* → MN. Both are enough to know a
       // batch is standing on a plot at some point in its life.
       sb.select('shared_inventory_logs',
-                'select=batch_name,plot_name,transaction_type,breed_name'
+                'select=batch_name,plot_name,transaction_type,breed_name,transaction_date,created_at,remark'
               + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
         .catch(e=>{console.warn('[height-audit] logs load failed:',e);return[];}),
       sb.select('audit_batches','select=nursery,plot,batch_no,breed')
@@ -136,18 +139,18 @@ async function loadRecords(){
     // Build (nursery, plot, batch) triples from BOTH sources, deduped.
     const seen=new Set();
     plotBatches=[];
-    const addBatch=(nursery, plot, batch, breed)=>{
+    const addBatch=(nursery, plot, batch, breed, planted)=>{
       if(!nursery||!plot||!batch)return;
       const key=nursery+'|'+plot+'|'+batch;
       if(seen.has(key))return;
       seen.add(key);
-      plotBatches.push({nursery, plot, batch, breed:breed||''});
+      plotBatches.push({nursery, plot, batch, breed:breed||'', planted:planted||''});
     };
     (tRows||[]).forEach(l=>{
       const plot=_canonicalPlot(l.plot_name);
       const batch=String(l.batch_name||'').trim();
       const nursery=plot?PLOT_TO_NURSERY[plot]:null;
-      addBatch(nursery, plot, batch, l.breed_name);
+      addBatch(nursery, plot, batch, l.breed_name, _logDate(l));
     });
     (abRows||[]).forEach(r=>{
       const plot=_canonicalPlot(r.plot);
@@ -164,6 +167,7 @@ async function loadRecords(){
       balanceByPB[plot+'|'+batch]=Number(r.qty||0);
     });
 
+    _rebuildPlanted();
     console.log('[height-audit] loaded', {
       audits: records.length,
       fromLogs:(tRows||[]).length,
@@ -175,6 +179,43 @@ async function loadRecords(){
   }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
 }
+
+/* The date a movement row actually happened on. Most rows are saved with
+   no transaction_date and carry the keyed date in the remark instead —
+   the same resolution shared/shared_plot_movement.js uses, so an auditor
+   and the office read one batch as the same age. */
+function _logDate(l){
+  if(l.transaction_date) return String(l.transaction_date).slice(0,10);
+  const m = l.remark ? String(l.remark).match(/(?:Cull)?Date:\s*(\d{4}-\d{2}-\d{2})/i) : null;
+  if(m) return m[1];
+  return l.created_at ? String(l.created_at).slice(0,10) : '';
+}
+
+/* Earliest planting known for a batch anywhere — a batch moves from PN to
+   MN and its age follows it, so the age is counted from where it started,
+   not from the transplant. */
+const _plantedByBatch = {};
+function _rebuildPlanted(){
+  Object.keys(_plantedByBatch).forEach(k=>delete _plantedByBatch[k]);
+  plotBatches.forEach(b=>{
+    if(!b.planted) return;
+    const k=String(b.batch||'').trim();
+    if(!k) return;
+    if(!_plantedByBatch[k] || b.planted < _plantedByBatch[k]) _plantedByBatch[k]=b.planted;
+  });
+}
+
+/* Is this batch one of the ages being audited? Set on Settings → System
+   Setting. Unknown age is never hidden: a batch with no planting on
+   record is a data gap, and hiding it would quietly drop real work. */
+function isBatchInAgeScope(batch){
+  if(typeof MJMAuditSettings==='undefined') return true;
+  if(MJMAuditSettings.ages()===null) return true;
+  const planted=_plantedByBatch[String(batch||'').trim()];
+  if(!planted) return true;
+  return MJMAuditSettings.ageAllowed(MJMAuditSettings.ageMonths(planted));
+}
+window.isBatchInAgeScope=isBatchInAgeScope;
 
 /* --- BATCH HELPERS (mirror plot-condition semantics exactly) --- */
 /* Fail closed: no balance data at all → treat every batch as required so
@@ -193,6 +234,9 @@ function batchesOnPlot(plot){
   plotBatches.forEach(b=>{
     if(b.nursery!==activeTab||b.plot!==plot)return;
     if(seen.has(b.batch))return;
+    // Out of the ages being audited — unless it has already been audited,
+    // in which case it stays so its record is still reachable.
+    if(!isBatchInAgeScope(b.batch) && !isBatchAudited(plot, b.batch))return;
     seen.add(b.batch);
     out.push(b);
   });

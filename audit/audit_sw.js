@@ -30,6 +30,7 @@ const ALL_FILES = [
   './audit_maintenance_script.js',
   './audit_supabase.js',
   './audit_pending.js',
+  './audit_settings.js',
   './audit_deeplink.js',
   './audit_dexie_offline.js',
   './audit_dexie.min.js',

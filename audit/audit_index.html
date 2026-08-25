@@ -524,9 +524,23 @@
      with the way through to the audit portal); everyone else goes straight
      to the auditor view. Kept here rather than imported because this page
      deliberately does not load audit_supabase.js. */
+  /* The portal an admin set for this auditor on Settings → User Access.
+     Applied at sign-in rather than only as a default, so an auditor who
+     switched nursery once still starts each session where their work is.
+     The key matches scopeKey() in audit_login_guard.js — keep the two in
+     step; this page deliberately does not load that file. */
+  function applyLandingScope(u){
+    try{
+      const want = String((u.permissions && u.permissions.audit_landing) || '').toUpperCase();
+      if (want !== 'PN' && want !== 'MN') return;
+      localStorage.setItem('mjm_nursery_scope:' + (u.id || u.email || 'anon'), want);
+    }catch(e){}
+  }
+
   function auditLanding(){
     try{
       const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+      applyLandingScope(u);
       const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
       const role = (u.audit_role || u.role || '').toLowerCase();
       if (mod === 'admin' || role === 'admin' || role === 'administrator')
