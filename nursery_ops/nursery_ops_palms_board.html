@@ -37,14 +37,6 @@
   .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
   .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
-  .p-open  { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
-  .p-done  { background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
-  .p-shut  { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
-  .req-btn { border-radius:999px; padding:5px 12px; font-size:10px; font-weight:900; letter-spacing:.08em;
-             text-transform:uppercase; border:1.5px solid #99f6e4; background:white; color:#0f766e;
-             cursor:pointer; white-space:nowrap; }
-  .req-btn:hover { background:#ccfbf1; }
-  .req-btn[disabled] { opacity:.45; cursor:default; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -88,32 +80,6 @@
     </div>
   </div>
 
-  <div class="card p-5 mb-5">
-    <div class="flex items-baseline justify-between gap-3 flex-wrap mb-1">
-      <h2 class="text-base font-black text-slate-800 uppercase tracking-widest">Waiting on the office</h2>
-      <span id="req-count" class="text-[11px] font-bold text-slate-400"></span>
-    </div>
-    <p class="text-[12px] text-slate-500 leading-relaxed mb-4">
-      Raised from the Culling Calculator on the <strong>555 FC Portal</strong>. A request to the
-      <strong>Site Auditor</strong> asks for a plot to be re-counted; one to <strong>HQ</strong> asks
-      for a ruling on a culling rate. Mark it done here and the Field Conductor sees the answer.
-    </p>
-    <div class="overflow-x-auto -mx-5">
-      <table class="w-full border-collapse">
-        <thead>
-          <tr>
-            <th>Plot</th><th>For</th><th>Raised</th><th>By</th><th>Figures</th>
-            <th>Status</th><th class="text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody id="req-rows"></tbody>
-      </table>
-    </div>
-    <p id="req-empty" class="hidden text-[12px] text-slate-400 text-center py-6">
-      Nothing waiting on the office.
-    </p>
-  </div>
-
   <div class="card overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
@@ -149,8 +115,6 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
-let REQS = [];
-let ME = '';
 let SCOPE = 'all';   // 'all', or a nursery key, or a list of keys the user may see
 
 /* Worst first. A board is read to find what needs chasing, so the most
@@ -197,93 +161,6 @@ function render() {
   }).join('');
 }
 
-/* The office's side of a field request.
-
-   Scoped the same way the board is — somebody narrowed to BNN is not shown
-   UNN's queue. nursery_name is what the phone sent; a row that predates it
-   falls back to reading the nursery off the plot, so an early request does
-   not vanish from every filter. */
-function reqNursery(r) {
-  const n = r.nursery_name || MJMPalms.nurseryOfPlot(String(r.plot_name || '').split('#')[0]);
-  return String(n || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
-}
-
-function reqInScope(r) {
-  if (SCOPE === 'all') return true;
-  const n = reqNursery(r);
-  return Array.isArray(SCOPE) ? SCOPE.indexOf(n) >= 0 : n === SCOPE;
-}
-
-/* HQ is sent the figures behind the decision, the auditor is not — so this
-   is blank for an auditor request rather than a row of dashes. */
-function reqFigures(d) {
-  if (!d || typeof d !== 'object') return '<span class="text-slate-300">—</span>';
-  const bits = [];
-  if (d.rate) bits.push('Rate <strong>' + esc(d.rate) + '</strong>');
-  if (d.transplant != null) bits.push('Transplant ' + esc(d.transplant));
-  if (d.balance != null) bits.push('Baki ' + esc(d.balance));
-  if (d.video) bits.push('Video ' + esc(d.video));
-  return bits.length ? bits.join('<br>') : '<span class="text-slate-300">—</span>';
-}
-
-function renderReqs() {
-  const rows = REQS.filter(reqInScope);
-  const open = rows.filter((r) => (r.status || 'open') === 'open').length;
-  $('req-count').textContent = open ? open + ' waiting' : 'all clear';
-  $('req-empty').classList.toggle('hidden', rows.length > 0);
-
-  $('req-rows').innerHTML = rows.map(function (r) {
-    const st = r.status || 'open';
-    const pill = st === 'open' ? 'p-open' : st === 'actioned' ? 'p-done' : 'p-shut';
-    const answered = st !== 'open';
-    // Two steps rather than one: an auditor marks a request DONE when they
-    // have been out to the plot; CLOSED is for one that is finished with —
-    // withdrawn, or superseded. Collapsing them would lose that difference.
-    const action = answered
-      ? (st === 'actioned'
-          ? '<button class="req-btn" data-id="' + r.id + '" data-to="closed">Close</button>'
-          : '<span class="text-slate-300 text-[11px] font-bold">—</span>')
-      : '<button class="req-btn" data-id="' + r.id + '" data-to="actioned">Mark done</button>';
-    const who = answered && r.actioned_by
-      ? '<div class="text-[10px] text-slate-400 font-bold mt-1">' + esc(r.actioned_by) + '</div>' : '';
-    return '<tr>' +
-      '<td class="font-black text-slate-800">' + esc(r.plot_name) + '</td>' +
-      '<td>' + (r.send_to === 'hq' ? 'HQ' : 'Site Auditor') +
-        '<div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">' +
-        esc(r.purpose || 'Culling') + '</div></td>' +
-      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(r.at_date)) + '</td>' +
-      '<td class="text-slate-500">' + esc(r.raised_by || '—') + '</td>' +
-      '<td class="text-slate-500 text-[12px] leading-relaxed">' + reqFigures(r.details) + '</td>' +
-      '<td><span class="pill ' + pill + '">' + esc(st) + '</span>' + who + '</td>' +
-      '<td class="text-right">' + action + '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-/* Delegated, because the buttons are redrawn on every render and on every
-   change of nursery. The row is updated in place on success — re-reading the
-   whole queue to learn one thing the server already confirmed is a wasted
-   round trip, and the button is disabled meanwhile so a double tap cannot
-   send it twice. */
-$('req-rows').addEventListener('click', async (ev) => {
-  const btn = ev.target.closest('.req-btn');
-  if (!btn || btn.disabled) return;
-  const id = Number(btn.dataset.id);
-  const to = btn.dataset.to;
-  btn.disabled = true;
-  btn.textContent = '…';
-  try {
-    await MJMPalms.answerRequest(_supabase, id, to, ME);
-    const row = REQS.find((r) => r.id === id);
-    if (row) { row.status = to; row.actioned_by = ME; }
-    renderReqs();
-  } catch (e) {
-    console.warn(e);
-    alert('Could not save that. ' + ((e && e.message) || 'Please try again.'));
-    renderReqs();
-  }
-});
-
 (async () => {
   try {
     await MJMAccess.load(_supabase);
@@ -322,23 +199,9 @@ $('req-rows').addEventListener('click', async (ev) => {
     $('f-nursery').addEventListener('change', (e) => {
       SCOPE = e.target.value === '__all' ? (allowed ? visible : 'all') : e.target.value;
       render();
-      renderReqs();
     });
 
-    ME = (u && (u.full_name || u.name || u.email)) || '';
-
     LOGS = await MJMPalms.loadLogs(_supabase);
-
-    /* Its own try: the queue is a second table and a second policy, and a
-       board that draws is worth more than one that bails because requests
-       could not be read. */
-    try {
-      REQS = await MJMPalms.loadRequests(_supabase);
-    } catch (e) {
-      console.warn('[palms] requests not read:', e);
-      REQS = [];
-    }
-    renderReqs();
     $('asof').textContent = 'as at ' + new Date().toLocaleString('en-MY',
       { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     render();

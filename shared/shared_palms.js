@@ -312,41 +312,6 @@
     return logsFromRows(all);
   }
 
-  /* Requests raised in the field for somebody in the office.
-     A Culling request goes to the Site Auditor (re-count this plot) or to
-     HQ (rule on this rate). They are raised on the 555 FC Portal and are
-     the one part of PALMS the office is expected to ACT on rather than
-     just read, which is why answering one is a write from here.
-
-     Open first, and newest first inside that: the list is a queue. */
-  async function loadRequests(supa, opts) {
-    const o = opts || {};
-    const res = await supa.from('fcportal_palms_requests')
-      .select('id, plot_name, nursery_name, purpose, send_to, raised_by, at_date, details, status, actioned_by, actioned_at')
-      .order('at_date', { ascending: false })
-      .limit(o.limit || 500);
-    if (res.error) throw res.error;
-    const rank = { open: 0, actioned: 1, closed: 2 };
-    return (res.data || []).slice().sort(function (a, b) {
-      return (rank[a.status] == null ? 3 : rank[a.status]) - (rank[b.status] == null ? 3 : rank[b.status])
-          || String(b.at_date).localeCompare(String(a.at_date))
-          || String(a.plot_name).localeCompare(String(b.plot_name));
-    });
-  }
-
-  /* Answering one. The phone never writes status — see requestsSync.js in
-     the field app — so this column belongs to whoever is reading the queue,
-     and their name goes on it. */
-  async function answerRequest(supa, id, status, who) {
-    const res = await supa.from('fcportal_palms_requests')
-      .update({ status: status,
-                actioned_by: who || null,
-                actioned_at: new Date().toISOString() })
-      .eq('id', id);
-    if (res.error) throw res.error;
-    return true;
-  }
-
   global.MJMPalms = {
     ACTIVITIES: ACTIVITIES,
     FIRST_ACT: FIRST_ACT,
@@ -361,8 +326,6 @@
     plotOf: plotOf,
     nurseryOfPlot: nurseryOfPlot,
     loadLogs: loadLogs,
-    loadRequests: loadRequests,
-    answerRequest: answerRequest,
     logsFromRows: logsFromRows,
     unitsOf: unitsOf,
     currentEntries: currentEntries,

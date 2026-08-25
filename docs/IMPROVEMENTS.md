@@ -288,10 +288,8 @@ names. A stranger with `USING (true)` reads your payroll.
 
 ## C. PALMS is half-migrated [needs a decision]
 
-`sync.js` moves the **plot log** and the **daily report** to the server.
-`requestsSync.js` now moves the **requests** as well — that was the one that
-was actually broken in daily use, and it is done (see below). Two of the five
-tables are still unused, so this data is still one-device-only:
+`sync.js` moves the **plot log** and the **daily report** to the server. Two
+of the five tables are still unused, so this data is still one-device-only:
 
 - `fcportal_palms_culling` — Pokok Inang amounts keyed in the field.
 - `fcportal_palms_settings` — plot layout, attention thresholds and the
@@ -303,32 +301,24 @@ Settings is the one to do next: it is one row, it is read at startup, and the
 office pages currently cannot honour a plot split at all because they cannot
 see `MULTI`.
 
-### C1. Requests — done, with one piece left
+### C1. `fcportal_palms_requests` is dead — do not build on it
 
-A request raised in the Culling Calculator now goes up to
-`fcportal_palms_requests` on the spot (and on the next sync if there is no
-signal), and the office reads the queue on **PALMS Monitoring Board →
-"Waiting on the office"**, where it can mark one *done* or *closed*. The
-answer comes back down and the Field Conductor's row reads "✓ Done · Siti"
-instead of "Sent today".
+This table was going to carry the Culling handoff: a request raised in the
+field *for somebody else* — the Site Auditor to re-count a plot, HQ to rule on
+a rate — which until then reached only the phone that raised it. It was the
+one part of PALMS genuinely broken in daily use.
 
-Two rules worth remembering if this is touched again:
+**It was solved a different way and better.** The Culling Calculator now
+raises a **Nelos case** (`src/lib/nelos.js` in the field app → `nelos_cases`),
+so the handoff lands in the case system that already has an office screen, a
+duplicate check, a priority and a status somebody owns. A fifth PALMS table
+with its own bespoke queue would have been a second, worse copy of all of
+that.
 
-- **The phone never sends `status`.** The push is
-  `upsert(..., { ignoreDuplicates: true })` on `(plot_name, send_to, at_date)`,
-  so a request the office has already actioned is left exactly as it is.
-  Change that to a plain upsert and every sync re-opens work that was
-  finished.
-- **`palms_can_read_requests()` is deliberately wider than
-  `palms_has_access()`.** A Site Auditor may hold the Audit module and nothing
-  else; without this they cannot read the request addressed to them. It is
-  scoped to the requests table only — an auditor still cannot read the daily
-  activity log, which was verified against a real Postgres.
-
-**Left to do:** the auditor reads the queue on the NOPS board today, which
-means they need the Nursery Operation Management module to see it. The natural
-home is a panel in the **555 Audit Portal** (`MJMNurseryAudit`) reading the
-same table — the RLS already allows it, so it is a page, not a migration.
+So `create_palms_tables.sql` still creates `fcportal_palms_requests` and
+nothing writes to it. Leave it empty; if it is ever dropped, drop it from the
+RLS migration in the same breath. Anything that looks like "a request from the
+field" belongs in Nelos.
 
 ## D. The Culling Calculator now reads real figures — check them against the office
 
