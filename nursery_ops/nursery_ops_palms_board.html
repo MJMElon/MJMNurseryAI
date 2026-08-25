@@ -38,6 +38,32 @@
   .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
   .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+  .up-btn { width:30px; height:30px; border-radius:9px; border:1.5px solid #99f6e4; background:white;
+            color:#0f766e; font-size:13px; font-weight:900; cursor:pointer; line-height:1;
+            display:inline-flex; align-items:center; justify-content:center; transition:all .15s; }
+  .up-btn:hover { background:#ccfbf1; }
+  .up-btn[disabled] { opacity:.4; cursor:default; }
+  .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60;
+              display:flex; align-items:center; justify-content:center; padding:16px; }
+  .modal-card { background:white; border-radius:22px; width:100%; max-width:520px; max-height:88vh;
+                display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.28); }
+  /* min-height:0 is what actually makes the list scroll. A flex item's floor
+     is its content, so without it the list refuses to shrink, the card grows
+     past max-height and the OK button ends up off the bottom of the screen —
+     with eleven stages that is every time. */
+  #up-list { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #up-modal .modal-card > :not(#up-list) { flex:none; }
+  .act-row { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:11px 14px;
+             border-radius:14px; border:1.5px solid #e2e8f0; background:white; cursor:pointer;
+             transition:all .12s; font-family:inherit; }
+  .act-row:hover { border-color:#99f6e4; }
+  .act-row.on { border-color:#10b981; background:#ecfdf5; }
+  .act-n { width:28px; height:28px; border-radius:999px; background:#f1f5f9; color:#64748b; font-weight:900;
+           font-size:11px; display:flex; align-items:center; justify-content:center; flex:none; }
+  .act-row.on .act-n { background:#059669; color:white; }
+  .act-name { font-weight:900; color:#1e293b; font-size:13px; flex:1; min-width:0; }
+  .act-row.on .act-name { color:#065f46; }
+  .act-d { font-weight:900; color:#94a3b8; font-size:11px; flex:none; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -82,13 +108,12 @@
       <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
         🪴 Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
       </h2>
-      <span class="text-[11px] font-bold text-slate-400">updated from the 555 FC Portal</span>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th>Plot</th><th>Current Status</th><th>Expected Completion</th>
+            <th style="width:52px"></th><th>Plot</th><th>Current Status</th><th>Expected Completion</th>
             <th class="text-right">Days Left / Over</th><th>Last Update</th>
           </tr>
         </thead>
@@ -107,7 +132,29 @@
 
 </div>
 
-  <p class="text-[11px] text-slate-400 text-center mt-7">
+  <div id="up-modal" class="modal-bg hidden">
+  <div class="modal-card">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+      <div>
+        <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Update status</div>
+        <div id="up-plot" class="text-lg font-black text-slate-800">—</div>
+      </div>
+      <button id="up-close" class="ml-auto text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
+    </div>
+    <div class="px-5 py-3 text-[12px] text-slate-500 leading-relaxed border-b border-slate-100">
+      Choose what this plot is on today — up to two at once.
+      <strong class="text-slate-700">Anything you leave out is recorded as finished today.</strong>
+      This writes the same record the Field Conductor's app writes.
+    </div>
+    <div id="up-list" class="px-5 py-4 space-y-2 overflow-y-auto"></div>
+    <div class="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
+      <span id="up-msg" class="text-[11px] font-bold text-slate-400"></span>
+      <button id="up-save" class="ml-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest cursor-pointer">OK</button>
+    </div>
+  </div>
+</div>
+
+<p class="text-[11px] text-slate-400 text-center mt-7">
     Page access is granted on this module's
     <a href="nursery_ops_user_access.html" class="text-teal-700 font-bold underline underline-offset-2">User Access</a>.
   </p>
@@ -119,6 +166,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
+let ME = '';        // the name written into anything saved from this page
 let MAP = null;
 let LINES = new Map();   // plot key → the line boardLines() built for it
 let SCOPE = 'all';       // 'all', or a nursery key, or the list the user may see
@@ -166,14 +214,12 @@ function renderTable() {
   $('empty').classList.toggle('hidden', plots.length > 0);
   if (!plots.length) { $('rows').innerHTML = ''; return; }
 
-  const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }))
-    .sort((a, b) => {
-      const ra = a.ln ? rankOf(a.ln.state) : 3, rb = b.ln ? rankOf(b.ln.state) : 3;
-      if (ra !== rb) return ra - rb;
-      const la = a.ln && a.ln.left != null ? a.ln.left : 1e9;
-      const lb = b.ln && b.ln.left != null ? b.ln.left : 1e9;
-      return la - lb || String(a.plot).localeCompare(String(b.plot));
-    });
+  /* Plot order, B1 · B2 · B3 — asked for, and right: the map above is laid
+     out in space and the eye moves between the two. A worst-first table makes
+     you hunt for the plot you just clicked. Urgency is carried by the red
+     pill and the red polygon, which is where it belongs. shared_plot_map
+     already sorts on the number, so this order is simply the map's. */
+  const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }));
 
   const late = rows.filter((r) => r.ln && r.ln.state === 'overdue').length;
   const idle = rows.filter((r) => !r.ln || r.ln.state === 'none').length;
@@ -188,6 +234,7 @@ function renderTable() {
         ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
         : '<span class="text-slate-300">—</span>';
       return '<tr>' +
+        upCell(r.plot) +
         '<td class="font-black text-slate-800">' + esc(r.plot) + '</td>' +
         '<td colspan="3"><span class="pill p-idle">Nothing running</span></td>' +
         '<td class="text-slate-500">' + seen + '</td></tr>';
@@ -195,6 +242,7 @@ function renderTable() {
     const over = ln.state === 'overdue';
     const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
     return '<tr>' +
+      upCell(MJMPalms.plotOf(ln.key)) +
       '<td class="font-black text-slate-800">' + esc(ln.label) + '</td>' +
       '<td>' + esc(ln.status || '—') + '</td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
@@ -204,6 +252,144 @@ function renderTable() {
       '</tr>';
   }).join('');
 }
+
+/* ── Updating a plot's status from here ──────────────────────────────────
+   The same record the Field Conductor's app writes: what is running now is
+   an OPEN entry (end_date null), finishing it is stamping today's date on
+   its end. So "update the status" is close what is no longer running, open
+   what is — which is exactly what applyDailySelection does on the phone.
+
+   The office writing this is new. It is meant for the day a Field Conductor
+   cannot key it in, not as the normal route: the person standing in the plot
+   is the one who knows. Whoever saves here has their own name recorded, so
+   the log says where the entry came from. */
+const upCell = (plot) =>
+  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status">🚦</button></td>';
+
+let UP_PLOT = null;    // the plot the modal is open for
+let UP_SEL = [];       // act numbers ticked in the modal
+const MAX_AT_ONCE = 2; // matches MAX_CONCURRENT in the field app's data.js
+
+function openUpdate(plot) {
+  UP_PLOT = plot;
+  // The plot may be split into areas; the modal edits the plot as a whole,
+  // which is the unit the office reads. An area-split plot keeps its areas —
+  // this opens whichever unit key the board is showing for it.
+  const ln = lineForPlot(plot);
+  const key = ln ? ln.key : plot;
+  UP_PLOT = key;
+  UP_SEL = MJMPalms.currentEntries(LOGS, key).map((e) => e.actN);
+  $('up-plot').textContent = MJMPalms.keyLabel(key);
+  $('up-msg').textContent = '';
+  renderUpList();
+  $('up-modal').classList.remove('hidden');
+}
+
+function renderUpList() {
+  $('up-list').innerHTML = MJMPalms.ACTIVITIES.map((a) => {
+    const on = UP_SEL.indexOf(a.n) !== -1;
+    return '<button type="button" class="act-row' + (on ? ' on' : '') + '" data-act="' + a.n + '">' +
+      '<span class="act-n">' + (on ? '✓' : a.n) + '</span>' +
+      '<span class="act-name">' + esc(a.name) + '</span>' +
+      '<span class="act-d">' + (a.days == null ? '—' : a.days + 'd') + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+$('up-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const n = Number(b.dataset.act);
+  const i = UP_SEL.indexOf(n);
+  if (i !== -1) UP_SEL.splice(i, 1);
+  else {
+    // Oldest tick drops off rather than refusing the new one: on the phone
+    // this is a thumb correcting itself, and a dead tap reads as broken.
+    UP_SEL.push(n);
+    while (UP_SEL.length > MAX_AT_ONCE) UP_SEL.shift();
+  }
+  renderUpList();
+});
+
+const closeUpdate = () => { $('up-modal').classList.add('hidden'); UP_PLOT = null; };
+$('up-close').addEventListener('click', closeUpdate);
+$('up-modal').addEventListener('click', (e) => { if (e.target === $('up-modal')) closeUpdate(); });
+
+function newUid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+$('up-save').addEventListener('click', async () => {
+  if (!UP_PLOT) return;
+  const btn = $('up-save');
+  btn.disabled = true;
+  $('up-msg').textContent = 'Saving…';
+  const today = MJMPalms.todayStr();
+  const key = UP_PLOT;
+  const open = MJMPalms.currentEntries(LOGS, key);
+  const sel = UP_SEL.slice().sort((a, b) => a - b);
+
+  // Finished: open, and no longer ticked.
+  const finish = open.filter((e) => sel.indexOf(e.actN) === -1);
+  // Started: ticked, and not already open.
+  const startN = sel.filter((n) => !open.some((e) => e.actN === n));
+
+  try {
+    if (!finish.length && !startN.length) { $('up-msg').textContent = 'Nothing changed.'; btn.disabled = false; return; }
+
+    for (const e of finish) {
+      if (!e.uid) continue;   // never synced, so there is no server row to close
+      const res = await _supabase.from('fcportal_palms_plot_logs')
+        .update({ end_date: today, updated_at: new Date().toISOString() })
+        .eq('client_uid', e.uid);
+      if (res.error) throw res.error;
+    }
+
+    if (startN.length) {
+      // seq_no orders a plot's log; the motion study reads it back in that
+      // order to tell one cycle from the next, so a new entry goes after
+      // everything this plot already has.
+      let seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0);
+      const rows = startN.map((n) => {
+        const act = MJMPalms.actByN(n);
+        return {
+          client_uid: newUid(),
+          nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
+          plot_name: key,
+          act_n: n,
+          start_date: today,
+          end_date: null,
+          ideal_days: act && act.days != null ? act.days : null,
+          recorded_by: ME || 'Office',
+          seq_no: ++seq,
+          updated_at: new Date().toISOString(),
+        };
+      });
+      const res = await _supabase.from('fcportal_palms_plot_logs').insert(rows);
+      if (res.error) throw res.error;
+    }
+
+    // Re-read rather than patching the copy in memory: the server is the
+    // record, and a board that disagrees with it is worse than a slow one.
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    render();
+    closeUpdate();
+  } catch (err) {
+    console.warn(err);
+    // The likeliest failure by far is the row-level policy: writing the plot
+    // log needs the FC Portal module, which an office-only account may not
+    // hold. Saying so beats "something went wrong".
+    $('up-msg').textContent = (err && err.message) || 'Could not save.';
+    $('up-msg').className = 'text-[11px] font-bold text-rose-600';
+  }
+  btn.disabled = false;
+});
+
+$('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-up]');
+  if (b) openUpdate(b.dataset.up);
+});
 
 function render() {
   LINES = new Map();
@@ -236,6 +422,9 @@ function render() {
     /* The same nursery scope the field app obeys, from the main portal's
        User Access. Someone narrowed to BNN must not read UNN's board here
        just because the office page is a different screen. */
+    const u = MJMAccess.user();
+    ME = (u && (u.full_name || u.email)) || '';
+
     const perms = MJMAccess.permissions() || {};
     const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
     const KEYS = ['BNN', 'UNN1', 'UNN2'];

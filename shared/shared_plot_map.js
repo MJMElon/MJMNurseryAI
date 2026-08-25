@@ -284,6 +284,17 @@
         supa.from('operation_nurseries').select('name, map_image_url').order('name'),
       ]);
       plots = (plotRes && !plotRes.error && plotRes.data) ? plotRes.data : [];
+      /* B1, B2, … B10 — the way the nursery says them. The server orders by
+         plot_name, which is text, so a plain sort gives B1, B10, B11, B2 and
+         the office reads a list that jumps about. Sorted on the NUMBER, with
+         the letters as the tie-break. */
+      plots.sort((a, b) => {
+        const A = String(a.plot_name || ''), B = String(b.plot_name || '');
+        const pa = A.replace(/[0-9]/g, ''), pb = B.replace(/[0-9]/g, '');
+        if (pa !== pb) return pa.localeCompare(pb);
+        return (parseInt(A.replace(/\D/g, ''), 10) || 0) - (parseInt(B.replace(/\D/g, ''), 10) || 0)
+            || A.localeCompare(B);
+      });
       nurseries = (nurRes && !nurRes.error && nurRes.data) ? nurRes.data : [];
       if (Array.isArray(lo.nurseries)) {
         const want = lo.nurseries.map((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase());
