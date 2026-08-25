@@ -8,9 +8,9 @@
 -- raised anywhere, whichever system it was routed to.
 --
 -- That is a property of the SYSTEM, not of each person, so it is a flag on
--- nelos_modules rather than something to set on every handler. Any system
--- can be made HQ — the flag is a toggle on the Case Routing page, and more
--- than one may carry it.
+-- nelos_modules rather than something to set on every handler. It is not
+-- exposed as a toggle: HQ oversight is compulsory, not a preference. More
+-- than one system may carry the flag if that is ever wanted — set it here.
 --
 -- WHAT IT CHANGES
 --   Somebody tagged to an HQ system sees every case, exactly as an unpinned
@@ -43,12 +43,13 @@ END $preflight$;
 ALTER TABLE nelos_modules
   ADD COLUMN IF NOT EXISTS sees_all_cases BOOLEAN NOT NULL DEFAULT false;
 
--- Nursery Operation is HQ. Applied once: a later UPDATE to false on the
--- Case Routing page must survive a re-run of this file, so this only fires
--- while no system carries the flag at all.
+-- Nursery Operation is HQ, and that is not a setting — there is no toggle
+-- for it on the User Setting page, because HQ oversight is the whole reason
+-- those people are in Nelos. So this is applied unconditionally rather than
+-- only-if-nobody-else-has-it: with no UI to turn it back on, a system that
+-- somehow lost the flag could never regain it.
 UPDATE nelos_modules SET sees_all_cases = true
- WHERE key = 'nursery_ops'
-   AND NOT EXISTS (SELECT 1 FROM nelos_modules WHERE sees_all_cases);
+ WHERE key = 'nursery_ops' AND sees_all_cases IS DISTINCT FROM true;
 
 -- ────────────────────────────────────────────────────────────────
 -- PART 2: Scope carries it

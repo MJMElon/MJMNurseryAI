@@ -90,40 +90,53 @@
   .btn-save { background:#7c3aed; color:#fff; } .btn-save:hover { background:#6d28d9; }
   .btn-ghost { background:#ede9fe; color:#6d28d9; }
 
-  /* ── Routing table ──────────────────────────────────────────── */
-  .route-head { display:grid; grid-template-columns:1fr 1.15fr; gap:16px; padding:0 16px 8px;
-                font-size:9.5px; font-weight:900; letter-spacing:.13em; text-transform:uppercase;
-                color:#a78bfa; }
-  .sys-row { display:flex; align-items:center; gap:9px; padding:11px 16px; background:#f5f3ff;
-             border-top:1.5px solid #ede9fe; border-bottom:1.5px solid #ede9fe; flex-wrap:wrap; }
-  .sys-row:first-of-type { border-top:none; }
-  .sys-ico { font-size:16px; }
-  .sys-name { font-size:13px; font-weight:900; color:#4c1d95; }
-  .sw { margin-left:auto; display:flex; align-items:center; gap:7px; font-size:11px;
-        font-weight:800; color:#6d28d9; cursor:pointer; }
-  .sw input { width:15px; height:15px; accent-color:#7c3aed; }
+  /* ── Routing ────────────────────────────────────────────────── */
+  .sys-block { border-bottom:1.5px solid #ede9fe; }
+  .sys-block:last-child { border-bottom:none; }
+  .sys-row { width:100%; display:flex; align-items:center; gap:10px; padding:15px 18px;
+             background:#fff; border:none; cursor:pointer; text-align:left; font:inherit; }
+  .sys-row:hover { background:#faf5ff; }
+  .sys-chev { color:#a78bfa; font-size:13px; width:12px; flex-shrink:0; }
+  .sys-ico { font-size:17px; }
+  .sys-name { font-size:14px; font-weight:900; color:#4c1d95; }
+  .sys-count { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
+               text-transform:uppercase; color:#a78bfa; }
+  .hq-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+            padding:2px 8px; border-radius:999px; background:#dcfce7; color:#15803d; }
 
-  .route-row { display:grid; grid-template-columns:1fr 1.15fr; gap:16px; align-items:start;
-               padding:10px 16px; border-bottom:1px dashed #ede9fe; }
-  .route-row:hover { background:#fdfcff; }
-  .route-row.is-default { background:#fafafa; }
-  .route-row.is-default .from-title { font-style:italic; color:#64748b; }
-  @media (max-width:720px) { .route-head { display:none; }
-    .route-row { grid-template-columns:1fr; gap:7px; } }
-
-  .from { display:flex; flex-direction:column; gap:2px; padding-top:7px; }
-  .from-title { font-size:13px; font-weight:800; color:#1e293b; }
-  .from-sys { font-size:10.5px; font-weight:700; color:#a78bfa; }
-
-  .solve { display:flex; flex-direction:column; gap:6px; }
-  .solve .inp { padding:7px 10px; font-size:12.5px; }
-  .solve-note { font-size:10.5px; font-weight:700; color:#94a3b8; display:flex;
-                align-items:center; gap:9px; min-height:1px; }
+  /* The table inside an open block. Four columns: number, case category,
+     destination system, PIC. */
+  .rt { padding:0 18px 16px; background:#fdfcff; }
+  .rt-band, .rt-sub, .rt-row { display:grid; grid-template-columns:38px 1fr 1.05fr 1.05fr; gap:12px;
+                               align-items:center; }
+  .rt-band { padding:14px 0 8px; }
+  .rt-band span:first-child { grid-column:1 / 3; }
+  .rt-band span:last-child  { grid-column:3 / 5; }
+  .rt-band span { font-size:13px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                  color:#4c1d95; border-bottom:2.5px solid #7c3aed; padding-bottom:6px; }
+  .rt-sub { padding:8px 0; border-bottom:1.5px solid #ede9fe; }
+  .rt-sub span { font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                 color:#94a3b8; }
+  .rt-row { padding:9px 0; border-bottom:1px dashed #ede9fe; align-items:start; }
+  .rt-row:last-child { border-bottom:none; }
+  .rt-row.is-default { background:#f8fafc; }
+  .rt-row.is-default .rt-cat { font-style:italic; color:#64748b; }
+  .rt-n { font-size:12px; font-weight:900; color:#a78bfa; padding-top:8px;
+          font-variant-numeric:tabular-nums; }
+  .rt-cat { font-size:13px; font-weight:800; color:#1e293b; padding-top:7px; }
+  .cell { display:flex; flex-direction:column; gap:4px; }
+  .cell .inp { padding:7px 10px; font-size:12.5px; }
+  .cell-note { font-size:10px; font-weight:700; color:#94a3b8; }
   .warn-txt { color:#b45309; }
-  .r-clear { margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
+  .r-clear { align-self:flex-start; background:none; border:none; cursor:pointer; padding:0;
              font-size:10px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
              color:#b91c1c; }
   .r-clear:hover { text-decoration:underline; }
+  @media (max-width:760px) {
+    .rt-band, .rt-sub { display:none; }
+    .rt-row { grid-template-columns:34px 1fr; gap:6px 10px; padding:12px 0; }
+    .rt-row .cell { grid-column:2; }
+  }
 
   .note { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; padding:13px 15px; margin-bottom:18px; }
   .note-h { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; margin-bottom:4px; }
@@ -181,6 +194,7 @@ let categories = [];   // active category names
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
 let extraSeats = 0;    // how many extra numbers the + button is offering
+let openRoute = null;  // which system's routing block is open
 let me = { name: '' };
 
 function toast(msg, ok) {
@@ -271,8 +285,8 @@ function seatRows(p, moduleKey) {
         <input type="radio" name="seat" value="${n}" ${mine ? 'checked' : ''} ${takenByOther ? 'disabled' : ''}>
         <span class="seat-badge">${n}</span>
         <span class="seat-who">${
-          takenByOther ? esc(holder.full_name || holder.email)
-          : mine ? 'this person'
+          holder ? esc(holder.full_name || holder.email)
+          : mine ? esc(p.full_name || p.email || '')
           : '<em>free</em>'}</span>
       </label>`;
   }
@@ -308,6 +322,11 @@ function panelHtml(p) {
 /* One list, grouped by system and numbered inside it, with whoever has no
    tag yet gathered at the bottom rather than scattered through. */
 function renderPeople() {
+  // Whatever "+ add another number" conjured belongs to the panel that was
+  // open. With none open it must not survive — otherwise setting somebody
+  // to #2 leaves a phantom #3 waiting for whoever is opened next.
+  if (!open) extraSeats = 0;
+
   if (!people.length) {
     $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
          Nobody has Nelos access yet.<br>
@@ -430,12 +449,9 @@ async function savePerson(userId) {
 
 /* ── Routing ───────────────────────────────────────────────────── */
 
-/* SOLVE BY — which system takes the case, and optionally which numbered
-   person in it. The people list follows whichever system is chosen, because
-   a number belongs to one system. */
-function solveByHtml(mod, cat, rule, isDefault) {
-  // A category with no rule of its own follows the section default; say so
-  // rather than showing a setting that is not really set.
+/* SOLVE BY — which system takes the case, and which person in it. The PIC
+   list follows the chosen system, because a number belongs to one system. */
+function solveCells(mod, cat, rule, isDefault) {
   const own = routes.some(r => r.source_module === mod && r.category === cat);
   const inherited = !isDefault && !own;
   const toModule = rule ? rule.to_module : mod;
@@ -444,27 +460,30 @@ function solveByHtml(mod, cat, rule, isDefault) {
   const n = handlerCount(toModule);
 
   return `
-    <div class="solve" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}">
+    <div class="cell" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}">
       <select class="inp r-dest">
         ${modules.map(x =>
           `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
       </select>
-      <select class="inp r-seat" ${staff.length ? '' : 'disabled'}>
-        <option value="">${staff.length ? 'Anyone in that system' : 'Nobody tagged there'}</option>
+      ${inherited ? '<span class="cell-note"><em>following the default</em></span>'
+        : n ? '' : '<span class="cell-note warn-txt">⚠ nobody tagged there</span>'}
+    </div>
+    <div class="cell">
+      <select class="inp r-seat" data-rule="${esc(mod)}" data-cat="${cat === null ? '' : esc(cat)}"
+              ${staff.length ? '' : 'disabled'}>
+        <option value="">${staff.length ? 'Anyone' : 'Nobody tagged'}</option>
         ${staff.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
           esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
       </select>
-      <div class="solve-note">
-        ${inherited ? '<em>following the default below</em>' :
-          n ? '' : '<span class="warn-txt">⚠ nobody tagged there — cases will sit unclaimed</span>'}
-        ${!isDefault && own ? '<button class="r-clear" title="Drop this rule and follow the default">clear</button>' : ''}
-      </div>
+      ${!isDefault && own
+        ? `<button class="r-clear" data-rule="${esc(mod)}" data-cat="${esc(cat)}"
+                   title="Drop this rule and follow the default">clear</button>` : ''}
     </div>`;
 }
 
-/* One flat table. Every row is a case title on the left with the system it
-   comes from, and who solves it on the right — no expanding, because the
-   whole point is seeing every route at once. */
+/* Each system is a closed block. Routing is set once and then read rarely,
+   so five systems' worth of rules open at once is noise — you open the one
+   you came to change. */
 function renderRouting() {
   if (!modules.length) {
     $('routing').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
@@ -473,78 +492,68 @@ function renderRouting() {
     return;
   }
 
-  let html = `
-    <div class="route-head">
-      <span>From</span>
-      <span>Solve by</span>
-    </div>`;
+  $('routing').innerHTML = modules.map(m => {
+    const openHere = openRoute === m.key;
+    const set = routes.filter(r => r.source_module === m.key && r.category !== null).length;
 
-  modules.forEach(m => {
-    html += `
-      <div class="sys-row">
-        <span class="sys-ico">${esc(m.icon || '📦')}</span>
-        <span class="sys-name">${esc(m.label)}</span>
-        <label class="sw">
-          <input type="checkbox" class="r-create" data-mod="${esc(m.key)}" ${m.can_create ? 'checked' : ''}>
-          Can raise cases
-        </label>
-        <label class="sw sw-hq" title="Its people oversee every queue instead of working one">
-          <input type="checkbox" class="r-hq" data-mod="${esc(m.key)}" ${m.sees_all_cases ? 'checked' : ''}>
-          HQ — sees every case
-        </label>
-      </div>`;
-
-    categories.forEach(cat => {
-      html += `
-        <div class="route-row">
-          <div class="from">
-            <span class="from-title">${esc(cat)}</span>
-            <span class="from-sys">${esc(m.label)}</span>
+    let inner = '';
+    if (openHere) {
+      inner = `
+        <div class="rt">
+          <div class="rt-band"><span>From</span><span>Solve by</span></div>
+          <div class="rt-sub"><span>#</span><span>Case Category</span><span>System</span><span>PIC</span></div>
+          ${categories.map((cat, i) => `
+            <div class="rt-row">
+              <span class="rt-n">${i + 1}.</span>
+              <span class="rt-cat">${esc(cat)}</span>
+              ${solveCells(m.key, cat, routeFor(m.key, cat), false)}
+            </div>`).join('')}
+          <div class="rt-row is-default">
+            <span class="rt-n">—</span>
+            <span class="rt-cat">Any other case title</span>
+            ${solveCells(m.key, null, routes.find(r => r.source_module === m.key && r.category === null), true)}
           </div>
-          ${solveByHtml(m.key, cat, routeFor(m.key, cat), false)}
         </div>`;
-    });
+    }
 
-    // The catch-all sits last, under the categories it backs up.
-    const def = routes.find(r => r.source_module === m.key && r.category === null);
-    html += `
-      <div class="route-row is-default">
-        <div class="from">
-          <span class="from-title">Any other case title</span>
-          <span class="from-sys">${esc(m.label)}</span>
-        </div>
-        ${solveByHtml(m.key, null, def, true)}
+    return `
+      <div class="sys-block">
+        <button class="sys-row" data-open="${esc(m.key)}">
+          <span class="sys-chev">${openHere ? '▾' : '▸'}</span>
+          <span class="sys-ico">${esc(m.icon || '📦')}</span>
+          <span class="sys-name">${esc(m.label)}</span>
+          ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
+          <span class="sys-count">${set ? set + ' set' : 'all default'}</span>
+        </button>
+        ${inner}
       </div>`;
-  });
+  }).join('');
 
-  $('routing').innerHTML = html;
+  $('routing').querySelectorAll('.sys-row').forEach(b =>
+    b.addEventListener('click', () => {
+      openRoute = openRoute === b.dataset.open ? null : b.dataset.open;
+      renderRouting();
+    }));
 
-  $('routing').querySelectorAll('.r-create').forEach(el =>
-    el.addEventListener('change', e => saveModule(el.dataset.mod, { can_create: e.target.checked })));
+  const cat = el => el.dataset.cat === '' ? null : el.dataset.cat;
 
-  $('routing').querySelectorAll('.r-hq').forEach(el =>
-    el.addEventListener('change', e => saveModule(el.dataset.mod, { sees_all_cases: e.target.checked })));
+  $('routing').querySelectorAll('.r-dest').forEach(el =>
+    el.addEventListener('change', () => {
+      // A new system means a new set of people, so the PIC is cleared —
+      // whoever was chosen in the old system would route nowhere.
+      const box = el.closest('.cell');
+      saveRule(box.dataset.rule, cat(box), el.value, null);
+    }));
 
-  $('routing').querySelectorAll('.solve').forEach(cell => {
-    const mod = cell.dataset.rule;
-    const cat = cell.dataset.cat === '' ? null : cell.dataset.cat;
-    const dest = cell.querySelector('.r-dest');
-    const seat = cell.querySelector('.r-seat');
-    const clear = cell.querySelector('.r-clear');
+  $('routing').querySelectorAll('.r-seat').forEach(el =>
+    el.addEventListener('change', () => {
+      const dest = $('routing').querySelector(
+        `.cell[data-rule="${el.dataset.rule}"][data-cat="${el.dataset.cat}"] .r-dest`);
+      saveRule(el.dataset.rule, cat(el), dest.value, el.value || null);
+    }));
 
-    // Changing the system clears the person: a number belongs to one system,
-    // so whoever was chosen in the old one would route nowhere.
-    dest.addEventListener('change', () => saveRule(mod, cat, dest.value, null));
-    seat.addEventListener('change', () => saveRule(mod, cat, dest.value, seat.value || null));
-    if (clear) clear.addEventListener('click', () => clearRule(mod, cat));
-  });
-}
-
-async function saveModule(key, fields) {
-  const { error } = await _supabase.from('nelos_modules').update(fields).eq('key', key);
-  if (error) { toast('Could not save — ' + error.message, false); }
-  else toast('Saved.');
-  await load();
+  $('routing').querySelectorAll('.r-clear').forEach(el =>
+    el.addEventListener('click', () => clearRule(el.dataset.rule, cat(el))));
 }
 
 /* One rule per (section, category); the default row is category NULL.
