@@ -24,7 +24,8 @@ migration_nelos_grant.sql
 migration_nelos_case_tools.sql
 migration_nelos_close_right.sql
 migration_nelos_solve_photo.sql
-migration_nelos_tier.sql"
+migration_nelos_tier.sql
+migration_nelos_access.sql"
 
 n=$(printf '%s\n' $PARTS | wc -l | tr -d ' ')
 OUT=migration_nelos_all.sql
@@ -53,6 +54,7 @@ cat <<HEADER
 --  11. migration_nelos_close_right.sql  may_create / may_close rights
 --  12. migration_nelos_solve_photo.sql  the photo of the fix
 --  13. migration_nelos_tier.sql   short system names for the list
+--  14. migration_nelos_access.sql which systems a person may use Nelos in
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing

@@ -120,12 +120,21 @@
        • optionally narrowed by category inside the home queue. A case
          with your name on it is never hidden by that narrowing — somebody
          has already decided it is yours.
+       • plus every case in any system TICKED for them on User Access
+         (nelos_handlers.access_modules). That is the second question the
+         home pin used to answer badly: an auditor handles Audit's queue,
+         and may also need to work in the FC Portal and the Admin Portal.
+         A tick opens a whole queue, without the number and category
+         narrowing, which belong to the one queue they actually handle.
 
        • tagged to an HQ system → sees everything. Nursery Operation is
          HQ: its people oversee every queue rather than working one. The
          flag is nelos_modules.sees_all_cases, so any system can be HQ.
-       • not pinned yet → sees everything. Somebody who has just been
-         granted Nelos must not find an empty screen.
+       • never set up at all (no handler row) → sees everything, so
+         nobody the User Access screen has not reached yet finds an empty
+         screen. Once they HAVE a row, what is on it governs — including
+         when all of it is empty, or "all off by default" would mean
+         nothing.
        • Nelos admin    → sees everything regardless, so an admin cannot
          lock themselves out of their own case log.
 
@@ -167,14 +176,29 @@
       if (error || !row) return (_scope = open);
       if (row.is_admin) return (_scope = open);
       if (row.sees_all) return (_scope = open);          // HQ system
-      if (!row.primary_module) return (_scope = open);   // not tagged yet
+
+      // Never set up at all — no handler row — still sees everything. That
+      // is the old rule, kept for anybody the User Access screen has not
+      // reached yet. Once they HAVE a row, what is on it governs, even when
+      // all of it is empty: "nothing ticked" has to mean "nothing shown" or
+      // there is no point ticking. row.has_row arrives with
+      // migration_nelos_access.sql; before it, undefined reads as the old
+      // behaviour.
+      if (row.has_row === false || (row.has_row === undefined && !row.primary_module)) {
+        return (_scope = open);
+      }
 
       const list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
+      const also = Array.isArray(row.access_modules) ? row.access_modules.filter(Boolean) : [];
       return (_scope = {
         unrestricted: false,
-        home: row.primary_module,
+        home: row.primary_module || null,
         seatNo: row.seat_no ?? null,
         cats: list.length ? new Set(list) : null,
+        // The systems ticked for them on User Access. Additive: their home
+        // queue is theirs whatever is ticked, and a tick only ever opens a
+        // door.
+        access: also.length ? new Set(also) : null,
         userId: me.id
       });
     } catch (_) {
@@ -187,7 +211,14 @@
     if (!sc || sc.unrestricted) return true;
     // Assigned to me — mine wherever it sits, past every filter below.
     if (sc.userId && c.assignee_id && c.assignee_id === sc.userId) return true;
-    if (QUEUE_OF(c) !== sc.home) return false;
+
+    const queue = QUEUE_OF(c);
+    // A system ticked on User Access: the whole of that queue, without the
+    // number and category narrowing, which belong to the queue somebody
+    // actually HANDLES rather than the ones they are allowed to work in.
+    if (sc.access && sc.access.has(queue)) return true;
+
+    if (!sc.home || queue !== sc.home) return false;
     // Routed to one numbered handler: only that person. No number on the
     // case means anyone in the system may take it.
     if (c.assigned_seat_no && c.assigned_seat_no !== sc.seatNo) return false;
