@@ -51,9 +51,9 @@
 </head>
 <body>
 
-<div id="mjm-ribbon" data-logo="off" data-brand=""></div>
+<div id="mjm-ribbon" data-logo="off" data-brand="" data-center=" "></div>
 <script src="../shared/shared_ribbon.js"></script>
-<script src="../shared/shared_fc_brand.js" data-sub="Setting"></script>
+<script src="../shared/shared_fc_brand.js" data-sub="Setting" data-back="scan_admin.html"></script>
 
 <div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -72,18 +72,6 @@
     <button class="tab on" data-tab="users">User Setting</button>
   </div>
 
-  <div class="card p-5 mb-4">
-    <p class="text-[12.5px] text-slate-600 leading-relaxed">
-      Tick the pages this person opens in the 555 FC Portal, and for each one, the nurseries they may see.
-      A page with no nursery ticked shows them nothing; <strong>All</strong> means every nursery, including any
-      added later.
-    </p>
-    <p class="text-[11px] text-slate-400 mt-2">
-      Whether they can open the portal at all is set on the
-      <a href="../user_access.html" class="text-violet-700 font-bold underline underline-offset-2">main User Access</a>.
-      Only people who already have the module appear below.
-    </p>
-  </div>
 
   <div class="card overflow-hidden">
     <div class="px-5 py-3.5 border-b border-violet-50 flex items-center justify-between gap-3">
@@ -164,27 +152,11 @@ function rowHtml(p) {
         <div class="flex-1 min-w-0">
           <div class="font-black text-slate-800 text-[14px] truncate">${esc(p.full_name || '(no name)')}</div>
           <div class="text-[11.5px] text-slate-400 truncate">${esc(p.email || '—')}</div>
-          <div class="text-[11px] text-violet-700 font-bold mt-0.5">${esc(summaryOf(p.permissions || {}))}</div>
         </div>
         <button class="btn btn-edit" data-edit="${esc(p.id)}">${open ? 'Close' : 'Edit Access'}</button>
       </div>
       ${open ? panelHtml() : ''}
     </div>`;
-}
-
-/** "PALMS, Maintenance · BNN" — enough to read the list without opening rows.
-    Says "mixed" rather than picking one page's answer for all of them: with
-    the nurseries set per page they genuinely can differ, and quoting the
-    unrestricted one would read as no restriction at all. */
-function summaryOf(perms) {
-  const on = PAGES.filter((pg) => pageOn(perms, pg.key));
-  if (!on.length) return 'No pages';
-  const names = on.map((pg) => pg.label).join(', ');
-  const lists = on.map((pg) => pageNurseries(perms, pg.key));
-  const shown = lists.map((l) => (l === null ? '*' : l.slice().sort().join(',')));
-  if (shown.some((x) => x !== shown[0])) return names + ' · nurseries differ by page';
-  if (lists[0] === null) return names + ' · all nurseries';
-  return names + (lists[0].length ? ' · ' + lists[0].join(', ') : ' · no nursery');
 }
 
 function panelHtml() {
