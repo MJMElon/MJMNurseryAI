@@ -122,6 +122,25 @@
     return false;
   }
 
+  /* ── IS A LOGIN ON SCREEN? ───────────────────────────────────────
+     A stored session is not the same as being signed in to the page.
+     The hub shows its sign-in over the same URL as the module grid —
+     it gates on a per-tab flag, not on the Supabase session — so a
+     returning visitor with a live token still meets the login screen,
+     and a floating to-do circle over it looks like a bug.
+
+     Any page can say so by marking its login element
+     data-login-screen; #auth-screen is recognised too, because that is
+     what the hub already calls it. */
+  function loginOnScreen() {
+    var el = document.querySelector('[data-login-screen]') ||
+             document.getElementById('auth-screen');
+    if (!el || el.hidden) return false;
+    var cs;
+    try { cs = getComputedStyle(el); } catch (_) { return false; }
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && el.offsetParent !== null;
+  }
+
   /* ── Supabase config ─────────────────────────────────────────── */
 
   /* shared_supabase.js and audit_supabase.js both declare their config
@@ -446,11 +465,9 @@
 
   .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px;
              background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; flex-shrink:0; }
-  .nd-head-mark { width:29px; height:29px; border-radius:9px; background:rgba(255,255,255,.2);
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
   .nd-head-t  { font-size:13px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; line-height:1.1; }
-  .nd-head-s  { font-size:9px; font-weight:700; letter-spacing:.08em; opacity:.82; margin-top:1px; }
   .nd-min { margin-left:auto; width:28px; height:28px; border-radius:8px; border:none; cursor:pointer;
             background:rgba(255,255,255,.18); color:#fff; font-size:15px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -465,8 +482,13 @@
   .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
                  border-bottom:1px solid #fee2e2; padding:7px 14px; }
 
+  /* A button, not a link: the case opens in this panel. The reset is
+     what a <button> needs to keep looking like the row it replaced. */
   .nd-row { display:flex; align-items:flex-start; gap:9px; padding:10px 14px;
-            border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit; }
+            border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit;
+            width:100%; text-align:left; background:none; border-left:none;
+            border-right:none; border-top:none; font-family:inherit;
+            cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .nd-row:last-child { border-bottom:none; }
   .nd-row:hover { background:#faf5ff; }
   .nd-row-over { background:#fffbfb; }
@@ -525,6 +547,25 @@
   .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
   .nd-done a:hover { text-decoration:underline; }
 
+  .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
+  .nd-detail[hidden] { display:none; }
+  .nd-d-title { font-size:15px; font-weight:800; color:#0f172a; line-height:1.35; }
+  .nd-d-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+  .nd-d-chip { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+               padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; }
+  .nd-d-chip.hot  { background:#fee2e2; color:#b91c1c; }
+  .nd-d-chip.due  { background:#fef3c7; color:#92400e; }
+  .nd-d-body { margin-top:12px; font-size:12.5px; line-height:1.55; color:#334155;
+               white-space:pre-wrap; word-break:break-word; }
+  .nd-d-none { margin-top:12px; font-size:12px; color:#94a3b8; font-style:italic; }
+  .nd-d-grid { margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px;
+               display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:11.5px; }
+  .nd-d-k { color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+  .nd-d-v { color:#334155; font-weight:600; word-break:break-word; }
+  .nd-d-open { display:inline-block; margin-top:14px; font-size:11px; font-weight:800;
+               color:#6d28d9; text-decoration:none; letter-spacing:.03em; }
+  .nd-d-open:hover { text-decoration:underline; }
+
   .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; flex-shrink:0; }
   .nd-foot[hidden] { display:none; }
   .nd-btn  { flex:1; text-align:center; padding:9px 10px; border-radius:10px; text-decoration:none;
@@ -534,6 +575,10 @@
   .nd-btn-b:hover { background:#ede9fe; }
   .nd-btn-c { background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; }
   .nd-btn-c:hover { background:#f1f5f9; }
+  /* Roughly 70/30 — the primary action earns the room. Declared after
+     .nd-btn, whose flex:1 would otherwise win on source order. */
+  .nd-btn-wide   { flex:7 1 0; }
+  .nd-btn-narrow { flex:3 1 0; font-size:11px; }
   button.nd-btn { font-family:inherit; cursor:pointer; }
   button.nd-btn:disabled { opacity:.6; cursor:progress; }
 
@@ -570,6 +615,17 @@
   var todayISO = function () { return new Date().toISOString().slice(0, 10); };
   var isOverdue = function (c) { return !!c.due_date && c.due_date < todayISO(); };
 
+  /* Same wording as dueText, without the markup — for places that need
+     the words rather than a styled span. */
+  function dueLabel(d) {
+    if (!d) return '';
+    var label;
+    try {
+      label = new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+    } catch (_) { label = d; }
+    return (d < todayISO() ? 'overdue ' : 'due ') + label;
+  }
+
   function dueText(d) {
     if (!d) return '';
     var label;
@@ -594,7 +650,8 @@
                       : '<em>unassigned</em>',
       dueText(c.due_date)
     ].filter(Boolean);
-    return '<a class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') + '" href="' + esc(caseHref(c.id)) + '">' +
+    return '<button type="button" class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') +
+           '" data-case="' + esc(c.id) + '">' +
              '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
                    'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
              '<span class="nd-main">' +
@@ -604,10 +661,10 @@
                  bits.join(' · ') +
                '</span>' +
              '</span>' +
-           '</a>';
+           '</button>';
   }
 
-  var dock, fab, badge, panel, listEl, formEl, grip;
+  var dock, fab, badge, panel, listEl, formEl, detailEl, grip;
   var rows = [], open = false;
   var view = 'list';           // 'list' | 'form' | 'done'
 
@@ -623,12 +680,12 @@
     dock.innerHTML =
       '<div id="nelos-dock-panel" hidden role="dialog" aria-label="My Nelos to-do list">' +
         '<div class="nd-grip" title="Drag to resize"></div>' +
+        /* Title alone. The NL square repeated the badge on the circle
+           that opened this panel, and the "Nelos · Pending on me"
+           line under it repeated the title — three pieces of chrome
+           for one idea, in a panel that is mostly list. */
         '<div class="nd-head">' +
-          '<div class="nd-head-mark">NL</div>' +
-          '<div>' +
-            '<div class="nd-head-t">My To-Do</div>' +
-            '<div class="nd-head-s">Nelos · Pending on me</div>' +
-          '</div>' +
+          '<div class="nd-head-t">My To Do Nelos</div>' +
           '<button class="nd-min" type="button" title="Minimise" aria-label="Minimise">&#8211;</button>' +
         '</div>' +
         '<div class="nd-list"><div class="nd-empty">loading cases…</div></div>' +
@@ -665,13 +722,20 @@
           '</div>' +
           '<div class="nd-from"></div>' +
         '</div>' +
+        /* Raising a case is what this panel is for; leaving for the full
+           Nelos page is the exception. The split says so — roughly 70/30
+           rather than two buttons of equal weight. */
         '<div class="nd-foot nd-foot-list">' +
-          '<a class="nd-btn nd-btn-b" href="' + esc(homeHref()) + '">Open Nelos →</a>' +
-          '<button type="button" class="nd-btn nd-btn-a nd-new">➕ Raise a Case</button>' +
+          '<a class="nd-btn nd-btn-b nd-btn-narrow" href="' + esc(homeHref()) + '">Open Nelos →</a>' +
+          '<button type="button" class="nd-btn nd-btn-a nd-btn-wide nd-new">+ New Case</button>' +
         '</div>' +
+        '<div class="nd-detail" hidden></div>' +
         '<div class="nd-foot nd-foot-form" hidden>' +
           '<button type="button" class="nd-btn nd-btn-c nd-cancel">Cancel</button>' +
           '<button type="button" class="nd-btn nd-btn-a nd-save">Raise Case</button>' +
+        '</div>' +
+        '<div class="nd-foot nd-foot-detail" hidden>' +
+          '<button type="button" class="nd-btn nd-btn-c nd-back">&#8592; Back</button>' +
         '</div>' +
       '</div>' +
       '<button id="nelos-dock-fab" type="button" title="Nelos — my to-do (drag to move)" ' +
@@ -686,6 +750,7 @@
     panel  = dock.querySelector('#nelos-dock-panel');
     listEl = dock.querySelector('.nd-list');
     formEl = dock.querySelector('.nd-form');
+    detailEl = dock.querySelector('.nd-detail');
     grip   = dock.querySelector('.nd-grip');
     wireForm();
 
@@ -1018,23 +1083,107 @@
     box.textContent = msg || '';
   }
 
+  /* One place decides which of the three panes is on screen, so a new
+     pane cannot half-appear over another. */
+  function showPane(which) {
+    listEl.hidden   = which !== 'list';
+    formEl.hidden   = which !== 'form';
+    detailEl.hidden = which !== 'detail';
+    panel.querySelector('.nd-foot-list').hidden   = which !== 'list';
+    panel.querySelector('.nd-foot-form').hidden   = which !== 'form';
+    panel.querySelector('.nd-foot-detail').hidden = which !== 'detail';
+  }
+
   function showList() {
     view = 'list';
-    listEl.hidden = false; formEl.hidden = true;
-    panel.querySelector('.nd-foot-list').hidden = false;
-    panel.querySelector('.nd-foot-form').hidden = true;
-    panel.querySelector('.nd-head-t').textContent = 'My To-Do';
-    panel.querySelector('.nd-head-s').textContent = 'Nelos · Pending on me';
+    showPane('list');
+    panel.querySelector('.nd-head-t').textContent = 'My To Do Nelos';
     paint();
+  }
+
+  /* ── ONE CASE, IN THE PANEL ──────────────────────────────────────
+     Tapping a row used to leave the page for nelos_case.html, which
+     threw away whatever the person was in the middle of — the dock
+     floats over a page they were working on, and the case is usually
+     something they want to read, not somewhere they want to go.
+
+     The list already carries everything but the description, so the
+     panel paints from the row it has and fills the description in when
+     it arrives. A failed fetch is not an error state: the case is
+     still readable, minus one field. */
+  var _detailCache = {};
+
+  async function fetchCase(id) {
+    if (_detailCache[id]) return _detailCache[id];
+    var token = await accessToken();
+    if (!token) return null;
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?select=*&limit=1&id=eq.' +
+                            encodeURIComponent(id), { headers: authHeaders(token) });
+      if (!res.ok) return null;
+      var out = await res.json();
+      var one = Array.isArray(out) ? out[0] : null;
+      if (one) _detailCache[id] = one;
+      return one || null;
+    } catch (_) { return null; }
+  }
+
+  function detailHtml(c, full) {
+    var subject = [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
+      .filter(Boolean).join(' · ');
+    var due = dueLabel(c.due_date);
+    var chips =
+      '<span class="nd-d-chip">' + esc(SOURCE_LABEL[c.source_module] || c.source_module || 'Nelos') + '</span>' +
+      '<span class="nd-d-chip' + (c.priority === 'urgent' || c.priority === 'high' ? ' hot' : '') + '">' +
+        esc(PRIORITY_LABEL[c.priority] || c.priority || 'normal') + '</span>' +
+      (c.status ? '<span class="nd-d-chip">' + esc(String(c.status).replace('_', ' ')) + '</span>' : '') +
+      (due ? '<span class="nd-d-chip' + (isOverdue(c) ? ' hot' : ' due') + '">' + esc(due) + '</span>' : '');
+
+    var rowsOut = [];
+    var put = function (k, v) { if (v) rowsOut.push(
+      '<div class="nd-d-k">' + esc(k) + '</div><div class="nd-d-v">' + esc(v) + '</div>'); };
+    put('Case', c.case_no);
+    put('Subject', subject);
+    put('Category', c.category);
+    put('Queue', SOURCE_LABEL[c.assigned_module] || c.assigned_module);
+    put('Assignee', c.assignee_name || 'Unassigned');
+    put('Raised', (c.created_at || '').slice(0, 10));
+
+    var body = full === null
+      ? '<div class="nd-d-none">Could not load the detail — the case above is what the list knows.</div>'
+      : full && full.description
+        ? '<div class="nd-d-body">' + esc(full.description) + '</div>'
+        : full
+          ? '<div class="nd-d-none">No further detail was written.</div>'
+          : '<div class="nd-d-none">Loading detail…</div>';
+
+    return '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
+           '<div class="nd-d-chips">' + chips + '</div>' +
+           body +
+           (rowsOut.length ? '<div class="nd-d-grid">' + rowsOut.join('') + '</div>' : '') +
+           '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>';
+  }
+
+  async function showDetail(id) {
+    var c = rows.filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!c) return;
+    view = 'detail';
+    showPane('detail');
+    panel.querySelector('.nd-head-t').textContent = c.case_no || 'Case';
+    detailEl.innerHTML = detailHtml(c, undefined);
+    detailEl.scrollTop = 0;
+
+    var full = await fetchCase(id);
+    /* They may have gone back, or into another case, while that was in
+       flight — only paint if this is still the case on screen. */
+    if (view === 'detail' && panel.querySelector('.nd-head-t').textContent === (c.case_no || 'Case'))
+      detailEl.innerHTML = detailHtml(c, full);
   }
 
   async function showForm() {
     view = 'form';
-    listEl.hidden = true; formEl.hidden = false;
-    panel.querySelector('.nd-foot-list').hidden = true;
-    panel.querySelector('.nd-foot-form').hidden = false;
-    panel.querySelector('.nd-head-t').textContent = 'Raise a Case';
-    panel.querySelector('.nd-head-s').textContent = 'Nelos · From where you are';
+    showPane('form');
+    panel.querySelector('.nd-head-t').textContent = 'New Case';
     formError('');
     formEl.querySelector('.nd-from').innerHTML =
       'Raised from <b>' + esc(pageName()) + '</b> — the case links back here.';
@@ -1051,9 +1200,11 @@
 
   function showDone(c) {
     view = 'done';
-    listEl.hidden = true; formEl.hidden = false;
-    panel.querySelector('.nd-foot-list').hidden = false;
+    showPane('form');
+    /* The done card sits in the form pane but is finished with, so it
+       takes the LIST footer — the way on is a new case or the list. */
     panel.querySelector('.nd-foot-form').hidden = true;
+    panel.querySelector('.nd-foot-list').hidden = false;
     formEl.innerHTML =
       '<div class="nd-done">' +
         '<div class="nd-done-t">✓ ' + esc(c.case_no || 'Case') + ' raised</div>' +
@@ -1177,6 +1328,12 @@
       showForm();
     });
     panel.querySelector('.nd-cancel').addEventListener('click', function () { showList(); });
+    panel.querySelector('.nd-back').addEventListener('click', function () { showList(); });
+    /* Delegated: the list is repainted on every refresh. */
+    listEl.addEventListener('click', function (e) {
+      var row = e.target.closest('.nd-row');
+      if (row && row.dataset.case) showDetail(row.dataset.case);
+    });
     panel.querySelector('.nd-save').addEventListener('click', function () { submitCase(); });
   }
 
@@ -1234,12 +1391,25 @@
 
   /* ── Boot ────────────────────────────────────────────────────── */
 
+  var _booted = false;
+
   async function boot() {
-    if (unwanted()) return;
+    if (_booted || unwanted()) return;
+
+    /* Sign-in swaps the screen without navigating, so this waits rather
+       than giving up — the dock appears the moment the grid does, with
+       no reload. Polling rather than observing: the login element is
+       often replaced wholesale, not just hidden, and an observer bound
+       to the old node would never fire. */
+    if (loginOnScreen()) {
+      setTimeout(boot, 700);
+      return;
+    }
 
     CFG = await loadConfig();
     if (!CFG) { warn('no Supabase config on this page and shared_supabase.js would not load.'); return; }
     if (!storedSession()) return;           // signed out: login pages get no dock, and say nothing
+    _booted = true;
 
     build();
 
