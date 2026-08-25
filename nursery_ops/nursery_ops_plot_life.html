@@ -150,7 +150,7 @@
       <div class="p-4 border-b border-slate-100 space-y-3">
         <div class="flex items-center justify-between gap-2">
           <h2 class="font-black text-slate-800 uppercase tracking-widest text-[12px]">📍 Plots</h2>
-          <button id="stages-btn" class="btn btn-ghost !py-1.5 !px-3 !text-[10px]" title="Set the plot status stages the FC Portal reports against">🚦 Status Stages</button>
+          <button id="stages-btn" class="btn btn-ghost !py-1.5 !px-3 !text-[10px]" title="The stages PALMS on the 555 FC Portal lets a Field Conductor pick from">🚦 Status Stages</button>
         </div>
         <select id="nursery-filter" class="inp !py-2 text-[13px]"><option value="">All nurseries</option></select>
         <input id="plot-search" class="inp !py-2 text-[13px]" placeholder="🔎 Search plot…">
@@ -224,9 +224,16 @@
   </div>
   <div class="p-6 space-y-5">
     <p class="text-[12px] text-slate-500 leading-relaxed -mt-1">
-      The stages a plot moves through, in order. Field Conductors report against these daily on the FC Portal's
-      <strong>Plot Status</strong>. Set the <strong>ideal days</strong> a plot should stay in each stage before
-      moving to the next — the day counter (and the coming over-time alert) uses it.
+      The stages a plot moves through, in order. This is the list a Field Conductor picks from every morning in
+      <strong>PALMS</strong> on the 555 FC Portal — set it here, not in the app. Set the <strong>ideal days</strong>
+      a plot should stay in each stage before moving to the next: the day counter, the over-time alert and the
+      PALMS Motion Study all measure the real duration against it.
+      <br><br>
+      <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[11px] leading-relaxed">
+        <strong>The order is the meaning.</strong> Every daily entry is stored against a stage's <em>position</em>,
+        not its name. Renaming a stage is free, and so is adding one at the end. <strong>Moving</strong> a stage
+        re-reads every past entry against the new order — do that only when the work itself has changed.
+      </span>
     </p>
 
     <!-- add / edit form -->
@@ -244,7 +251,7 @@
     </div>
 
     <div id="stages-list" class="space-y-2"></div>
-    <p class="text-[11px] text-slate-400">Deleting a stage keeps its name on past daily entries — only the reusable stage is removed.</p>
+    <p class="text-[11px] text-slate-400">Deleting a stage keeps its name on past daily entries — only the reusable stage is removed. Field Conductors pick the new list up the next time PALMS is opened with a signal.</p>
   </div>
 </div>
 
