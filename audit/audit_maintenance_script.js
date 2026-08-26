@@ -628,20 +628,14 @@ function openForm(taskId, isEdit, existingAuditUid){
   if(_ftm)_ftm.textContent='Audit — '+t.plot;
   const _fim=document.getElementById('form-id');
   if(_fim)_fim.textContent='';
-  // Reset tri buttons
-  document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
+  // Reset chooser buttons (Satisfied / Unsatisfied)
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
   if(formState.result){
     const btn=document.querySelector(`#f-result-grp [data-val="${formState.result}"]`);
-    if(btn)btn.classList.add(getTriClass(formState.result));
+    if(btn)btn.classList.add('picked');
   }
-  // Legacy 'Not Done' audits map onto the Unsatisfied branch so their
-  // remark / photo stays visible on re-open. The button itself stays
-  // unselected (there's no 'Not Done' button any more), but the
-  // Unsatisfied section shows so the auditor can review or update.
-  const isUnsat = formState.result === 'Unsatisfactory' || formState.result === 'Not Done';
-  const wrap = document.getElementById('unsat-only');
-  if (wrap) wrap.style.display = isUnsat ? '' : 'none';
-
+  /* Remarks + photo cards are always visible now (photo compulsory,
+     remarks optional). The old #unsat-only wrapper is a hidden stub. */
   const rem = document.getElementById('f-remarks');
   if (rem) rem.value = formState.remarks || '';
   if (formState.photo) {
@@ -660,27 +654,14 @@ function getTriClass(v){
   if(v==='Unsatisfactory')return'sel-bad';
   return'sel-na';
 }
-/* Two-option flow: Satisfied is the whole audit; Unsatisfied reveals
-   the Remarks + Photo cards (photo becomes compulsory, remark stays
-   optional). Toggle #unsat-only here so the form stays honest — the
-   only time the auditor sees the photo card is when the answer needs it. */
+/* Satisfied / Unsatisfied is the only compulsory choice; a photo is
+   required for both branches now, so the Remarks + Audit Photo cards
+   stay visible either way. pickResult just marks the chosen button
+   and flips formState.result. */
 function pickResult(val,el){
-  document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
-  if (el) el.classList.add(getTriClass(val));
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
+  if (el) el.classList.add('picked');
   formState.result=val;
-  const wrap = document.getElementById('unsat-only');
-  if (wrap) wrap.style.display = (val === 'Unsatisfactory') ? '' : 'none';
-  // Clear a stale Satisfied → Unsatisfied swap: if the auditor flipped
-  // back to Satisfied, drop any remark / photo they'd tentatively keyed
-  // so the saved record can't carry misleading residue.
-  if (val === 'Satisfactory') {
-    const rem = document.getElementById('f-remarks'); if (rem) rem.value = '';
-    formState.remarks = '';
-    formState.photo = null;
-    const drop = document.getElementById('photo-drop');    if (drop) drop.style.display = 'block';
-    const prev = document.getElementById('photo-preview'); if (prev) prev.style.display = 'none';
-    const img  = document.getElementById('photo-img');     if (img)  img.src = '';
-  }
 }
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
@@ -700,16 +681,14 @@ function clearPhoto(){
 function cancelForm(){setView('list');}
 
 /* --- SAVE ---
-   Two-branch validation matching the new UI:
-     Satisfied   → just needs the result; no remark or photo required
-     Unsatisfied → photo is compulsory (auditor has to show what's wrong);
-                   remark stays optional
-*/
+   Single validation shape now — the auditor picks Satisfied or
+   Unsatisfied (compulsory), attaches a photo (compulsory), and
+   optionally leaves a remark. The photo requirement is the same
+   either way, so nothing branches on the result. */
 async function saveAudit(){
-  if(!formState.result){showToast('⚠ Please select Work Quality');return;}
-  const isUnsat = (formState.result === 'Unsatisfactory');
-  if (isUnsat && !formState.photo){
-    showToast('⚠ A photo is required when the work is Unsatisfied');
+  if(!formState.result){showToast('⚠ Please pick Satisfied or Unsatisfied');return;}
+  if (!formState.photo){
+    showToast('⚠ A photo is required for every audit');
     return;
   }
   const t=tasks.find(x=>x.id===formTaskId);if(!t)return;
