@@ -42,13 +42,15 @@
      Current Status takes the slack because it carries the longest text —
      two activity names joined by " + " — and the last three are equal so
      the eye can run down them. */
-  .c-act    { width:56px; }
-  .c-plot   { width:88px; }
-  .c-status { width:auto; min-width:190px; }
+  .c-plot   { width:92px; }
+  /* Current Status holds a dropdown, so it needs a fixed, generous width of
+     its own rather than "whatever is left" — a select that changes width
+     with its longest option is what made the column look ragged. */
+  .c-status { width:262px; }
   /* Narrower than the header text, so the header wraps to two lines and the
      width the column actually needs is the DATA's, not the label's. That is
      what frees the room Current Status wants. */
-  .c-eq     { width:16%; white-space:normal; }
+  .c-eq     { width:auto; white-space:normal; }
   td.wrap   { white-space:normal; }
   .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
           border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
@@ -69,19 +71,6 @@
      is its content, so without it the list refuses to shrink, the card grows
      past max-height and the OK button ends up off the bottom of the screen —
      with eleven stages that is every time. */
-  #up-list { flex:1 1 auto; min-height:0; overflow-y:auto; }
-  #up-modal .modal-card > :not(#up-list) { flex:none; }
-  .act-row { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:11px 14px;
-             border-radius:14px; border:1.5px solid #e2e8f0; background:white; cursor:pointer;
-             transition:all .12s; font-family:inherit; }
-  .act-row:hover { border-color:#99f6e4; }
-  .act-row.on { border-color:#10b981; background:#ecfdf5; }
-  .act-n { width:28px; height:28px; border-radius:999px; background:#f1f5f9; color:#64748b; font-weight:900;
-           font-size:11px; display:flex; align-items:center; justify-content:center; flex:none; }
-  .act-row.on .act-n { background:#059669; color:white; }
-  .act-name { font-weight:900; color:#1e293b; font-size:13px; flex:1; min-width:0; }
-  .act-row.on .act-name { color:#065f46; }
-  .act-d { font-weight:900; color:#94a3b8; font-size:11px; flex:none; }
   .pv-row { display:flex; align-items:baseline; gap:12px; padding:7px 0; border-top:1px solid #f8fafc; }
   .pv-row:first-child { border-top:none; }
   .pv-k { font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.1em;
@@ -120,6 +109,21 @@
   .pv-line + .pv-line { border-top:1px solid rgba(255,255,255,.13); }
   .pv-sw { width:11px; height:11px; border-radius:3px; border:1.5px solid rgba(255,255,255,.5); flex:none;
            align-self:center; }
+  .st-pick { width:100%; appearance:none; -webkit-appearance:none; font-family:inherit;
+             padding:7px 30px 7px 11px; border-radius:10px; border:1.5px solid #e2e8f0; background:white;
+             color:#0f172a; font-weight:900; font-size:12px; cursor:pointer; outline:none;
+             background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%2394a3b8' d='M5 6L0 0h10z'/></svg>");
+             background-repeat:no-repeat; background-position:right 11px center; background-size:9px;
+             text-overflow:ellipsis; }
+  .st-pick:hover { border-color:#99f6e4; }
+  .st-pick:disabled { background-image:none; border-color:transparent; background-color:transparent;
+                      color:#334155; cursor:default; padding-left:0; font-weight:700; }
+  .cf-was { background:#f8fafc; border:1.5px solid #e2e8f0; }
+  .cf-now { background:#ecfdf5; border:1.5px solid #a7f3d0; }
+  .cf-box { border-radius:14px; padding:12px 14px; }
+  .cf-k { font-size:9px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#94a3b8; }
+  .cf-v { font-size:15px; font-weight:900; color:#0f172a; margin-top:3px; }
+  .cf-s { font-size:11px; font-weight:700; color:#64748b; margin-top:3px; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -153,11 +157,10 @@
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th class="c-act"></th>
             <th class="c-plot">Plot</th>
             <th class="c-status">Current Status</th>
             <th class="c-eq">Expected Completion</th>
-            <th class="c-eq text-right">Days Left / Over</th>
+            <th class="c-eq">Days Left / Over</th>
             <th class="c-eq">Last Update</th>
           </tr>
         </thead>
@@ -183,7 +186,8 @@
         <span class="text-slate-300 font-black text-lg">·</span>
         <span id="pv-title" class="text-2xl font-black text-slate-800 truncate">—</span>
       </div>
-      <button id="pv-edit" class="ml-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
+      <button id="pv-hide" class="ml-auto px-4 py-2 rounded-xl bg-white border-[1.5px] border-rose-200 hover:bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Hide plot</button>
+      <button id="pv-edit" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
       <span id="pv-note" class="ml-auto text-[11px] font-bold text-slate-400 hidden">Admins can redraw this</span>
       <button id="pv-close" class="text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
     </div>
@@ -203,24 +207,33 @@
   </div>
 </div>
 
-<div id="up-modal" class="modal-bg hidden">
-  <div class="modal-card">
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div>
-        <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Update status</div>
-        <div id="up-plot" class="text-lg font-black text-slate-800">—</div>
+<div id="cf-modal" class="modal-bg hidden">
+  <div class="modal-card" style="max-width:470px">
+    <div class="px-5 py-4 border-b border-slate-100">
+      <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Change plot status</div>
+      <div id="cf-plot" class="text-lg font-black text-slate-800">—</div>
+    </div>
+    <div class="px-5 py-4 space-y-2">
+      <div class="cf-box cf-was">
+        <div class="cf-k">Before</div>
+        <div id="cf-was-v" class="cf-v">—</div>
+        <div id="cf-was-s" class="cf-s"></div>
       </div>
-      <button id="up-close" class="ml-auto text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
+      <div class="text-center text-slate-300 font-black text-lg leading-none">↓</div>
+      <div class="cf-box cf-now">
+        <div class="cf-k">After</div>
+        <div id="cf-now-v" class="cf-v">—</div>
+        <div id="cf-now-s" class="cf-s"></div>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed pt-1">
+        The stage running now is recorded as finished today and the new one starts today. This is the
+        same record the Field Conductor's app writes, saved under your name.
+      </p>
     </div>
-    <div class="px-5 py-3 text-[12px] text-slate-500 leading-relaxed border-b border-slate-100">
-      Choose what this plot is on today — up to two at once.
-      <strong class="text-slate-700">Anything you leave out is recorded as finished today.</strong>
-      This writes the same record the Field Conductor's app writes.
-    </div>
-    <div id="up-list" class="px-5 py-4 space-y-2 overflow-y-auto"></div>
     <div class="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
-      <span id="up-msg" class="text-[11px] font-bold text-slate-400"></span>
-      <button id="up-save" class="ml-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest cursor-pointer">OK</button>
+      <span id="cf-msg" class="text-[11px] font-bold text-slate-400"></span>
+      <button id="cf-cancel" class="ml-auto px-4 py-2.5 rounded-xl bg-white border-[1.5px] border-slate-200 hover:bg-slate-50 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-pointer">Cancel</button>
+      <button id="cf-ok" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-widest cursor-pointer">Confirm change</button>
     </div>
   </div>
 </div>
@@ -238,7 +251,8 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
 let AREAS = {};      // plot_name → [{ area_key, polygon, batch_name }]
-let CAN_DRAW = false; // may this account redraw a boundary?
+let CAN_DRAW = false;   // may this account redraw a boundary?
+let CAN_UPDATE = false; // may this account change a plot's status?
 let MAP_SCOPE = {};   // what MAP.load was given, so a reload matches
 let ME = '';        // the name written into anything saved from this page
 let MAP = null;
@@ -351,17 +365,17 @@ function renderTable() {
         ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
         : '<span class="text-slate-300">—</span>';
       return '<tr>' +
-        upCell(r.plot) +
         '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
-        '<td colspan="3"><span class="pill p-idle">Nothing running</span></td>' +
+        statusCell(r.plot, ln) +
+        '<td class="text-slate-300">—</td>' +
+        '<td class="text-slate-300">—</td>' +
         '<td class="text-slate-500">' + seen + '</td></tr>';
     }
     const over = ln.state === 'overdue';
     const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
     return '<tr>' +
-      upCell(r.plot) +
       '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
-      '<td class="wrap">' + esc(ln.status || '—') + '</td>' +
+      statusCell(r.plot, ln) +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
       '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
@@ -369,177 +383,6 @@ function renderTable() {
       '</tr>';
   }).join('');
 }
-
-/* ── Updating a plot's status from here ──────────────────────────────────
-   The same record the Field Conductor's app writes: what is running now is
-   an OPEN entry (end_date null), finishing it is stamping today's date on
-   its end. So "update the status" is close what is no longer running, open
-   what is — which is exactly what applyDailySelection does on the phone.
-
-   The office writing this is new. It is meant for the day a Field Conductor
-   cannot key it in, not as the normal route: the person standing in the plot
-   is the one who knows. Whoever saves here has their own name recorded, so
-   the log says where the entry came from. */
-const upCell = (plot) =>
-  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status" aria-label="Update status">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 20h9"></path>' +
-      '<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>' +
-    '</svg></td>';
-
-let UP_PLOT = null;    // the plot the modal is open for
-let UP_SEL = [];       // act numbers ticked in the modal
-const MAX_AT_ONCE = 2; // matches MAX_CONCURRENT in the field app's data.js
-
-function openUpdate(plot) {
-  UP_PLOT = plot;
-  // The plot may be split into areas; the modal edits the plot as a whole,
-  // which is the unit the office reads. An area-split plot keeps its areas —
-  // this opens whichever unit key the board is showing for it.
-  const ln = lineForPlot(plot);
-  const key = ln ? ln.key : plot;
-  UP_PLOT = key;
-  UP_SEL = MJMPalms.currentEntries(LOGS, key).map((e) => e.actN);
-  $('up-plot').textContent = MJMPalms.keyLabel(key);
-  $('up-msg').textContent = '';
-  renderUpList();
-  $('up-modal').classList.remove('hidden');
-}
-
-function renderUpList() {
-  $('up-list').innerHTML = MJMPalms.ACTIVITIES.map((a) => {
-    const on = UP_SEL.indexOf(a.n) !== -1;
-    return '<button type="button" class="act-row' + (on ? ' on' : '') + '" data-act="' + a.n + '">' +
-      '<span class="act-n">' + (on ? '✓' : a.n) + '</span>' +
-      '<span class="act-name">' + esc(a.name) + '</span>' +
-      '<span class="act-d">' + (a.days == null ? '—' : a.days + 'd') + '</span>' +
-      '</button>';
-  }).join('');
-}
-
-$('up-list').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-act]');
-  if (!b) return;
-  const n = Number(b.dataset.act);
-  const i = UP_SEL.indexOf(n);
-  if (i !== -1) UP_SEL.splice(i, 1);
-  else {
-    // Oldest tick drops off rather than refusing the new one: on the phone
-    // this is a thumb correcting itself, and a dead tap reads as broken.
-    UP_SEL.push(n);
-    while (UP_SEL.length > MAX_AT_ONCE) UP_SEL.shift();
-  }
-  renderUpList();
-});
-
-const closeUpdate = () => { $('up-modal').classList.add('hidden'); UP_PLOT = null; };
-$('up-close').addEventListener('click', closeUpdate);
-$('up-modal').addEventListener('click', (e) => { if (e.target === $('up-modal')) closeUpdate(); });
-
-function newUid() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-}
-
-$('up-save').addEventListener('click', async () => {
-  if (!UP_PLOT) return;
-  const btn = $('up-save');
-  btn.disabled = true;
-  $('up-msg').textContent = 'Saving…';
-  const today = MJMPalms.todayStr();
-  const key = UP_PLOT;
-  const open = MJMPalms.currentEntries(LOGS, key);
-  const sel = UP_SEL.slice().sort((a, b) => a - b);
-
-  // Finished: open, and no longer ticked.
-  const finish = open.filter((e) => sel.indexOf(e.actN) === -1);
-  // Started: ticked, and not already open.
-  const startN = sel.filter((n) => !open.some((e) => e.actN === n));
-
-  try {
-    if (!finish.length && !startN.length) { $('up-msg').textContent = 'Nothing changed.'; btn.disabled = false; return; }
-
-    for (const e of finish) {
-      if (!e.uid) continue;   // never synced, so there is no server row to close
-      const res = await _supabase.from('fcportal_palms_plot_logs')
-        .update({ end_date: today, updated_at: new Date().toISOString() })
-        .eq('client_uid', e.uid);
-      if (res.error) throw res.error;
-    }
-
-    if (startN.length) {
-      // seq_no orders a plot's log; the motion study reads it back in that
-      // order to tell one cycle from the next, so a new entry goes after
-      // everything this plot already has.
-      let seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0);
-      const rows = startN.map((n) => {
-        const act = MJMPalms.actByN(n);
-        return {
-          client_uid: newUid(),
-          nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
-          plot_name: key,
-          act_n: n,
-          start_date: today,
-          end_date: null,
-          ideal_days: act && act.days != null ? act.days : null,
-          recorded_by: ME || 'Office',
-          seq_no: ++seq,
-          updated_at: new Date().toISOString(),
-        };
-      });
-      const res = await _supabase.from('fcportal_palms_plot_logs').insert(rows);
-      if (res.error) throw res.error;
-    }
-
-    // Re-read rather than patching the copy in memory: the server is the
-    // record, and a board that disagrees with it is worse than a slow one.
-    LOGS = await MJMPalms.loadLogs(_supabase);
-    render();
-    closeUpdate();
-  } catch (err) {
-    console.warn(err);
-    // The likeliest failure by far is the row-level policy: writing the plot
-    // log needs the FC Portal module, which an office-only account may not
-    // hold. Saying so beats "something went wrong".
-    $('up-msg').textContent = (err && err.message) || 'Could not save.';
-    $('up-msg').className = 'text-[11px] font-bold text-rose-600';
-  }
-  btn.disabled = false;
-});
-
-const closePv = () => $('pv-modal').classList.add('hidden');
-$('pv-close').addEventListener('click', closePv);
-$('pv-modal').addEventListener('click', (e) => { if (e.target === $('pv-modal')) closePv(); });
-
-$('pv-edit').addEventListener('click', () => {
-  const plot = $('pv-modal').dataset.plot;
-  if (!plot) return;
-  const rec = MAP.plotsOf().find((p) => p.plot_name === plot);
-  const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
-  closePv();
-  MJMPlotDraw.open({
-    supa: _supabase,
-    plot: plot,
-    nursery: MAP.active(),
-    imageUrl: nur ? nur.map_image_url : null,
-    mapTop: rec ? rec.map_top : null,
-    by: ME,
-    // Re-read rather than patch: the editor may have added, moved and
-    // removed areas in one go, and the server is the record.
-    onSaved: async () => {
-      await MAP.load(_supabase, MAP_SCOPE);
-      await loadAreas();
-      MAP.setAreas(AREAS);
-      render();
-    },
-  });
-});
-
-$('rows').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-up]');
-  if (b) openUpdate(b.dataset.up);
-});
 
 /* Which plots have been split, and where. Its own read and its own try: a
    map that draws every plot whole is worth more than one that does not draw,
@@ -594,6 +437,7 @@ function openPlot(unit) {
   $('pv-nursery').textContent = MJMPalms.nurseryOfPlot(plot) || '—';
   $('pv-title').textContent = plot;
   $('pv-edit').classList.toggle('hidden', !CAN_DRAW);
+  $('pv-hide').classList.toggle('hidden', !CAN_DRAW);
   $('pv-note').classList.toggle('hidden', CAN_DRAW);
   $('pv-modal').dataset.plot = plot;
   $('pv-modal').classList.remove('hidden');
@@ -699,6 +543,202 @@ function drawPvStrip() {
   }).join('');
 }
 
+/* ── The plot panel's buttons ─────────────────────────────────────────── */
+const closePv = () => $('pv-modal').classList.add('hidden');
+$('pv-close').addEventListener('click', closePv);
+$('pv-modal').addEventListener('click', (e) => { if (e.target === $('pv-modal')) closePv(); });
+
+/* Taking a plot out of sight without deleting it. shared_plots is read by the
+   map, this table, the Field Conductor's picker, Maintenance and the batch
+   screens, and every one of those names a plot by its TEXT — so deleting the
+   row leaves that history pointing at nothing. is_active does the job and
+   keeps the records. */
+$('pv-hide').addEventListener('click', async () => {
+  const plot = $('pv-modal').dataset.plot;
+  if (!plot) return;
+  if (!confirm('Hide ' + plot + '?\n\nIt comes off this map, out of the table and out of the ' +
+               'Field Conductor\'s list. Nothing is deleted — its batches, its maintenance rows ' +
+               'and its plot log all stay, and it can be brought back in Seedling Stock ' +
+               'Management \u2192 System Settings.')) return;
+  try {
+    const res = await _supabase.from('shared_plots').update({ is_active: false }).eq('plot_name', plot);
+    if (res.error) throw res.error;
+    closePv();
+    await reloadMap();
+  } catch (err) {
+    console.warn(err);
+    alert(/is_active/i.test((err && err.message) || '')
+      ? 'Hiding a plot needs migration_plot_hide.sql to be run first.'
+      : ((err && err.message) || 'Could not hide that plot.'));
+  }
+});
+
+$('pv-edit').addEventListener('click', () => {
+  const plot = $('pv-modal').dataset.plot;
+  if (!plot) return;
+  const rec = MAP.plotsOf().find((p) => p.plot_name === plot);
+  const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
+  closePv();
+  MJMPlotDraw.open({
+    supa: _supabase,
+    plot: plot,
+    nursery: MAP.active(),
+    imageUrl: nur ? nur.map_image_url : null,
+    mapTop: rec ? rec.map_top : null,
+    by: ME,
+    // Re-read rather than patch: the editor may have added, moved and removed
+    // areas in one go, and the server is the record.
+    onSaved: reloadMap,
+  });
+});
+
+/* Everything the map draws, read again. Used after a boundary is redrawn and
+   after a plot is hidden — both change which shapes exist, not just their
+   colour, so a refresh() would not be enough. */
+async function reloadMap() {
+  await MAP.load(_supabase, MAP_SCOPE);
+  await loadAreas();
+  MAP.setAreas(AREAS);
+  render();
+}
+
+/* ── Changing a plot's status from the table ──────────────────────────────
+   The Current Status cell IS the control: pick a different stage and a
+   before/after panel asks you to confirm it. No pencil, no separate modal to
+   find, and nothing is written until Confirm.
+
+   What gets written is the same record the Field Conductor's app writes:
+   whatever is running is closed with today's date, and the chosen stage is
+   opened starting today. See applyDailySelection in the field app.
+
+   ONE THING THIS GIVES UP: PALMS allows two activities at once, and a
+   dropdown is one. Setting two concurrent stages is still done in the field
+   app; from here a plot is on one stage, which is what the office is
+   answering when it corrects a status. */
+const MAX_AT_ONCE = 2;   // matches MAX_CONCURRENT in the field app's data.js
+
+let CF = null;   // { unit, fromN, toN } awaiting confirmation
+
+function statusCell(unitKey, ln) {
+  const cur = ln && ln.state !== 'none' ? MJMPalms.currentEntries(LOGS, unitKey) : [];
+  const curN = cur.length === 1 ? cur[0].actN : null;
+  if (!CAN_UPDATE) {
+    return '<td class="wrap">' + esc(ln && ln.status ? ln.status : '—') + '</td>';
+  }
+  /* Two stages running at once cannot be shown in one dropdown honestly, so
+     that plot keeps plain text and stays the field app's to change. */
+  if (cur.length > 1) {
+    return '<td class="wrap">' + esc(ln.status) +
+           '<div class="text-[10px] font-bold text-slate-400 mt-1">two at once — change in the app</div></td>';
+  }
+  const opts = MJMPalms.ACTIVITIES.map((a) =>
+    '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+  return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' + (curN == null ? '' : curN) + '">' +
+    (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
+    opts + '</select></td>';
+}
+
+$('rows').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-st]');
+  if (!sel) return;
+  const unit = sel.dataset.st;
+  const toN = Number(sel.value);
+  const fromN = sel.dataset.cur === '' ? null : Number(sel.dataset.cur);
+  if (!toN || toN === fromN) return;
+  askChange(unit, fromN, toN);
+});
+
+function askChange(unit, fromN, toN) {
+  CF = { unit: unit, fromN: fromN, toN: toN };
+  const today = MJMPalms.todayStr();
+  const from = fromN == null ? null : MJMPalms.actByN(fromN);
+  const to = MJMPalms.actByN(toN);
+  const ln = lineForPlot(unit);
+
+  $('cf-plot').textContent = MJMPalms.keyLabel(unit);
+  $('cf-was-v').textContent = from ? from.name : 'Nothing running';
+  $('cf-was-s').textContent = from && ln && ln.state !== 'none'
+    ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
+      ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
+    : '';
+  // The new due date, worked out the same way the board will once it is
+  // saved — so what is promised here is what appears in the row.
+  const due = MJMPalms.addDays(today, to && to.days != null ? to.days : 0);
+  $('cf-now-v').textContent = to ? to.name : '—';
+  $('cf-now-s').textContent = 'Starts today · due ' + MJMPalms.prettyD(due) +
+    ' · ' + MJMPalms.diffDays(today, due) + 'd';
+  $('cf-msg').textContent = '';
+  $('cf-msg').className = 'text-[11px] font-bold text-slate-400';
+  $('cf-modal').classList.remove('hidden');
+}
+
+function closeCf(redraw) {
+  $('cf-modal').classList.add('hidden');
+  CF = null;
+  // A cancelled dropdown is still showing the stage that was picked, so the
+  // table is redrawn to put it back to what is actually recorded.
+  if (redraw) renderTable();
+}
+
+$('cf-cancel').addEventListener('click', () => closeCf(true));
+$('cf-modal').addEventListener('click', (e) => { if (e.target === $('cf-modal')) closeCf(true); });
+
+function newUid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+$('cf-ok').addEventListener('click', async () => {
+  if (!CF) return;
+  const btn = $('cf-ok');
+  btn.disabled = true;
+  $('cf-msg').textContent = 'Saving…';
+  const today = MJMPalms.todayStr();
+  const key = CF.unit;
+  const open = MJMPalms.currentEntries(LOGS, key);
+  const act = MJMPalms.actByN(CF.toN);
+
+  try {
+    for (const e of open) {
+      if (!e.uid) continue;          // never synced — no server row to close
+      const res = await _supabase.from('fcportal_palms_plot_logs')
+        .update({ end_date: today, updated_at: new Date().toISOString() })
+        .eq('client_uid', e.uid);
+      if (res.error) throw res.error;
+    }
+
+    // seq_no orders a plot's log; the motion study reads it back in that
+    // order to tell one cycle from the next.
+    const seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0) + 1;
+    const res = await _supabase.from('fcportal_palms_plot_logs').insert([{
+      client_uid: newUid(),
+      nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
+      plot_name: key,
+      act_n: CF.toN,
+      start_date: today,
+      end_date: null,
+      ideal_days: act && act.days != null ? act.days : null,
+      recorded_by: ME || 'Office',
+      seq_no: seq,
+      updated_at: new Date().toISOString(),
+    }]);
+    if (res.error) throw res.error;
+
+    /* Re-read rather than patch: last update, the new due date and the days
+       left all come off the log, and the server is the record. */
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    closeCf(false);
+    render();
+  } catch (err) {
+    console.warn(err);
+    // The likeliest failure is the row-level policy: writing the plot log
+    // needs the FC Portal module, which an office-only account may not hold.
+    $('cf-msg').className = 'text-[11px] font-bold text-rose-600';
+    $('cf-msg').textContent = (err && err.message) || 'Could not save.';
+    btn.disabled = false;
+  }
+});
+
 function render() {
   LINES = new Map();
   MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
@@ -734,6 +774,19 @@ function render() {
     ME = (u && (u.full_name || u.email)) || '';
     /* Guarded like the rest: an older cached shared_access.js has no
        isAdminOf, and it must not take the page down. Fails closed. */
+    /* Changing a status writes the plot log, which the RLS gives to whoever
+       holds the FC Portal (or manages users) — NOT to an ops admin as such.
+       Offering a dropdown that always fails would be worse than plain text,
+       so the check matches the policy. Guarded and fails closed, like the
+       rest. */
+    CAN_UPDATE = (function () {
+      try {
+        const perms = MJMAccess.permissions() || {};
+        const mods = perms.modules || {};
+        return (mods.scan && mods.scan !== 'none') || !!perms.manage_users;
+      } catch (e) { return false; }
+    })();
+
     CAN_DRAW = (function () {
       try {
         return (typeof MJMAccess.isAdminOf === 'function' && MJMAccess.isAdminOf('nursery_ops'))

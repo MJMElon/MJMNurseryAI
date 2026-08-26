@@ -374,21 +374,10 @@
       if (t) setNursery(t.dataset.pmTab);
     });
 
-    elView.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const old = z.zoom;
-      z.zoom = Math.max(0.5, Math.min(5, z.zoom + (e.deltaY < 0 ? 0.15 : -0.15)));
-      // Zoom toward the pointer rather than the middle, so the thing being
-      // looked at stays under it.
-      const r = elView.getBoundingClientRect();
-      const cx = e.clientX - r.left - r.width / 2;
-      const cy = e.clientY - r.top - r.height / 2;
-      const k = z.zoom / old;
-      z.panX = (z.panX - cx) * k + cx;
-      z.panY = (z.panY - cy) * k + cy;
-      if (z.zoom <= 1.01) { z.panX = 0; z.panY = 0; }
-      applyTransform();
-    }, { passive: false });
+    /* No wheel zoom. Scrolling the page over the map used to jump the zoom
+       instead, which is startling and easy to do by accident on a laptop.
+       The + and − buttons are the only way to change it now; dragging still
+       pans, because that is deliberate. */
 
     let dragging = false, lastX = 0, lastY = 0;
     const onDown = (e) => {
@@ -431,11 +420,26 @@
      */
     async function load(supa, loadOpts) {
       const lo = loadOpts || {};
+      /* is_active comes from migration_plot_hide.sql and may not exist yet.
+         Naming a column that is not there fails the WHOLE read, so the read
+         is retried without it — a nursery that has not run that migration
+         sees every plot, which is exactly how this behaved before. */
+      async function readPlots() {
+        const withFlag = await supa.from('shared_plots')
+          .select('nursery_name, plot_name, map_top, is_active').order('plot_name');
+        if (!withFlag.error) return (withFlag.data || []).filter((p) => p.is_active !== false);
+        if (!/is_active/i.test(withFlag.error.message || '')) throw withFlag.error;
+        const plain = await supa.from('shared_plots')
+          .select('nursery_name, plot_name, map_top').order('plot_name');
+        if (plain.error) throw plain.error;
+        return plain.data || [];
+      }
+
       const [plotRes, nurRes] = await Promise.all([
-        supa.from('shared_plots').select('nursery_name, plot_name, map_top').order('plot_name'),
+        readPlots().catch((e) => { console.warn('[map] plots not read:', e.message); return []; }),
         supa.from('operation_nurseries').select('name, map_image_url').order('name'),
       ]);
-      plots = (plotRes && !plotRes.error && plotRes.data) ? plotRes.data : [];
+      plots = Array.isArray(plotRes) ? plotRes : [];
       /* B1, B2, … B10 — the way the nursery says them. The server orders by
          plot_name, which is text, so a plain sort gives B1, B10, B11, B2 and
          the office reads a list that jumps about. Sorted on the NUMBER, with
