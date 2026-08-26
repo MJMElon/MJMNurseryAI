@@ -1152,6 +1152,7 @@ const I18N = {
     'btn.pdf':'⬇ Download Schedule PDF', 'btn.save':'💾 Save Schedule',
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
+    'sched.ticked':'ticked', 'sched.none':'not set yet',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
     'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
@@ -1233,6 +1234,7 @@ const I18N = {
     'btn.pdf':'⬇ Muat Turun Jadual PDF', 'btn.save':'💾 Simpan Jadual',
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
+    'sched.ticked':'ditanda', 'sched.none':'belum ditetapkan',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
     'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
     'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
@@ -1601,11 +1603,11 @@ function renderAll() {
   // nursery on its own tabs — so its header is just the word.
   // Remember the last-viewed month & nursery (restored on next visit).
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
-  ['pd','manuring','weeding','interrow'].forEach(k => {
-    const el = document.getElementById(`${k}-nursery-line`);
-    if (el) el.textContent = bigHdr;
-  });
+  // The four schedule grids share one header now, above all of them.
+  const schedHdr = document.getElementById('sched-nursery-line');
+  if (schedHdr) schedHdr.textContent = bigHdr;
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
+  renderSchedCounts();
   updateCarryNotice();
   // Re-render analytics when its sub-view inside Work Record is showing
   const chartView = document.getElementById('recview-chart');
@@ -1946,14 +1948,107 @@ function switchRecordView(view, btn) {
 }
 
 /* Schedule sub-tabs: P&D / Manuring / Weeding / Interrow. */
-function switchSchedView(name, btn) {
-  const bar = btn ? btn.closest('.subtabs-bar') : null;
-  if (bar) bar.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  document.querySelectorAll('.sched-panel').forEach(p => p.classList.remove('active'));
-  const el = document.getElementById('sched-' + name);
-  if (el) el.classList.add('active');
+/* ══════════════════════════════════════════════════════════════
+   THE SCHEDULE, ALL FOUR PROGRAMS ON ONE PAGE
+
+   There used to be a sub-tab per program and, inside each one, its own
+   ➕ Add Row and 💾 Save Schedule. Those Save buttons were four copies of
+   one button: saveSchedule() has always written all four programs at once,
+   whichever tab happened to be showing. The tabs were hiding three
+   quarters of what you were about to save.
+
+   So: one toolbar, one Save, and the four programs stacked in the order
+   they are worked. Each is a slab you can fold shut, and each says how
+   much of itself is set, so a folded one is still answering the question
+   you came to the page with. Which ones you keep folded is remembered.
+   Nothing about the grids themselves changed.
+══════════════════════════════════════════════════════════════ */
+const SCHED_BLOCKS = ['pd', 'manuring', 'weeding', 'interrow'];
+const SCHED_FOLD_KEY = 'mjm_maint_sched_folded';
+
+function getFoldedSched() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SCHED_FOLD_KEY));
+    return Array.isArray(raw) ? raw.filter(k => SCHED_BLOCKS.includes(k)) : [];
+  } catch (_) {
+    return [];
+  }
 }
+function setFoldedSched(list) {
+  try { localStorage.setItem(SCHED_FOLD_KEY, JSON.stringify(list)); } catch (_) {}
+}
+
+function toggleSchedBlock(name) {
+  const el = document.getElementById('sched-' + name);
+  if (!el) return;
+  const folded = el.classList.toggle('collapsed');
+  const hdr = el.querySelector('.sched-block-hdr');
+  if (hdr) hdr.setAttribute('aria-expanded', folded ? 'false' : 'true');
+  const list = getFoldedSched().filter(k => k !== name);
+  if (folded) list.push(name);
+  setFoldedSched(list);
+}
+
+/* Applied on load, and never on a later render: re-folding a block somebody
+   has just opened, because the month changed under them, would be the page
+   arguing with them. */
+function applySchedFolds() {
+  const folded = getFoldedSched();
+  SCHED_BLOCKS.forEach(name => {
+    const el = document.getElementById('sched-' + name);
+    if (!el) return;
+    const off = folded.includes(name);
+    el.classList.toggle('collapsed', off);
+    const hdr = el.querySelector('.sched-block-hdr');
+    if (hdr) hdr.setAttribute('aria-expanded', off ? 'false' : 'true');
+  });
+}
+
+/* A jump chip on a folded block opens it first — otherwise it scrolls you to
+   a closed door. */
+function jumpToSched(name) {
+  const el = document.getElementById('sched-' + name);
+  if (!el) return;
+  if (el.classList.contains('collapsed')) toggleSchedBlock(name);
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* How many plot-ticks each program is carrying this month. This is what
+   makes a folded block still worth looking at, and it is counted from the
+   same state saveSchedule() reads, so it cannot disagree with what gets
+   published. */
+function schedTickCount(name) {
+  const n = getNursery(), m = getMonth(), s = getState(n, m), plots = NURSERY_PLOTS[n] || [];
+  let count = 0;
+  if (name === 'pd') {
+    ['W1','W2','W3','W4'].forEach(w => plots.forEach(p => {
+      if (s.pd[w]?.[p]?.P) count++;
+      if (s.pd[w]?.[p]?.D) count++;
+    }));
+  } else if (name === 'weeding') {
+    ['R1','R2'].forEach(r => plots.forEach(p => { if (s.weeding[p]?.[r]) count++; }));
+  } else if (name === 'manuring') {
+    s.manuringConfig.forEach((round, ri) => round.forEach((_, ci) =>
+      plots.forEach(p => { if (s.manuring[p]?.[ri]?.[ci]) count++; })));
+  } else if (name === 'interrow') {
+    s.interrowConfig.forEach((round, ri) => round.forEach((_, ci) =>
+      plots.forEach(p => { if (s.interrow[p]?.[ri]?.[ci]) count++; })));
+  }
+  return count;
+}
+
+function renderSchedCount(name) {
+  const el = document.getElementById('sched-count-' + name);
+  if (!el) return;
+  const n = schedTickCount(name);
+  el.textContent = n ? `${n} ${t('sched.ticked')}` : t('sched.none');
+  el.classList.toggle('is-set', n > 0);
+}
+function renderSchedCounts() { SCHED_BLOCKS.forEach(renderSchedCount); }
+
+/* Kept so a stale bookmark, a console call or anything else still holding the
+   old name lands somewhere sensible rather than throwing. */
+function switchSchedView(name) { jumpToSched(name); }
 
 /* Nursery circle buttons drive the (hidden) select, so every existing
    getNursery() caller keeps working untouched. */
@@ -2304,6 +2399,7 @@ function renderPD() {
   });
   h+='</tr></tbody>';
   document.getElementById('pd-table').innerHTML=h;
+  renderSchedCount('pd');
 }
 function togPD(n,m,w,plot,type,el){
   if(!canEditSchedule) return;
@@ -2516,6 +2612,7 @@ function renderManuring() {
   });
   h+='</tr></tbody>';
   document.getElementById('manuring-table').innerHTML=h;
+  renderSchedCount('manuring');
 }
 function togManuring(n,m,plot,ri,ci,el){
   if(!canEditSchedule) return;
@@ -2576,6 +2673,7 @@ function renderWeeding() {
   rounds.forEach(r=>h+=`<td>${plots.filter(p=>s.weeding[p]?.[r]).length}</td>`);
   h+='</tr></tbody>';
   document.getElementById('weeding-table').innerHTML=h;
+  renderSchedCount('weeding');
 }
 function togWeeding(n,m,plot,r,el){
   if(!canEditSchedule) return;
@@ -2788,6 +2886,7 @@ function renderInterrow() {
   });
   h+='</tr></tbody>';
   document.getElementById('interrow-table').innerHTML=h;
+  renderSchedCount('interrow');
 }
 function togInterrow(n,m,plot,ri,ci,el){
   if(!canEditSchedule) return;
@@ -3909,6 +4008,7 @@ _syncMonthButtons();
 document.getElementById('nursery-pill').textContent = getNursery();
 syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
+applySchedFolds();  // whichever schedule blocks this person keeps folded
 autoSyncRecords();
 
 /* ── Initial load from Supabase ─────────────────────────────────
