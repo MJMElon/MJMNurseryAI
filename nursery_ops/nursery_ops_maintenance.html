@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=45">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=47">
 </head>
 <body>
 
@@ -338,41 +338,36 @@
       </div>
 
       <!-- PLOT CAPACITY ————————————————————————————————————
-           Every nursery on one page, switched by this block's own tab bar
-           rather than by the one in the top bar: capacity is not a monthly
-           figure and does not follow the nursery the schedules are on. The
-           tabs and their plots come from Seedling Stock — operation_nurseries
-           and shared_plots — so there is nothing to key in twice. -->
-      <div class="card" style="padding:0;margin-bottom:16px;overflow:hidden;">
-        <!-- The title names the whole block, so it sits above the nursery
-             tabs rather than inside whichever one happens to be open. Edit is
-             taken out of the flow so the heading centres over the block and
-             not over what is left beside a button. -->
-        <div class="cap-top">
+           Every nursery at once, laid out the way the Chemical List below
+           is: a headed column of short rows. It used to be one nursery at a
+           time behind its own tab bar, which meant somebody setting
+           capacities up — which is going through all four, not looking at
+           one — clicked between four screens to do one job. There is room
+           for all of them side by side, so they are.
+
+           A nursery with more plots than fit a readable column is split
+           into more than one column, each headed with the range it covers.
+           Pre Nursery has 52 plots; one column of 52 is a page of
+           scrolling, four of 14 is a glance.
+
+           The nurseries and their plots come from Seedling Stock —
+           operation_nurseries and shared_plots — so there is nothing to key
+           in twice. -->
+      <div class="card" style="padding:18px;margin-bottom:16px;">
+        <div class="lst-top">
           <div class="set-h">Plot Capacity</div>
-          <button class="btn cap-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
+          <button class="btn lst-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
         </div>
-        <div class="cap-tabs" id="cap-tabs"></div>
 
-        <div style="padding:18px;">
+        <div id="cap-cols" class="cap-cols"></div>
+        <div id="cap-empty" class="set-empty" style="display:none;"></div>
 
-          <!-- Pre nursery only: one tray size for the whole nursery. -->
-          <div id="cap-tray-size" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
-               background:var(--gold-bg,#fffbeb);border:1.5px solid var(--gold-border,#fcd34d);
-               border-radius:var(--r-sm);padding:11px 13px;margin:14px 0 4px;">
-            <span style="font-size:12px;font-weight:800;color:#78350f;">Seedlings per tray</span>
-            <input type="number" min="0" step="1" id="cap-per-tray" class="set-in" style="width:110px;" disabled>
-            <span style="font-size:11.5px;font-weight:600;color:#92400e;">
-              Every tray in this nursery holds the same number, so it is set once here.</span>
-          </div>
-
-          <div id="cap-grid" class="cap-grid"></div>
-          <div id="cap-empty" class="set-empty" style="display:none;"></div>
-
-          <div class="cap-foot" id="cap-actions" style="display:none;">
-            <button class="btn" onclick="cancelCapEdit()">Cancel</button>
-            <button class="btn btn-primary" onclick="saveCapEdit()">Save</button>
-          </div>
+        <!-- One Edit and one Save for the whole block: the four nurseries
+             are one job, and saving three of them is not a thing anybody
+             means to do. -->
+        <div class="lst-foot" id="cap-actions" style="display:none;">
+          <button class="btn" onclick="cancelCapEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveCapEdit()">Save</button>
         </div>
       </div>
 
@@ -561,7 +556,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=61"></script>
+<script src="plot_maintenance_script.js?v=63"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

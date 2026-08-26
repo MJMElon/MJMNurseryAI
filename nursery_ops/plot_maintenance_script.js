@@ -4219,17 +4219,31 @@ async function loadSettingLists() {
 }
 
 /* ── Plot capacity ─────────────────────────────────────────────────────
-   Every nursery on one page, on this block's own tabs. It does not follow
-   the nursery in the top bar: a capacity is not a monthly figure, and
-   somebody setting them up is going through all four, not looking at one.
+   Every nursery at once, in the shape the Chemical List uses: headed
+   columns of thin rows.
+
+   It used to be one nursery at a time behind its own tab bar. Somebody
+   setting capacities up is going through all four, not looking at one, so
+   the tabs made one job into four screens — and made "Edit" and "Save"
+   mean one nursery, which is not what anybody means by saving a capacity
+   table. Now Edit opens all of them and Save writes all of them.
+
+   A nursery with more plots than fit a readable column is split across
+   several, each headed with the range it covers: Pre Nursery's 52 plots
+   are four columns of fourteen rather than one column of fifty-two.
 
    A main nursery plot is counted in polybags; a pre nursery plot in trays,
-   which come to seedlings once. Same row, different question. */
+   which come to seedlings once. Same row, different question — so the pre
+   nursery columns carry a third figure and their own tray size.
+────────────────────────────────────────────────────────────────────────── */
 const isPreNursery = n => n === 'PN' || /^pre/i.test(n || '');
 
-let capTab     = null;    // the nursery this block is showing
+/* How many plots to a column. Fourteen keeps every column about the same
+   height whatever the nursery, and happens to be exactly BNN. */
+const CAP_CHUNK = 14;
+
 let capEditing = false;
-let capDraft   = null;    // { plots:{plot:number}, perTray:number } while editing
+let capDraft   = null;   // { nursery: { plots:{plot:number}, perTray:number } }
 
 function trayQty(n, p) {
   return (plotTrays[n] && plotTrays[n][p] != null) ? +plotTrays[n][p] || 0 : 0;
@@ -4247,117 +4261,107 @@ function capNurseries() { return stockNurseries; }
 function capPlots(n)     { return (stockPlots[n] || []).slice(); }
 
 function renderSetting() {
-  if (!capTab || capNurseries().indexOf(capTab) === -1) capTab = capNurseries()[0] || null;
-  renderCapTabs();
   renderCapacity();
   renderChemBoth();
   renderFertilisers();
 }
 
-function renderCapTabs() {
-  const bar = document.getElementById('cap-tabs');
-  if (!bar) return;
-  bar.innerHTML = capNurseries().map(n =>
-    '<button type="button" class="cap-tab' + (n === capTab ? ' on' : '') + '" ' +
-      'onclick="switchCapTab(\'' + esc(n) + '\')">' +
-      // Stock Management's own spelling, untranslated. A local nickname for
-      // the same nursery is how the two lists drifted apart in the first place.
-      esc(n) + '</button>').join('');
-}
-
-function switchCapTab(n) {
-  // Leaving mid-edit would silently drop what was typed, so it is asked about.
-  if (capEditing && !confirm('Leave the edits on this nursery without saving?')) return;
-  capEditing = false; capDraft = null;
-  capTab = n;
-  renderCapTabs();
-  renderCapacity();
-}
-
 function renderCapacity() {
-  const grid = document.getElementById('cap-grid');
-  if (!grid) return;
-  const n     = capTab;
-  const pre   = isPreNursery(n);
-  const plots = capPlots(n);
+  const wrap = document.getElementById('cap-cols');
+  if (!wrap) return;
 
   const editBtn = document.getElementById('cap-edit-btn');
   if (editBtn) editBtn.style.display = capEditing ? 'none' : '';
   const acts = document.getElementById('cap-actions');
   if (acts) acts.style.display = capEditing ? 'flex' : 'none';
 
-  const traySizeBox = document.getElementById('cap-tray-size');
-  if (traySizeBox) {
-    traySizeBox.style.display = pre ? 'flex' : 'none';
-    const inp = document.getElementById('cap-per-tray');
-    if (inp) {
-      inp.disabled = !capEditing;
-      if (document.activeElement !== inp) {
-        inp.value = (capEditing ? capDraft.perTray : traySize[n]) || '';
-      }
-      inp.setAttribute('oninput', 'onDraftTraySize(this.value)');
-    }
-  }
-
+  const nurseries = capNurseries().filter(n => capPlots(n).length);
   const empty = document.getElementById('cap-empty');
-  if (!plots.length) {
-    grid.innerHTML = '';
+  if (!nurseries.length) {
+    wrap.innerHTML = '';
     if (empty) {
       empty.style.display = '';
-      empty.innerHTML = 'No plots for this nursery yet. They come from Seedling ' +
-        'Stock — add them there and they appear here.';
+      empty.innerHTML = 'No plots yet. They come from Seedling Stock — add them ' +
+        'there and they appear here.';
     }
     return;
   }
   if (empty) empty.style.display = 'none';
+  wrap.innerHTML = nurseries.map(capNurseryHtml).join('');
+}
 
-  /* Ten rows a column, so the grid knows how tall to be before it wraps. */
-  grid.style.gridTemplateRows = window.matchMedia('(max-width:640px)').matches
-    ? '' : 'repeat(' + Math.min(10, plots.length) + ', auto)';
+/* One nursery: its name and, if it counts in trays, its tray size — said
+   once over however many columns its plots need. The columns wrap as a
+   group, so a nursery is never split across two rows of the page. */
+function capNurseryHtml(n) {
+  const pre = isPreNursery(n), plots = capPlots(n);
 
-  grid.innerHTML = plots.map(p => {
-    const shown = pre ? trayQty(n, p) : getPlotQty(n, p);
-    const draft = capEditing ? (capDraft.plots[p] ?? '') : null;
-    const seedlings = pre ? capacityOf(n, p) : 0;
-    return '<div class="cap-row" data-plot="' + esc(p) + '">' +
-      '<span class="cap-row-n">' + esc(p) + '</span>' +
-      (capEditing
-        ? '<span style="display:flex;align-items:center;gap:7px;">' +
-            (pre ? '<span class="cap-row-d" data-derived>' + derivedText(n, p) + '</span>' : '') +
-            '<input type="number" min="0" step="1" value="' + draft + '" placeholder="0" ' +
-              'oninput="onDraftInput(\'' + esc(p) + '\', this.value)">' +
-          '</span>'
-        : '<span style="display:flex;align-items:center;gap:8px;">' +
-            (pre && seedlings ? '<span class="cap-row-d">= ' + seedlings.toLocaleString() + '</span>' : '') +
-            '<span class="cap-row-v' + (shown ? '' : ' muted') + '">' +
-              (shown ? shown.toLocaleString() : '—') +
-            '</span>' +
-          '</span>') +
-      '</div>';
-  }).join('');
+  /* Divide evenly rather than filling columns to CAP_CHUNK and leaving the
+     last one short: eighteen plots is two columns of nine, not fourteen and
+     four. Ragged columns read as if the short one meant something. */
+  const parts = Math.max(1, Math.ceil(plots.length / CAP_CHUNK));
+  const size  = Math.ceil(plots.length / parts);
 
+  let h = '<div class="cap-nursery' + (pre ? ' cap-nursery-tray' : '') + '" data-nursery="' + esc(n) + '">';
+  h += '<div class="cap-nursery-h"><span class="cap-nursery-n">' + esc(n) + '</span>';
+  if (pre) {
+    h += '<span class="cap-tray"><span>Per tray</span>' +
+         '<input type="number" min="0" step="1" data-tray="' + esc(n) + '" ' +
+           'value="' + ((capEditing ? capDraft[n].perTray : traySize[n]) || '') + '" ' +
+           (capEditing ? '' : 'disabled ') +
+           'oninput="onDraftTraySize(\'' + esc(n) + '\', this.value)"></span>';
+  }
+  h += '</div><div class="cap-nursery-cols">';
+
+  for (let i = 0; i < parts; i++) {
+    h += '<div class="cap-col">';
+    h += '<div class="cap-head"><span>Plot</span>' +
+         (pre ? '<span>Trays</span><span>Seedlings</span>' : '<span>Capacity</span>') +
+         '</div>';
+    h += plots.slice(i * size, (i + 1) * size).map(p => capRowHtml(n, p, pre)).join('');
+    h += '</div>';
+  }
+  return h + '</div></div>';
+}
+
+function capRowHtml(n, p, pre) {
+  const shown = pre ? trayQty(n, p) : getPlotQty(n, p);
+  const draft = capEditing ? (capDraft[n].plots[p] ?? '') : null;
+  return '<div class="cap-row" data-nursery="' + esc(n) + '" data-plot="' + esc(p) + '">' +
+    '<span class="cap-row-n">' + esc(p) + '</span>' +
+    (capEditing
+      ? '<input type="number" min="0" step="1" value="' + draft + '" placeholder="0" ' +
+          'oninput="onDraftInput(\'' + esc(n) + '\', \'' + esc(p) + '\', this.value)">'
+      : '<span class="cap-row-v' + (shown ? '' : ' muted') + '">' +
+          (shown ? shown.toLocaleString() : '—') + '</span>') +
+    (pre ? '<span class="cap-row-d" data-derived>' + derivedText(n, p) + '</span>' : '') +
+    '</div>';
 }
 
 /* What a pre nursery plot's trays come to, from whichever numbers are live —
    the draft while editing, the saved ones otherwise. */
 function derivedText(n, p) {
-  const trays = capEditing ? (+capDraft.plots[p] || 0) : trayQty(n, p);
-  const per   = capEditing ? (+capDraft.perTray || 0) : (traySize[n] || 0);
-  if (!per)   return 'set the tray size';
-  if (!trays) return '—';
-  return '= ' + (trays * per).toLocaleString();
+  const trays = capEditing ? (+capDraft[n].plots[p] || 0) : trayQty(n, p);
+  const per   = capEditing ? (+capDraft[n].perTray || 0) : (traySize[n] || 0);
+  if (!per || !trays) return '—';
+  return (trays * per).toLocaleString();
 }
 
 /* ── The edit cycle ────────────────────────────────────────────────────
    Nothing is written until Save. A capacity is read by every dosage on the
    page, so a half-typed number must not be one of them, and a mistake has
-   to be undoable by walking away. */
+   to be undoable by walking away. Edit takes in every nursery at once,
+   because that is the job. */
 function startCapEdit() {
-  const n = capTab, pre = isPreNursery(n);
-  capDraft = { plots: {}, perTray: traySize[n] || '' };
-  capPlots(n).forEach(p => {
-    const v = pre ? trayQty(n, p) : getPlotQty(n, p);
-    capDraft.plots[p] = v || '';
+  capDraft = {};
+  capNurseries().forEach(n => {
+    const pre = isPreNursery(n);
+    const d = { plots: {}, perTray: traySize[n] || '' };
+    capPlots(n).forEach(p => {
+      const v = pre ? trayQty(n, p) : getPlotQty(n, p);
+      d.plots[p] = v || '';
+    });
+    capDraft[n] = d;
   });
   capEditing = true;
   renderCapacity();
@@ -4368,75 +4372,103 @@ function cancelCapEdit() {
   renderCapacity();
 }
 
-function onDraftInput(plot, val) {
-  if (!capEditing) return;
-  capDraft.plots[plot] = val === '' ? '' : Math.max(0, +val || 0);
-  refreshDerived(plot);
+function onDraftInput(n, plot, val) {
+  if (!capEditing || !capDraft[n]) return;
+  capDraft[n].plots[plot] = val === '' ? '' : Math.max(0, +val || 0);
+  refreshDerived(n, plot);
 }
 
-function onDraftTraySize(val) {
-  if (!capEditing) return;
-  capDraft.perTray = val === '' ? '' : Math.max(0, +val || 0);
-  // Every plot's seedling figure just changed and none of the boxes did, so
-  // the derived lines redraw and the inputs are left alone.
-  capPlots(capTab).forEach(refreshDerived);
+function onDraftTraySize(n, val) {
+  if (!capEditing || !capDraft[n]) return;
+  capDraft[n].perTray = val === '' ? '' : Math.max(0, +val || 0);
+  // Every plot's seedling figure in that nursery just changed and none of the
+  // boxes did, so the derived lines redraw and the inputs are left alone.
+  capPlots(n).forEach(p => refreshDerived(n, p));
+  // The nursery's other columns each carry the same box; keep them level
+  // without repainting the one being typed in.
+  document.querySelectorAll('[data-tray="' + CSS.escape(n) + '"]').forEach(el => {
+    if (el !== document.activeElement) el.value = capDraft[n].perTray;
+  });
 }
 
 /* Only the line beside the box being typed in — repainting the grid would
    take the focus out of it on every keystroke. */
-function refreshDerived(plot) {
-  if (!isPreNursery(capTab)) return;
-  const grid = document.getElementById('cap-grid');
-  const row = grid && grid.querySelector('.cap-row[data-plot="' + CSS.escape(plot) + '"]');
+function refreshDerived(n, plot) {
+  if (!isPreNursery(n)) return;
+  const row = document.querySelector(
+    '.cap-row[data-nursery="' + CSS.escape(n) + '"][data-plot="' + CSS.escape(plot) + '"]');
   const el = row && row.querySelector('[data-derived]');
-  if (el) el.textContent = derivedText(capTab, plot);
+  if (el) el.textContent = derivedText(n, plot);
 }
 
 async function saveCapEdit() {
   if (!capEditing || !_supabase) { cancelCapEdit(); return; }
-  const n = capTab, pre = isPreNursery(n);
   const btns = document.getElementById('cap-actions');
   if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
 
-  const rows = capPlots(n).map(p => {
-    const v = capDraft.plots[p] === '' ? 0 : +capDraft.plots[p] || 0;
-    return pre
-      ? { nursery: n, plot: p, trays: v, qty: v * (+capDraft.perTray || 0),
-          updated_at: new Date().toISOString() }
-      : { nursery: n, plot: p, qty: v, updated_at: new Date().toISOString() };
+  /* Every nursery, in one pass. One upsert per nursery rather than one for
+     the lot, because the pre nursery's rows carry a column the others do
+     not and the trays fallback below is per nursery. */
+  const nurseries = capNurseries().filter(n => capDraft[n] && capPlots(n).length);
+  const staged = [];
+  let failure = null;
+
+  for (const n of nurseries) {
+    const pre = isPreNursery(n);
+    const stamp = new Date().toISOString();
+    const rows = capPlots(n).map(p => {
+      const v = capDraft[n].plots[p] === '' ? 0 : +capDraft[n].plots[p] || 0;
+      return pre
+        ? { nursery: n, plot: p, trays: v, qty: v * (+capDraft[n].perTray || 0), updated_at: stamp }
+        : { nursery: n, plot: p, qty: v, updated_at: stamp };
+    });
+
+    let { error } = await _supabase.from('nops_maint_plot_qty')
+      .upsert(rows, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e }));
+
+    /* No trays column → migration_nops_maint_settings.sql has not been run.
+       The seedling figure is the one everything else reads, so it is saved
+       without the trays rather than not at all. */
+    if (error && pre && /trays/i.test(error.message || '')) {
+      const flat = rows.map(r => ({ nursery: r.nursery, plot: r.plot, qty: r.qty, updated_at: r.updated_at }));
+      ({ error } = await _supabase.from('nops_maint_plot_qty')
+        .upsert(flat, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e })));
+    }
+
+    if (!error && pre) {
+      await _supabase.from('nops_maint_tray_size')
+        .upsert({ nursery: n, per_tray: +capDraft[n].perTray || 0, updated_at: stamp },
+                { onConflict: 'nursery' })
+        .then(r => r, () => ({}));
+    }
+
+    if (error) { failure = { n, error }; break; }
+    staged.push({ n, pre, rows });
+  }
+
+  /* Whatever landed is made true on screen, even if a later nursery failed —
+     re-rendering those back to their old figures would be telling somebody
+     their saved numbers were not saved. */
+  staged.forEach(({ n, pre, rows }) => {
+    if (!plotQtyOverrides[n]) plotQtyOverrides[n] = {};
+    if (!plotTrays[n]) plotTrays[n] = {};
+    rows.forEach(r => {
+      plotQtyOverrides[n][r.plot] = r.qty;
+      if (pre) plotTrays[n][r.plot] = r.trays;
+    });
+    if (pre) traySize[n] = +capDraft[n].perTray || 0;
   });
-
-  let { error } = await _supabase.from('nops_maint_plot_qty')
-    .upsert(rows, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e }));
-
-  /* No trays column → migration_nops_maint_settings.sql has not been run.
-     The seedling figure is the one everything else reads, so it is saved
-     without the trays rather than not at all. */
-  if (error && pre && /trays/i.test(error.message || '')) {
-    const flat = rows.map(r => ({ nursery: r.nursery, plot: r.plot, qty: r.qty,
-                                  updated_at: r.updated_at }));
-    ({ error } = await _supabase.from('nops_maint_plot_qty')
-      .upsert(flat, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e })));
-  }
-
-  if (!error && pre) {
-    await _supabase.from('nops_maint_tray_size')
-      .upsert({ nursery: n, per_tray: +capDraft.perTray || 0,
-                updated_at: new Date().toISOString() }, { onConflict: 'nursery' })
-      .then(r => r, () => ({}));
-  }
 
   if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false);
-  if (error) { alert('Could not save — ' + (error.message || 'try again')); return; }
 
-  // Only once the write landed: what is on screen and what is stored agree.
-  if (!plotQtyOverrides[n]) plotQtyOverrides[n] = {};
-  if (!plotTrays[n]) plotTrays[n] = {};
-  rows.forEach(r => {
-    plotQtyOverrides[n][r.plot] = r.qty;
-    if (pre) plotTrays[n][r.plot] = r.trays;
-  });
-  if (pre) traySize[n] = +capDraft.perTray || 0;
+  if (failure) {
+    // Stay in edit mode: the nurseries that did not save still hold what was
+    // typed, and walking away is the one thing that would lose it.
+    renderCapacity();
+    alert('Saved ' + staged.length + ' of ' + nurseries.length + ' nurseries.\n\n' +
+          failure.n + ' could not be saved — ' + (failure.error.message || 'try again'));
+    return;
+  }
 
   capEditing = false; capDraft = null;
   renderCapacity();
