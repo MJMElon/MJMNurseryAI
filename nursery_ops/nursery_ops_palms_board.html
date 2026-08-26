@@ -233,19 +233,6 @@ function lineForPlot(plot) {
   return best;
 }
 
-/* What the map paints. 'over' is red, 'ok' green, anything else grey. */
-/* The key beside the map: which stages share a colour, and what colour.
-   Grouped by stage NUMBER rather than by name, so renaming a stage in
-   Settings keeps its colour and the key picks the new name up on its own.
-
-   Colours chosen by the office. Blue is the one they left open — the three
-   ground-preparation stages — and it is the hue that separates cleanest
-   from the other four. The set is validated with all pairs in play: worst
-   normal-vision ΔE 16.3, all inside the lightness band and over the chroma
-   floor. Red against green is the one soft pair at CVD ΔE 7.2, which is
-   legal only with a second encoding — every plot carries its name, the key
-   spells its stages out and the table under the map gives the exact stage,
-   so it holds. Do not add a sixth colour without re-running that check. */
 /* The colours come from the office now — one per work status, set on
    PALMS → Settings → Ideal Work (nops_plot_status_stages.color).
 
@@ -255,7 +242,13 @@ function lineForPlot(plot) {
    the one stage you care about its own colour and it stands out.
 
    A stage with no colour set is grey. That is deliberate and visible — a
-   wrong colour on a map is worse than an obviously unassigned one. */
+   wrong colour on a map is worse than an obviously unassigned one.
+
+   HOW MANY COLOURS. Plots sit beside each other, so every colour on this
+   map is compared with every other one, not just its neighbour in the key.
+   That supports about five distinct fills, not eleven — measured, and the
+   figures are in migration_palms_stage_colours.sql. Anyone adding a sixth
+   should check it separates before trusting it. */
 function buildPhases() {
   const acts = MJMPalms.ACTIVITIES || [];
   const groups = [];

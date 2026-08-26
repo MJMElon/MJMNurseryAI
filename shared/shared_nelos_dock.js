@@ -2272,6 +2272,17 @@
     refresh: function () { if (dock) refresh(); },
     open:    function () { if (dock) setOpen(true); },
     close:   function () { if (dock) setOpen(false); },
+    /* Open straight onto the raise form. This is the only new-case form in
+       the system — the To-Do block on a dashboard opens THIS rather than
+       carrying a second copy of it, which is how the two stay identical.
+       Returns false when there is no dock on the page, so a caller can
+       fall back to the hub. */
+    newCase: function () {
+      if (!dock) return false;
+      setOpen(true);
+      showForm();
+      return true;
+    },
     /* Back to the bottom-right corner at its default size, for a circle
        someone has parked somewhere unhelpful. */
     reset:   function () {
