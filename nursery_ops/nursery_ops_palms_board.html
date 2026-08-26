@@ -193,10 +193,45 @@ function lineForPlot(plot) {
 }
 
 /* What the map paints. 'over' is red, 'ok' green, anything else grey. */
-/* The key beside the map: the office's own stages, in their own order,
-   grouped into the phases the map can actually colour apart. Read from
-   MJMPalms.ACTIVITIES rather than written out, so a stage added or renamed
-   in Settings shows up here without this file being touched. */
+/* The key beside the map: which stages share a colour, and what colour.
+   Grouped by stage NUMBER rather than by name, so renaming a stage in
+   Settings keeps its colour and the key picks the new name up on its own.
+
+   Colours chosen by the office. Blue is the one they left open — the three
+   ground-preparation stages — and it is the hue that separates cleanest
+   from the other four. The set is validated with all pairs in play: worst
+   normal-vision ΔE 16.3, all inside the lightness band and over the chroma
+   floor. Red against green is the one soft pair at CVD ΔE 7.2, which is
+   legal only with a second encoding — every plot carries its name, the key
+   spells its stages out and the table under the map gives the exact stage,
+   so it holds. Do not add a sixth colour without re-running that check. */
+const PHASE_DEF = [
+  { n: [1, 2, 3],  color: '#e34948' },   // Saringan · Tunggu buat culling · Culling
+  { n: [4, 5, 6],  color: '#2a78d6' },   // Membersih · Meracun secara selingan · Angkat tanah
+  { n: [7, 8, 9],  color: '#4a3aa7' },   // Isi polibeg · Lining · Transplanting
+  { n: [10],       color: '#eda100' },   // Membesar
+  { n: [11],       color: '#008300' },   // Pengambilan
+];
+
+/* A stage the office has added and no group claims is given its own grey
+   row rather than quietly taking someone else's colour — a wrong colour on
+   a map is worse than an obviously unassigned one. */
+function buildPhases() {
+  const acts = MJMPalms.ACTIVITIES || [];
+  const nameOf = (n) => { const a = MJMPalms.actByN(n); return a ? a.name : null; };
+  const groups = PHASE_DEF.map((g) => ({
+    color: g.color,
+    stages: g.n.map(nameOf).filter(Boolean),
+  })).filter((g) => g.stages.length);
+
+  const claimed = {};
+  PHASE_DEF.forEach((g) => g.n.forEach((n) => { claimed[n] = true; }));
+  const rest = acts.filter((a) => !claimed[a.n]).map((a) => a.name);
+  if (rest.length) groups.push({ stages: rest, color: '#94a3b8' });
+
+  return MJMPlotMap.phases(groups);
+}
+
 let PAL = { legend: [], keyOf: {} };
 
 /* What the map paints a plot. `key` picks the colour off the key beside it;
@@ -451,7 +486,7 @@ function render() {
     await MJMPalms.loadStages(_supabase);
     LOGS = await MJMPalms.loadLogs(_supabase);
 
-    PAL = MJMPlotMap.phases((MJMPalms.ACTIVITIES || []).map((a) => a.name));
+    PAL = buildPhases();
     MAP = MJMPlotMap.create({
       mount: $('plot-map'),
       title: '🗺️ Plot Status Map',

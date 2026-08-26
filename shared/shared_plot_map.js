@@ -103,74 +103,58 @@
     none: { fill: 'rgba(148,163,184,.25)', stroke: '#94a3b8' },
   };
 
-  /* ---------- the key a caller colours an ordered set of stages with ----
+  /* ---------- the key a caller colours its stages with ----------
      Eleven stages, and there is no set of eleven colours a person can tell
      apart on this map. Plots sit next to each other, so every colour is
      compared with every other one rather than only its neighbour in a list,
      and against that test even a validated eight-hue palette does not clear
      the floors. Measured, not guessed: one hue in eleven shades leaves
      adjacent stages at ΔE 4.2, and four hues in three shades each puts pale
-     blue against pale violet at ΔE 5.1 and pale green against pale orange
-     at CVD ΔE 3.4. Both are "the same colour" to a reader. Every lightness
-     spread between 0.06 and 0.18 fails one end or the other: tight enough
-     to keep the hues apart is too tight to separate the shades.
+     blue against pale violet at ΔE 5.1.
 
-     So colour carries the PHASE — four hues, no shading — and the key names
-     the stages inside each. That is a real colour a real reader can name,
-     and it is honest about what colour can carry. Which stage exactly is on
-     the key beside the map and in the table under it, per plot, which is
-     what those are for.
+     So colour carries a GROUP of stages, the caller says which stages go
+     together and what colour each group is, and the key names the stages
+     inside each one. Which stage exactly is in that key and in the table
+     under the map, per plot, which is what those are for.
 
-     The four are the data-viz reference palette's slots 1, 2, 3 and 7,
-     unchanged. Validated with ALL pairs in play on a light surface: worst
-     CVD ΔE 9.2 (deutan), worst normal-vision ΔE 16.3, every one inside the
-     lightness band and over the chroma floor. Aqua sits at 2.74:1 against
-     the surface, under 3:1, which obliges visible labels — every plot
-     carries its name and every key row its stage names, so that holds. */
-  const PHASE_HUES = ['#2a78d6', '#eb6834', '#1baf7a', '#4a3aa7'];
+         MJMPlotMap.phases([
+           { stages: ['Saringan Anak Bibit', 'Culling'], color: '#e34948' },
+           { stages: ['Membesar'],                       color: '#eda100' },
+         ])
+
+     Returns { legend, keyOf }: pass `legend` to create(), and answer
+     `keyOf[stageName]` as the `key` from statusOf().
+
+     The fill is translucent because a photograph is underneath and the plot
+     has to stay recognisable through the colour; the stroke is the same hue
+     opaque, so the edge holds where the fill is palest. */
 
   const hexToRgb = (h) => {
     const n = parseInt(String(h).replace('#', ''), 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   };
 
-  /**
-   * A key for an ordered list of stages, split into as many phases as there
-   * are hues (fewer if there are fewer stages).
-   *
-   *   const pal = MJMPlotMap.phases(['Saringan Anak Bibit', 'Culling', …]);
-   *   MJMPlotMap.create({ legend: pal.legend, … });
-   *   // then statusOf() returns  key: pal.keyOf[stageName]
-   *
-   * Driven off the list handed in, so a stage added or renamed upstream
-   * needs nothing changed here.
-   *
-   * The fill is translucent because a photograph is underneath and the plot
-   * has to stay recognisable through the colour; the stroke is the same hue
-   * opaque, so the edge holds where the fill is palest.
-   */
-  function phases(labels) {
-    const list = (labels || []).map(String);
-    const n = list.length;
-    if (!n) return { legend: [], keyOf: {} };
+  /* Late is a near-black outline rather than a red one. Red is a stage
+     colour now, and an outline in a colour that is also a fill cannot be
+     read as a different fact. Black is in none of the groups, so it can
+     only mean the one thing. The days-over on the label say it in words
+     as well, so it is never colour alone. */
+  const LATE_STROKE = '#111827';
 
-    const groups = Math.min(PHASE_HUES.length, n);
-    const buckets = [];
-    list.forEach((label, i) => {
-      const g = Math.min(groups - 1, Math.floor((i * groups) / n));
-      (buckets[g] = buckets[g] || []).push(label);
-    });
-
+  function phases(groups) {
+    const list = (groups || []).filter((g) => g && g.color && (g.stages || []).length);
     const keyOf = {};
-    const legend = buckets.map((stages, g) => {
-      stages.forEach((name) => { keyOf[name] = 'p' + g; });
-      const rgb = hexToRgb(PHASE_HUES[g]);
+    const legend = list.map(function (g, i) {
+      const stages = g.stages.map(String);
+      const key = g.key || ('p' + i);
+      stages.forEach((name) => { keyOf[name] = key; });
+      const rgb = hexToRgb(g.color);
       return {
-        key: 'p' + g,
-        label: stages.join(' · '),
+        key: key,
+        label: g.label || stages.join(' · '),
         stages: stages,
         fill: 'rgba(' + rgb.join(',') + ',.55)',
-        stroke: PHASE_HUES[g],
+        stroke: g.color,
       };
     });
     return { legend: legend, keyOf: keyOf };
@@ -256,7 +240,7 @@
         '<p class="pm-lg-cap">' + esc(o.legendTitle || 'Status') + '</p>' +
         legend.map((e) => row(e.fill, e.stroke, e.label)).join('') +
         '<p class="pm-lg-cap mt">Also</p>' +
-        row('transparent', '#e11d48', 'Over its time') +
+        row('transparent', LATE_STROKE, 'Over its time') +
         row(TONES.none.fill, TONES.none.stroke, 'Nothing recorded');
     })();
     const elImg = q('.pm-image'), elSvg = q('.pm-svg'), elLabels = q('.pm-labels');
@@ -304,9 +288,9 @@
         const tone = TONES[(st && st.tone) || 'none'] || TONES.none;
         const late = st && st.tone === 'over';
         const fill = hit ? hit.fill : tone.fill;
-        const stroke = legend ? (late ? '#e11d48' : (hit ? hit.stroke : TONES.none.stroke))
+        const stroke = legend ? (late ? LATE_STROKE : (hit ? hit.stroke : TONES.none.stroke))
                               : tone.stroke;
-        const width = legend && late ? '.9' : '.4';
+        const width = legend && late ? '1.1' : '.4';
         shapes.push(
           `<polygon points="${pts.map((pt) => pt.x + ',' + pt.y).join(' ')}" fill="${fill}" ` +
           `stroke="${stroke}" stroke-width="${width}" class="pm-shape" data-pm-plot="${esc(p.plot_name)}"/>`);
