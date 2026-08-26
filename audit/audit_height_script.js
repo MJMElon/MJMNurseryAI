@@ -304,13 +304,10 @@ function plotHasWork(p){
 function isPlotAudited(p){
   return records.some(r => r.nursery === activeTab && r.plot === p);
 }
-function openPlotAudit(plot){
-  window._lastOpenedPlot = plot;
-  const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
-  if (rec) { openDetail(rec.uid); return; }
-  _openFormForPlot(plot, null);
-}
-window.openPlotAudit = openPlotAudit;
+/* Where a PN plot goes when it is tapped is openPlot's decision, and in
+   this module that is the multi-batch form — one screen carrying every
+   batch standing on the plot, rather than one record for the plot. The
+   counting above still treats the plot as the task. */
 /* The batch box belongs to a batch-by-batch audit. Hide it where the
    audit is the plot, and hide the row it sits in so nothing gaps. */
 function syncBatchField(){
@@ -378,7 +375,7 @@ function renderList(){
     return `
       <button class="plot-cell ${allDone?'done':''}"
               data-plot="${p}"
-              onclick="${onePlot ? 'openPlotAudit' : 'openPlot'}('${p}')"
+              onclick="openPlot('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
