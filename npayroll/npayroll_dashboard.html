@@ -11,7 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=10">
+<link rel="stylesheet" href="npayroll_styles.css?v=11">
 </head>
 <body>
 
@@ -140,6 +140,12 @@
           section below and the section is already filled in.</div>
       </div>
       <div class="bar-actions">
+        <!-- One register, two ways of reading it: the section-by-section list,
+             and the board that shows who stands where. -->
+        <div class="vtoggle">
+          <button class="vtoggle-btn is-on" id="wv-list"  onclick="setWorkerView('list')">List</button>
+          <button class="vtoggle-btn"       id="wv-board" onclick="setWorkerView('board')">Team Board</button>
+        </div>
         <label class="chk"><input type="checkbox" id="w-show-inactive" onchange="renderWorkers()"> Show inactive</label>
         <input type="text" id="w-search" class="sel" placeholder="Search name or role…" oninput="renderWorkers()">
       </div>
@@ -155,6 +161,7 @@
       Until then the PIN boxes below are read-only.
     </div>
     <div id="worker-sections"></div>
+    <div id="worker-board" class="hidden"></div>
   </section>
 
   <!-- ═══════════ PIECE RATE ═══════════ -->
@@ -293,7 +300,7 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=13"></script>
+<script src="npayroll_script.js?v=14"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
