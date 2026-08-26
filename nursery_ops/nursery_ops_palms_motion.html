@@ -32,6 +32,16 @@
   td { padding:10px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; }
   .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:900; }
   .muted { color:#cbd5e1; font-weight:900; }
+  .iw-grid { display:grid; grid-template-columns:38px minmax(160px,1fr) 104px; gap:10px 14px; align-items:center; }
+  .iw-n { width:30px; height:30px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
+          color:#0f766e; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center; }
+  .iw-name { font-weight:900; color:#1e293b; font-size:13px; }
+  .iw-in { width:100%; background:white; border:1.5px solid #e2e8f0; border-radius:10px; padding:7px 10px;
+           font-size:14px; font-weight:900; color:#0f172a; outline:none; font-family:inherit; text-align:right; }
+  .iw-in:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  .iw-in.dirty { border-color:#f59e0b; background:#fffbeb; }
+  .iw-in[readonly] { background:#f8fafc; color:#475569; border-color:#e2e8f0; box-shadow:none; }
+  .iw-ro { font-weight:900; color:#0f766e; font-size:14px; text-align:right; }
   .fast { color:#047857; }
   .slow { color:#b91c1c; }
   .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
@@ -63,12 +73,30 @@
   </div>
 
   <div class="card p-5 mb-5">
-    <h1 class="text-base font-black text-slate-800 uppercase tracking-widest mb-1">What the work actually costs in days</h1>
-    <p class="text-[12px] text-slate-500 leading-relaxed">
-      Read off the plot log recorded in the field, not off the ideal-day table. The unit of measurement is a
-      <strong>cycle</strong> — Saringan Anak Bibit through to Pengambilan, one intake worked from start to sale —
-      so a plot that has gone round three times contributes three figures, and the shortest and the longest of
-      them are what a motion study is after. A measurement counts in the month it <strong>finished</strong>.
+    <div class="flex flex-wrap items-baseline justify-between gap-3 mb-1">
+      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">⏱️ Ideal Work — the standard days</h1>
+      <span id="iw-state" class="text-[11px] font-bold text-slate-400"></span>
+    </div>
+    <p class="text-[12px] text-slate-500 leading-relaxed mb-4">
+      How long each stage is <strong>meant</strong> to take. Everything below is measured against these
+      numbers — what the Monitoring Board calls a plot late by, and what the Shortest / Average / Longest
+      figures are compared with. Change one here and the whole page re-reads against it.
+      <span id="iw-note" class="hidden"></span>
+    </p>
+
+    <div class="iw-grid" id="iw-list"></div>
+
+    <div id="iw-actions" class="hidden flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+      <button id="iw-save" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-widest cursor-pointer">Save changes</button>
+      <button id="iw-reset" class="px-4 py-2.5 rounded-xl bg-white border-[1.5px] border-slate-200 hover:bg-slate-50 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-pointer">Undo</button>
+      <span id="iw-msg" class="text-[11px] font-bold text-slate-400"></span>
+    </div>
+
+    <p class="text-[11px] text-slate-400 leading-relaxed mt-4 pt-4 border-t border-slate-100">
+      A measurement is read off the plot log recorded in the field, not off this table. The unit is a
+      <strong>cycle</strong> — the first stage through to the last, one intake worked from start to sale — so a
+      plot that has gone round three times contributes three figures. A measurement counts in the month it
+      <strong>finished</strong>.
     </p>
   </div>
 
@@ -216,6 +244,9 @@ let MONTH = '';        // '' = every month
 let FROM = 1, TO = 9;  // Saringan Anak Bibit → Transplanting, the incentive run
 let ACT = 1;
 let PLOT = '';        // the plot the stage record is showing
+let IW_ADMIN = false; // may this person change the standard?
+let IW_ROWS = [];     // [{ id, n, name, days }] as the office last saved them
+let IW_DRAFT = {};    // stage id → the value typed but not yet saved
 
 const days = (n) => (n == null ? '<span class="muted">—</span>' : n + 'd');
 
@@ -278,6 +309,113 @@ function renderUnits() {
     '</tr>').join('');
 }
 
+/* ── Ideal Work: the standard days, edited in place ───────────────────
+   These are nops_plot_status_stages.ideal_days — the same numbers the PALMS
+   Settings page holds and the field app reads. They are edited HERE too
+   because this is the page where you find out a standard is wrong: the
+   Shortest / Average / Longest columns right below are what tells you two
+   days was never realistic, and having to leave for another page to act on
+   that is how a stale standard survives for a year.
+
+   Editing is admin only. Everyone else sees the numbers, because every
+   figure underneath is measured against them and they explain the page. */
+function renderIdealWork() {
+  IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, n: a.n, name: a.name, days: a.days }));
+  const fromOffice = IW_ROWS.some((r) => r.id != null);
+
+  $('iw-state').textContent = fromOffice
+    ? (IW_ADMIN ? 'tap a number to change it' : 'set by an admin')
+    : 'built-in list';
+
+  /* No stageId means shared_palms fell back to its built-in eleven, because
+     nops_plot_status_stages is empty or could not be read. Editing boxes
+     would write nowhere, so they are not offered and the reason is said. */
+  const note = $('iw-note');
+  if (!fromOffice) {
+    note.className = 'text-amber-700 font-bold';
+    note.textContent = ' These are the built-in defaults — the office stage list is empty or unreadable, ' +
+      'so there is nothing to save a change to. Add the stages on PALMS → Settings first.';
+  } else {
+    note.className = 'hidden';
+  }
+
+  const editable = IW_ADMIN && fromOffice;
+  $('iw-actions').classList.toggle('hidden', !editable);
+
+  $('iw-list').innerHTML =
+    '<div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">#</div>' +
+    '<div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Work status</div>' +
+    '<div class="text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ideal days</div>' +
+    IW_ROWS.map((r) => {
+      const val = Object.prototype.hasOwnProperty.call(IW_DRAFT, r.id) ? IW_DRAFT[r.id] : r.days;
+      const dirty = String(val) !== String(r.days);
+      const cell = editable
+        ? '<input class="iw-in' + (dirty ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
+            'data-iw="' + esc(r.id) + '" value="' + esc(val == null ? '' : val) + '">'
+        : '<div class="iw-ro">' + (r.days == null ? '—' : esc(r.days) + 'd') + '</div>';
+      return '<div class="iw-n">' + r.n + '</div>' +
+             '<div class="iw-name">' + esc(r.name) + '</div>' +
+             cell;
+    }).join('');
+}
+
+$('iw-list').addEventListener('input', (e) => {
+  const el = e.target.closest('[data-iw]');
+  if (!el) return;
+  const id = el.dataset.iw;
+  IW_DRAFT[id] = el.value === '' ? null : Number(el.value);
+  const row = IW_ROWS.find((r) => String(r.id) === String(id));
+  el.classList.toggle('dirty', !!row && String(IW_DRAFT[id]) !== String(row.days));
+  $('iw-msg').textContent = '';
+});
+
+$('iw-reset').addEventListener('click', () => {
+  IW_DRAFT = {};
+  $('iw-msg').textContent = '';
+  renderIdealWork();
+});
+
+$('iw-save').addEventListener('click', async () => {
+  const changed = IW_ROWS.filter((r) =>
+    Object.prototype.hasOwnProperty.call(IW_DRAFT, r.id) && String(IW_DRAFT[r.id]) !== String(r.days));
+  const msg = $('iw-msg');
+  msg.className = 'text-[11px] font-bold text-slate-400';
+  if (!changed.length) { msg.textContent = 'Nothing changed.'; return; }
+  const bad = changed.find((r) => IW_DRAFT[r.id] == null || !(IW_DRAFT[r.id] >= 0));
+  if (bad) { msg.className = 'text-[11px] font-bold text-rose-600';
+             msg.textContent = 'Give ' + bad.name + ' a number of days (0 or more).'; return; }
+
+  $('iw-save').disabled = true;
+  msg.textContent = 'Saving…';
+  try {
+    for (const r of changed) {
+      const res = await _supabase.from('nops_plot_status_stages')
+        .update({ ideal_days: IW_DRAFT[r.id] }).eq('id', r.id);
+      if (res.error) throw res.error;
+    }
+    IW_DRAFT = {};
+    /* Re-read the stages and re-parse the log against them. The log stores
+       each entry's own ideal, so a FINISHED stage keeps the number it was
+       judged against — only the aggregates and anything still running move.
+       Reloading both is what makes that visible immediately rather than on
+       the next visit. */
+    await MJMPalms.loadStages(_supabase);
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    // The stage names and their count do not change here, so the activity
+    // pickers stand; only the months can move, and only because the log was
+    // re-read.
+    fillMonths();
+    renderAll();
+    msg.className = 'text-[11px] font-bold text-emerald-600';
+    msg.textContent = 'Saved — everything below now reads against it.';
+  } catch (err) {
+    console.warn(err);
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = (err && err.message) || 'Could not save.';
+  }
+  $('iw-save').disabled = false;
+});
+
 /* ── One plot's stage record ───────────────────────────────────────────
    Variance is one signed number rather than two columns: positive is days
    OVER the ideal, negative is days ahead of it. The sign is the finding, so
@@ -330,7 +468,7 @@ function renderPlotRecord() {
   }).join('');
 }
 
-function renderAll() { renderPlotRecord(); renderSpan(); renderRuns(); renderActs(); renderUnits(); }
+function renderAll() { renderIdealWork(); renderPlotRecord(); renderSpan(); renderRuns(); renderActs(); renderUnits(); }
 
 function fillMonths() {
   const months = MJMPalms.monthsWithData(LOGS, SCOPE);
@@ -367,6 +505,8 @@ function fillMonths() {
     /* The same nursery scope the field app obeys, from the main portal's User
        Access. Someone narrowed to BNN must not read UNN's figures here just
        because the office page is a different screen. */
+    IW_ADMIN = MJMAccess.isAdminOf('nursery_ops') || MJMAccess.canManageUsers();
+
     const perms = MJMAccess.permissions() || {};
     const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
     const KEYS = ['BNN', 'UNN1', 'UNN2'];
