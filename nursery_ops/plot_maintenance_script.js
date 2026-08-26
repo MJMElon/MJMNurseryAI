@@ -964,10 +964,27 @@ function isGeneralWorker(r, nurseryNamesTheRole) {
 /* Turn the whole register into nursery → [name], applying the rules above per
    nursery. Shared by the boot load and the live refresh so the two can never
    drift apart. */
+/* Which sheet a register row belongs to.
+ 
+   The two sides spell a nursery differently and always have: this page keys
+   on UNN1, the Payroll register is filled in by hand and says "UNN 1". An
+   exact match therefore linked BNN and PN — which have no space in them — and
+   silently found nobody for UNN 1 or UNN 2, so those two sheets fell back to
+   the old local list and looked like nurseries with no workers.
+ 
+   Compare on letters and digits alone, the same rule every other crossing of
+   this boundary uses. And read `nursery` when `section` has not been filled
+   in: the register copies one into the other, but a row added since is only
+   guaranteed to have the one the person keying it happened to use. */
+function _registerNurseryKey(r) {
+  const key = (x) => String(x == null ? '' : x).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  return key(r && r.section) || key(r && r.nursery);
+}
+
 function generalWorkersByNursery(rows) {
   const by = {};
   MAINT_NURSERIES.forEach(n => {
-    const mine = (rows || []).filter(r => String(r.section || '').trim().toUpperCase() === n);
+    const mine = (rows || []).filter(r => _registerNurseryKey(r) === n);
     const named = mine.some(r => r.active !== false && MAINT_ROLE.test(roleOf(r)));
     const names = mine.filter(r => isGeneralWorker(r, named))
                       .map(r => String(r.full_name || '').trim())
