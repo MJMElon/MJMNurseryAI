@@ -410,8 +410,6 @@
                        gap:9px; margin-bottom:11px; min-height:32px; }
     .nelos-todo-title { font-size:16px; font-weight:900; letter-spacing:.025em; text-transform:uppercase;
                         color:#1e293b; white-space:nowrap; line-height:1.2; }
-    .nelos-todo-count { font-size:10px; font-weight:900; padding:2px 8px; border-radius:999px;
-                        background:#fee2e2; color:#b91c1c; letter-spacing:.04em; }
     .nelos-todo-all { position:absolute; left:0; top:50%; transform:translateY(-50%);
                       font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                       color:#7c3aed; text-decoration:none; }
@@ -548,6 +546,17 @@
     if (!el) return 0;
 
     injectCss();
+
+    /* Raised through the dock's modal, this list is one case out of date and
+       has no other way to hear about it. Bound BEFORE the early returns
+       below: a block that is empty — and with hideIfEmpty, not on the page
+       at all — is exactly the one that has to notice a first case appearing.
+       Rebound on every mount, and the previous one removed, so re-rendering
+       does not stack listeners. */
+    if (el._nelosOnChange) document.removeEventListener('nelos:changed', el._nelosOnChange);
+    el._nelosOnChange = () => { mountTodo(el, opts); };
+    document.addEventListener('nelos:changed', el._nelosOnChange);
+
     el.innerHTML = `<div class="nelos-todo"><div class="nelos-empty">loading cases…</div></div>`;
 
     const { data, error } = await pending(Object.assign({}, opts, { limit: opts.limit || 6 }));
@@ -584,7 +593,6 @@
           ${opts.openLink === false ? '' :
             `<a class="nelos-todo-all" href="${esc(homeHref())}">Open Nelos →</a>`}
           <span class="nelos-todo-title">${esc(opts.title || 'Nelos To Do List')}</span>
-          ${total ? `<span class="nelos-todo-count">${total}</span>` : ''}
           ${newBtn}
         </div>
         ${total ? sections(data) : '<div class="nelos-empty">Nothing pending ✓</div>'}

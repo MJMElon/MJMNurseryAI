@@ -574,6 +574,31 @@
                       background:#fff; border:1.5px solid #ede9fe; border-radius:18px; overflow:hidden;
                       box-shadow:0 22px 55px rgba(15,23,42,.22); display:flex; flex-direction:column; }
   #nelos-dock-panel[hidden] { display:none; }
+
+  /* ── the same panel, shown as a modal ──
+     A dashboard's To-Do block raises a case through this. A floating panel
+     unfolding in the corner is not what a button in the middle of a page
+     should do, so the presentation changes and NOTHING else does: same
+     markup, same form, same handlers — centred over a backdrop, with the
+     circle and the resize grip out of the way.
+
+     !important throughout: the dock's corner is written INLINE by
+     applyPos() and the panel's size by applySize(), so it can be dragged
+     and resized, and an inline declaration outranks a stylesheet one
+     whatever the selector. Without it the modal would still be pinned to
+     the bottom-right at 370px. */
+  #nelos-dock.nd-modal { left:0 !important; right:0 !important; top:0 !important; bottom:0 !important;
+                         flex-direction:column !important; align-items:center !important;
+                         justify-content:center; padding:18px; }
+  #nelos-dock.nd-modal::before { content:''; position:fixed; inset:0; background:rgba(15,23,42,.5); }
+  #nelos-dock.nd-modal #nelos-dock-panel {
+      position:relative; z-index:1;
+      width:min(430px, calc(100vw - 32px)) !important; height:auto !important;
+      max-width:none !important; max-height:calc(100vh - 40px) !important; }
+  #nelos-dock.nd-modal #nelos-dock-fab { display:none !important; }
+  #nelos-dock.nd-modal .nd-grip { display:none !important; }
+  #nelos-dock.nd-modal .nd-hist { display:none !important; }
+  #nelos-dock.nd-modal .nd-min { font-size:19px; line-height:1; }
   #nelos-dock-panel.nd-in { animation:nd-in .18s ease-out; }
   @keyframes nd-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 
@@ -1050,9 +1075,19 @@
       if (fab.dataset.ndDragged === '1') { fab.dataset.ndDragged = '0'; e.preventDefault(); return; }
       setOpen(!open);
     });
-    dock.querySelector('.nd-min').addEventListener('click', function () { setOpen(false); });
+    dock.querySelector('.nd-min').addEventListener('click', function () {
+      if (modal) { closeModal(); return; }
+      setOpen(false);
+    });
+    /* Clicking the darkened area around a modal closes it. The backdrop is
+       a pseudo-element, so the click lands on the dock itself — which is
+       only ever the target when nothing inside the panel was hit. */
+    dock.addEventListener('click', function (e) {
+      if (modal && e.target === dock) closeModal();
+    });
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape' || !open) return;
+      if (modal) { closeModal(); return; }
       if (view !== 'list') showList(); else setOpen(false);
     });
 
@@ -1063,6 +1098,56 @@
 
   /* Expanded or minimised — remembered, so it carries across pages. */
   var _inTimer = null;
+
+  /* Shown as a modal rather than as the corner dock. Only ever entered
+     through newCase(), and left the moment that one job is done — the
+     modal is opened FOR raising a case, so "back to the list" means there
+     is nothing left to do here. */
+  var modal = false;
+  var hidBeforeModal = false;
+
+  function setModal(on) {
+    modal = !!on;
+    if (!dock) return;
+    dock.classList.toggle('nd-modal', modal);
+
+    /* The dock hides its own ROOT when it cannot read the case list — a
+       dropped connection, a stale session, no nelos_cases table — so that
+       no unexplained circle floats over the page. That rule is about the
+       circle appearing on its own; it must not swallow a button somebody
+       pressed. Left alone, "+ New Case" on a dashboard would open this
+       modal inside a display:none element and the press would do visibly
+       nothing at all.
+
+       So the modal unhides the root, and putting it back afterwards
+       restores exactly what was there — a dock that was standing down goes
+       back to standing down rather than leaving a circle behind. */
+    if (modal) {
+      hidBeforeModal = dock.hidden;
+      dock.hidden = false;
+    } else if (hidBeforeModal) {
+      dock.hidden = true;
+      hidBeforeModal = false;
+    }
+
+    /* Two header buttons belong to the dock, not to a modal. Minimise means
+       "put it back in the corner", which a modal has no corner to go to —
+       here the same button closes, so it says so and looks like a close.
+       The history button opens the solved-but-not-closed LIST, and a modal
+       raising a case has no list to show it in; it is hidden rather than
+       left to lead somewhere that is not there. */
+    var min = dock.querySelector('.nd-min');
+    if (min) {
+      min.textContent = modal ? '\u00d7' : '\u2013';
+      min.title = modal ? 'Close' : 'Minimise';
+      min.setAttribute('aria-label', min.title);
+    }
+  }
+
+  function closeModal() {
+    setModal(false);
+    setOpen(false);
+  }
 
   function setOpen(next) {
     open = !!next;
@@ -1485,6 +1570,10 @@
   }
 
   function showList() {
+    /* In a modal there is no list to go back to. Cancel, Escape, the
+       minimise button and a finished save all arrive here, and all four
+       mean the same thing: done. */
+    if (modal) { closeModal(); return; }
     view = 'list';
     editing = null;
     showPane('list');
@@ -2061,6 +2150,13 @@
       var no = was ? (was.case_no || (made && made.case_no))
                    : ((made && made.case_no) || null);
       setFlash(no ? (no + (was ? ' saved' : ' raised')) : (was ? 'Case saved' : 'Case raised'));
+      /* Anything else on the page showing these cases — a dashboard's
+         To-Do block — is now out of date by exactly this case. It has no
+         other way to know: the modal it was raised through is the dock's,
+         not the block's. */
+      try {
+        document.dispatchEvent(new CustomEvent('nelos:changed', { detail: { caseNo: no } }));
+      } catch (_) { /* very old browser: the block simply refreshes later */ }
       showList();
       refresh();
     } catch (err) {
@@ -2184,7 +2280,10 @@
           warn(out.error === 'http-404'
             ? 'no nelos_cases table — run shared/migration_nelos.sql. Standing down.'
             : 'no usable session (' + out.error + '). Standing down.');
-          dock.hidden = true;
+          /* Never while a modal is up. refresh() runs as part of opening
+             one, and standing down here would pull the form out from under
+             somebody who had just pressed a button to get it. */
+          if (!modal) dock.hidden = true;
           stopTimer();
           return;
         }
@@ -2195,7 +2294,7 @@
         // comes back.
         if (!loaded) {
           warn('could not read the case list (' + out.error + '). Hiding until it answers.');
-          dock.hidden = true;
+          if (!modal) dock.hidden = true;
         }
         return;
       }
@@ -2279,6 +2378,7 @@
        fall back to the hub. */
     newCase: function () {
       if (!dock) return false;
+      setModal(true);
       setOpen(true);
       showForm();
       return true;
