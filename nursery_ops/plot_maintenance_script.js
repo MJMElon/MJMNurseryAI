@@ -4103,14 +4103,17 @@ function plotOrder(a, b) {
 
 async function loadSettingLists() {
   if (!_supabase) return;
-  const [tsRes, chRes, feRes] = await Promise.all([
+  const [tsRes, chRes, feRes, cfgRes] = await Promise.all([
     _supabase.from('nops_maint_tray_size').select('nursery, per_tray').then(r => r, () => ({ data: [] })),
     _supabase.from('nops_maint_chemicals').select('*').order('sort_order').order('name')
       .then(r => r, () => ({ data: [] })),
     _supabase.from('nops_maint_fertilisers').select('*').order('sort_order').order('name')
-      .then(r => r, () => ({ data: [] }))
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nops_maint_config').select('key, num_value').then(r => r, () => ({ data: [] }))
   ]);
   ((tsRes && tsRes.data) || []).forEach(r => { traySize[r.nursery] = +r.per_tray || 0; });
+  const cfg = ((cfgRes && cfgRes.data) || []).find(r => r.key === 'pump_coverage');
+  if (cfg && +cfg.num_value > 0) pumpCoverage = +cfg.num_value;
   chemicals   = (chRes && chRes.data) || [];
   fertilisers = (feRes && feRes.data) || [];
 }
@@ -4352,20 +4355,35 @@ async function saveCapEdit() {
    exception (CHEMICAL_COVERAGE) which this page did not know about, so it
    divided Asir by 800 as well and disagreed with the Dosage Calculator. It
    is a column now, and shown. */
-const CHEM_LABEL = { pest: 'pest', disease: 'disease' };
-const DEFAULT_COVERAGE = COVERAGE_PER_PUMP;
+const CHEM_LABEL = { pest: 'pest', disease: 'disease', other: 'other' };
+const CHEM_KINDS = ['pest', 'disease', 'other'];
+
+/* How many seedlings one pump covers, for every chemical that does not name
+   its own figure. Preset in nops_maint_config so it can be changed without a
+   deploy; COVERAGE_PER_PUMP is the fallback until that row is read, and
+   stays the number the rest of this file has always used. */
+let pumpCoverage = COVERAGE_PER_PUMP;
+let presetDraft  = null;
 
 let chemEditing = false;
 let chemDraft   = null;    // [{ id?, kind, name, dose, unit, coverage, _new }]
 let fertEditing = false;
 let fertDraft   = null;
 
-const coverageOf = c => Math.max(1, +c.coverage || DEFAULT_COVERAGE);
+/* A chemical's own coverage when it has one, the preset when it does not.
+   NULL is not 0 here: "follow the preset" and "one seedling to a pump" are
+   different answers, and only one of them should move when the preset does. */
+function livePreset() {
+  return Math.max(1, +(presetDraft != null ? presetDraft : pumpCoverage) || COVERAGE_PER_PUMP);
+}
+function coverageOf(c) {
+  return c.coverage == null || c.coverage === '' ? livePreset() : Math.max(1, +c.coverage || 1);
+}
 
 /* Enough decimal places to be worth printing. 30gm over 800 seedlings is
    0.0375 — rounded to two it reads 0.04 and the arithmetic stops adding up. */
 function perSeedling(dose, coverage) {
-  const v = (+dose || 0) / Math.max(1, +coverage || DEFAULT_COVERAGE);
+  const v = (+dose || 0) / Math.max(1, +coverage || livePreset());
   if (!v) return null;
   return v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : String(+v.toFixed(2));
 }
@@ -4406,31 +4424,64 @@ function renderChemicals(kind) {
             '<option value="mL"' + (c.unit === 'mL' ? ' selected' : '') + '>mL</option>' +
           '</select>' +
         '</span>' +
-        '<input type="number" min="1" step="1" value="' + coverageOf(c) + '" ' +
-          'title="Seedlings one pump covers — 1 if the dose is already per seedling" ' +
+        '<input type="number" min="1" step="1" ' +
+          'value="' + (c.coverage == null || c.coverage === '' ? '' : c.coverage) + '" ' +
+          'placeholder="' + livePreset() + '" ' +
+          'title="Leave blank to follow the preset. 1 if the dose is already per seedling." ' +
           'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'coverage\', this.value)">' +
         '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
         '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
           'onclick="dropChemRow(\'' + kind + '\',' + i + ')">&#10005;</button>'
       : '<span class="lst-txt">' + esc(c.name) + '</span>' +
         '<span class="lst-num">' + (+c.dose || 0) + ' ' + esc(c.unit || 'gm') + '</span>' +
-        '<span class="lst-num">' + coverageOf(c).toLocaleString() + '</span>' +
+        '<span class="lst-num' + (c.coverage == null || c.coverage === '' ? ' preset' : '') + '">' +
+          coverageOf(c).toLocaleString() + '</span>' +
         '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
         '<span></span>') +
     '</div>';
   }).join('');
 }
 
-function renderChemBoth() { renderChemicals('pest'); renderChemicals('disease'); }
+function renderChemBoth() {
+  const inp = document.getElementById('pump-coverage');
+  if (inp) {
+    inp.disabled = !chemEditing;
+    if (document.activeElement !== inp) inp.value = livePreset();
+  }
+  CHEM_KINDS.forEach(renderChemicals);
+}
+
+function onPresetInput(val) {
+  if (!chemEditing) return;
+  presetDraft = Math.max(1, +val || 1);
+  // Every chemical following the preset just changed, and none of the boxes
+  // did — so the derived cells redraw and the inputs are left alone.
+  CHEM_KINDS.forEach(k => {
+    const box = document.getElementById('chem-' + k + '-list');
+    if (!box) return;
+    chemRows(k).forEach((c, i) => {
+      if (c.coverage != null && c.coverage !== '') return;
+      const cell = box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
+      if (!cell) return;
+      const per = perSeedling(c.dose, null);
+      cell.textContent = per ? per + ' ' + (c.unit || 'gm') : '—';
+      cell.classList.toggle('none', !per);
+    });
+  });
+}
 
 function startChemEdit() {
   chemDraft = chemicals.map(c => ({ id: c.id, kind: c.kind, name: c.name, dose: c.dose,
-                                    unit: c.unit || 'gm', coverage: coverageOf(c) }));
+                                    unit: c.unit || 'gm', coverage: c.coverage ?? null }));
+  presetDraft = pumpCoverage;
   chemEditing = true;
   renderChemBoth();
 }
 
-function cancelChemEdit() { chemEditing = false; chemDraft = null; renderChemBoth(); }
+function cancelChemEdit() {
+  chemEditing = false; chemDraft = null; presetDraft = null;
+  renderChemBoth();
+}
 
 /* The draft is filtered per column for display, so an index within a column
    has to be turned back into the row it names in the whole draft. */
@@ -4442,8 +4493,10 @@ function onChemDraft(kind, i, field, val) {
   const row = draftAt(chemDraft, kind, i);
   if (!row) return;
   if (field === 'name') { row.name = val; return; }           // repaint would lose the caret
-  if (field === 'unit') { row.unit = val === 'mL' ? 'mL' : 'gm'; }
-  else row[field] = field === 'coverage' ? Math.max(1, +val || 1) : Math.max(0, +val || 0);
+  if (field === 'unit') row.unit = val === 'mL' ? 'mL' : 'gm';
+  // Blank is "follow the preset", which is why it is not coerced to a number.
+  else if (field === 'coverage') row.coverage = val === '' ? null : Math.max(1, +val || 1);
+  else row[field] = Math.max(0, +val || 0);
   // Only the derived cell beside the box being typed in.
   const box = document.getElementById('chem-' + kind + '-list');
   const cell = box && box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
@@ -4456,8 +4509,9 @@ function onChemDraft(kind, i, field, val) {
 
 function addChemRow(kind) {
   if (!chemEditing) return;
-  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm',
-                   coverage: DEFAULT_COVERAGE, _new: true });
+  // No coverage of its own: a new chemical follows the preset until told
+  // otherwise, which is true of nearly all of them.
+  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm', coverage: null, _new: true });
   renderChemicals(kind);
   const box = document.getElementById('chem-' + kind + '-list');
   const last = box && box.querySelector('.lst-row:last-child input[type=text]');
@@ -4476,7 +4530,7 @@ async function saveChemEdit() {
   const named = chemDraft.map(c => ({ ...c, name: (c.name || '').trim() })).filter(c => c.name);
   // Two of the same name in one column would break the table's own unique
   // index halfway through the save, leaving half of it written.
-  for (const k of ['pest', 'disease']) {
+  for (const k of CHEM_KINDS) {
     const seen = new Set();
     for (const c of named.filter(x => x.kind === k)) {
       const key = c.name.toLowerCase();
@@ -4494,7 +4548,7 @@ async function saveChemEdit() {
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
     const fresh = named.filter(c => !c.id).map(c => ({
       kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
-      coverage: coverageOf(c), updated_at: new Date().toISOString() }));
+      coverage: c.coverage ?? null, updated_at: new Date().toISOString() }));
 
     let err = null;
     if (gone.length) {
@@ -4505,7 +4559,7 @@ async function saveChemEdit() {
     for (const c of named.filter(x => x.id)) {
       if (err) break;
       const { error } = await _supabase.from('nops_maint_chemicals').update({
-        name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: coverageOf(c),
+        name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
         updated_at: new Date().toISOString() }).eq('id', c.id).then(r => r, e => ({ error: e }));
       err = error;
     }
@@ -4514,11 +4568,21 @@ async function saveChemEdit() {
         .then(r => r, e => ({ error: e }));
       err = error;
     }
+    if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
+      const { error } = await _supabase.from('nops_maint_config').upsert({
+        key: 'pump_coverage', num_value: +presetDraft,
+        updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .then(r => r, e => ({ error: e }));
+      if (!error) pumpCoverage = +presetDraft;
+      else console.warn('[maint] pump coverage save failed:', error.message);
+    }
     if (err) {
       done();
       alert('Could not save — ' + (err.message || 'try again') +
             (/coverage/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : ''));
+              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
+            (/kind/i.test(err.message || '')
+              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
       return;
     }
     // Read it back, so what is on screen is what is stored — and so the new
@@ -4532,7 +4596,8 @@ async function saveChemEdit() {
   }
 
   done();
-  chemEditing = false; chemDraft = null;
+  if (presetDraft != null) pumpCoverage = livePreset();
+  chemEditing = false; chemDraft = null; presetDraft = null;
   renderChemBoth();
 }
 
