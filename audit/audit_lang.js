@@ -353,7 +353,7 @@ const TRANSLATIONS = {
     quantity_lbl:     'Quantity:',
     transplant_lbl:   'Transplant:',
     transplanted_lbl: 'Transplanted Date:',
-    d_transplanting_lbl:'D. Transplanting:',
+    d_transplanting_lbl:'Transplanting date:',
     mature_lbl:       'Mature:',
     planted_lbl:      'Planted Date:',
     audit_tab:        'Audit',
