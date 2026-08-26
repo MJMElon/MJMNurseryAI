@@ -69,16 +69,12 @@
     <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
   </div>
 
-  <!-- MULTI-BATCH FORM — every batch on the plot on one screen. The
-       "click a plot → click a batch → open a form" chain collapsed to
-       "click a plot → fill everything in". Fixed Date + Plot on top,
-       one batch card per pending batch, one Save All at the bottom.
-       Used for PN. Fed by openMultiBatchForm(plot). -->
+  <!-- PLOT FORM — one record for the whole plot. The batches sitting on
+       the plot are auto-detected from the batches roster and shown as
+       read-only chips inside Record Information; the auditor keys one
+       set of samples + photos for the plot rather than one set per
+       batch. Fed by openPlotForm(plot). -->
   <div id="view-multi" class="view page-scroll">
-    <!-- Sub-header removed. The plot label reads on the outer ribbon
-         via #ctx-plot (populated by openMultiBatchForm), and the
-         back button up there returns to the plot grid. Batch count
-         pill was retired at the auditor's request. -->
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="record_info">Record Information</span></div>
@@ -93,22 +89,105 @@
             <input id="mf-plot" class="input" type="text" readonly/>
           </div>
         </div>
+        <div class="form-field" style="margin-top:10px">
+          <div class="field-label" data-t="batches_on_plot">Batches on this plot</div>
+          <div id="mf-batches-chips"
+               style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;
+                      border-radius:10px;background:#f4f6f4;border:1px solid #dde8dd;
+                      min-height:38px;align-items:center">
+            <span style="font-size:12px;color:#94a3b8">—</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- One card per batch, rendered by JS -->
-    <div id="multi-batches"></div>
+    <!-- Samples: one set for the whole plot -->
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span data-t="height_samples">Seedling Height Samples</span></div>
+      <div class="form-inner">
+        <div class="samples-grid">
+          <div class="sample-col">
+            <div class="sample-num">1</div>
+            <div class="sample-col-label" data-t="sample1">Sample 1</div>
+            <div class="height-input-wrap">
+              <input class="height-input" id="mf-s1" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onPlotHeightInput(1,this)"/>
+              <span class="height-unit">cm</span>
+            </div>
+            <div class="sample-filled" id="mf-s1-fb"></div>
+          </div>
+          <div class="sample-col">
+            <div class="sample-num">2</div>
+            <div class="sample-col-label" data-t="sample2">Sample 2</div>
+            <div class="height-input-wrap">
+              <input class="height-input" id="mf-s2" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onPlotHeightInput(2,this)"/>
+              <span class="height-unit">cm</span>
+            </div>
+            <div class="sample-filled" id="mf-s2-fb"></div>
+          </div>
+          <div class="sample-col">
+            <div class="sample-num">3</div>
+            <div class="sample-col-label" data-t="sample3">Sample 3</div>
+            <div class="height-input-wrap">
+              <input class="height-input" id="mf-s3" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onPlotHeightInput(3,this)"/>
+              <span class="height-unit">cm</span>
+            </div>
+            <div class="sample-filled" id="mf-s3-fb"></div>
+          </div>
+        </div>
+        <div class="avg-bar" style="margin-top:8px">
+          <span class="avg-bar-label" data-t="height_avg">Average Height</span>
+          <span><span class="avg-bar-value" id="mf-avg">—</span><span class="avg-bar-unit">cm</span></span>
+        </div>
+      </div>
+    </div>
 
-    <!-- One Save All button at the bottom -->
-    <div style="padding:14px 12px 32px">
-      <button class="btn-primary" id="btn-save-all" onclick="saveAllBatches()"
+    <!-- Photos: three per plot -->
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg><span data-t="height_photos">Gambar Sampel (Photos)</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-inner">
+        <div class="photo-slots">
+          <div class="photo-slot" id="mf-photo-1" onclick="triggerPlotPhoto(1)">
+            <div class="photo-slot-num">1</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label" data-t="sample1">Sample 1</span>
+          </div>
+          <div class="photo-slot" id="mf-photo-2" onclick="triggerPlotPhoto(2)">
+            <div class="photo-slot-num">2</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label" data-t="sample2">Sample 2</span>
+          </div>
+          <div class="photo-slot" id="mf-photo-3" onclick="triggerPlotPhoto(3)">
+            <div class="photo-slot-num">3</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label" data-t="sample3">Sample 3</span>
+          </div>
+        </div>
+        <div id="mf-photo-req-note" class="photo-req-note" style="margin-top:8px;font-size:11px;color:#94a3b8">All 3 photos required</div>
+      </div>
+    </div>
+
+    <!-- Not Required + Save -->
+    <div style="padding:0 12px 14px">
+      <button type="button" onclick="markPlotNotRequired()" id="mf-notreq-btn"
+              style="width:100%;background:transparent;border:1px dashed #cbd5e1;color:#64748b;
+                     font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.4px;
+                     text-transform:uppercase;padding:10px 12px;border-radius:12px;cursor:pointer;
+                     margin-bottom:12px">
+        Mark Plot as Not Required
+      </button>
+      <button class="btn-primary" id="btn-save-plot" onclick="savePlotAudit()"
               style="width:100%;height:50px;border-radius:12px;background:#1a4d1a;color:#fff;
                      font-size:14px;font-weight:700;font-family:inherit;border:none;
                      cursor:pointer;letter-spacing:.5px;text-transform:uppercase;
                      box-shadow:0 4px 12px rgba(26,77,26,.25)">
-        <span data-t="save_all_filled">Save All Filled Batches</span>
+        <span data-t="save_plot_audit">Save Plot Audit</span>
       </button>
     </div>
+
+    <!-- Legacy container — the old per-batch card list. Kept as an
+         empty hidden div so any stale JS that still writes into it
+         does not throw. -->
+    <div id="multi-batches" style="display:none"></div>
   </div>
 
   <!-- FORM VIEW -->
@@ -329,7 +408,7 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<script src="audit_height_script.js?v=20260826e"></script>
+<script src="audit_height_script.js?v=20260826f"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
