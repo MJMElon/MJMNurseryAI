@@ -240,6 +240,13 @@ BEGIN
     RAISE EXCEPTION 'PIN not recognised' USING ERRCODE = '28000';
   END IF;
 
+  -- Tidy this worker's dead sessions while we are here. Nothing reads an
+  -- expired row — worker_from_token refuses it — so keeping them is only a
+  -- table that grows and never shrinks. Scoped to this worker so the sweep
+  -- stays as small as the sign-in that triggered it.
+  DELETE FROM mjmnpayroll_worker_sessions
+   WHERE worker_id = w.id AND expires_at <= now();
+
   INSERT INTO mjmnpayroll_worker_sessions (worker_id)
   VALUES (w.id)
   RETURNING token INTO tok;
