@@ -47,17 +47,16 @@
   .list-head { display:flex; align-items:center; gap:11px; padding:15px 18px;
                border-bottom:1.5px solid #ede9fe; background:#faf5ff; }
   .list-title { font-size:15px; font-weight:900; color:#4c1d95; letter-spacing:.01em; }
-  .list-n { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
-            text-transform:uppercase; color:#8b5cf6; background:#ede9fe;
-            padding:3px 10px; border-radius:999px; }
-
   /* Five columns, the same grid for the header strip and every row. */
-  .th, .tr { display:grid; grid-template-columns:74px 92px 96px 158px 1fr 142px; gap:14px; }
+  /* Five columns now. Status went with the tabs — a row in the Solved tab
+     saying "Solved" was answering a question the tab had already answered —
+     and the width it held went to the four that were tightest. */
+  .th, .tr { display:grid; grid-template-columns:84px 104px 190px 1fr 150px; gap:17px; }
   /* align-items:center, or the two headings carrying a funnel sit a few
      pixels below the four that do not. */
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe;
         align-items:center; }
-  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; }
+  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#6d28d9; }
   .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
   .tr:last-child { border-bottom:none; }
   .tr:hover { background:#fdfcff; }
@@ -68,11 +67,6 @@
   /* Created date, leftmost. */
   .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
   .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
-
-  .st-word { font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
-             padding:4px 10px; border-radius:7px; }
-  .st-pending { background:#fef3c7; color:#a16207; }
-  .st-solved  { background:#dcfce7; color:#15803d; }
 
   /* ── Content is black ──
      The case number, the PIC block and the case details all read as
@@ -104,22 +98,29 @@
   /* The detail lines, one per row: a label on the left and its value on the
      right, so figures line up down the column instead of running together
      in a paragraph. */
-  .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; }
+  /* Capped: the column got wider when Status left, and a dotted rule
+     running 800px to meet a four-character value reads as an empty table. */
+  .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; max-width:560px; }
   .d-row { display:grid; grid-template-columns:112px 1fr; gap:8px; align-items:baseline;
            padding:2px 0; border-bottom:1px dotted #f1eafe; }
   .d-row:last-child { border-bottom:none; }
   .d-row.d-free { grid-template-columns:1fr; }
   .d-lab { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
            color:#8a93a3; overflow-wrap:anywhere; }
-  .d-val { font-size:12px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
-  .d-row.d-free .d-val { font-weight:600; color:#0f172a; }
+  /* One grey for everything under the title, whichever module wrote it.
+     The figures a raising module fills in were arriving black while the
+     prose beside them was grey, so two cases from two modules read as two
+     different kinds of thing. The title is the black line; this is all
+     supporting detail. */
+  .d-val { font-size:12px; font-weight:700; color:#8a93a3; overflow-wrap:anywhere; }
+  .d-row.d-free .d-val { font-weight:600; }
   /* Prose, not a figure: the heading sits on its own line and the sentence
      gets the whole width, instead of wrapping four words at a time beside a
      112px label. */
   .d-row.d-remark { grid-template-columns:1fr; gap:1px; }
   /* Prose in the same grey as its heading: it is context, and at full black
      it pulled the eye away from the figures above it. */
-  .d-row.d-remark .d-val { font-weight:600; line-height:1.45; color:#8a93a3; }
+  .d-row.d-remark .d-val { font-weight:600; line-height:1.45; }
   .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
   .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
   @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
@@ -200,23 +201,38 @@
      Pending / Solved / Closed. Three tabs rather than a status dropdown:
      they are the three states of a case anybody actually asks about, and a
      tab shows which one you are in without being opened. */
-  .stabs { display:flex; gap:2px; padding:10px 12px 0; flex-wrap:wrap;
-           border-bottom:1.5px solid #ede9fe; }
-  .stab { position:relative; padding:9px 14px 12px; border:none; background:none; cursor:pointer;
+  /* Drawn as tabs, not as three words with a line under one of them: each
+     has its own edge, and the open one loses its bottom edge so it reads as
+     the front of the panel below rather than a button above it. */
+  .stabs { display:flex; gap:5px; padding:11px 14px 0; flex-wrap:wrap;
+           background:#faf5ff; border-bottom:1.5px solid #ede9fe; }
+  .stab { position:relative; margin-bottom:-1.5px; padding:9px 16px 10px; cursor:pointer;
+          border:1.5px solid #e4dbfa; border-radius:11px 11px 0 0; background:#f2ecfd;
           font-family:inherit; font-size:11px; font-weight:900; letter-spacing:.06em;
-          text-transform:uppercase; color:#a3adbb; display:inline-flex; align-items:center; gap:7px; }
-  .stab:hover { color:#7c3aed; }
-  .stab.on { color:#4c1d95; }
-  .stab.on::after { content:''; position:absolute; left:12px; right:12px; bottom:-1.5px; height:3px;
-                    border-radius:3px 3px 0 0; background:#7c3aed; }
+          text-transform:uppercase; color:#8b83a6; display:inline-flex; align-items:center; gap:7px; }
+  .stab:hover { background:#e9e0fb; color:#6d28d9; }
+  /* Same fill as the heading strip below, so the two share one surface. */
+  .stab.on { background:#fdfcff; border-color:#ede9fe; border-bottom-color:#fdfcff;
+             color:#4c1d95; }
   .stab-n { font-size:9.5px; font-weight:900; letter-spacing:.03em; padding:2px 7px;
-            border-radius:999px; background:#f1f5f9; color:#8792a3; }
+            border-radius:999px; background:#e4dbfa; color:#7c6aa8; }
   .stab.on .stab-n { background:#ede9fe; color:#6d28d9; }
+
+  /* Only when something is narrowing the list, because it is the only place
+     left that says how many rows there are — the tab counts deliberately
+     ignore the column ticks. */
+  .narrowed { display:flex; align-items:center; gap:10px; padding:9px 18px;
+              background:#fdfcff; border-bottom:1.5px solid #f4f0ff;
+              font-size:11px; font-weight:800; color:#7c6aa8; }
+  .narrowed button { margin-left:auto; border:1.5px solid #ddd6fe; background:#fff; cursor:pointer;
+                     font-family:inherit; font-size:9.5px; font-weight:900; letter-spacing:.07em;
+                     text-transform:uppercase; color:#7c3aed; padding:5px 11px; border-radius:999px; }
+  .narrowed button:hover { background:#f5f3ff; }
 
   /* ── Search, in the list's own head ──────────────────────────
      The one filter that cannot live in a column, because it looks across
      all of them. Everything else moved into the headings. */
-  .srch { position:relative; flex:1; max-width:330px; min-width:110px; }
+  .srch { position:relative; flex:0 1 330px; min-width:110px; margin-left:auto; }
   .srch input { width:100%; box-sizing:border-box; font-family:inherit; font-size:12px;
                 font-weight:700; color:#1e293b; background:#fff; border:1.5px solid #e9d5ff;
                 border-radius:999px; padding:8px 28px 8px 31px; outline:none; }
@@ -233,7 +249,7 @@
      A funnel beside the heading of the column it narrows, so the filter is
      where the thing being filtered already is. */
   .th-f { display:inline-flex; align-items:center; gap:5px; }
-  .th-fb { border:none; background:none; cursor:pointer; padding:2px; line-height:0; color:#c4b5fd;
+  .th-fb { border:none; background:none; cursor:pointer; padding:2px; line-height:0; color:#a78bfa;
            border-radius:6px; display:inline-flex; align-items:center; gap:3px; }
   .th-fb:hover { color:#7c3aed; background:#f5f3ff; }
   .th-fb svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2;
@@ -270,10 +286,9 @@
   }
   /* All three tabs on one line at 390px, which is the phone this is read on. */
   @media (max-width:520px) {
-    .stabs { padding:8px 7px 0; gap:0; }
-    .stab { padding:8px 8px 11px; font-size:10px; gap:5px; letter-spacing:.03em; }
+    .stabs { padding:8px 6px 0; gap:3px; }
+    .stab { padding:8px 9px 9px; font-size:10px; gap:5px; letter-spacing:.03em; }
     .stab-n { padding:2px 6px; }
-    .stab.on::after { left:8px; right:8px; }
   }
 
   /* Stacked on a phone: the column headings mean nothing once the columns
@@ -423,14 +438,15 @@
        column's heading. -->
   <div class="list-box">
     <div class="list-head">
-      <span class="list-title">🗂️ Nursery Cases</span>
+      <span class="list-title">Nursery Cases</span>
+      <!-- Where the case count used to sit. The tabs carry the counts now,
+           so this corner was saying twice what they say once. -->
       <div class="srch">
         <svg class="srch-i" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>
         <input id="f-q" placeholder="Search title, batch, plot…" aria-label="Search cases">
         <button id="f-q-x" class="srch-x hidden" aria-label="Clear search">&times;</button>
       </div>
-      <span class="list-n" id="count">—</span>
     </div>
 
     <div class="stabs" id="stabs" role="tablist">
@@ -442,12 +458,14 @@
         <span class="stab-n" data-n="closed">0</span></button>
     </div>
 
+    <div class="narrowed hidden" id="narrowed">
+      <span id="narrowed-t"></span>
+      <button type="button" id="narrowed-x">Clear filters</button>
+    </div>
+
     <div class="th">
       <span>Created</span>
       <span>Case No</span>
-      <span class="th-f" data-col="status">Status<button class="th-fb" type="button"
-        title="Filter status" aria-label="Filter status"><svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3.5 5h17l-6.6 7.8v5.6l-3.8 2.1v-7.7z"/></svg></button></span>
       <span class="th-f" data-col="pic">PIC<button class="th-fb" type="button"
         title="Filter PIC" aria-label="Filter PIC"><svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3.5 5h17l-6.6 7.8v5.6l-3.8 2.1v-7.7z"/></svg></button></span>
@@ -817,14 +835,6 @@ function rowHtml(c) {
         <span class="case-no">${esc(c.case_no || '')}</span>
       </div>
 
-      <div class="td-stack">
-        <span class="cell-cap">Status</span>
-        <span class="st-word ${pending ? 'st-pending' : 'st-solved'}">${pending ? 'Pending' : 'Solved'}</span>
-        ${c.priority && c.priority !== 'normal'
-          ? `<span class="pill pi-${esc(c.priority)}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority)}</span>`
-          : ''}
-      </div>
-
       <!-- Who it is with now, not where it came from: a case raised in the FC
            Portal and routed to the auditors is the auditors' work. -->
       <div class="td-stack">
@@ -840,7 +850,9 @@ function rowHtml(c) {
       <div class="td-case">
         ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
         <div class="min-w-0 flex-1">
-          <div class="case-title">${esc(c.title)}</div>
+          <div class="case-title">${esc(c.title)}${c.priority && c.priority !== 'normal'
+            ? ` <span class="pill pi-${esc(c.priority)}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority)}</span>`
+            : ''}</div>
           <!-- No category line: the problem chosen when the case is raised
                becomes both its title and its category, so printing the
                category here was printing the title twice. -->
@@ -870,15 +882,16 @@ function rowHtml(c) {
           ? `<button class="act act-solve" title="Solve" aria-label="Solve"
            data-act="solve" data-id="${esc(c.id)}">&#x2713;</button>`
           : ''}
-        <!-- A solved case has nothing left to solve, so the tick is replaced
-             by the padlock for whoever may close it. Same sheet either way:
-             it restates the case and offers what is actually available. -->
-        ${!pending && rights.may_close
-          ? `<button class="act act-close" title="Close" aria-label="Close"
+        <!-- A solved case has nothing left to solve, so the tick becomes a
+             double tick — done, and accepted — for whoever may close it.
+             Same sheet either way: it restates the case and offers what is
+             actually available. A closed case shows neither: there is
+             nothing left to do to it. -->
+        ${c.status === 'resolved' && rights.may_close
+          ? `<button class="act act-close" title="Close case" aria-label="Close case"
            data-act="solve" data-id="${esc(c.id)}">
              <svg viewBox="0 0 24 24" aria-hidden="true">
-               <rect x="4" y="10.5" width="16" height="10" rx="2"/>
-               <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+               <path d="M1.8 12.6l4.2 4.2 7.4-8"/><path d="M9.6 16.8l1.4 1.4 8.8-9.6"/></svg>
            </button>`
           : ''}
         ${rights.may_delete ? `<button class="act act-del" title="Delete" aria-label="Delete"
@@ -906,16 +919,16 @@ let tab = 'pending';
    value off a case, how to name that value, and — where the values have a
    natural order rather than an alphabet — how to rank them. */
 const FGROUPS = [
-  { col:'status',  key:'priority', title:'Priority',
-    of: c => c.priority || 'normal',
-    label: v => MJMNelos.PRIORITY_LABEL[v] || v,
-    rank: v => ['urgent', 'high', 'normal', 'low'].indexOf(v) },
-
   { col:'pic', key:'system', title:'System',
     of: c => queueOf(c) || '', label: v => tierOf(v) || 'No system' },
   { col:'pic', key:'assignee', title:'Person',
     of: c => c.assignee_name || '', label: v => v || 'No PIC yet' },
 
+  /* Priority followed its pill here when the Status column went. */
+  { col:'details', key:'priority', title:'Priority',
+    of: c => c.priority || 'normal',
+    label: v => MJMNelos.PRIORITY_LABEL[v] || v,
+    rank: v => ['urgent', 'high', 'normal', 'low'].indexOf(v) },
   { col:'details', key:'nursery', title:'Nursery',
     of: c => c.nursery_name || '', label: v => v || 'No nursery' },
   { col:'details', key:'due', title:'Due',
@@ -1005,10 +1018,17 @@ function render() {
   syncTabs();
   syncFBtns();
 
-  const overdue = rows.filter(isOverdue).length;
-  $('count').textContent = rows.length
-    ? `${rows.length} case${rows.length === 1 ? '' : 's'}${overdue ? ` · ${overdue} overdue` : ''}`
-    : 'none';
+  /* The tab counts answer "how much is in each state" and deliberately do
+     not move when a funnel is touched. So when one has been, this says what
+     the list is actually showing, and offers the way back out. */
+  const inTab = allCases.filter(TABS[tab]).length;
+  const narrowed = rows.length !== inTab;
+  $('narrowed').classList.toggle('hidden', !narrowed);
+  if (narrowed) {
+    const overdue = rows.filter(isOverdue).length;
+    $('narrowed-t').textContent =
+      `Showing ${rows.length} of ${inTab}${overdue ? ` · ${overdue} overdue` : ''}`;
+  }
 
   renderPager(rows.length, pages, from, shown.length);
 
@@ -1262,6 +1282,13 @@ async function loadRights() {
     return;
   }
   rights = row;
+}
+
+/* What this person may press. The three tabs stay put whatever the ticks
+   say — everybody can look at what is pending, solved and closed; the ticks
+   decide what can be done to a case, not what can be seen. */
+function applyRights() {
+  $('new-case-btn').classList.toggle('hidden', !rights.may_create);
 }
 
 async function loadCases() {
@@ -1745,6 +1772,14 @@ $('f-q').addEventListener('input', () => {
   $('f-q-x').classList.toggle('hidden', !$('f-q').value);
   refilter();
 });
+$('narrowed-x').addEventListener('click', () => {
+  FGROUPS.forEach(g => picked[g.key].clear());
+  $('f-q').value = '';
+  $('f-q-x').classList.add('hidden');
+  closeFMenu();
+  refilter();
+});
+
 $('f-q-x').addEventListener('click', () => {
   $('f-q').value = '';
   $('f-q-x').classList.add('hidden');
@@ -1898,6 +1933,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && openFBtn) 
 
     // What this person may press, before the first render draws buttons.
     await loadRights();
+    applyRights();
 
     // Anything a schedule owes gets raised before the list is read, so a
     // case that came due overnight is on the screen rather than waiting for
