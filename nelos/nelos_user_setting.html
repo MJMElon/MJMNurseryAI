@@ -229,6 +229,12 @@
      every line at full strength: a card of four names should read as four
      names. Kept visible whenever the row has focus inside it, so it does
      not vanish from under the keyboard. */
+  /* An open card with nobody ticked for it is a dead end, and a picker
+     holding only "— empty —" does not say why. */
+  .slot-none { margin:2px 11px 8px; font-size:10.5px; font-weight:700; color:#b45309;
+               line-height:1.5; }
+  .slot-none strong { font-weight:900; }
+
   .grip { flex-shrink:0; width:13px; height:16px; opacity:0; cursor:grab;
           transition:opacity .15s; color:#c4b5fd; }
   .slot:hover .grip, .slot:focus-within .grip { opacity:1; }
@@ -456,6 +462,21 @@ const categoriesIn = key => categories.filter(c => c.module_key === key).map(c =
 const pickLabel = m => m.label + (m.sees_all_cases ? '  (HQ)' : '');
 const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
 const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
+/* Who may be given a number in a system: the people ticked for it on User
+   Access, plus whoever already holds a number there.
+
+   The picker used to offer everybody holding Nelos, which meant a card for
+   Audit listed the whole company and seating somebody there was a decision
+   that quietly contradicted their access — they would hold Audit's #1 and
+   still not be able to open a case in it. The tick is the qualification;
+   this is the list of people who have it.
+
+   A person's home queue counts as ticked. User Access shows it that way
+   too, fixed on and not editable there, since Case Handlers is what sets
+   it — so somebody seated in a system is never missing from its own list. */
+const eligibleFor = key => people.filter(p =>
+  p.primary_module === key || (p.access_modules || []).includes(key));
+
 /* Everyone tagged to a system, in number order — the shape the list uses. */
 const peopleIn = key => people
   .filter(p => p.primary_module === key)
@@ -508,10 +529,11 @@ function seatSlot(key, n) {
   const who = holder ? (holder.full_name || holder.email) : '';
 
   if (editing) {
-    // Whoever could go here: everybody holding Nelos. Somebody already in
-    // another system is offered too — choosing them moves them, which is
-    // the only way to move anybody.
-    const options = people.map(p => {
+    // Somebody whose home is another system is offered too, if they are
+    // ticked for this one — choosing them moves them, which is the only
+    // way to move anybody.
+    const can = eligibleFor(key);
+    const options = can.map(p => {
       const where = p.primary_module && p.primary_module !== key
         ? ` — now ${seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module)}`
         : '';
@@ -608,6 +630,9 @@ function renderPeople() {
                   >${editCard === m.key ? 'Done' : '&#x270E;'}</button>
         </div>
         <div class="slots">${slots.join('')}</div>
+        ${editCard === m.key && !eligibleFor(m.key).length ? `
+          <p class="slot-none">Nobody is ticked for ${esc(m.label)} yet, so there is
+             nobody to put here. Tick it for them on <strong>User Access</strong>.</p>` : ''}
         <button type="button" class="seat-add" data-more="${esc(m.key)}">+ add another person</button>
       </div>`;
   }).join('') + '</div>';

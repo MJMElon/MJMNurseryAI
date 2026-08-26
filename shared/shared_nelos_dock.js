@@ -587,40 +587,46 @@
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
-  .nd-list { overflow-y:auto; flex:1; padding:0 0 4px; -webkit-overflow-scrolling:touch; }
+  .nd-list { overflow-y:auto; flex:1; padding:0 10px 10px; background:#fbfaff;
+             -webkit-overflow-scrolling:touch; }
   .nd-list[hidden] { display:none; }
 
   /* the overdue block, pinned to the top of the scroll */
-  .nd-sec { padding:7px 14px 5px; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-            color:#94a3b8; background:#fff; }
-  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
-                 border-bottom:1px solid #fee2e2; padding:7px 14px; }
+  .nd-sec { padding:11px 4px 6px; font-size:9px; font-weight:900; letter-spacing:.1em;
+            text-transform:uppercase; color:#94a3b8; background:#fbfaff; }
+  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fbfaff;
+                 padding:11px 4px 6px; }
 
   /* A button, not a link: the case opens in this panel. The reset is
      what a <button> needs to keep looking like the row it replaced. */
-  /* The row is a container now, not a button: three buttons live inside
-     it, and a button cannot hold buttons. The reading half is the button. */
-  .nd-row { display:flex; align-items:stretch; padding:0 8px 0 0;
-            border-bottom:1px dashed #f1f5f9; color:inherit; }
-  .nd-row:last-child { border-bottom:none; }
-  .nd-row:hover { background:#faf5ff; }
-  .nd-row-over { background:#fffbfb; }
-  .nd-row-over:hover { background:#fef2f2; }
-  .nd-open { display:flex; align-items:flex-start; gap:8px; flex:1; min-width:0;
-             padding:10px 6px 10px 12px; text-align:left; background:none; border:none;
+  /* One card per case, so where one ends and the next begins is a border
+     rather than a judgement about spacing. The card is a container, not a
+     button: three buttons live inside it, and a button cannot hold
+     buttons — the reading part is the button. */
+  .nd-row { display:flex; flex-direction:column; margin-bottom:8px; color:inherit;
+            background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+            box-shadow:0 1px 2px rgba(76,29,149,.04); }
+  .nd-row:last-child { margin-bottom:0; }
+  .nd-row:hover { border-color:#c4b5fd; }
+  .nd-row-over { background:#fffbfb; border-color:#fecaca; }
+  .nd-row-over:hover { border-color:#fca5a5; }
+  .nd-open { display:flex; align-items:flex-start; gap:9px; min-width:0;
+             padding:11px 12px 8px; text-align:left; background:none; border:none;
              font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .nd-n { font-size:10px; font-weight:900; color:#c0c7d2; line-height:1.5; margin-top:1px;
+  .nd-n { font-size:10px; font-weight:900; color:#c0c7d2; line-height:1.6; margin-top:1px;
           min-width:13px; flex-shrink:0; font-variant-numeric:tabular-nums; }
   .nd-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
   .nd-p-urgent { background:#dc2626; } .nd-p-high { background:#f97316; }
   .nd-p-normal { background:#0ea5e9; } .nd-p-low  { background:#94a3b8; }
   .nd-main  { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
-  /* Case number, then the work it is about, on one line. */
+  /* The case number heads the card; the work it is about sits under it,
+     where it has the whole width and does not have to be cut short. */
   .nd-l1    { display:flex; align-items:center; gap:6px; min-width:0; }
-  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.04em; color:#7c3aed;
+  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.06em; color:#7c3aed;
               flex-shrink:0; font-variant-numeric:tabular-nums; }
   .nd-title { font-size:12.5px; font-weight:700; color:#1e293b; line-height:1.3;
-              white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+              overflow:hidden; }
   .nd-where { font-size:10.5px; font-weight:800; color:#64748b; line-height:1.35; }
   .nd-remark{ font-size:10px; font-weight:600; color:#a3adbb; line-height:1.4;
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -628,10 +634,12 @@
   .nd-shotpic { width:40px; height:40px; object-fit:cover; border-radius:8px; flex-shrink:0;
                 border:1px solid #ede9fe; margin-top:1px; }
 
-  /* Stacked, so three of them cost 26px of width rather than 90. */
-  .nd-acts { display:flex; flex-direction:column; justify-content:center; gap:4px;
-             padding:8px 0; flex-shrink:0; }
-  .nd-act { width:24px; height:22px; border-radius:6px; cursor:pointer; padding:0;
+  /* Side by side along the foot of the card, inside its border, where
+     three buttons read as three buttons rather than a column of marks
+     down the edge of the list. */
+  .nd-acts { display:flex; justify-content:flex-end; gap:6px;
+             padding:0 11px 9px; margin-top:-4px; }
+  .nd-act { width:30px; height:26px; border-radius:8px; cursor:pointer; padding:0;
             border:1px solid #e9e3fb; background:#fff; color:#7c3aed;
             font-family:inherit; font-size:11px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; }
@@ -644,9 +652,9 @@
   .nd-act-del:hover { background:#fef2f2; }
 
   /* Said once, at the top of the list, after a case is raised. */
-  .nd-flash { display:flex; align-items:center; gap:7px; padding:9px 14px;
-              background:#f0fdf4; border-bottom:1px solid #dcfce7;
-              font-size:11px; font-weight:800; color:#15803d; }
+  .nd-flash { display:flex; align-items:center; gap:7px; margin:10px 0 8px;
+              padding:9px 12px; background:#f0fdf4; border:1.5px solid #bbf7d0;
+              border-radius:11px; font-size:11px; font-weight:800; color:#15803d; }
   /* the due date and the owner read as one thing each, so they wrap
      whole rather than splitting across two lines */
   .nd-nw    { white-space:nowrap; }
@@ -886,8 +894,8 @@
                    '<span class="nd-no">' + esc(c.case_no || '') + '</span>' +
                    '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
                          'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
-                   '<span class="nd-title">' + esc(c.title) + '</span>' +
                  '</span>' +
+                 '<span class="nd-title">' + esc(c.title) + '</span>' +
                  (where  ? '<span class="nd-where">' + esc(where) + '</span>' : '') +
                  (remark ? '<span class="nd-remark">' + esc(remark) + '</span>' : '') +
                  (c.due_date ? '<span class="nd-due">' + dueText(c.due_date) + '</span>' : '') +
