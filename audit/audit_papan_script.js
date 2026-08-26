@@ -181,8 +181,9 @@ function setView(v){
 /* Outer top-bar back is context-aware: from a form → list; from list
    → audit_home (the anchor's own href takes over when we return true). */
 function goBack(e){
-  if(activeView==='batch-form'){ if(e)e.preventDefault(); setView('list');selectTab('batch'); return false; }
-  if(activeView==='audit-form'){ if(e)e.preventDefault(); setView('list');selectTab('audit'); return false; }
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
   return true;
 }
 window.goBack=goBack;

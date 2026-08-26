@@ -204,7 +204,9 @@ function setView(v){
   window.scrollTo(0,0);
 }
 function goBack(e){
-  if(activeView==='form'){ if(e)e.preventDefault(); cancelForm(); return false; }
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
   return true;
 }
 window.goBack=goBack;
