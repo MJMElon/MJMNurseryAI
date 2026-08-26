@@ -538,6 +538,14 @@ GRANT EXECUTE ON FUNCTION public.worker_my_records(UUID, INT)            TO anon
 GRANT EXECUTE ON FUNCTION public.worker_roster(UUID)                     TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_set_portal(UUID, BIGINT, JSONB)  TO anon, authenticated;
 
+-- The phone does not call Postgres, it calls PostgREST, which answers from a
+-- cached picture of the schema. A function this file has just created is not
+-- in that picture until it is rebuilt, and until then the portal is told
+-- "Could not find the function public.worker_signin(p_pin) in the schema
+-- cache" — which reads like the file was never run. Ask for the rebuild here
+-- so running the file is the whole of the job.
+NOTIFY pgrst, 'reload schema';
+
 
 -- ── 11. The first supervisor ────────────────────────────────────────────
 --
