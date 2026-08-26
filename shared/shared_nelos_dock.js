@@ -245,11 +245,19 @@
      time a database says it has never heard of those columns. A portal
      that has not run the migrations yet still gets its To-Do list; it
      simply does not get queue routing until the SQL is run. */
-  var BASE_COLS   = 'id,case_no,title,category,priority,status,source_module,nursery_name,' +
-                    'plot_name,batch_name,assignee_id,assignee_name,due_date,created_at,' +
-                    'resolution,resolved_by,resolved_at';
+  var BASE_COLS   = 'id,case_no,title,description,category,priority,status,source_module,' +
+                    'nursery_name,plot_name,batch_name,assignee_id,assignee_name,due_date,' +
+                    'created_at,resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
-  var _cols = ROUTED_COLS;      // narrowed to BASE_COLS on the first 400
+  var FULL_COLS   = ROUTED_COLS + ',photo_url';
+
+  /* Asked for in this order, dropping to the next on a 400 — two different
+     migrations add the columns above the base set, and a database may have
+     run either, both or neither. Once dropped it stays dropped for the
+     session; there is no point asking again every thirty seconds. */
+  var COL_TIERS = [FULL_COLS, ROUTED_COLS, BASE_COLS];
+  var _tier = 0;
+  var _cols = COL_TIERS[0];
 
   var PRIORITY_RANK  = { urgent: 0, high: 1, normal: 2, low: 3 };
   var PRIORITY_LABEL = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
@@ -292,6 +300,33 @@
 
   var _scope = null;
   var _perms = undefined;                 // undefined = not asked yet
+
+  /* What this person may press, from the same RPC the Nelos page reads.
+     The fallback is the same too: on a database with no nelos_my_rights()
+     everybody solves and nobody edits or deletes, which is what the whole
+     system did before migration_nelos_case_tools.sql. Solving is the
+     dock's own job — this IS the list of what is yours to do — so it is
+     the one that defaults on. */
+  var rights = { may_solve: true, may_edit: false, may_delete: false };
+
+  async function loadRights(token) {
+    try {
+      var r = await fetch(CFG.url + '/rest/v1/rpc/nelos_my_rights', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(token)),
+        body: '{}'
+      });
+      if (!r.ok) return;
+      var rows = await r.json();
+      var row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row) return;
+      rights = {
+        may_solve:  row.may_solve  !== false,
+        may_edit:   row.may_edit   === true || row.is_admin === true,
+        may_delete: row.may_delete === true || row.is_admin === true
+      };
+    } catch (_) { /* keep the fallback */ }
+  }
 
   /* This person's permissions object, read once. Both the admin test and
      the "may they see the dock at all" gate want the same row, and the
@@ -456,13 +491,18 @@
     try {
       var res = await query(_cols);
 
-      // 400 with the routed columns = this database has not run the
-      // routing/seat migrations. Ask again for what it does have, once,
-      // and stay on the base set from here on.
-      if (res.status === 400 && _cols === ROUTED_COLS) {
-        _cols = BASE_COLS;
-        warn('nelos_cases has no routing columns yet — run shared/migration_nelos_routing.sql ' +
-             'and shared/migration_nelos_seats.sql for queue routing. Showing the list without it.');
+      /* A 400 means this database has not heard of a column in the set
+         just asked for. Step down a tier and ask again — a portal that has
+         not run the migrations still gets its To-Do list, it simply does
+         not get the photo or the queue routing until the SQL is run. */
+      while (res.status === 400 && _tier < COL_TIERS.length - 1) {
+        _tier++;
+        _cols = COL_TIERS[_tier];
+        warn('nelos_cases is missing columns from a migration — falling back. ' +
+             (_tier === 1
+               ? 'No photo_url: run shared/migration_nelos_case_tools.sql.'
+               : 'No routing columns: run shared/migration_nelos_routing.sql and ' +
+                 'shared/migration_nelos_seats.sql.'));
         res = await query(_cols);
       }
 
@@ -547,36 +587,74 @@
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
-  .nd-list { overflow-y:auto; flex:1; padding:0 0 4px; -webkit-overflow-scrolling:touch; }
+  .nd-list { overflow-y:auto; flex:1; padding:0 10px 10px; background:#fbfaff;
+             -webkit-overflow-scrolling:touch; }
   .nd-list[hidden] { display:none; }
 
   /* the overdue block, pinned to the top of the scroll */
-  .nd-sec { padding:7px 14px 5px; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-            color:#94a3b8; background:#fff; }
-  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
-                 border-bottom:1px solid #fee2e2; padding:7px 14px; }
+  .nd-sec { padding:11px 4px 6px; font-size:9px; font-weight:900; letter-spacing:.1em;
+            text-transform:uppercase; color:#94a3b8; background:#fbfaff; }
+  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fbfaff;
+                 padding:11px 4px 6px; }
 
   /* A button, not a link: the case opens in this panel. The reset is
      what a <button> needs to keep looking like the row it replaced. */
-  .nd-row { display:flex; align-items:flex-start; gap:9px; padding:10px 14px;
-            border-bottom:1px dashed #f1f5f9; text-decoration:none; color:inherit;
-            width:100%; text-align:left; background:none; border-left:none;
-            border-right:none; border-top:none; font-family:inherit;
-            cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .nd-row:last-child { border-bottom:none; }
-  .nd-row:hover { background:#faf5ff; }
-  .nd-row-over { background:#fffbfb; }
-  .nd-row-over:hover { background:#fef2f2; }
-  .nd-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  /* One card per case, so where one ends and the next begins is a border
+     rather than a judgement about spacing. The card is a container, not a
+     button: three buttons live inside it, and a button cannot hold
+     buttons — the reading part is the button. */
+  .nd-row { display:flex; flex-direction:column; margin-bottom:8px; color:inherit;
+            background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+            box-shadow:0 1px 2px rgba(76,29,149,.04); }
+  .nd-row:last-child { margin-bottom:0; }
+  .nd-row:hover { border-color:#c4b5fd; }
+  .nd-row-over { background:#fffbfb; border-color:#fecaca; }
+  .nd-row-over:hover { border-color:#fca5a5; }
+  .nd-open { display:flex; align-items:flex-start; gap:9px; min-width:0;
+             padding:11px 12px 8px; text-align:left; background:none; border:none;
+             font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .nd-n { font-size:10px; font-weight:900; color:#c0c7d2; line-height:1.6; margin-top:1px;
+          min-width:13px; flex-shrink:0; font-variant-numeric:tabular-nums; }
+  .nd-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
   .nd-p-urgent { background:#dc2626; } .nd-p-high { background:#f97316; }
   .nd-p-normal { background:#0ea5e9; } .nd-p-low  { background:#94a3b8; }
-  .nd-main  { min-width:0; flex:1; }
-  .nd-title { font-size:12.5px; font-weight:700; color:#1e293b; line-height:1.35;
+  .nd-main  { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
+  /* The case number heads the card; the work it is about sits under it,
+     where it has the whole width and does not have to be cut short. */
+  .nd-l1    { display:flex; align-items:center; gap:6px; min-width:0; }
+  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.06em; color:#7c3aed;
+              flex-shrink:0; font-variant-numeric:tabular-nums; }
+  .nd-title { font-size:12.5px; font-weight:700; color:#1e293b; line-height:1.3;
+              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+              overflow:hidden; }
+  .nd-where { font-size:10.5px; font-weight:800; color:#64748b; line-height:1.35; }
+  .nd-remark{ font-size:10px; font-weight:600; color:#a3adbb; line-height:1.4;
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .nd-meta  { font-size:9.5px; font-weight:600; color:#94a3b8; margin-top:3px; line-height:1.5; }
-  .nd-chip  { display:inline-block; font-size:8.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-              padding:1px 6px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-right:5px;
-              max-width:100%; vertical-align:middle; }
+  .nd-due   { font-size:9.5px; font-weight:700; color:#94a3b8; line-height:1.5; margin-top:1px; }
+  .nd-shotpic { width:40px; height:40px; object-fit:cover; border-radius:8px; flex-shrink:0;
+                border:1px solid #ede9fe; margin-top:1px; }
+
+  /* Side by side along the foot of the card, inside its border, where
+     three buttons read as three buttons rather than a column of marks
+     down the edge of the list. */
+  .nd-acts { display:flex; justify-content:flex-end; gap:6px;
+             padding:0 11px 9px; margin-top:-4px; }
+  .nd-act { width:30px; height:26px; border-radius:8px; cursor:pointer; padding:0;
+            border:1px solid #e9e3fb; background:#fff; color:#7c3aed;
+            font-family:inherit; font-size:11px; font-weight:900; line-height:1;
+            display:flex; align-items:center; justify-content:center; }
+  .nd-act svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2;
+                stroke-linecap:round; stroke-linejoin:round; }
+  .nd-act-solve { border-color:#bbf7d0; color:#15803d; }
+  .nd-act-solve:hover { background:#f0fdf4; }
+  .nd-act-edit:hover  { background:#f5f3ff; }
+  .nd-act-del { border-color:#fecaca; color:#dc2626; }
+  .nd-act-del:hover { background:#fef2f2; }
+
+  /* Said once, at the top of the list, after a case is raised. */
+  .nd-flash { display:flex; align-items:center; gap:7px; margin:10px 0 8px;
+              padding:9px 12px; background:#f0fdf4; border:1.5px solid #bbf7d0;
+              border-radius:11px; font-size:11px; font-weight:800; color:#15803d; }
   /* the due date and the owner read as one thing each, so they wrap
      whole rather than splitting across two lines */
   .nd-nw    { white-space:nowrap; }
@@ -620,11 +698,6 @@
   .nd-err { font-size:10.5px; font-weight:800; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca;
             border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.5; }
   .nd-err[hidden] { display:none; }
-  .nd-done { text-align:center; padding:30px 18px; }
-  .nd-done-t { font-size:13px; font-weight:900; color:#15803d; margin-bottom:4px; }
-  .nd-done-s { font-size:11px; font-weight:700; color:#94a3b8; line-height:1.6; }
-  .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
-  .nd-done a:hover { text-decoration:underline; }
 
   /* margin-left:auto here and nowhere else. With it on Minimise too, the
      two autos SPLIT the free space and the history button drifted into the
@@ -740,6 +813,7 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   };
 
+  var isPending = function (c) { return c.status === 'open' || c.status === 'in_progress'; };
   var todayISO = function () { return new Date().toISOString().slice(0, 10); };
   var isOverdue = function (c) { return !!c.due_date && c.due_date < todayISO(); };
 
@@ -768,33 +842,86 @@
   function caseHref(id) { return ROOT + 'nelos/nelos_case.html?id=' + encodeURIComponent(id); }
   function homeHref()   { return ROOT + 'nelos/nelos_dashboard.html'; }
 
-  function rowHtml(c) {
-    var subject = [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
-      .filter(Boolean).join(' · ');
-    var bits = [
-      esc(c.case_no || ''),
-      subject && esc(subject),
-      c.assignee_name ? '<span class="nd-nw">→ ' + esc(c.assignee_name) + '</span>'
-                      : '<em>unassigned</em>',
-      dueText(c.due_date)
-    ].filter(Boolean);
-    return '<button type="button" class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') +
+  /* Where the case is, as one phrase — "BNN (B04)". Same shape the Nelos
+     page uses, so a case reads the same in both places. */
+  function whereText(c) {
+    if (c.nursery_name && c.plot_name) return c.nursery_name + ' (' + c.plot_name + ')';
+    return c.nursery_name || c.plot_name || '';
+  }
+
+  /* The first line of prose out of the description. A raising module writes
+     its figures as "Label: value" lines; those belong on the case page, not
+     on a row three lines tall, so only the free text is shown here. */
+  function remarkText(c) {
+    var lines = String(c.description || '').split(/\r?\n/);
+    var free = [];
+    for (var i = 0; i < lines.length; i++) {
+      var t = lines[i].trim();
+      if (t && !/^[^:：]{1,40}\s*[:：]\s*.+$/.test(t)) free.push(t);
+    }
+    return free.join(' ');
+  }
+
+  /* One row: its number, then the case; the photo beside it; the buttons
+     last. The reading half is a button of its own — the whole thing cannot
+     be one, because three more buttons live inside it. */
+  function rowHtml(c, n) {
+    var where  = whereText(c);
+    var remark = remarkText(c);
+    /* Drawn rather than typed: &#x270E; picks up the emoji face in some
+       Android fonts and arrives as a paperclip. */
+    var acts = '';
+    if (rights.may_solve && isPending(c))
+      acts += '<button type="button" class="nd-act nd-act-solve" data-act="solve" ' +
+              'title="Solve" aria-label="Solve">' +
+              '<svg viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></svg></button>';
+    if (rights.may_edit)
+      acts += '<button type="button" class="nd-act nd-act-edit" data-act="edit" ' +
+              'title="Edit" aria-label="Edit">' +
+              '<svg viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/>' +
+              '<path d="M14.5 6.5l3 3"/></svg></button>';
+    if (rights.may_delete)
+      acts += '<button type="button" class="nd-act nd-act-del" data-act="del" ' +
+              'title="Delete" aria-label="Delete">' +
+              '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+
+    return '<div class="nd-row' + (isOverdue(c) ? ' nd-row-over' : '') +
            '" data-case="' + esc(c.id) + '">' +
-             '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
-                   'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
-             '<span class="nd-main">' +
-               '<span class="nd-title">' + esc(c.title) + '</span>' +
-               '<span class="nd-meta">' +
-                 '<span class="nd-chip">' + esc(SOURCE_LABEL[c.source_module] || c.source_module || '') + '</span>' +
-                 bits.join(' · ') +
+             '<button type="button" class="nd-open">' +
+               '<span class="nd-n">' + n + '</span>' +
+               '<span class="nd-main">' +
+                 '<span class="nd-l1">' +
+                   '<span class="nd-no">' + esc(c.case_no || '') + '</span>' +
+                   '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
+                         'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
+                 '</span>' +
+                 '<span class="nd-title">' + esc(c.title) + '</span>' +
+                 (where  ? '<span class="nd-where">' + esc(where) + '</span>' : '') +
+                 (remark ? '<span class="nd-remark">' + esc(remark) + '</span>' : '') +
+                 (c.due_date ? '<span class="nd-due">' + dueText(c.due_date) + '</span>' : '') +
                '</span>' +
-             '</span>' +
-           '</button>';
+               (c.photo_url
+                 ? '<img class="nd-shotpic" src="' + esc(c.photo_url) + '" alt="" loading="lazy">'
+                 : '') +
+             '</button>' +
+             (acts ? '<span class="nd-acts">' + acts + '</span>' : '') +
+           '</div>';
   }
 
   var dock, fab, badge, panel, listEl, formEl, detailEl, grip;
   var rows = [], open = false;
-  var view = 'list';           // 'list' | 'form' | 'done'
+  var view = 'list';           // 'list' | 'form' | 'detail' | 'done-list'
+  var flash = null;            // the one-line note at the top of the list
+  var flashTimer = null;
+
+  function setFlash(msg) {
+    flash = msg || null;
+    clearTimeout(flashTimer);
+    if (flash) flashTimer = setTimeout(function () {
+      flash = null;
+      if (view === 'list') paint();
+    }, 6000);
+  }
 
   function build() {
     var style = document.createElement('style');
@@ -948,7 +1075,9 @@
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
     try { localStorage.setItem(LS_OPEN, open ? '1' : '0'); } catch (_) {}
     if (open) {
-      if (view === 'done') { rebuildForm(); showList(); }
+      /* Reopening lands on the list, not on a half-filled form somebody
+         walked away from — except when they minimised mid-edit and came
+         straight back, which the form pane keeps. */
       applyPos(pos);
       refresh();
     }
@@ -1151,8 +1280,10 @@
     badge.className = (rows.length ? '' : 'zero') + (rows.length && hot ? ' hot' : '');
 
     if (!rows.length) {
-      listEl.innerHTML = '<div class="nd-empty">Nothing pending for you ✓<br>' +
-                         'Open Nelos to see every case.</div>';
+      listEl.innerHTML =
+        (flash ? '<div class="nd-flash">&#10003; ' + esc(flash) + '</div>' : '') +
+        '<div class="nd-empty">Nothing pending for you ✓<br>' +
+        'Open Nelos to see every case.</div>';
       return;
     }
 
@@ -1160,15 +1291,25 @@
     var groups = [over.length, restM.length, restO.length].filter(Boolean).length;
     var head = function (cls, text) { return groups > 1 ? '<div class="nd-sec ' + cls + '">' + text + '</div>' : ''; };
 
-    var html = '';
+    /* Numbered straight down the list rather than restarting per group:
+       the number is "how many are on my plate, and which one is this",
+       and three counts starting at 1 would answer neither. */
+    var seq = 0;
+    var numbered = function (list) {
+      return list.map(function (c) { return rowHtml(c, ++seq); }).join('');
+    };
+
+    var html = flash
+      ? '<div class="nd-flash">&#10003; ' + esc(flash) + '</div>'
+      : '';
     if (over.length) {
       // Overdue rides at the top of the scroll and stays there. It is
       // sticky rather than merely first, so scrolling never buries it.
       html += '<div class="nd-sec nd-sec-over">⏰ Overdue · ' + over.length + '</div>' +
-              over.map(rowHtml).join('');
+              numbered(over);
     }
-    if (restM.length) html += head('', 'Assigned to me · ' + restM.length) + restM.map(rowHtml).join('');
-    if (restO.length) html += head('', 'Other pending cases · ' + restO.length) + restO.map(rowHtml).join('');
+    if (restM.length) html += head('', 'Assigned to me · ' + restM.length) + numbered(restM);
+    if (restO.length) html += head('', 'Other pending cases · ' + restO.length) + numbered(restO);
     listEl.innerHTML = html;
   }
 
@@ -1345,6 +1486,7 @@
 
   function showList() {
     view = 'list';
+    editing = null;
     showPane('list');
     panel.querySelector('.nd-head-t').textContent = 'Nelos To Do List';
     panel.querySelector('.nd-hist').classList.remove('on');
@@ -1581,18 +1723,66 @@
     if (view !== 'done-list') return;
     doneRows = out.error ? [] : out.rows;
     listEl.innerHTML = doneRows.length
-      ? doneRows.map(rowHtml).join('')
+      ? doneRows.map(function (c, i) { return rowHtml(c, i + 1); }).join('')
       : '<div class="nd-empty">' + (out.error
           ? 'Could not read the solved cases.'
           : 'Nothing solved and waiting to be closed.') + '</div>';
   }
 
+  function findCase(id) {
+    var all = rows.concat(doneRows || []);
+    for (var i = 0; i < all.length; i++) if (String(all[i].id) === String(id)) return all[i];
+    return null;
+  }
+
+  /* Solve opens the case, because solving wants the case in front of you —
+     the detail pane already carries the block that does it. Edit and
+     delete act on the row where they were pressed. */
+  function rowAction(act, id) {
+    var c = findCase(id);
+    if (act === 'solve') { _cameFromHistory = (view === 'done-list'); return showDetail(id); }
+    if (act === 'edit')  { return c ? showForm(c) : showDetail(id); }
+    if (act === 'del')   { return deleteCase(c || { id: id }); }
+  }
+
+  async function deleteCase(c) {
+    var what = c.case_no || 'this case';
+    if (!window.confirm('Delete ' + what + '? This cannot be undone.')) return;
+    var token = await accessToken();
+    if (!token) return;
+    try {
+      var r = await fetch(CFG.url + '/rest/v1/nelos_cases?id=eq.' + encodeURIComponent(c.id), {
+        method: 'DELETE', headers: authHeaders(token)
+      });
+      if (!r.ok) { setFlash('Could not delete ' + what + '.'); paint(); return; }
+      setFlash(what + ' deleted');
+      refresh();
+    } catch (_) {
+      setFlash('Could not delete ' + what + '.');
+      paint();
+    }
+  }
+
   function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
 
-  async function showForm() {
+  /* The case being edited, or null for a new one. The form is the same
+     either way — the same questions, in the same order — so there is one
+     form and one submit, branching only where it must. */
+  var editing = null;
+
+  async function showForm(c) {
+    /* Always from blank markup. Whatever the last pass was — a new case
+       abandoned, another case edited, a photo picked and not sent — its
+       answers are still sitting in these fields, and none of them belong
+       to this one. */
+    rebuildForm();
+    editing = c || null;
     view = 'form';
     showPane('form');
-    panel.querySelector('.nd-head-t').textContent = 'Add New Case';
+    panel.querySelector('.nd-head-t').textContent =
+      editing ? ('Edit ' + (editing.case_no || 'Case')) : 'Add New Case';
+    panel.querySelector('.nd-save').textContent =
+      editing ? 'Save Changes' : 'Create New Case';
     formError('');
     // The date, said rather than asked.
     formEl.querySelector('.nd-today').textContent =
@@ -1615,6 +1805,36 @@
     if (to.options.length <= 1) {
       to.innerHTML = opt('', '— choose —') +
         all[0].map(function (m) { return opt(m.key, m.label); }).join('');
+    }
+
+    /* Filled in after the three reads, because the lists have to exist
+       before a value can be chosen from them. Each dependent list is
+       rebuilt by the same handler a person's click would fire, so an
+       edited case goes through exactly the path a new one does. */
+    if (editing) {
+      to.value = editing.assigned_module || editing.source_module || '';
+      onAssignTo();
+
+      /* The work list holds this system's set titles. A case raised before
+         that list changed — or from a surface that types its own title —
+         has one that is not on it, and forcing it into the dropdown would
+         silently rename the case on save. When it does not match, the
+         typed line takes over carrying the title it actually has. */
+      var work  = formEl.querySelector('#nd-f-work');
+      var typed = formEl.querySelector('#nd-f-title');
+      if (!work.hidden) work.value = editing.category || editing.title || '';
+      if (work.hidden || !work.value) {
+        work.hidden = true;
+        typed.hidden = false;
+        typed.disabled = false;
+        typed.value = editing.title || '';
+      }
+      formEl.querySelector('#nd-f-pic').value = editing.assignee_id || '';
+      formEl.querySelector('#nd-f-nursery').value = editing.nursery_name || '';
+      onNursery();
+      formEl.querySelector('#nd-f-plot').value = editing.plot_name || '';
+      formEl.querySelector('#nd-f-desc').value = editing.description || '';
+      return;
     }
     setTimeout(function () { to.focus(); }, 60);
   }
@@ -1699,26 +1919,8 @@
     return CFG.url + '/storage/v1/object/public/nelos-photos/' + path;
   }
 
-  function showDone(c) {
-    view = 'done';
-    showPane('form');
-    /* The done card sits in the form pane but is finished with, so it
-       takes the LIST footer — the way on is a new case or the list. */
-    panel.querySelector('.nd-foot-form').hidden = true;
-    panel.querySelector('.nd-foot-list').hidden = false;
-    formEl.innerHTML =
-      '<div class="nd-done">' +
-        '<div class="nd-done-t">✓ ' + esc(c.case_no || 'Case') + ' raised</div>' +
-        '<div class="nd-done-s">' + esc(c.title || '') + '<br>' +
-          '<a href="' + esc(caseHref(c.id)) + '">Open the case →</a>' +
-        '</div>' +
-      '</div>';
-    // Back to the list on its own, so the dock is ready for the next
-    // thought rather than parked on a receipt.
-    setTimeout(function () { if (view === 'done') { rebuildForm(); showList(); } }, 4000);
-  }
-
-  /* showDone() eats the form markup, so put it back before it is needed. */
+  /* An edit rebuilds the form's markup wholesale, so put it back rather
+     than trusting whatever the last pass left behind. */
   var FORM_HTML = null;
   function rebuildForm() {
     if (FORM_HTML === null) return;
@@ -1727,25 +1929,35 @@
   }
 
   async function submitCase() {
+    var was = editing;                       // captured: showList() clears it
     var assignTo = formEl.querySelector('#nd-f-to').value;
-    var works    = worksFor(assignTo);
     /* The chosen work IS the case's title — that is what "choose work"
        means. A system with no case titles set up yet falls back to a typed
-       line, so an empty nelos_categories cannot make this form unusable. */
-    var title = (works.length ? formEl.querySelector('#nd-f-work').value
-                              : formEl.querySelector('#nd-f-title').value.trim());
+       line, so an empty nelos_categories cannot make this form unusable.
+
+       Which of the two is read comes from which is on SCREEN, not from
+       whether the system has works: an edited case whose title is not one
+       of them is shown on the typed line even where a dropdown exists, and
+       reading the dropdown there would save an empty title. */
+    var workSel  = formEl.querySelector('#nd-f-work');
+    var typedEl  = formEl.querySelector('#nd-f-title');
+    var fromList = !workSel.hidden;
+    var title    = fromList ? workSel.value : typedEl.value.trim();
 
     if (!assignTo) return formError('Choose who this is for.');
     if (!title) {
-      if (works.length) return formError('Choose the work.');
+      if (fromList) return formError('Choose the work.');
       formError('Say what the case is.');
-      formEl.querySelector('#nd-f-title').focus();
+      typedEl.focus();
       return;
     }
 
     var btn = panel.querySelector('.nd-save');
-    var reset = function () { btn.disabled = false; btn.textContent = 'Create New Case'; };
-    btn.disabled = true; btn.textContent = 'Creating…';
+    var reset = function () {
+      btn.disabled = false;
+      btn.textContent = was ? 'Save Changes' : 'Create New Case';
+    };
+    btn.disabled = true; btn.textContent = was ? 'Saving…' : 'Creating…';
     formError('');
 
     var token = await accessToken();
@@ -1769,7 +1981,10 @@
     var row = {
       title:           title.slice(0, 300),
       description:     formEl.querySelector('#nd-f-desc').value.trim() || null,
-      category:        works.length ? title : null,
+      /* Chosen from the list, the work name IS the category. Typed, there
+         is none to record — except on an edit, where the case already has
+         one and a typo fixed in the remark must not throw it away. */
+      category:        fromList ? title : (was ? was.category : null),
       priority:        priority(),
       status:          'open',
       source_module:   sourceModule(),
@@ -1791,12 +2006,28 @@
     // the insert.
     if (photoUrl) row.photo_url = photoUrl;
 
+    /* An edit changes what the case IS, never what it has become. Status,
+       who raised it and where from are its history; a person fixing a typo
+       in the remark must not reopen a case or take authorship of it. And
+       no photo picked means the one already attached stays. */
+    if (was) {
+      delete row.status;
+      delete row.source_module;
+      delete row.source_ref;
+      delete row.raised_by;
+      delete row.raised_by_id;
+      if (!photoUrl) delete row.photo_url;
+      row.updated_by = u.name;
+      row.updated_at = new Date().toISOString();
+    }
+
     try {
-      var res = await fetch(CFG.url + '/rest/v1/nelos_cases', {
-        method: 'POST',
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases' +
+                            (was ? '?id=eq.' + encodeURIComponent(was.id) : ''), {
+        method: was ? 'PATCH' : 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
                                authHeaders(token)),
-        body: JSON.stringify([row])
+        body: JSON.stringify(was ? row : [row])
       });
       if (!res.ok) {
         var detail = '';
@@ -1808,8 +2039,9 @@
 
       // The opening detail also lands in the thread, so the case page
       // reads as one conversation from the first line. Best effort: the
-      // case exists either way.
-      if (made && row.description) {
+      // case exists either way. Only on the way in: an edit is not a new
+      // remark in the conversation.
+      if (!was && made && row.description) {
         fetch(CFG.url + '/rest/v1/nelos_case_comments', {
           method: 'POST',
           headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(token)),
@@ -1820,12 +2052,21 @@
         }).catch(function () {});
       }
 
-      btn.disabled = false; btn.textContent = 'Raise Case';
-      showDone(made || { title: title });
+      reset();
+      /* Straight back to the list rather than a receipt card. The case
+         that was just raised is in it — that is the receipt, and it is
+         the thing the person wants to see next anyway. */
+      // On an edit the case number is already known; the row that came
+      // back is only a confirmation of it.
+      var no = was ? (was.case_no || (made && made.case_no))
+                   : ((made && made.case_no) || null);
+      setFlash(no ? (no + (was ? ' saved' : ' raised')) : (was ? 'Case saved' : 'Case raised'));
+      showList();
       refresh();
     } catch (err) {
       reset();
-      formError('Could not raise it — ' + (err && err.message ? err.message : 'try again') + '.');
+      formError('Could not ' + (was ? 'save' : 'raise') + ' it — ' +
+                (err && err.message ? err.message : 'try again') + '.');
     }
   }
 
@@ -1877,10 +2118,7 @@
   function wireForm() {
     FORM_HTML = formEl.innerHTML;
     wireFormFields();
-    panel.querySelector('.nd-new').addEventListener('click', function () {
-      if (view === 'done') rebuildForm();
-      showForm();
-    });
+    panel.querySelector('.nd-new').addEventListener('click', function () { showForm(); });
     panel.querySelector('.nd-cancel').addEventListener('click', function () { showList(); });
     panel.querySelector('.nd-back').addEventListener('click', function () {
       /* Back from a case reached through history goes back to history,
@@ -1919,6 +2157,8 @@
     listEl.addEventListener('click', function (e) {
       var row = e.target.closest('.nd-row');
       if (!row || !row.dataset.case) return;
+      var act = e.target.closest('[data-act]');
+      if (act) return rowAction(act.dataset.act, row.dataset.case);
       _cameFromHistory = (view === 'done-list');
       showDetail(row.dataset.case);
     });
@@ -2000,8 +2240,13 @@
 
     /* Before anything is drawn: no Nelos, no circle. Checked here rather
        than inside refresh() so nothing flashes on screen first. */
-    if (!await hasNelos(await accessToken())) return;
+    var token = await accessToken();
+    if (!await hasNelos(token)) return;
     _booted = true;
+
+    // Which buttons the rows carry. Read before the first paint, so no row
+    // is ever drawn with a button this person may not press.
+    await loadRights(token);
 
     build();
 

@@ -21,6 +21,8 @@
 --   worker_plot_batches(token)             → what is standing in them
 --   worker_submit_maint(token, payload)    → record a job
 --   worker_my_records(token, limit)        → this worker's own recent jobs
+--   worker_maint_records(token, limit)     → every record in the boundary
+--   worker_schedules(token)                → the office plan for those nurseries
 --   worker_roster(token)                   → Settings: every worker, no PINs
 --   worker_set_portal(token, id, portal)   → Settings: save one worker's access
 --
@@ -454,6 +456,97 @@ END;
 $$;
 
 
+-- The verify columns this reads. Normally added by
+-- shared/add_maint_field_verify.sql; repeated here so running the files in
+-- either order leaves a working portal.
+ALTER TABLE nops_maint_field_records
+  ADD COLUMN IF NOT EXISTS worked_by   TEXT,
+  ADD COLUMN IF NOT EXISTS verified_by TEXT,
+  ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+
+
+-- ── 8b. What the maintenance board needs ────────────────────────────────
+--
+-- The worker portal shows the same Maintenance board as the FC Portal: this
+-- week's outstanding plots, the month's weeks, the ticks against each job.
+-- That board counts WORK, not the worker — a plot sprayed by somebody else
+-- this morning is done, and showing it as outstanding would have two workers
+-- spray it twice.
+--
+-- So this returns every record inside the boundary, whoever recorded it,
+-- while worker_my_records stays what it is: the worker's own list. Neither
+-- reaches past the boundary.
+-- The return type gained verified_by/verified_at, and Postgres will not
+-- REPLACE a function whose OUT columns changed. Dropped first so re-running
+-- this file over an earlier install upgrades rather than erroring.
+DROP FUNCTION IF EXISTS public.worker_maint_records(UUID, INT);
+CREATE OR REPLACE FUNCTION public.worker_maint_records(p_token UUID, p_limit INT DEFAULT 500)
+RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
+               work_type TEXT, jenis TEXT, chemical TEXT, qty NUMERIC,
+               remark TEXT, reported_by TEXT, batch_name TEXT,
+               week_no INT, schedule_month TEXT,
+               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  PERFORM public.worker_from_token(p_token);
+
+  RETURN QUERY
+    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
+           r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
+           r.batch_name, r.week_no, r.schedule_month,
+           -- Who the conductor credited the job to, when he keyed it for
+           -- somebody whose phone was broken. NULL means reported_by did it.
+           r.worked_by,
+           -- So a worker can see their morning has been checked off. Read
+           -- only: verifying is the conductor's signature, and nobody signs
+           -- for their own work.
+           r.verified_by, r.verified_at
+      FROM nops_maint_field_records r
+      JOIN public.worker_plots(p_token) wp
+        ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
+     ORDER BY r.work_date DESC, r.id DESC
+     LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 500), 2000));
+END;
+$fn$;
+
+
+-- The office's maintenance plan for the nurseries inside the boundary. The
+-- board reads it to know which plots each week is asking for; without it the
+-- week cards have nothing to count against and simply say so.
+--
+-- Every month this nursery has ever had a plan for, not just this one: the
+-- office carries a plan forward without writing a row until it is saved, so
+-- which month applies is worked out in the app. There is at most one row per
+-- nursery per month, so this stays small.
+CREATE OR REPLACE FUNCTION public.worker_schedules(p_token UUID)
+RETURNS TABLE (nursery TEXT, month TEXT, payload JSONB)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  PERFORM public.worker_from_token(p_token);
+
+  -- Not created yet on this database: the board copes with an empty plan, so
+  -- an absent table is nothing to raise about.
+  IF to_regclass('public.nops_maint_state') IS NULL THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY EXECUTE $q$
+    SELECT s.nursery, s.month, s.payload
+      FROM nops_maint_state s
+     WHERE EXISTS (
+             SELECT 1 FROM public.worker_plots($1) wp
+              WHERE public.worker_key(wp.nursery_name) = public.worker_key(s.nursery))
+  $q$ USING p_token;
+END;
+$fn$;
+
+
 -- ── 9. Settings: user access and boundary ───────────────────────────────
 --
 -- Open to a worker whose Settings module is on — a supervisor, in practice.
@@ -535,8 +628,18 @@ GRANT EXECUTE ON FUNCTION public.worker_plots(UUID)                      TO anon
 GRANT EXECUTE ON FUNCTION public.worker_plot_batches(UUID)               TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_submit_maint(UUID, JSONB)        TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_my_records(UUID, INT)            TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_maint_records(UUID, INT)         TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_schedules(UUID)                  TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_roster(UUID)                     TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_set_portal(UUID, BIGINT, JSONB)  TO anon, authenticated;
+
+-- The phone does not call Postgres, it calls PostgREST, which answers from a
+-- cached picture of the schema. A function this file has just created is not
+-- in that picture until it is rebuilt, and until then the portal is told
+-- "Could not find the function public.worker_signin(p_pin) in the schema
+-- cache" — which reads like the file was never run. Ask for the rebuild here
+-- so running the file is the whole of the job.
+NOTIFY pgrst, 'reload schema';
 
 
 -- ── 11. The first supervisor ────────────────────────────────────────────

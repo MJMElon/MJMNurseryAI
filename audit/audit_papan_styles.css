@@ -162,8 +162,14 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
 .batch-banner-title svg{width:13px;height:13px;stroke:var(--g600);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .batch-banner-grid{display:flex;flex-direction:column;gap:5px}
 .bbg-row{display:flex;gap:6px;font-size:12px}
-.bbg-label{color:var(--text3);font-weight:600;min-width:80px;flex-shrink:0}
+.bbg-label{color:var(--text3);font-weight:600;min-width:120px;flex-shrink:0}
 .bbg-val{color:var(--text1);font-weight:500}
+/* Plot + Batch share one row on the physical sign; mirror that here.
+   Each cell keeps the same label/value shape as the single-column rows
+   so they read as one grid, just laid out two-across. */
+.bbg-row.bbg-pair{gap:14px}
+.bbg-row.bbg-pair .bbg-cell{flex:1;display:flex;gap:6px;min-width:0}
+.bbg-row.bbg-pair .bbg-cell .bbg-label{min-width:52px}
 
 /* DETAIL */
 .detail-hero{position:relative;height:220px;background:var(--g100);overflow:hidden}

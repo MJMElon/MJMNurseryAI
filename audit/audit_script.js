@@ -62,10 +62,41 @@ function setView(v){
      their own back button inside .form-view-header, so the outer top-bar
      one steps aside; on the list view it comes back to be the only way
      out to the audit home. */
+  /* One back arrow, and it is the ribbon's. The sub-views used to carry
+     their own under it; now the ribbon names the plot instead and its
+     arrow steps back a view at a time. */
   const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  if(topBack)topBack.style.display='';
+  const ctxP=document.getElementById('ctx-plot');
+  const ctxF=document.getElementById('ctx-form');
+  const today=document.getElementById('nav-today');
+  if(ctxP)ctxP.style.display=(v==='plot')?'':'none';
+  if(ctxF)ctxF.style.display=(v==='form')?'':'none';
+  if(today)today.style.display=(v==='plot'||v==='form')?'none':'';
   window.scrollTo(0,0);
 }
+/* The ribbon arrow: out of the form to the plot it belongs to, out of
+   the plot to the grid, and only from the grid out of the module — which
+   is the link's own href, so ?from=home still decides where that goes. */
+function goBack(e){
+  if(activeView==='form'){
+    if(e)e.preventDefault();
+    /* PN uses the per-plot form (no batch-list step), so back from
+       it goes to the grid. MN uses the batch list — back from the
+       per-batch form returns to that list for the same plot. */
+    if(activeTab!=='PN' && window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot);
+    else setView('list');
+    return false;
+  }
+  if(activeView==='plot'||activeView==='detail'){
+    if(e)e.preventDefault();
+    setView('list');
+    return false;
+  }
+  return true;
+}
+window.goBack=goBack;
+
 function selectTab(nursery){
   activeTab=nursery;
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.n===nursery));
@@ -214,6 +245,72 @@ async function loadRecords(){
   setLoading(false);
 }
 
+/* ── PRE NURSERY IS AUDITED BY PLOT ──────────────────────────────────
+   The main nursery tracks work batch by batch: a plot holds several,
+   each with its own age and its own audit. Pre Nursery does not work
+   that way — the seedlings there are audited plot by plot, so the batch
+   layer is noise on the screen and a second tap for nothing. For PN the
+   grid counts one task per plot, tapping a plot goes straight to the
+   form (or to the record, once there is one), and the batch box is not
+   on the form at all. The batches are still read behind the scenes —
+   they are how we know whether anything is standing on the plot. */
+/* PN audits by plot (one record per plot, batches as chips inside
+   the form). MN reverted to per-batch at the auditor's request — a
+   plot on MN carries several batches with distinct ages and each
+   needs its own record. */
+function byPlot(){ return activeTab === 'PN'; }
+function plotHasWork(p){
+  return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
+}
+function isPlotAudited(p){
+  return records.some(r => r.nursery === activeTab && r.plot === p);
+}
+function openPlotAudit(plot){
+  window._lastOpenedPlot = plot;
+  const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
+  if (rec) { openDetail(rec.uid); return; }
+  _openFormForPlot(plot, null);
+  /* Fill the read-only batches chips inside the form so the auditor
+     sees which batches sit on this plot. Sorted by batch number. */
+  _paintBatchesChips(plot);
+}
+window.openPlotAudit = openPlotAudit;
+
+function _paintBatchesChips(plot){
+  const chips = document.getElementById('f-batches-chips');
+  if (!chips) return;
+  const bs = batchesOnPlot(plot).slice().sort((a,b)=>{
+    const na=Number(a.batch)||0, nb=Number(b.batch)||0;
+    if(na!==nb)return na-nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
+  if (!bs.length){
+    chips.innerHTML='<span style="font-size:12px;color:#94a3b8">No batches on file</span>';
+    return;
+  }
+  chips.innerHTML=bs.map(b=>{
+    const breed=b.breed ? ' · '+b.breed : '';
+    return '<span class="batch-chip" style="display:inline-flex;align-items:center;padding:5px 11px;'
+      +'border-radius:999px;background:#e0f2e0;border:1px solid #a7d5b0;color:#0f5527;'
+      +'font-size:11.5px;font-weight:700;letter-spacing:.2px">Batch '+b.batch+breed+'</span>';
+  }).join('');
+}
+window._paintBatchesChips = _paintBatchesChips;
+/* The batch box belongs to a batch-by-batch audit. Hide it where the
+   audit is the plot, and hide the row it sits in so nothing gaps.
+   The "Batches on this plot" chips row is the opposite: only useful
+   when the form is per-plot (PN); hidden when the auditor is on a
+   single batch (MN). */
+function syncBatchField(){
+  const bf = document.getElementById('f-batch');
+  if (bf) {
+    const row = bf.closest('.form-field');
+    if (row) row.style.display = byPlot() ? 'none' : '';
+  }
+  const chipsRow = document.getElementById('f-batches-row');
+  if (chipsRow) chipsRow.style.display = byPlot() ? '' : 'none';
+}
+
 /* --- RENDER LIST --- */
 /* Not-required = the operation ledger says nothing is standing in
    this (plot, batch) right now. Balance ≤ 0 counts (culled, sold,
@@ -274,6 +371,10 @@ function renderList(){
   let totalRequired = 0;
   let totalAudited  = 0;
   plots.forEach(p => {
+    if (byPlot()) {
+      if (plotHasWork(p)) { totalRequired++; if (isPlotAudited(p)) totalAudited++; }
+      return;
+    }
     const required = batchesOnPlot(p).filter(b => !isBatchNotRequired(p, b.batch));
     totalRequired += required.length;
     totalAudited  += required.filter(b => isBatchAudited(p, b.batch)).length;
@@ -298,8 +399,11 @@ function renderList(){
     const bs = batchesOnPlot(p);
     // Only REQUIRED batches count — anything the operation ledger says
     // is out (balance ≤ 0) is Not Required and never turns into work.
-    const required = bs.filter(b => !isBatchNotRequired(p, b.batch));
-    const pending  = required.filter(b => !isBatchAudited(p, b.batch)).length;
+    const onePlot  = byPlot();
+    const required = onePlot ? (plotHasWork(p) ? [p] : [])
+                             : bs.filter(b => !isBatchNotRequired(p, b.batch));
+    const pending  = onePlot ? (required.length && !isPlotAudited(p) ? 1 : 0)
+                             : required.filter(b => !isBatchAudited(p, b.batch)).length;
     const done     = required.length - pending;
     const allDone  = required.length > 0 && pending === 0;
 
@@ -314,13 +418,15 @@ function renderList(){
     }
     // Subtitle carries the ratio when there is work; falls back to the
     // total-batch count on plots with only Not-Required (or none at all).
-    const subtitle = required.length
-      ? done + ' / ' + required.length + ' ' + t('audited')
-      : (bs.length ? bs.length + ' ' + t(bs.length > 1 ? 'batches_many' : 'batch_one') : t('no_batches'));
+    const subtitle = onePlot
+      ? (required.length ? (pending ? t('pending_word') : t('all_audited')) : '—')
+      : required.length
+        ? done + ' / ' + required.length + ' ' + t('audited')
+        : (bs.length ? bs.length + ' ' + t(bs.length > 1 ? 'batches_many' : 'batch_one') : t('no_batches'));
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
-              onclick="openPlotDetail('${p}')"
+              onclick="${onePlot ? 'openPlotAudit' : 'openPlotDetail'}('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
@@ -341,8 +447,12 @@ function renderList(){
    plot + batch pre-selected. Existing audits show an Edit button
    instead so re-auditing takes the same path everyone else uses. */
 function openPlotDetail(plot){
-  // Remember which plot is on screen so the top-bar refresh can re-open
-  // the same detail after loadRecords() completes.
+  /* MN batch-list drill-down. PN routes to the per-plot form via
+     openPlotAudit(); this function is only called for MN now. Kept
+     tolerant to a direct call for PN by delegating. */
+  if (activeTab === 'PN' && typeof openPlotAudit === 'function') {
+    openPlotAudit(plot); return;
+  }
   window._lastOpenedPlot = plot;
   // Row order: pending on top, audited in the middle, Not-Required at
   // the bottom. Within each band, batch number ascending. That way an
@@ -422,7 +532,7 @@ function openPlotDetail(plot){
       ? (isNoAuditRequired(audit)
           ? `<div class="record-chips">
                <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0;padding:3px 10px">
-                 ✕ No Audit Required · by ${audit.auditor_name || 'Auditor'}
+                 ✕ ${noAuditReason(audit) || 'No Audit Required'} · by ${audit.auditor_name || 'Auditor'}
                </span>
              </div>`
           : `<div class="record-chips">
@@ -544,7 +654,7 @@ function _unlockPlotBatchInputs(){
    the previous decline still greyed-out or its confirmation panel
    still showing. Called at the top of openAddForm / openEdit. */
 function _resetDeclineUI(){
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = '';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
   document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
     b.disabled = false;
@@ -575,8 +685,9 @@ function openEdit(uid){
   // If this record was closed with "No Audit Required", replay the same
   // greyed-out state so the auditor can see (or re-decline / re-open).
   if (isNoAuditRequired(r)) {
-    const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+    const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = 'none';
     const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+    const nr   = document.getElementById('no-audit-reason');if (nr)   nr.textContent = noAuditReason(r) || NO_AUDIT_SENTINEL;
     const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = r.auditor_name || 'Auditor';
     const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = fmtDT(r.createdAt);
     document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
@@ -599,10 +710,8 @@ function openEdit(uid){
   document.getElementById('form-view-title').textContent='Edit — '+r.id;
 }
 function populateForm(r){
-  const id=editMode?r.id:nextID(formState.nursery);
-  document.getElementById('f-id').value=id;
   document.getElementById('f-date').value=editMode?r.date:todayISO();
-  document.getElementById('form-view-id').textContent=id;
+  syncBatchField();
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
@@ -688,30 +797,45 @@ function cancelForm(){setView('list');}
    required — by X · date" pill. Kept as a distinctive constant string
    rather than a Boolean column so nothing has to change in the DB. */
 const NO_AUDIT_SENTINEL = 'No Audit Required';
+/* The auditor now says WHY a batch needs no audit — it is a culling plot
+   or a transplanting plot. The reason rides in the same field, appended
+   to the sentinel ('No Audit Required — Culling Plot'), so no column has
+   to be added and every record written before this still reads as
+   declined. Records from then carry no reason and simply show none. */
+const NO_AUDIT_REASONS = ['Culling Plot','Transplanting Plot'];
 function isNoAuditRequired(r){
-  return !!r && r.ulat === NO_AUDIT_SENTINEL && r.warna === NO_AUDIT_SENTINEL;
+  return !!r && String(r.ulat||'').indexOf(NO_AUDIT_SENTINEL) === 0
+             && String(r.warna||'').indexOf(NO_AUDIT_SENTINEL) === 0;
+}
+function noAuditReason(r){
+  const m = String((r&&r.ulat)||'').split('—')[1];
+  return m ? m.trim() : '';
 }
 window.isNoAuditRequired = isNoAuditRequired;
+window.noAuditReason = noAuditReason;
 
 /* Decline flow — one tap on the form's NO AUDIT REQUIRED button:
    fills formState with the sentinel values, shows the "who + when"
    confirmation panel, disables every other field, and lets the auditor
    press Save to write the record. The user's own name is captured from
    localStorage.mjm_user (the same field auditor_name uses elsewhere). */
-function declineAudit(){
+function declineAudit(reason){
   const u = (function(){ try { return JSON.parse(localStorage.getItem('mjm_user')||'{}'); } catch(e){ return {}; } })();
   const who = u.name || u.email || 'Auditor';
-  formState.ulat   = NO_AUDIT_SENTINEL;
-  formState.tikus  = NO_AUDIT_SENTINEL;
-  formState.bintik = NO_AUDIT_SENTINEL;
-  formState.warna  = NO_AUDIT_SENTINEL;
+  const why = NO_AUDIT_REASONS.indexOf(reason) !== -1 ? reason : '';
+  const stamp = why ? NO_AUDIT_SENTINEL + ' — ' + why : NO_AUDIT_SENTINEL;
+  formState.ulat   = stamp;
+  formState.tikus  = stamp;
+  formState.bintik = stamp;
+  formState.warna  = stamp;
   formState.photo1 = null;
   formState.photo2 = null;
 
   // Reveal the confirmation panel + hide the decline button so it can't
   // be tapped again. Stamp the "by <name> · <when>" line at the same time.
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = 'none';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+  const nr   = document.getElementById('no-audit-reason');if (nr)   nr.textContent = why || NO_AUDIT_SENTINEL;
   const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = who;
   const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
@@ -730,9 +854,9 @@ function declineAudit(){
     s.style.pointerEvents = 'none';
   });
   const photoReq = document.getElementById('photo-req-note');
-  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch is being closed with No Audit Required.'; }
+  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch is being closed as a ' + (why || 'no-audit') + '.'; }
 
-  showToast('Marked "No Audit Required". Tap Save to close this batch.');
+  showToast('Marked "' + (why || NO_AUDIT_SENTINEL) + '". Tap Save to close this batch.');
 }
 window.declineAudit = declineAudit;
 
@@ -748,7 +872,7 @@ function undoDeclineAudit(){
   formState.tikus  = null;
   formState.bintik = null;
   formState.warna  = null;
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = '';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
   document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
     b.disabled = false;
@@ -762,7 +886,7 @@ function undoDeclineAudit(){
   });
   const photoReq = document.getElementById('photo-req-note');
   if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = t('photo_req'); }
-  showToast('Undone. Fill in the audit or tap No Audit Required again.');
+  showToast('Undone. Fill in the audit, or name the plot type again.');
 }
 window.undoDeclineAudit = undoDeclineAudit;
 
@@ -770,14 +894,13 @@ async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot)           {showToast(t('err_select_plot'));return;}
-  if(!batch)          {showToast(t('err_batch'));return;}
+  if(!byPlot() && !batch){showToast(t('err_batch'));return;}
   // "No Audit Required" bypasses the four measurement + two-photo
   // requirements — the whole point is that the auditor is closing out
   // a batch without checking it. All four fields carry NO_AUDIT_SENTINEL,
   // set by declineAudit(). Everything else on the payload (audit_id,
   // date, auditor_name) is captured the same way as a normal save.
-  const declined = formState.ulat === NO_AUDIT_SENTINEL
-                && formState.warna === NO_AUDIT_SENTINEL;
+  const declined = isNoAuditRequired({ulat:formState.ulat, warna:formState.warna});
   if (!declined) {
     if(!formState.ulat) {showToast(t('err_pest'));return;}
     if(!formState.tikus){showToast(t('err_animal'));return;}
@@ -792,7 +915,7 @@ async function saveRecord(){
   setLoading(true);
   try{
     const payload={
-      nursery:formState.nursery,plot,batch,
+      nursery:formState.nursery,plot,batch:batch||null,
       pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
       warna_daun:formState.warna,
       photo_url:formState.photo1||null,
@@ -874,6 +997,18 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Same treatment as Papan Tanda: opening the module page without a
+     specific plot lands on a redundant plot-grid. The pending plot
+     chips on audit_home already send the auditor here with ?plot=;
+     land on Home instead when no plot is named. ?admin=1 keeps the
+     escape hatch for admins who want the grid. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot = !!qs.get('plot');
+    const isAdm   = qs.get('admin') === '1';
+    if (!hasPlot && !isAdm) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
   // FAB was removed from the page but a stub is kept so this binding
   // still succeeds without a null-check. If a future refactor drops

@@ -964,10 +964,27 @@ function isGeneralWorker(r, nurseryNamesTheRole) {
 /* Turn the whole register into nursery → [name], applying the rules above per
    nursery. Shared by the boot load and the live refresh so the two can never
    drift apart. */
+/* Which sheet a register row belongs to.
+ 
+   The two sides spell a nursery differently and always have: this page keys
+   on UNN1, the Payroll register is filled in by hand and says "UNN 1". An
+   exact match therefore linked BNN and PN — which have no space in them — and
+   silently found nobody for UNN 1 or UNN 2, so those two sheets fell back to
+   the old local list and looked like nurseries with no workers.
+ 
+   Compare on letters and digits alone, the same rule every other crossing of
+   this boundary uses. And read `nursery` when `section` has not been filled
+   in: the register copies one into the other, but a row added since is only
+   guaranteed to have the one the person keying it happened to use. */
+function _registerNurseryKey(r) {
+  const key = (x) => String(x == null ? '' : x).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  return key(r && r.section) || key(r && r.nursery);
+}
+
 function generalWorkersByNursery(rows) {
   const by = {};
   MAINT_NURSERIES.forEach(n => {
-    const mine = (rows || []).filter(r => String(r.section || '').trim().toUpperCase() === n);
+    const mine = (rows || []).filter(r => _registerNurseryKey(r) === n);
     const named = mine.some(r => r.active !== false && MAINT_ROLE.test(roleOf(r)));
     const names = mine.filter(r => isGeneralWorker(r, named))
                       .map(r => String(r.full_name || '').trim())
@@ -1727,15 +1744,21 @@ async function loadFieldRecords() {
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
     let res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by')
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
     // still recording the work itself, so fall back to reading what is there.
     if (res.error) {
       res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-        .select('id, work_date, plot_name, work_type, jenis')
+        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty')
         .order('id', { ascending: true }));
+      // Still no? Then this database predates the batch columns too.
+      if (res.error && /column .* does not exist|schema cache/i.test(String(res.error.message || ''))) {
+        res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
+          .select('id, work_date, plot_name, work_type, jenis')
+          .order('id', { ascending: true }));
+      }
     }
     if (res.error) { console.warn('[maint] field records unavailable:', res.error.message); return; }
     fieldRecords = res.data || [];
@@ -1743,6 +1766,29 @@ async function loadFieldRecords() {
 }
 
 /* "Round 2: Daconil 50gm" → 2 */
+/* Which of the four Worker Record sheets a job belongs on. PAYROLL_TYPES
+   already says it the other way round; this is that map inverted, built once
+   rather than scanned on every row. */
+const _PAYROLL_TYPE_BY_JENIS = Object.keys(PAYROLL_TYPES).reduce((acc, k) => {
+  acc[PAYROLL_TYPES[k].jenis] = k;
+  return acc;
+}, {});
+
+/* The field ticks names from the Payroll register (mjmnpayroll_workers); this
+   page counts against its own maintenance worker list (nops_maint_workers).
+   They are the same people and usually the same strings, but "Ali B. Hassan"
+   and "Ali b Hassan" are one worker to everybody except a string comparison —
+   and a tick that lands on a name with no column here drops that worker's
+   capacity out of the totals silently. So match on letters and digits, and
+   return the column's own spelling so what gets written is what this page
+   counts. */
+function _matchWorkerName(nursery, name) {
+  const key = (x) => String(x == null ? '' : x).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const want = key(name);
+  if (!want) return null;
+  return (workers[nursery] || []).find((w) => key(w) === want) || null;
+}
+
 function _recRound(racun) {
   const m = /^\s*Round\s+(\d+)\s*:/i.exec(String(racun || ''));
   return m ? parseInt(m[1], 10) : 0;
@@ -1781,6 +1827,45 @@ function fieldRecordIndex(monthLbl) {
 function applyFieldRecords(nursery, monthLbl) {
   const idx = fieldRecordIndex(monthLbl);
   const plots = NURSERY_PLOTS[nursery] || [];
+  /* Which Worker Record sheets this pass touched, so only those are saved. */
+  const touched = new Set();
+  /* Names the field credited that have no column on this page — reported
+     once at the end rather than dropped without a word. */
+  const unmatched = new Set();
+
+  /* Tick the workers the field said did the job.
+   
+     Provenance matters more than it looks. A tick put here is marked 'field',
+     and only an empty cell or another 'field' tick is ever overwritten — so a
+     conductor who corrects the sheet by hand keeps his correction, and a
+     field record that is later deleted takes its own ticks with it and
+     nobody else's. Ticks made on this page are 1, and stay 1. */
+  const syncTicks = (rec, field) => {
+    const type = _PAYROLL_TYPE_BY_JENIS[rec.jenis];
+    if (!type) return;
+    const k = payrollKey(nursery, monthLbl, type);
+    const store = payrollData[k] || (payrollData[k] = {});
+    const cells = store[rec.id] || {};
+    const byHand = Object.keys(cells).some((w) => cells[w] !== 'field');
+    if (byHand) return;                       // somebody has answered already
+
+    const names = String((field && field.worked_by) || '')
+      .split(',').map((x) => x.trim()).filter(Boolean);
+
+    const next = {};
+    names.forEach((n) => {
+      const col = _matchWorkerName(nursery, n);
+      if (col) next[col] = 'field';
+      else unmatched.add(n);
+    });
+
+    // Nothing to say and nothing was said before: leave the row alone.
+    if (!Object.keys(next).length && !Object.keys(cells).length) return;
+    if (Object.keys(next).length) store[rec.id] = next;
+    else delete store[rec.id];
+    touched.add(type);
+  };
+
   records.forEach(r => {
     if (!plots.includes(r.plot) || r.checked) return;
     const week = _recRound(r.racun);
@@ -1792,6 +1877,7 @@ function applyFieldRecords(nursery, monthLbl) {
       if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
       if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
       if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
+      syncTicks(r, null);
       return;
     }
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
@@ -1809,7 +1895,20 @@ function applyFieldRecords(nursery, monthLbl) {
       r.qty = Number(f.qty);
       r._fromFieldQty = 1;
     }
+    syncTicks(r, f);
   });
+
+  /* Save only the sheets that changed, and only if something did — this runs
+     on every schedule sync and an unconditional write would be four upserts a
+     minute for nothing. */
+  touched.forEach((type) => persistPayroll(nursery, monthLbl, type));
+  if (touched.size) renderPayroll();
+
+  if (unmatched.size) {
+    console.warn('[maint] the field credited work to names with no column on '
+      + 'this nursery\'s Worker Record, so their capacity is not counted:',
+      [...unmatched].join(', '));
+  }
 }
 
 /* Auto-sync: silently regenerate records from current schedule (no confirm, no alert) */
