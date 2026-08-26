@@ -398,19 +398,51 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
            padding-top:13px; border-top:1px solid var(--border); }
 .set-empty { font-size:12px; color:var(--text-faint); padding:14px 0; line-height:1.7; }
 
-/* Plot capacity: a tile per plot, the plot's own name on it. */
-.set-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; }
-.set-cap  { background:#fff; border:1.5px solid var(--border); border-radius:var(--r-sm);
-            padding:9px 11px; }
-.set-cap-n{ font-size:12.5px; font-weight:800; color:var(--green-text); margin-bottom:6px; }
-.set-cap input { width:100%; height:32px; padding:0 9px; font-size:12px; font-family:inherit;
-                 border:1.5px solid var(--border); border-radius:var(--r-sm); box-sizing:border-box; }
-.set-cap input:focus { outline:none; border-color:var(--green-mid); }
-.set-cap-u{ font-size:10px; font-weight:700; color:var(--text-faint); margin-top:4px;
-            text-transform:uppercase; letter-spacing:.05em; }
-/* A tray plot shows what its trays come to, because that is the number the
-   dosage is worked out from and it is not the number being typed. */
-.set-cap-d{ font-size:10.5px; font-weight:800; color:var(--green-mid); margin-top:4px; }
+/* ── Plot capacity ────────────────────────────────────────────────────────
+   Its own nursery tabs, equal width, sitting on the top edge of the block. */
+.cap-tabs { display:flex; border-bottom:1.5px solid var(--border); background:#f7f9f8; }
+.cap-tab  { flex:1 1 0; min-width:0; padding:12px 8px; border:none; background:none; cursor:pointer;
+            font-family:inherit; font-size:11px; font-weight:900; letter-spacing:.07em;
+            text-transform:uppercase; color:var(--text-muted); border-bottom:3px solid transparent;
+            margin-bottom:-1.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cap-tab:hover { color:var(--green-text); background:#eef3f0; }
+.cap-tab.on    { color:var(--green-text); background:#fff; border-bottom-color:var(--green-mid); }
+
+.cap-top  { display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+            margin-bottom:14px; }
+.cap-foot { display:flex; align-items:center; justify-content:space-between; gap:14px;
+            flex-wrap:wrap; margin-top:16px; padding-top:13px; border-top:1px solid var(--border);
+            font-size:12px; font-weight:800; color:var(--green-text); }
+.cap-foot > div:last-child { display:flex; gap:8px; margin-left:auto; }
+
+/* Ten plots down a column, then the next column to the right. grid-auto-flow
+   fills top-to-bottom before moving across, which is the order a plot list is
+   read in; auto-fill across would run left-to-right and put P01 beside P02. */
+/* Capped, not 1fr. Stretched to fill the card, two columns each ran 900px
+   wide and left the plot name at one end of the row and its number at the
+   other. A column is as wide as it needs to be read. */
+.cap-grid { display:grid; grid-auto-flow:column; grid-template-rows:repeat(10, auto);
+            grid-auto-columns:minmax(180px, 262px); justify-content:start;
+            gap:0 26px; overflow-x:auto; padding-bottom:2px; }
+.cap-row  { display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:7px 2px; border-bottom:1px dotted var(--border); min-height:38px; }
+.cap-row-n{ font-size:12.5px; font-weight:800; color:var(--green-text); }
+.cap-row-v{ font-size:12.5px; font-weight:700; color:var(--text-head); font-variant-numeric:tabular-nums; }
+.cap-row-v.muted { color:var(--text-faint); font-weight:600; }
+.cap-row input { width:96px; height:31px; padding:0 9px; font-size:12px; font-family:inherit;
+                 text-align:right; border:1.5px solid var(--green-mid); border-radius:var(--r-sm);
+                 box-sizing:border-box; background:#fff; }
+.cap-row input:focus { outline:none; box-shadow:0 0 0 3px #dbeee3; }
+/* A tray plot also shows what its trays come to: that product, not the number
+   being typed, is what every dosage is worked out from. */
+.cap-row-d{ font-size:10.5px; font-weight:700; color:var(--green-mid); white-space:nowrap; }
+
+@media (max-width:640px) {
+  /* One column on a phone — ten rows of a six-column grid is a lot of
+     sideways scrolling to find one plot. */
+  .cap-grid { grid-auto-flow:row; grid-template-rows:none; grid-template-columns:1fr; }
+  .cap-tab  { font-size:10px; padding:11px 4px; letter-spacing:.03em; }
+}
 
 /* Chemical and fertiliser rows. */
 .set-rows { display:flex; flex-direction:column; gap:7px; }
