@@ -149,12 +149,20 @@ AS $$
 DECLARE
   w mjmnpayroll_workers;
 BEGIN
+  -- Three things keep a session alive, and all three are things the office
+  -- can take away from the Payroll register without touching this portal:
+  -- the session has not expired, the worker is still Active, and they still
+  -- have a PIN. That last one matters — without it, clearing somebody's PIN
+  -- stops them signing in TOMORROW while the phone in their pocket carries on
+  -- working for the next sixty days. Taking the PIN off a worker's row is
+  -- meant to be how you take the portal away from them, so it is.
   SELECT wk.* INTO w
     FROM mjmnpayroll_worker_sessions s
     JOIN mjmnpayroll_workers wk ON wk.id = s.worker_id
    WHERE s.token = p_token
      AND s.expires_at > now()
-     AND wk.active;
+     AND wk.active
+     AND wk.pin IS NOT NULL;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'not signed in' USING ERRCODE = '28000';
   END IF;

@@ -62,6 +62,8 @@
   .iw-sw[disabled] { cursor:default; }
   .iw-sw.dirty { border-color:#f59e0b; box-shadow:0 0 0 2px #fef3c7; }
   .iw-dot { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; display:block; }
+  .iw-row.no-map, .iw-head.no-map { grid-template-columns:24px 34px minmax(150px,1fr) 106px; }
+  .iw-head.no-map .iw-mapcol { display:none; }
   .iw-add { display:flex; align-items:center; gap:8px; width:100%; margin-top:6px; padding:9px 12px;
             border-radius:12px; border:1.5px dashed #99f6e4; background:#f0fdfa; color:#0f766e;
             font-weight:900; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
@@ -112,7 +114,7 @@
     <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
 
     <div class="iw-head">
-      <div></div><div>#</div><div>Work status</div><div>Map</div><div class="text-right">Ideal days</div>
+      <div></div><div>#</div><div>Work status</div><div class="iw-mapcol">Map</div><div class="text-right">Ideal days</div>
     </div>
     <div id="iw-list"></div>
     <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
@@ -161,7 +163,16 @@ function iwEditable() {
   return IW_ADMIN && MJMPalms.ACTIVITIES.some((a) => a.stageId != null);
 }
 
+/* The colour column exists only after migration_palms_stage_colours.sql.
+   Until then the Map column is not drawn at all — a swatch that cannot be
+   saved is worse than no swatch. */
+const iwColours = () => typeof MJMPalms.hasStageColours !== 'function' || MJMPalms.hasStageColours();
+
 function renderIdealWork() {
+  // The grid has one fewer column when there is nowhere to store a colour.
+  document.querySelectorAll('.iw-head').forEach(function (el) {
+    el.classList.toggle('no-map', !iwColours());
+  });
   IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, name: a.name, days: a.days, color: a.color }));
 
   /* No stageId means shared_palms fell back to its built-in eleven, because
@@ -172,8 +183,12 @@ function renderIdealWork() {
   const note = $('iw-note');
   if (!fromOffice) {
     note.className = 'text-[12px] font-bold text-amber-700 leading-relaxed mb-3';
-    note.textContent = 'These are the built-in defaults — the office stage list is empty or unreadable, ' +
-      'so there is nothing to save a change to. Add the stages on PALMS → Settings first.';
+    /* This IS the Settings page, so "go to Settings" would be nonsense. Say
+       what is actually true: the table is empty or the read was refused. */
+    note.textContent = 'Showing the built-in defaults. The stage list could not be read — either the ' +
+      'table is empty, or your account is not allowed to read it. Nothing here can be saved until ' +
+      'that is sorted; run create_palms_tables.sql and migration_palms_stages_seed.sql if this ' +
+      'nursery has never been set up.';
   } else {
     note.className = 'hidden';
   }
@@ -189,11 +204,11 @@ function renderIdealWork() {
   const list = IW_EDIT ? IW_WORK : IW_ROWS;
   $('iw-list').innerHTML = list.map((r, i) => {
     if (!IW_EDIT) {
-      return '<div class="iw-row">' +
+      return '<div class="iw-row' + (iwColours() ? '' : ' no-map') + '">' +
         '<div></div>' +
         '<div class="iw-n">' + (i + 1) + '</div>' +
         '<div class="iw-name">' + esc(r.name) + '</div>' +
-        '<span class="iw-dot" style="background:' + esc(r.color || '#94a3b8') + '"></span>' +
+        (iwColours() ? '<span class="iw-dot" style="background:' + esc(r.color || '#94a3b8') + '"></span>' : '') +
         '<div class="iw-ro">' + (r.days == null ? '—' : esc(r.days) + 'd') + '</div>' +
         '</div>';
     }
@@ -206,14 +221,16 @@ function renderIdealWork() {
        reading under the new one. Moving a stage is the operation that
        changes what a stored number means — which is why the drag handle,
        not this box, is the one worth pausing over. */
-    return '<div class="iw-row edit" draggable="false" data-key="' + esc(r.key) + '">' +
+    return '<div class="iw-row edit' + (iwColours() ? '' : ' no-map') + '" draggable="false" data-key="' + esc(r.key) + '">' +
       '<div class="iw-handle" data-iw-drag="' + esc(r.key) + '" title="Drag to reorder">⠿</div>' +
       '<div class="iw-n">' + (i + 1) + '</div>' +
       '<input class="iw-in name' + (dName ? ' dirty' : '') + '" data-iw-name="' + esc(r.key) + '" ' +
         'placeholder="Work status name" value="' + esc(r.name || '') + '">' +
-      '<input class="iw-sw' + (dColor ? ' dirty' : '') + '" type="color" ' +
-        'data-iw-color="' + esc(r.key) + '" value="' + esc(r.color || '#94a3b8') + '" ' +
-        'title="Colour on the Plot Status Map">' +
+      (iwColours()
+        ? '<input class="iw-sw' + (dColor ? ' dirty' : '') + '" type="color" ' +
+            'data-iw-color="' + esc(r.key) + '" value="' + esc(r.color || '#94a3b8') + '" ' +
+            'title="Colour on the Plot Status Map">'
+        : '') +
       '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
         'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
       '</div>';

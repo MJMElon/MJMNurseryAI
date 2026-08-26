@@ -291,6 +291,32 @@
      membership version needed. */
 
   var _scope = null;
+  var _perms = undefined;                 // undefined = not asked yet
+
+  /* This person's permissions object, read once. Both the admin test and
+     the "may they see the dock at all" gate want the same row, and the
+     dock used to fetch it twice on every page.
+
+     undefined means the read has not happened; null means it happened and
+     answered nothing — which the callers treat differently, because
+     "unknown" must not read as "denied". */
+  async function loadPerms(token) {
+    if (_perms !== undefined) return _perms;
+    var u = me();
+    if (!u.id) return (_perms = null);
+    try {
+      // self_read_profile lets anyone signed in read their own row.
+      var r = await fetch(CFG.url + '/rest/v1/shared_profiles?select=permissions&id=eq.' +
+                          encodeURIComponent(u.id), { headers: authHeaders(token) });
+      if (!r.ok) return (_perms = null);
+      var rows = await r.json();
+      return (_perms = (rows && rows[0] && rows[0].permissions) || null);
+    } catch (_) { return (_perms = null); }
+  }
+
+  var nelosLevel = function (perms) {
+    return (perms && perms.modules && perms.modules.nelos) || null;
+  };
 
   async function isNelosAdmin(token) {
     // shared_access.js already knows, on the pages that load it.
@@ -298,18 +324,32 @@
       if (window.MJMAccess && window.MJMAccess.isAdminOf &&
           window.MJMAccess.isAdminOf('nelos')) return true;
     } catch (_) { /* fall through and ask the database */ }
+    return nelosLevel(await loadPerms(token)) === 'admin';
+  }
 
-    var u = me();
-    if (!u.id) return false;
-    try {
-      // self_read_profile lets anyone signed in read their own row.
-      var r = await fetch(CFG.url + '/rest/v1/shared_profiles?select=permissions&id=eq.' +
-                          encodeURIComponent(u.id), { headers: authHeaders(token) });
-      if (!r.ok) return false;
-      var rows = await r.json();
-      var perms = rows && rows[0] && rows[0].permissions;
-      return !!(perms && perms.modules && perms.modules.nelos === 'admin');
-    } catch (_) { return false; }
+  /* Whether the circle should exist on this page at all.
+
+     A dock that opens onto an empty list, or onto a 401, is worse than no
+     dock: it says there is something here for you when there is not. So it
+     is drawn only for somebody who actually holds Nelos.
+
+     The one case that stays permissive is a profile with no permissions
+     object at all — an account set up before modules were per-user. Denying
+     those would take the dock away from people who have always had it. A
+     profile that HAS the object and does not list Nelos, or lists it as
+     'none', is a decision, and is honoured. */
+  async function hasNelos(token) {
+    /* Deliberately NOT asking MJMAccess, which isNelosAdmin above does ask.
+       MJMAccess.canAccess() answers 'none' until MJMAccess.load() has
+       finished, and the dock boots on DOMContentLoaded — so on every page
+       that loads shared_access.js this would race it and lose, and the
+       dock would never appear for anybody. A false answer is survivable in
+       isNelosAdmin, which falls through to the database; here it is the
+       whole decision, so it comes from the database every time. */
+    var perms = await loadPerms(token);
+    if (!perms || !perms.modules) return true;      // nothing said = nothing denied
+    var lvl = nelosLevel(perms);
+    return !!lvl && lvl !== 'none';
   }
 
   async function loadScope(token) {
@@ -502,7 +542,7 @@
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
   .nd-head-t  { font-size:13px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; line-height:1.1; }
-  .nd-min { margin-left:auto; width:28px; height:28px; border-radius:8px; border:none; cursor:pointer;
+  .nd-min { width:28px; height:28px; border-radius:8px; border:none; cursor:pointer;
             background:rgba(255,255,255,.18); color:#fff; font-size:15px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
@@ -588,7 +628,10 @@
   .nd-done a { color:#7c3aed; font-weight:900; text-decoration:none; }
   .nd-done a:hover { text-decoration:underline; }
 
-  .nd-hist { width:26px; height:26px; margin-left:auto; margin-right:2px; padding:0;
+  /* margin-left:auto here and nowhere else. With it on Minimise too, the
+     two autos SPLIT the free space and the history button drifted into the
+     middle of the bar instead of sitting next to it. */
+  .nd-hist { width:26px; height:26px; margin-left:auto; margin-right:-3px; padding:0;
              border:none; border-radius:8px; background:rgba(255,255,255,.16); color:#fff;
              cursor:pointer; display:flex; align-items:center; justify-content:center;
              flex-shrink:0; }
@@ -772,7 +815,7 @@
            line under it repeated the title — three pieces of chrome
            for one idea, in a panel that is mostly list. */
         '<div class="nd-head">' +
-          '<div class="nd-head-t">My To Do Nelos</div>' +
+          '<div class="nd-head-t">Nelos To Do List</div>' +
           '<button class="nd-hist" type="button" title="Solved, not yet closed" ' +
                   'aria-label="Solved, not yet closed">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -1308,7 +1351,7 @@
   function showList() {
     view = 'list';
     showPane('list');
-    panel.querySelector('.nd-head-t').textContent = 'My To Do Nelos';
+    panel.querySelector('.nd-head-t').textContent = 'Nelos To Do List';
     panel.querySelector('.nd-hist').classList.remove('on');
     paint();
   }
@@ -1961,6 +2004,10 @@
     CFG = await loadConfig();
     if (!CFG) { warn('no Supabase config on this page and shared_supabase.js would not load.'); return; }
     if (!storedSession()) return;           // signed out: login pages get no dock, and say nothing
+
+    /* Before anything is drawn: no Nelos, no circle. Checked here rather
+       than inside refresh() so nothing flashes on screen first. */
+    if (!await hasNelos(await accessToken())) return;
     _booted = true;
 
     build();

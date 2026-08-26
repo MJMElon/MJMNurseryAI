@@ -190,13 +190,18 @@
    columns either side of it claim equal width. Measured: with the name
    showing that comes to 771px, so anything under about 820 was pushing
    the bar into a sideways scroll. Without it the same bar needs 584. */
-/* The welcome name goes first, and it has to go before the phone
-   breakpoint: centring the wordmark needs room for the right-hand
-   cluster TWICE over, since the two grid columns either side of it
-   claim equal width. Measured on this bar: 664px with the name
-   showing, 528 without. Below 680 it would push the bar into a
-   sideways scroll, so that is where it goes. */
-@media (max-width:680px){
+/* The welcome name goes first, and it has to go a long way before the
+   phone breakpoint: centring the wordmark needs room for the right-hand
+   cluster TWICE over, since the two grid columns either side of it claim
+   equal width.
+
+   680 was measured when the way back was still the round arrow on the
+   left. The Portal pill moved into this cluster afterwards and nothing
+   re-measured: re-measured now, the bar needs 904px with the name showing
+   and fits every width down to 320 without it. So 680 to 900 was a
+   sideways scroll on every page carrying this ribbon — audit_admin.html
+   and audit_report.html both, at exactly the width a tablet holds it. */
+@media (max-width:900px){
   .fcr-welcome{display:none}
 }
 

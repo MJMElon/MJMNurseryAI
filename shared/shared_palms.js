@@ -39,6 +39,10 @@
     { n: 11, name: 'Pengambilan',                days: 30 },
   ];
 
+  /* Whether the office table actually has the colour column — see
+     loadStages. Null until a read has been attempted. */
+  let STAGE_COLOURS = null;
+
   let FIRST_ACT = 1;    // Saringan Anak Bibit
   let LAST_ACT = 11;    // Pengambilan
   const TARGET_DAYS = 15; // the speed incentive: Saringan → Transplanting
@@ -90,12 +94,32 @@
      Best effort — a table that does not exist yet, or a read a policy
      refuses, leaves the fallback in place rather than emptying the page. */
   async function loadStages(supa) {
-    try {
-      const res = await supa.from('nops_plot_status_stages')
-        .select('id, name, sort_order, ideal_days, color')
-        .order('sort_order');
+    /* `color` is newer than the table — migration_palms_stage_colours.sql
+       adds it. Asking for a column that does not exist fails the WHOLE read,
+       not just that column, and the fallback then quietly replaces the
+       office's stage list with the built-in eleven on every PALMS page: the
+       board's due dates, the map, the motion study's ideals, all of it.
+
+       So the colour is asked for, and if the server says it has no such
+       column the same read is made again without it. A nursery that has not
+       run that migration yet keeps everything except the colours. */
+    async function read(cols) {
+      const res = await supa.from('nops_plot_status_stages').select(cols).order('sort_order');
       if (res.error) throw res.error;
-      return applyStages(res.data);
+      return res.data;
+    }
+    try {
+      let rows;
+      try {
+        rows = await read('id, name, sort_order, ideal_days, color');
+        STAGE_COLOURS = true;
+      } catch (e) {
+        if (!/color/i.test((e && e.message) || '')) throw e;
+        console.warn('[palms] no colour column yet — reading the stages without it.');
+        STAGE_COLOURS = false;
+        rows = await read('id, name, sort_order, ideal_days');
+      }
+      return applyStages(rows);
     } catch (e) {
       console.warn('[palms] office stages not read, using the built-in list:', (e && e.message) || e);
       return false;
@@ -476,6 +500,9 @@
     nurseryOfPlot: nurseryOfPlot,
     loadLogs: loadLogs,
     loadStages: loadStages,
+    // false once a read has found no colour column: a page offering to set
+    // one would be offering a save that cannot succeed.
+    hasStageColours: function () { return STAGE_COLOURS !== false; },
     applyStages: applyStages,
     logsFromRows: logsFromRows,
     unitsOf: unitsOf,
