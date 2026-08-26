@@ -239,7 +239,17 @@ $('add-btn').addEventListener('click', () => { editingId = 'new'; render(); });
     /* Reading the list is for anyone in the module — the board and the motion
        study are read against it, so seeing it explains them. Changing it is
        admin only: these numbers decide what "late" means everywhere. */
-    isAdmin = MJMAccess.isAdminOf('nursery_ops') || MJMAccess.canManageUsers();
+    isAdmin = (function () {
+      /* Guarded the same way canOpenPage is below: a browser holding an
+         older cached shared_access.js has no isAdminOf, and an unguarded
+         call there takes the whole page down — every figure on it, not just
+         the edit button. Fails CLOSED: no admin rights from a script that
+         cannot answer the question. */
+      try {
+        return (typeof MJMAccess.isAdminOf === 'function' && MJMAccess.isAdminOf('nursery_ops'))
+            || (typeof MJMAccess.canManageUsers === 'function' && MJMAccess.canManageUsers());
+      } catch (e) { return false; }
+    })();
     await load();
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');
