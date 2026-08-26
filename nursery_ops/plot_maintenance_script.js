@@ -4040,7 +4040,15 @@ let traySize   = {};    // { nursery: seedlings per tray }
 let plotTrays  = {};    // { nursery: { plot: trays } }
 let chemicals  = [];    // nops_maint_chemicals rows
 let fertilisers = [];   // nops_maint_fertilisers rows
-let nurseryList = [];   // operation_nurseries.name — the batch module's list
+/* Stock Management's own list, kept apart from NURSERY_PLOTS.
+
+   NURSERY_PLOTS is the hardcoded list the four schedules and the payroll
+   still run on. Merging stock's plots into it looked tidy and was not: the
+   two spellings differ — "UNN1" here is "UNN 1" there — so the merge added
+   nurseries rather than reconciling them, and the Setting page grew six
+   tabs for four places. The Setting page reads THESE and nothing else. */
+let stockNurseries = [];   // names, in Stock Management's own order
+let stockPlots     = {};   // { nursery name: [plot, ...] }
 let _sharedPlotsLoaded = false;
 
 /* ── Where the plot names come from ────────────────────────────────────
@@ -4058,32 +4066,39 @@ async function loadSharedPlots() {
       .then(r => r, e => ({ error: e }))
   ]);
 
-  const data = pRes && pRes.data;
   if (pRes && pRes.error) console.warn('[maint] shared_plots read failed:', pRes.error.message);
-  if (Array.isArray(data) && data.length) {
-    data.forEach(r => {
-      const n = (r.nursery_name || '').trim();
-      const p = (r.plot_name || '').trim();
-      if (!n || !p) return;
-      if (!NURSERY_PLOTS[n]) NURSERY_PLOTS[n] = [];
-      if (!NURSERY_PLOTS[n].includes(p)) NURSERY_PLOTS[n].push(p);
-    });
-    _sharedPlotsLoaded = true;
-  }
-
-  /* The nurseries the Setting block offers, in the batch module's own order.
-     Only ones that actually have plots — a nursery with none would be a tab
-     onto an empty list. Anything shared_plots knows about that the nursery
-     table does not is added after, so a plot can never be unreachable. */
-  if (nRes && !nRes.error && Array.isArray(nRes.data)) {
-    nurseryList = nRes.data.map(r => (r.name || '').trim())
-      .filter(n => n && (NURSERY_PLOTS[n] || []).length);
-  } else if (nRes && nRes.error) {
-    console.warn('[maint] operation_nurseries read failed:', nRes.error.message);
-  }
-  Object.keys(NURSERY_PLOTS).forEach(n => {
-    if ((NURSERY_PLOTS[n] || []).length && nurseryList.indexOf(n) === -1) nurseryList.push(n);
+  const plots = (pRes && pRes.data) || [];
+  stockPlots = {};
+  plots.forEach(r => {
+    const n = (r.nursery_name || '').trim();
+    const p = (r.plot_name || '').trim();
+    if (!n || !p) return;
+    if (!stockPlots[n]) stockPlots[n] = [];
+    if (stockPlots[n].indexOf(p) === -1) stockPlots[n].push(p);
   });
+  Object.keys(stockPlots).forEach(n => stockPlots[n].sort(plotOrder));
+  _sharedPlotsLoaded = plots.length > 0;
+
+  /* Nurseries in Stock Management's own order, and only ones that have
+     plots — a tab onto an empty list is a tab onto nothing. A nursery that
+     only shared_plots knows about is added after, so no plot is unreachable. */
+  if (nRes && nRes.error) console.warn('[maint] operation_nurseries read failed:', nRes.error.message);
+  stockNurseries = (((nRes && nRes.data) || []).map(r => (r.name || '').trim()))
+    .filter(n => n && (stockPlots[n] || []).length);
+  Object.keys(stockPlots).forEach(n => {
+    if (stockNurseries.indexOf(n) === -1) stockNurseries.push(n);
+  });
+}
+
+/* B1, B2, B10 — not B1, B10, B2. A plot name is a letter run and a number,
+   and the number is a number. Anything after it (B13-R) sorts beside the
+   plot it belongs to rather than at the end of the alphabet. */
+function plotOrder(a, b) {
+  const m = v => (String(v).match(/^([^0-9]*)(\d*)(.*)$/) || []).slice(1);
+  const [ap, an, at] = m(a), [bp, bn, bt] = m(b);
+  if (ap !== bp) return ap.localeCompare(bp, 'en');
+  if (an !== bn) return (+an || 0) - (+bn || 0);
+  return at.localeCompare(bt, 'en');
 }
 
 async function loadSettingLists() {
@@ -4125,12 +4140,8 @@ function capacityOf(n, p) {
 /* The nurseries this block offers, and the plots under each. Both come from
    Seedling Stock. Falls back to the built-in list so the block is never
    empty on a database that cannot be read. */
-function capNurseries() {
-  return nurseryList.length ? nurseryList : Object.keys(NURSERY_PLOTS);
-}
-function capPlots(n) {
-  return (NURSERY_PLOTS[n] || []).slice();
-}
+function capNurseries() { return stockNurseries; }
+function capPlots(n)     { return (stockPlots[n] || []).slice(); }
 
 function renderSetting() {
   if (!capTab || capNurseries().indexOf(capTab) === -1) capTab = capNurseries()[0] || null;
@@ -4147,7 +4158,9 @@ function renderCapTabs() {
   bar.innerHTML = capNurseries().map(n =>
     '<button type="button" class="cap-tab' + (n === capTab ? ' on' : '') + '" ' +
       'onclick="switchCapTab(\'' + esc(n) + '\')">' +
-      esc(NURSERY_NAMES[n] || n) + '</button>').join('');
+      // Stock Management's own spelling, untranslated. A local nickname for
+      // the same nursery is how the two lists drifted apart in the first place.
+      esc(n) + '</button>').join('');
 }
 
 function switchCapTab(n) {
@@ -4355,67 +4368,119 @@ function updateCapTotal() {
 
 
 /* ── Chemicals, pest and disease ───────────────────────────────────────
-   One table, two lists. The dose is per seedling; a plot needs its
-   capacity times this. */
+   One table, one `kind`, shown as two columns of one list.
+
+   The dosage is keyed the way it is written on the drum — so much per pump
+   — and the per-seedling figure is worked out from it rather than asked
+   for. Nobody measures a chemical per seedling; they measure it per pump,
+   and the calculator is the thing that has to divide.
+
+   COVERAGE_PER_PUMP is the standard the rest of this file already sprays
+   to, so the two cannot disagree. */
 const CHEM_LABEL = { pest: 'pest', disease: 'disease' };
+
+/* Enough decimal places to be worth printing. A dose of 50gm over 800
+   seedlings is 0.0625 — rounded to two it reads 0.06 and the arithmetic
+   stops adding up. */
+function perSeedling(dose) {
+  const v = (+dose || 0) / COVERAGE_PER_PUMP;
+  if (!v) return null;
+  return v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(2);
+}
 
 function renderChemicals(kind) {
   const box = document.getElementById('chem-' + kind + '-list');
   if (!box) return;
-  const rows = chemicals.filter(c => c.kind === kind);
-  box.innerHTML = rows.length ? rows.map(c =>
-    '<div class="set-row">' +
-      '<span class="set-row-n">' + esc(c.name) + '</span>' +
-      '<span class="set-row-d">' +
-        '<span class="set-row-l">Dose / seedling</span>' +
-        '<input type="number" min="0" step="0.0001" value="' + (c.dose ?? '') + '" ' +
-          'oninput="onChemInput(\'' + c.id + '\', this.value)">' +
-        '<span class="set-row-u">' + esc(c.unit || 'gm') + '</span>' +
-      '</span>' +
-      '<button class="btn btn-sm btn-danger" style="font-size:11px;" ' +
-        'onclick="removeChemical(\'' + c.id + '\')">Remove</button>' +
-    '</div>').join('')
-    : '<div class="set-empty">No ' + CHEM_LABEL[kind] + ' chemical listed yet — add one below.</div>';
-}
+  const cover = document.getElementById('chem-cover');
+  if (cover) cover.textContent = COVERAGE_PER_PUMP.toLocaleString();
 
-async function addChemical(kind) {
-  const nameEl = document.getElementById(kind + '-name');
-  const doseEl = document.getElementById(kind + '-dose');
-  const unitEl = document.getElementById(kind + '-unit');
-  const name = (nameEl?.value || '').trim();
-  if (!name) { alert('Key in the chemical name first.'); nameEl?.focus(); return; }
-  if (chemicals.some(c => c.kind === kind && c.name.toLowerCase() === name.toLowerCase())) {
-    alert('“' + name + '” is already on the ' + CHEM_LABEL[kind] + ' list.');
+  const rows = chemicals.filter(c => c.kind === kind);
+  if (!rows.length) {
+    box.innerHTML = '<div class="lst-empty">No ' + CHEM_LABEL[kind] +
+      ' chemical yet — add one below.</div>';
     return;
   }
-  const row = { kind: kind, name: name, dose: +doseEl?.value || 0,
-                unit: unitEl?.value || 'gm', sort_order: chemicals.length,
+  box.innerHTML = rows.map(c => {
+    const per = perSeedling(c.dose);
+    return '<div class="lst-row" data-id="' + esc(c.id) + '">' +
+      '<input type="text" value="' + esc(c.name) + '" placeholder="Chemical name" ' +
+        'onchange="onChemName(\'' + esc(c.id) + '\', this.value)">' +
+      '<input type="number" min="0" step="0.01" value="' + (c.dose ?? '') + '" placeholder="0" ' +
+        'oninput="onChemDose(\'' + esc(c.id) + '\', this.value)">' +
+      '<span class="lst-calc' + (per ? '' : ' none') + '" data-calc>' +
+        (per ? per + ' ' + esc(c.unit || 'gm') : '—') + '</span>' +
+      '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
+        'onclick="removeChemical(\'' + esc(c.id) + '\')">&#10005;</button>' +
+    '</div>';
+  }).join('');
+}
+
+/* A blank row, saved as soon as it is added so it has an id to hang the
+   rest of the typing off. Named "New chemical" rather than left empty:
+   a row with no name at all cannot be told apart from the one above it. */
+async function addChemRow(kind) {
+  const base = 'New chemical';
+  let name = base, i = 2;
+  while (chemicals.some(c => c.kind === kind && c.name.toLowerCase() === name.toLowerCase())) {
+    name = base + ' ' + (i++);
+  }
+  const row = { kind: kind, name: name, dose: 0, unit: 'gm',
+                sort_order: chemicals.filter(c => c.kind === kind).length,
                 updated_at: new Date().toISOString() };
-  if (!_supabase) { chemicals.push({ ...row, id: 'local-' + Date.now() }); }
+  if (!_supabase) chemicals.push({ ...row, id: 'local-' + Date.now() });
   else {
     const { data, error } = await _supabase.from('nops_maint_chemicals')
       .insert([row]).select().then(r => r, e => ({ error: e }));
     if (error) {
-      alert('Could not save it — ' + (error.message || 'try again') +
+      alert('Could not add it — ' + (error.message || 'try again') +
             '\n\nIf this says the table is missing, run shared/migration_nops_maint_settings.sql.');
       return;
     }
     chemicals.push((data && data[0]) || row);
   }
-  if (nameEl) nameEl.value = '';
-  if (doseEl) doseEl.value = '';
   renderChemicals(kind);
+  // Straight into the name box: the row was added to be named.
+  const box = document.getElementById('chem-' + kind + '-list');
+  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
+  if (last) { last.focus(); last.select(); }
 }
 
-function onChemInput(id, val) {
+function saveChem(id, patch) {
+  if (!_supabase) return;
+  _supabase.from('nops_maint_chemicals')
+    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    .then(({ error }) => { if (error) console.warn('[maint] chemical save failed:', error.message); });
+}
+
+function onChemName(id, val) {
+  const c = chemicals.find(x => String(x.id) === String(id));
+  if (!c) return;
+  const name = (val || '').trim();
+  if (!name) { renderChemicals(c.kind); return; }   // put the old name back
+  if (chemicals.some(x => x.kind === c.kind && String(x.id) !== String(id) &&
+                          x.name.toLowerCase() === name.toLowerCase())) {
+    alert('“' + name + '” is already on the ' + CHEM_LABEL[c.kind] + ' list.');
+    renderChemicals(c.kind);
+    return;
+  }
+  c.name = name;
+  saveChem(id, { name: name });
+}
+
+function onChemDose(id, val) {
   const c = chemicals.find(x => String(x.id) === String(id));
   if (!c) return;
   c.dose = Math.max(0, +val || 0);
-  if (_supabase) {
-    _supabase.from('nops_maint_chemicals')
-      .update({ dose: c.dose, updated_at: new Date().toISOString() }).eq('id', id)
-      .then(({ error }) => { if (error) console.warn('[maint] chemical save failed:', error.message); });
+  // Only the derived cell beside the box being typed in — a full repaint
+  // would take the focus out of it on every keystroke.
+  const row = document.querySelector('.lst-row[data-id="' + CSS.escape(String(id)) + '"]');
+  const cell = row && row.querySelector('[data-calc]');
+  if (cell) {
+    const per = perSeedling(c.dose);
+    cell.textContent = per ? per + ' ' + (c.unit || 'gm') : '—';
+    cell.classList.toggle('none', !per);
   }
+  saveChem(id, { dose: c.dose });
 }
 
 async function removeChemical(id) {
@@ -4433,78 +4498,108 @@ async function removeChemical(id) {
 
 
 /* ── Fertilisers ───────────────────────────────────────────────────────
-   One row, two doses: the same product at transplanting and at monthly
-   manuring, which are different rates. A blank dose means the fertiliser
-   is not used for that work. */
+   One dosage and two ticks. The table keeps a dose per usage, which is the
+   shape to grow into if transplanting and monthly manuring ever want
+   different rates; until then a tick writes this dose into that usage and
+   clearing it writes NULL, so "not used for this work" stays distinct from
+   "used at nothing per seedling". */
+function fertDose(f) {
+  return f.dose_transplant != null ? f.dose_transplant
+       : f.dose_monthly    != null ? f.dose_monthly : '';
+}
+
 function renderFertilisers() {
   const box = document.getElementById('fert-list');
   if (!box) return;
-  box.innerHTML = fertilisers.length ? fertilisers.map(f =>
-    '<div class="set-row">' +
-      '<span class="set-row-n">' + esc(f.name) + '</span>' +
-      '<span class="set-row-d">' +
-        '<span class="set-row-l">Transplanting</span>' +
-        '<input type="number" min="0" step="0.0001" value="' + (f.dose_transplant ?? '') + '" ' +
-          'placeholder="—" oninput="onFertInput(\'' + f.id + '\',\'dose_transplant\', this.value)">' +
-      '</span>' +
-      '<span class="set-row-d">' +
-        '<span class="set-row-l">Monthly manuring</span>' +
-        '<input type="number" min="0" step="0.0001" value="' + (f.dose_monthly ?? '') + '" ' +
-          'placeholder="—" oninput="onFertInput(\'' + f.id + '\',\'dose_monthly\', this.value)">' +
-        '<span class="set-row-u">' + esc(f.unit || 'gm') + '</span>' +
-      '</span>' +
-      '<button class="btn btn-sm btn-danger" style="font-size:11px;" ' +
-        'onclick="removeFertiliser(\'' + f.id + '\')">Remove</button>' +
-    '</div>').join('')
-    : '<div class="set-empty">No fertiliser listed yet — add one below.</div>';
+  if (!fertilisers.length) {
+    box.innerHTML = '<div class="lst-empty">No fertiliser yet — add one below.</div>';
+    return;
+  }
+  box.innerHTML = fertilisers.map(f =>
+    '<div class="lst-row fert-row" data-id="' + esc(f.id) + '">' +
+      '<input type="text" value="' + esc(f.name) + '" placeholder="Fertiliser type" ' +
+        'onchange="onFertName(\'' + esc(f.id) + '\', this.value)">' +
+      '<input type="number" min="0" step="0.0001" value="' + fertDose(f) + '" placeholder="0" ' +
+        'oninput="onFertDose(\'' + esc(f.id) + '\', this.value)">' +
+      '<span class="lst-tick"><input type="checkbox" ' +
+        (f.dose_transplant != null ? 'checked ' : '') +
+        'onchange="onFertUse(\'' + esc(f.id) + '\', \'dose_transplant\', this.checked)"></span>' +
+      '<span class="lst-tick"><input type="checkbox" ' +
+        (f.dose_monthly != null ? 'checked ' : '') +
+        'onchange="onFertUse(\'' + esc(f.id) + '\', \'dose_monthly\', this.checked)"></span>' +
+      '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
+        'onclick="removeFertiliser(\'' + esc(f.id) + '\')">&#10005;</button>' +
+    '</div>').join('');
 }
 
-async function addFertiliser() {
-  const nameEl = document.getElementById('fert-name');
-  const tpEl   = document.getElementById('fert-tp');
-  const mmEl   = document.getElementById('fert-mm');
-  const unitEl = document.getElementById('fert-unit');
-  const name = (nameEl?.value || '').trim();
-  if (!name) { alert('Key in the fertiliser type first.'); nameEl?.focus(); return; }
-  if (fertilisers.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-    alert('“' + name + '” is already on the list. Edit its doses on the row above.');
-    return;
-  }
-  // A blank stays blank rather than becoming 0: "not used for this work" and
-  // "used at nothing per seedling" are different answers.
-  const num = el => (el && el.value !== '' ? Math.max(0, +el.value || 0) : null);
-  const row = { name: name, dose_transplant: num(tpEl), dose_monthly: num(mmEl),
-                unit: unitEl?.value || 'gm', sort_order: fertilisers.length,
-                updated_at: new Date().toISOString() };
-  if (row.dose_transplant === null && row.dose_monthly === null) {
-    alert('Give it a dose for at least one of the two — transplanting or monthly manuring.');
-    return;
-  }
-  if (!_supabase) { fertilisers.push({ ...row, id: 'local-' + Date.now() }); }
+async function addFertRow() {
+  const base = 'New fertiliser';
+  let name = base, i = 2;
+  while (fertilisers.some(f => f.name.toLowerCase() === name.toLowerCase())) name = base + ' ' + (i++);
+  // Ticked for transplanting to start with: a fertiliser used for neither
+  // would never appear anywhere, which is not a useful row to have made.
+  const row = { name: name, dose_transplant: 0, dose_monthly: null, unit: 'gm',
+                sort_order: fertilisers.length, updated_at: new Date().toISOString() };
+  if (!_supabase) fertilisers.push({ ...row, id: 'local-' + Date.now() });
   else {
     const { data, error } = await _supabase.from('nops_maint_fertilisers')
       .insert([row]).select().then(r => r, e => ({ error: e }));
     if (error) {
-      alert('Could not save it — ' + (error.message || 'try again') +
+      alert('Could not add it — ' + (error.message || 'try again') +
             '\n\nIf this says the table is missing, run shared/migration_nops_maint_settings.sql.');
       return;
     }
     fertilisers.push((data && data[0]) || row);
   }
-  [nameEl, tpEl, mmEl].forEach(el => { if (el) el.value = ''; });
   renderFertilisers();
+  const box = document.getElementById('fert-list');
+  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
+  if (last) { last.focus(); last.select(); }
 }
 
-function onFertInput(id, field, val) {
+function saveFert(id, patch) {
+  if (!_supabase) return;
+  _supabase.from('nops_maint_fertilisers')
+    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    .then(({ error }) => { if (error) console.warn('[maint] fertiliser save failed:', error.message); });
+}
+
+function onFertName(id, val) {
   const f = fertilisers.find(x => String(x.id) === String(id));
   if (!f) return;
-  f[field] = val === '' ? null : Math.max(0, +val || 0);
-  if (_supabase) {
-    const patch = { updated_at: new Date().toISOString() };
-    patch[field] = f[field];
-    _supabase.from('nops_maint_fertilisers').update(patch).eq('id', id)
-      .then(({ error }) => { if (error) console.warn('[maint] fertiliser save failed:', error.message); });
+  const name = (val || '').trim();
+  if (!name) { renderFertilisers(); return; }
+  if (fertilisers.some(x => String(x.id) !== String(id) &&
+                            x.name.toLowerCase() === name.toLowerCase())) {
+    alert('“' + name + '” is already on the list.');
+    renderFertilisers();
+    return;
   }
+  f.name = name;
+  saveFert(id, { name: name });
+}
+
+/* The dosage goes to whichever usages are ticked, and only those. */
+function onFertDose(id, val) {
+  const f = fertilisers.find(x => String(x.id) === String(id));
+  if (!f) return;
+  const d = val === '' ? 0 : Math.max(0, +val || 0);
+  const patch = {};
+  if (f.dose_transplant != null) { f.dose_transplant = d; patch.dose_transplant = d; }
+  if (f.dose_monthly    != null) { f.dose_monthly    = d; patch.dose_monthly    = d; }
+  if (Object.keys(patch).length) saveFert(id, patch);
+}
+
+function onFertUse(id, field, on) {
+  const f = fertilisers.find(x => String(x.id) === String(id));
+  if (!f) return;
+  const d = +fertDose(f) || 0;
+  f[field] = on ? d : null;
+  const patch = {}; patch[field] = f[field];
+  saveFert(id, patch);
+  // Unticking the last one leaves a dosage the row no longer uses, so the
+  // box goes back to blank rather than showing a figure nothing reads.
+  if (f.dose_transplant == null && f.dose_monthly == null) renderFertilisers();
 }
 
 async function removeFertiliser(id) {
