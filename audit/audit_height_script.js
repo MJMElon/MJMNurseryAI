@@ -87,16 +87,9 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  if(activeView==='form'){
-    if(e)e.preventDefault();
-    /* PN opens the multi-batch form directly from the grid, so a
-       back from the traditional per-batch form on PN skips the plot
-       list (there isn't one) and returns to the grid. */
-    if(window._lastOpenedPlot && activeTab!=='PN') openPlotDetail(window._lastOpenedPlot);
-    else setView('list');
-    return false;
-  }
-  if(activeView==='plot'||activeView==='detail'||activeView==='multi'){
+  /* Per-plot audit was cancelled, so there is no batch-list view to
+     return to. Back from any sub-view goes to the plot grid. */
+  if(activeView==='form'||activeView==='plot'||activeView==='detail'||activeView==='multi'){
     if(e)e.preventDefault();
     setView('list');
     return false;
@@ -411,6 +404,11 @@ function openPlot(plot){
 window.openPlot=openPlot;
 
 function openPlotDetail(plot){
+  /* Batch-list drill-down cancelled — the audit is per-plot now.
+     Any lingering caller (deep link, refresh handler, back button)
+     is re-aimed at the per-plot form so nobody lands on the old
+     list. Falls through only for a truly missing plot. */
+  if (typeof openMultiBatchForm === 'function') { openMultiBatchForm(plot); return; }
   window._lastOpenedPlot=plot;
   const bs=batchesOnPlot(plot).slice().sort((a,b)=>{
     const rank=x=>{
