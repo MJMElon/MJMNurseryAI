@@ -284,6 +284,38 @@ function isBatchAudited(plot, batch){
     r.nursery===activeTab && r.plot===plot && String(r.batch||'').trim()===wanted);
 }
 
+/* ── PRE NURSERY IS AUDITED BY PLOT ──────────────────────────────────
+   The main nursery tracks work batch by batch: a plot holds several,
+   each with its own age and its own audit. Pre Nursery does not work
+   that way — the seedlings there are audited plot by plot, so the batch
+   layer is noise on the screen and a second tap for nothing. For PN the
+   grid counts one task per plot, tapping a plot goes straight to the
+   form (or to the record, once there is one), and the batch box is not
+   on the form at all. The batches are still read behind the scenes —
+   they are how we know whether anything is standing on the plot. */
+function byPlot(){ return activeTab === 'PN'; }
+function plotHasWork(p){
+  return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
+}
+function isPlotAudited(p){
+  return records.some(r => r.nursery === activeTab && r.plot === p);
+}
+function openPlotAudit(plot){
+  window._lastOpenedPlot = plot;
+  const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
+  if (rec) { openDetail(rec.uid); return; }
+  _openFormForPlot(plot, null);
+}
+window.openPlotAudit = openPlotAudit;
+/* The batch box belongs to a batch-by-batch audit. Hide it where the
+   audit is the plot, and hide the row it sits in so nothing gaps. */
+function syncBatchField(){
+  const bf = document.getElementById('f-batch');
+  if (!bf) return;
+  const row = bf.closest('.form-field');
+  if (row) row.style.display = byPlot() ? 'none' : '';
+}
+
 /* --- RENDER LIST — plot-icon grid --- */
 function renderList(){
   const plots=NURSERY_PLOTS[activeTab]||[];
@@ -292,7 +324,11 @@ function renderList(){
   let totalRequired=0;
   let totalAudited=0;
   plots.forEach(p=>{
-    const required=batchesOnPlot(p).filter(b=>!isBatchNotRequired(p, b.batch));
+    if (byPlot()) {
+      if (plotHasWork(p)) { totalRequired++; if (isPlotAudited(p)) totalAudited++; }
+      return;
+    }
+    const required = batchesOnPlot(p).filter(b => !isBatchNotRequired(p, b.batch));
     totalRequired += required.length;
     totalAudited  += required.filter(b=>isBatchAudited(p, b.batch)).length;
   });
@@ -316,10 +352,13 @@ function renderList(){
   }
   grid.innerHTML = plots.map(p=>{
     const bs=batchesOnPlot(p);
-    const required=bs.filter(b=>!isBatchNotRequired(p, b.batch));
-    const pending=required.filter(b=>!isBatchAudited(p, b.batch)).length;
-    const done=required.length - pending;
-    const allDone=required.length>0 && pending===0;
+    const onePlot = byPlot();
+    const required = onePlot ? (plotHasWork(p) ? [p] : [])
+                            : bs.filter(b => !isBatchNotRequired(p, b.batch));
+    const pending  = onePlot ? (required.length && !isPlotAudited(p) ? 1 : 0)
+                            : required.filter(b => !isBatchAudited(p, b.batch)).length;
+    const done = required.length - pending;
+    const allDone = required.length > 0 && pending === 0;
 
     let badgeHtml='';
     if(required.length){
@@ -327,13 +366,15 @@ function renderList(){
         ? '<div class="plot-badge done" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="5 12 10 17 19 8"/></svg></div>'
         : '<div class="plot-badge" aria-hidden="true">'+pending+'</div>';
     }
-    const subtitle = required.length
-      ? done + ' / ' + required.length + ' ' + t('audited')
-      : (bs.length ? bs.length + ' ' + t(bs.length>1?'batches_many':'batch_one') : t('no_batches'));
+    const subtitle = onePlot
+      ? (required.length ? (pending ? t('pending_word') : t('all_audited')) : '—')
+      : required.length
+        ? done + ' / ' + required.length + ' ' + t('audited')
+        : (bs.length ? bs.length + ' ' + t(bs.length > 1 ? 'batches_many' : 'batch_one') : t('no_batches'));
     return `
       <button class="plot-cell ${allDone?'done':''}"
               data-plot="${p}"
-              onclick="openPlotDetail('${p}')"
+              onclick="${onePlot ? 'openPlotAudit' : 'openPlotDetail'}('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
@@ -646,6 +687,7 @@ function undoDeclineAudit(){
 window.undoDeclineAudit=undoDeclineAudit;
 function populateForm(r){
   document.getElementById('f-date').value=editMode?r.date:todayISO();
+  syncBatchField();
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{

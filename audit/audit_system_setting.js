@@ -215,15 +215,20 @@
   }
 
   /* ── Ages ───────────────────────────────────────────────────────── */
+  /* All ages is a shortcut, not a lock. Ticking it ticks every age;
+     unticking one of them leaves the rest ticked and simply stops the
+     set being "all". The stored value is still null for all, so nothing
+     that reads the setting has to know about this. */
+  const everyAge = () => Array.from({ length: MAX_AGE + 1 }, (_, m) => m);
+  const pickedAges = () => new Set(draft.ages === null ? everyAge() : draft.ages);
+
   function drawAges() {
-    const all = draft.ages === null;
-    $('ss-age-all').checked = all;
-    const picked = new Set(draft.ages || []);
+    const picked = pickedAges();
+    $('ss-age-all').checked = picked.size === MAX_AGE + 1;
     $('ss-ages').innerHTML = Array.from({ length: MAX_AGE + 1 }, (_, m) => `
       <label class="ss-age inline-flex items-center gap-2 rounded-full border px-3 py-2 cursor-pointer ${
-        all ? 'opacity-40 pointer-events-none border-slate-200 bg-white'
-            : (picked.has(m) ? 'border-orange-300 bg-orange-50' : 'border-slate-200 bg-white')}">
-        <input type="checkbox" data-age="${m}" ${picked.has(m) ? 'checked' : ''} ${all ? 'disabled' : ''}
+        picked.has(m) ? 'border-orange-300 bg-orange-50' : 'border-slate-200 bg-white'}">
+        <input type="checkbox" data-age="${m}" ${picked.has(m) ? 'checked' : ''}
                class="w-4 h-4 accent-orange-500">
         <span class="text-[11px] font-black text-slate-700 whitespace-nowrap">${m} month${m === 1 ? '' : 's'}</span>
       </label>`).join('');
@@ -347,15 +352,19 @@
         return;
       }
       if (t.id === 'ss-age-all') {
-        draft.ages = t.checked ? null : (draft.ages || []);
+        draft.ages = t.checked ? null : [];
         drawAges();
         return;
       }
       if (t.dataset.age != null) {
         const m = +t.dataset.age;
-        const set = new Set(draft.ages || []);
+        const set = pickedAges();
         if (t.checked) set.add(m); else set.delete(m);
-        draft.ages = Array.from(set).sort((a, b) => a - b);
+        // Back to every age → store null, so "all" keeps meaning all even
+        // if the range is widened later.
+        draft.ages = set.size === MAX_AGE + 1
+          ? null
+          : Array.from(set).sort((a, b) => a - b);
         drawAges();
       }
     });
