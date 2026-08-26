@@ -541,39 +541,36 @@ function _timelineHtml(list, isAudited){
   const WEEKS  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
   return keys.map(k => {
     const items = groups.get(k).slice().sort((a,b) => String(a.plot||'').localeCompare(String(b.plot||'')));
-    let dateBox;
-    if (k) {
-      const [y,m,d] = k.split('T')[0].split('-').map(Number);
-      const dt = new Date(y, (m||1)-1, d||1);
-      dateBox = `<div class="timeline-date">
-        <div class="td-day">${String(d).padStart(2,'0')}</div>
-        <div class="td-mon">${MONTHS[(m||1)-1]}</div>
-        <div class="td-yr">'${String(y).slice(-2)}</div>
-        <div class="td-wk">${WEEKS[dt.getDay()]}</div>
-      </div>`;
-    } else {
-      dateBox = `<div class="timeline-date">
-        <div class="td-day">—</div>
-        <div class="td-mon">NO DATE</div>
-      </div>`;
-    }
+    /* Date column retired — the "by <due date>" line under each card
+       carries the same day already, and dropping the box lets each
+       card use the full row width. */
     const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t.id) : null)).join('');
-    return `<div class="timeline-day">${dateBox}<div class="timeline-tasks">${cards}</div></div>`;
+    return `<div class="timeline-day"><div class="timeline-tasks">${cards}</div></div>`;
   }).join('');
+}
+
+/* Left-border colour by task type — one colour per kind of work so
+   the auditor sees which task a row is at a glance. Falls back to
+   grey for anything the map does not recognise. */
+function _taskTypeColour(type){
+  const s = String(type||'').toLowerCase();
+  if (s.indexOf('manur')  !== -1) return '#1e40af';   // blue
+  if (s.indexOf('weed')   !== -1) return '#166534';   // green
+  if (s.indexOf('interrow')!==-1) return '#c2410c';   // orange
+  if (s.indexOf('p&d')    !== -1 ||
+      s.indexOf('pest')   !== -1 ||
+      s.indexOf('disease')!== -1 ||
+      s.indexOf('spray')  !== -1) return '#ca8a04';   // yellow
+  return '#94a3b8';                                    // slate
 }
 
 function makeTaskCard(t, audit){
   const status = audit ? resultStatusClass(audit.result) : 'status-pending';
-  const badgeLabel = audit ? audit.result : 'Pending';
-  const badgeClass = audit ? resultBadgeClass(audit.result) : 'badge-pending';
-  // Chip row: no chemical chip (per feedback), no nursery tag (moved
-  // to context), no date pill (the timeline column carries it). Round
-  // is shown as a chip, based on week_no from the field record.
   // Countdown pill only renders while pending — the clock stops once
-  // the audit is filed.
+  // the audit is filed. Round chip and Pending status pill were
+  // retired at the auditor's request.
   const countdownHtml = audit ? '' : _countdownChip(t);
   const chips = `<div class="task-chips">
-    ${t.round?`<span class="task-chip">Round ${t.round}</span>`:''}
     ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
     ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
     ${countdownHtml}
@@ -586,15 +583,12 @@ function makeTaskCard(t, audit){
     : `<div class="task-actions">
         <button class="btn-audit-now" onclick="openForm('${t.id}',false,null)">Audit Now</button>
       </div>`;
-  // Top row now only carries the status pill (Pending / Satisfied /
-  // …). The work name is the card's big heading; the plot sits below
-  // it as a slightly smaller subtitle. Nursery tag was removed per
-  // feedback — the auditor already picked the nursery on the bottom
-  // tab bar so it's redundant on every card.
-  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}">
-    <div class="task-card-top">
-      <span class="task-status-badge ${badgeClass}">${badgeLabel}</span>
-    </div>
+  /* Left border colour is set inline so it does not need a class per
+     task type — a new work type only has to be named in
+     _taskTypeColour and the card picks it up. */
+  const tone = _taskTypeColour(t.type);
+  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}"
+                style="border-left-color:${tone}">
     <div class="task-work">${t.type}</div>
     <div class="task-plot">${t.plot}</div>
     <div class="task-meta">${t.worker?'Worker: '+t.worker:''}</div>
