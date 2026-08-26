@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -29,16 +30,44 @@
   .lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
          color:#64748b; margin-bottom:5px; }
 
-  /* # · Stage · Ideal days · Remark · actions */
-  .st-grid { display:grid; grid-template-columns:40px minmax(190px,1.2fr) 120px minmax(160px,1fr) 150px; gap:12px; align-items:center; }
-  .st-head { padding:0 18px 8px; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:#94a3b8; }
-  .st-row { padding:13px 18px; border:1px solid #e2e8f0; border-radius:16px; background:white; }
-  .st-row.editing { border-color:#5eead4; box-shadow:0 0 0 3px rgba(20,184,166,.12); }
-  .st-num { width:36px; height:36px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
-            color:#0f766e; font-weight:900; font-size:14px; display:flex; align-items:center; justify-content:center; }
-  .st-name { font-weight:900; color:#0f172a; font-size:16px; }
-  .st-days { font-weight:900; color:#0f766e; font-size:16px; }
-  .st-remark { font-weight:600; color:#64748b; font-size:14px; }
+  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 106px; gap:10px 14px;
+            align-items:center; padding:5px 6px; border-radius:12px; border:1.5px solid transparent; }
+  .iw-row + .iw-row { margin-top:2px; }
+  .iw-row.edit { border-color:#f1f5f9; }
+  .iw-row.dragging { background:#f0fdfa; border-color:#5eead4; opacity:.85; }
+  .iw-row.over { border-color:#14b8a6; }
+  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 106px; gap:10px 14px;
+             padding:0 6px 6px; font-size:10px; font-weight:900; letter-spacing:.1em;
+             text-transform:uppercase; color:#94a3b8; }
+  .iw-handle { cursor:grab; touch-action:none; user-select:none; color:#cbd5e1; font-size:15px;
+               text-align:center; line-height:1; padding:4px 0; border-radius:6px; }
+  .iw-handle:hover { color:#0d9488; background:#f0fdfa; }
+  .iw-row.dragging .iw-handle { cursor:grabbing; }
+  .iw-n { width:30px; height:30px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
+          color:#0f766e; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center; }
+  .iw-name { font-weight:900; color:#1e293b; font-size:13px; }
+  .iw-in { width:100%; background:white; border:1.5px solid #e2e8f0; border-radius:10px; padding:7px 10px;
+           font-size:14px; font-weight:900; color:#0f172a; outline:none; font-family:inherit; text-align:right; }
+  .iw-in.name { text-align:left; font-size:13px; }
+  .iw-in:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  .iw-in.dirty { border-color:#f59e0b; background:#fffbeb; }
+  .iw-ro { font-weight:900; color:#0f766e; font-size:14px; text-align:right; }
+  .iw-add { display:flex; align-items:center; gap:8px; width:100%; margin-top:6px; padding:9px 12px;
+            border-radius:12px; border:1.5px dashed #99f6e4; background:#f0fdfa; color:#0f766e;
+            font-weight:900; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+            cursor:pointer; font-family:inherit; }
+  .iw-add:hover { background:#ccfbf1; }
+  .iw-btn { padding:9px 16px; border-radius:11px; font-size:11px; font-weight:900; letter-spacing:.08em;
+            text-transform:uppercase; cursor:pointer; border:1.5px solid transparent; font-family:inherit; }
+  .iw-btn-dark { background:#0f172a; color:white; }
+  .iw-btn-dark:hover { background:#1e293b; }
+  .iw-btn-ghost { background:white; color:#475569; border-color:#e2e8f0; }
+  .iw-btn-ghost:hover { background:#f8fafc; }
+  .iw-icon { width:34px; height:34px; border-radius:11px; background:white; border:1.5px solid #99f6e4;
+             color:#0f766e; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+             padding:0; transition:all .15s; }
+  .iw-icon:hover { background:#ccfbf1; }
+  .iw-icon svg { width:16px; height:16px; display:block; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -57,31 +86,32 @@
 
   <div class="palms-body space-y-6">
 
-  <div class="card p-5 md:p-7">
-    <div class="flex items-center justify-between gap-3 mb-2">
-      <h2 class="font-black text-slate-800 uppercase tracking-widest text-base">🚦 PALMS — Status Stages</h2>
-      <button id="add-btn" class="btn btn-teal shrink-0">+ Add Stage</button>
-    </div>
-    <p class="text-[12px] text-slate-500 leading-relaxed max-w-[720px]">
-      The stages a plot moves through, in order, and how many days each is meant to take. This is the list
-      the Field Conductor picks from on the <strong>555 FC Portal</strong>, and the ideal days are what the
-      Monitoring Board calls a plot late by and what the Motion Study measures against.
-    </p>
-
-    <div class="overflow-x-auto -mx-2 px-2">
-      <div class="min-w-[720px]">
-        <div class="st-grid st-head mt-5">
-          <div>#</div><div>Stage</div><div>Ideal days</div><div>Remark</div><div class="text-right pr-1">&nbsp;</div>
-        </div>
-        <div id="list" class="space-y-3"></div>
-      </div>
+  <div class="card p-5 mb-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h2 class="text-base font-black text-slate-800 uppercase tracking-widest">⏱️ Ideal Work — the standard days</h2>
+      <span id="iw-rest-msg" class="text-[11px] font-bold text-slate-400 ml-auto mr-2"></span>
+      <button id="iw-edit" class="iw-icon hidden" title="Edit the standard days" aria-label="Edit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+        </svg>
+      </button>
     </div>
 
-    <p class="text-[11px] text-slate-400 mt-4 leading-relaxed">
-      Renaming a stage does <strong>not</strong> rewrite history — a plot log keeps the stage number it was
-      recorded against. Moving a stage changes what that number MEANS, so past records are re-read against the
-      new order; that is right for "where is this plot now" and worth a moment's thought before reordering.
-    </p>
+    <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
+
+    <div class="iw-head">
+      <div></div><div>#</div><div>Work status</div><div class="text-right">Ideal days</div>
+    </div>
+    <div id="iw-list"></div>
+    <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
+
+    <div id="iw-actions" class="hidden items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+      <span id="iw-msg" class="text-[11px] font-bold text-slate-400 mr-auto"></span>
+      <button id="iw-cancel" class="iw-btn iw-btn-ghost">Cancel</button>
+      <button id="iw-save" class="iw-btn iw-btn-dark">Save</button>
+    </div>
   </div>
 
 </div>
@@ -95,137 +125,261 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-let stages = [];
-let isAdmin = false;
-let editingId = null;   // the id being edited, 'new' for the add row, or null
+let IW_ADMIN = false;  // may this person change the standard?
+let IW_ROWS = [];      // [{ id, name, days }] as the office last saved them
+let IW_EDIT = false;   // is the card in edit mode?
 
-function showToast(msg, kind) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'fixed bottom-6 right-6 z-[80] px-5 py-3 rounded-xl font-bold text-sm shadow-lg ' +
-    (kind === 'err' ? 'bg-red-50 text-red-700 border border-red-200'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200');
-  t.classList.remove('hidden');
-  setTimeout(() => t.classList.add('hidden'), 2600);
+/* ── Ideal Work: the standard days ────────────────────────────────────
+   These are nops_plot_status_stages — the same rows the PALMS Settings page
+   holds and the field app reads. They are edited HERE too because this is
+   the page where you find out a standard is wrong: the Shortest / Average /
+   Longest columns right below are what tell you two days was never
+   realistic, and having to leave for another page to act on that is how a
+   stale standard survives for a year.
+
+   The card is READ-ONLY until Edit is pressed. Nothing on this page is
+   changed by accident: no boxes, no drag, no Save to mis-click. Edit turns
+   all three on together, Cancel throws the draft away, and only Save writes.
+
+   IW_ROWS is what the office last saved. IW_WORK is the draft — a copy made
+   when Edit is pressed, mutated freely, and diffed against IW_ROWS on save
+   so an untouched row is never written. */
+let IW_WORK = [];      // the draft, only while editing
+let IW_SEQ = 0;        // ids for rows added but not yet saved
+
+function iwEditable() {
+  return IW_ADMIN && MJMPalms.ACTIVITIES.some((a) => a.stageId != null);
 }
 
-/* The number shown is the POSITION, not the database id — that is what the
-   plot log stores as act_n and what makes "stage 1 comes before stage 2"
-   true. Reordering renumbers, which is why it is a deliberate action. */
-function displayRow(s, i) {
-  return `
-    <div class="st-row st-grid" data-id="${s.id}">
-      <div class="st-num">${i + 1}</div>
-      <div class="st-name">${esc(s.name)}</div>
-      <div class="st-days">${s.ideal_days == null ? '<span class="text-slate-300">—</span>' : esc(s.ideal_days) + 'd'}</div>
-      <div class="st-remark">${s.remark ? esc(s.remark) : '<span class="text-slate-300">—</span>'}</div>
-      <div class="flex items-center justify-end gap-1.5">
-        ${isAdmin ? `
-          <button class="btn btn-ghost btn-mini" data-up="${s.id}" ${i === 0 ? 'disabled style="opacity:.3"' : ''}>↑</button>
-          <button class="btn btn-ghost btn-mini" data-down="${s.id}" ${i === stages.length - 1 ? 'disabled style="opacity:.3"' : ''}>↓</button>
-          <button class="btn btn-ghost btn-mini" data-edit="${s.id}">✏️</button>
-          <button class="btn btn-danger btn-mini" data-del="${s.id}">🗑</button>` : ''}
-      </div>
-    </div>`;
-}
+function renderIdealWork() {
+  IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, name: a.name, days: a.days }));
 
-function editRow(s, i) {
-  const isNew = !s;
-  return `
-    <div class="st-row st-grid editing" data-id="${isNew ? 'new' : s.id}">
-      <div class="st-num">${isNew ? stages.length + 1 : i + 1}</div>
-      <div><input id="f-name" class="inp" placeholder="e.g. Saringan Anak Bibit" value="${isNew ? '' : esc(s.name)}"></div>
-      <div><input id="f-days" class="inp" type="number" min="0" step="1" placeholder="days"
-                  value="${isNew || s.ideal_days == null ? '' : esc(s.ideal_days)}"></div>
-      <div><input id="f-remark" class="inp" placeholder="optional" value="${isNew || !s.remark ? '' : esc(s.remark)}"></div>
-      <div class="flex items-center justify-end gap-1.5">
-        <button class="btn btn-teal btn-mini" data-save="1">Save</button>
-        <button class="btn btn-ghost btn-mini" data-cancel="1">Cancel</button>
-      </div>
-    </div>`;
-}
-
-function render() {
-  const rows = stages.map((s, i) => (String(editingId) === String(s.id) ? editRow(s, i) : displayRow(s, i)));
-  if (editingId === 'new') rows.push(editRow(null, -1));
-  $('list').innerHTML = rows.join('') ||
-    '<div class="text-center text-slate-400 text-sm py-10">No stages yet. Add the first one.</div>';
-  $('add-btn').classList.toggle('hidden', !isAdmin || editingId !== null);
-}
-
-async function load() {
-  const { data, error } = await _supabase
-    .from('nops_plot_status_stages').select('*').order('sort_order').order('name');
-  if (error) { showToast('Could not read the stages.', 'err'); return; }
-  stages = data || [];
-  render();
-}
-
-async function save() {
-  const name = $('f-name').value.trim();
-  if (!name) { showToast('A stage needs a name.', 'err'); return; }
-  const daysRaw = $('f-days').value;
-  const payload = {
-    name: name,
-    ideal_days: daysRaw === '' ? null : Number(daysRaw),
-    remark: $('f-remark').value.trim() || null,
-  };
-  let error;
-  if (editingId === 'new') {
-    payload.sort_order = stages.length ? Math.max.apply(null, stages.map((s) => s.sort_order || 0)) + 1 : 1;
-    ({ error } = await _supabase.from('nops_plot_status_stages').insert([payload]));
+  /* No stageId means shared_palms fell back to its built-in eleven, because
+     nops_plot_status_stages is empty or could not be read. There would be
+     nothing to save a change to, so editing is not offered and the reason is
+     said rather than left as a dead button. */
+  const fromOffice = IW_ROWS.some((r) => r.id != null);
+  const note = $('iw-note');
+  if (!fromOffice) {
+    note.className = 'text-[12px] font-bold text-amber-700 leading-relaxed mb-3';
+    note.textContent = 'These are the built-in defaults — the office stage list is empty or unreadable, ' +
+      'so there is nothing to save a change to. Add the stages on PALMS → Settings first.';
   } else {
-    ({ error } = await _supabase.from('nops_plot_status_stages').update(payload).eq('id', editingId));
+    note.className = 'hidden';
   }
-  if (error) { showToast(error.message || 'Could not save.', 'err'); return; }
-  editingId = null;
-  await load();
-  showToast('Saved.');
+
+  $('iw-edit').classList.toggle('hidden', IW_EDIT || !iwEditable());
+  $('iw-add').classList.toggle('hidden', !IW_EDIT);
+  // The action bar is display:flex when shown; toggling `hidden` alone would
+  // leave a flex container that is still laid out.
+  const bar = $('iw-actions');
+  bar.classList.toggle('hidden', !IW_EDIT);
+  bar.classList.toggle('flex', IW_EDIT);
+
+  const list = IW_EDIT ? IW_WORK : IW_ROWS;
+  $('iw-list').innerHTML = list.map((r, i) => {
+    if (!IW_EDIT) {
+      return '<div class="iw-row">' +
+        '<div></div>' +
+        '<div class="iw-n">' + (i + 1) + '</div>' +
+        '<div class="iw-name">' + esc(r.name) + '</div>' +
+        '<div class="iw-ro">' + (r.days == null ? '—' : esc(r.days) + 'd') + '</div>' +
+        '</div>';
+    }
+    const was = r.id != null ? IW_ROWS.find((x) => String(x.id) === String(r.id)) : null;
+    const dDays = !was || String(r.days) !== String(was.days);
+    const dName = !was || String(r.name || '') !== String(was.name || '');
+    /* Renaming is allowed here. It does NOT rewrite history: a plot log
+       stores the stage NUMBER, not its name, so past records simply start
+       reading under the new one. Moving a stage is the operation that
+       changes what a stored number means — which is why the drag handle,
+       not this box, is the one worth pausing over. */
+    return '<div class="iw-row edit" draggable="false" data-key="' + esc(r.key) + '">' +
+      '<div class="iw-handle" data-iw-drag="' + esc(r.key) + '" title="Drag to reorder">⠿</div>' +
+      '<div class="iw-n">' + (i + 1) + '</div>' +
+      '<input class="iw-in name' + (dName ? ' dirty' : '') + '" data-iw-name="' + esc(r.key) + '" ' +
+        'placeholder="Work status name" value="' + esc(r.name || '') + '">' +
+      '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
+        'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
+      '</div>';
+  }).join('');
 }
 
-async function remove(id) {
-  const s = stages.find((x) => String(x.id) === String(id));
-  if (!s) return;
-  if (!confirm('Delete "' + s.name + '"?\n\nPast plot records keep the stage NUMBER they were recorded ' +
-               'against, so deleting shifts what every later number means. Renaming is usually what is wanted.')) return;
-  const { error } = await _supabase.from('nops_plot_status_stages').delete().eq('id', id);
-  if (error) { showToast(error.message || 'Could not delete.', 'err'); return; }
-  await load();
-  showToast('Deleted.');
+function iwEnter() {
+  // Every draft row carries a stable `key` — the database id for a saved
+  // stage, a made-up one for a new row. Drag and the boxes are addressed by
+  // it, so a row keeps its identity through reordering, when its INDEX does
+  // not and its id may not exist yet.
+  IW_WORK = IW_ROWS.map((r) => ({ id: r.id, key: 'k' + r.id, name: r.name, days: r.days, isNew: false }));
+  IW_EDIT = true;
+  $('iw-msg').textContent = '';
+  $('iw-rest-msg').textContent = '';
+  renderIdealWork();
 }
 
-/* Moving a stage rewrites sort_order for the whole list rather than swapping
-   two rows: a list that has ever been edited by hand can have gaps or
-   duplicates in sort_order, and a swap would preserve them. */
-async function move(id, dir) {
-  const i = stages.findIndex((x) => String(x.id) === String(id));
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= stages.length) return;
-  const next = stages.slice();
-  next.splice(j, 0, next.splice(i, 1)[0]);
-  const writes = next
-    .map((s, idx) => (s.sort_order === idx + 1
-      ? null
-      : _supabase.from('nops_plot_status_stages').update({ sort_order: idx + 1 }).eq('id', s.id)))
-    .filter(Boolean);
-  stages = next;
-  render();
-  const results = await Promise.all(writes);
-  if (results.some((r) => r && r.error)) showToast('Could not save the new order.', 'err');
-  await load();
+function iwLeave() {
+  IW_EDIT = false;
+  IW_WORK = [];
+  renderIdealWork();
 }
 
-$('list').addEventListener('click', (e) => {
-  const t = (a) => { const b = e.target.closest('[data-' + a + ']'); return b ? b.dataset[a] : null; };
-  if (t('save') !== null) return void save();
-  if (t('cancel') !== null) { editingId = null; return void render(); }
-  const ed = t('edit'); if (ed) { editingId = ed; return void render(); }
-  const dl = t('del'); if (dl) return void remove(dl);
-  const up = t('up'); if (up) return void move(up, -1);
-  const dn = t('down'); if (dn) return void move(dn, 1);
+$('iw-edit').addEventListener('click', iwEnter);
+$('iw-cancel').addEventListener('click', () => { $('iw-msg').textContent = ''; iwLeave(); });
+
+$('iw-add').addEventListener('click', () => {
+  IW_WORK.push({ id: null, key: 'new' + (++IW_SEQ), name: '', days: null, isNew: true });
+  renderIdealWork();
+  const boxes = $('iw-list').querySelectorAll('[data-iw-name]');
+  if (boxes.length) boxes[boxes.length - 1].focus();
 });
 
-$('add-btn').addEventListener('click', () => { editingId = 'new'; render(); });
+$('iw-list').addEventListener('input', (e) => {
+  const d = e.target.closest('[data-iw-days]');
+  if (d) {
+    const row = IW_WORK.find((r) => r.key === d.dataset.iwDays);
+    if (row) row.days = d.value === '' ? null : Number(d.value);
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    d.classList.toggle('dirty', !was || (row && String(row.days) !== String(was.days)));
+  }
+  const n = e.target.closest('[data-iw-name]');
+  if (n) {
+    const row = IW_WORK.find((r) => r.key === n.dataset.iwName);
+    if (row) row.name = n.value;
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    n.classList.toggle('dirty', !was || (row && String(row.name || '') !== String(was.name || '')));
+  }
+  $('iw-msg').textContent = '';
+});
+
+/* ── Drag to reorder ──────────────────────────────────────────────
+   Pointer events, not HTML5 drag-and-drop: this has to work under a finger
+   on the tablet the office actually uses, and dragstart never fires there.
+
+   The DOM node is moved as the pointer passes each row's midpoint and the
+   draft array is kept in step, rather than re-rendering — a re-render mid
+   drag destroys the element the pointer is captured on and the drag dies on
+   the first move. Numbers are refreshed in place instead. */
+(function wireDrag() {
+  const list = $('iw-list');
+  let node = null, key = null;
+
+  const renumber = () => {
+    [].forEach.call(list.querySelectorAll('.iw-row'), (el, i) => {
+      const n = el.querySelector('.iw-n');
+      if (n) n.textContent = i + 1;
+    });
+  };
+
+  list.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest('[data-iw-drag]');
+    if (!h || !IW_EDIT) return;
+    key = h.dataset.iwDrag;
+    node = h.closest('.iw-row');
+    if (!node) { key = null; return; }
+    node.classList.add('dragging');
+    h.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  list.addEventListener('pointermove', (e) => {
+    if (!node) return;
+    const rows = [].slice.call(list.querySelectorAll('.iw-row'));
+    for (const other of rows) {
+      if (other === node) continue;
+      const r = other.getBoundingClientRect();
+      if (e.clientY > r.top && e.clientY < r.bottom) {
+        const before = other.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING;
+        list.insertBefore(node, before ? other : other.nextSibling);
+        renumber();
+        break;
+      }
+    }
+  });
+
+  const drop = () => {
+    if (!node) return;
+    node.classList.remove('dragging');
+    // The DOM is the order now; the draft follows it.
+    const order = [].map.call(list.querySelectorAll('.iw-row'), (el) => el.dataset.key);
+    IW_WORK.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    node = null; key = null;
+    $('iw-msg').textContent = '';
+  };
+  list.addEventListener('pointerup', drop);
+  list.addEventListener('pointercancel', drop);
+})();
+
+$('iw-save').addEventListener('click', async () => {
+  const msg = $('iw-msg');
+  msg.className = 'text-[11px] font-bold text-slate-400';
+
+  // A blank Add-new row the user never filled in is a mind changed, so it is
+  // dropped. An EXISTING stage emptied of its name is a mistake, and saying
+  // so beats silently keeping the old name or writing an unnamed stage.
+  const named = IW_WORK.filter((r) => !r.isNew || String(r.name || '').trim());
+  const blank = named.find((r) => !String(r.name || '').trim());
+  if (blank) {
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = 'A work status needs a name.';
+    return;
+  }
+  const bad = named.find((r) => r.days == null || !(r.days >= 0));
+  if (bad) {
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = 'Give ' + (String(bad.name || '').trim() || 'the new work') + ' a number of days.';
+    return;
+  }
+  // A blank Add-new row the user never filled in is a mind changed, not an
+  // error: it is dropped rather than refused.
+  const drafts = named;
+
+  const inserts = drafts.filter((r) => r.isNew).map((r) => ({
+    name: String(r.name).trim(), ideal_days: r.days, sort_order: drafts.indexOf(r) + 1,
+  }));
+  const updates = drafts.filter((r) => !r.isNew).map((r, _i) => {
+    const was = IW_ROWS.find((x) => String(x.id) === String(r.id));
+    const pos = drafts.indexOf(r) + 1;
+    const patch = {};
+    if (!was || String(was.days) !== String(r.days)) patch.ideal_days = r.days;
+    if (!was || String(was.name || '') !== String(r.name || '')) patch.name = String(r.name).trim();
+    // sort_order is rewritten for every row whose position moved, not just
+    // the dragged one — everything after it shifts up or down by one.
+    if (IW_ROWS.findIndex((x) => String(x.id) === String(r.id)) !== pos - 1) patch.sort_order = pos;
+    return Object.keys(patch).length ? { id: r.id, patch: patch } : null;
+  }).filter(Boolean);
+
+  if (!inserts.length && !updates.length) { iwLeave(); return; }
+
+  $('iw-save').disabled = true;
+  msg.textContent = 'Saving…';
+  try {
+    for (const u of updates) {
+      const res = await _supabase.from('nops_plot_status_stages').update(u.patch).eq('id', u.id);
+      if (res.error) throw res.error;
+    }
+    if (inserts.length) {
+      const res = await _supabase.from('nops_plot_status_stages').insert(inserts);
+      if (res.error) throw res.error;
+    }
+    /* Re-read the stages and re-parse the log against them. The log stores
+       each entry's own ideal, so a FINISHED stage keeps the number it was
+       judged against — only the aggregates and anything still running move. */
+    /* No log to re-measure here — that happens on the Plot Status Map and
+       the Plot Motion Study, which read these same rows when they load. */
+    await MJMPalms.loadStages(_supabase);
+    iwLeave();
+    msg.textContent = '';
+    const rest = $('iw-rest-msg');
+    rest.className = 'text-[11px] font-bold text-emerald-600 ml-auto mr-2';
+    rest.textContent = 'Saved.';
+    setTimeout(() => { rest.textContent = ''; }, 4000);
+  } catch (err) {
+    console.warn(err);
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = (err && err.message) || 'Could not save.';
+  }
+  $('iw-save').disabled = false;
+});
 
 (async () => {
   try {
@@ -239,7 +393,7 @@ $('add-btn').addEventListener('click', () => { editingId = 'new'; render(); });
     /* Reading the list is for anyone in the module — the board and the motion
        study are read against it, so seeing it explains them. Changing it is
        admin only: these numbers decide what "late" means everywhere. */
-    isAdmin = (function () {
+    IW_ADMIN = (function () {
       /* Guarded the same way canOpenPage is below: a browser holding an
          older cached shared_access.js has no isAdminOf, and an unguarded
          call there takes the whole page down — every figure on it, not just
@@ -250,14 +404,15 @@ $('add-btn').addEventListener('click', () => { editingId = 'new'; render(); });
             || (typeof MJMAccess.canManageUsers === 'function' && MJMAccess.canManageUsers());
       } catch (e) { return false; }
     })();
-    await load();
+    await MJMPalms.loadStages(_supabase);
+    renderIdealWork();
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');
   } catch (e) {
     console.warn(e);
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');
-    $('list').innerHTML = '<div class="text-center text-slate-400 text-sm py-10">Could not load the stages.</div>';
+    $('iw-list').innerHTML = '<div class="text-center text-slate-400 text-sm py-10">Could not load the stages.</div>';
   }
 })();
 </script>

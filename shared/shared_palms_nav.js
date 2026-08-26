@@ -33,11 +33,15 @@
    ================================================================ */
 (function (global) {
 
-  /* Hrefs are relative to nursery_ops/, where all four live. */
+  /* Hrefs are relative to nursery_ops/, where these live.
+
+     Life of Plot is deliberately NOT in this strip. It is still a page and
+     still reached from the Nursery Operation Manage dashboard; it simply is
+     not one of PALMS's own three. A page that is not listed can still mount
+     the strip to get out of — an unknown data-page marks nothing current. */
   var PAGES = [
-    { key: 'board',    label: 'Monitoring Board', icon: '🪴', href: 'nursery_ops_palms_board.html' },
-    { key: 'life',     label: 'Life of Plot',     icon: '🌱', href: 'nursery_ops_plot_life.html' },
-    { key: 'motion',   label: 'Motion Study',     icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
+    { key: 'board',    label: 'Plot Status Map',  icon: '🪴', href: 'nursery_ops_palms_board.html' },
+    { key: 'motion',   label: 'Plot Motion Study', icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
     /* nursery_ops_settings.html is the MAINTENANCE module's work types
        (P&D, Manuring, Weeding, Interrow) and is read by the monthly
        schedule — it is not PALMS and must not be reached from this strip.
