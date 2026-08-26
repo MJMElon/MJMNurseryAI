@@ -87,7 +87,12 @@
   .pv-k { font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.1em;
           flex:0 0 132px; }
   .pv-v { font-size:13px; font-weight:700; color:#334155; flex:1 1 auto; }
-  .pv-map { position:relative; background:#0f172a; height:340px; overflow:hidden; }
+  /* flex:none is the point. .modal-card is a flex column with a max-height,
+     and a flex item's default is to shrink — so on a short window the photo
+     was squeezed to nothing and the panel looked like it had no map at all.
+     It keeps its height and the panel scrolls instead. */
+  .pv-map { position:relative; background:#0f172a; overflow:hidden;
+            flex:none; height:clamp(260px, 44vh, 420px); }
   .pv-frame { position:absolute; inset:0; overflow:hidden; }
   /* The photo is positioned and scaled so the plot's own bounding box fills
      the frame — a crop, done with CSS, so no second image is needed and the
@@ -109,6 +114,12 @@
   .pv-s-late { color:#fda4af; }
   .pv-none { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
              color:#94a3b8; font-size:12px; font-weight:800; text-align:center; padding:20px; }
+  /* One line per boundary, all of them, no clicking. */
+  .pv-strip { max-height:44%; overflow-y:auto; }
+  .pv-line { display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 12px; padding:5px 0; }
+  .pv-line + .pv-line { border-top:1px solid rgba(255,255,255,.13); }
+  .pv-sw { width:11px; height:11px; border-radius:3px; border:1.5px solid rgba(255,255,255,.5); flex:none;
+           align-self:center; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -165,11 +176,12 @@
 </div>
 
   <div id="pv-modal" class="modal-bg hidden">
-  <div class="modal-card" style="max-width:620px">
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div>
-        <div id="pv-nursery" class="text-[10px] font-black text-teal-600 uppercase tracking-widest">—</div>
-        <div id="pv-title" class="text-lg font-black text-slate-800">—</div>
+  <div class="modal-card" style="max-width:860px">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+      <div class="flex items-baseline gap-2.5 min-w-0">
+        <span id="pv-nursery" class="text-base font-black text-teal-600 uppercase tracking-widest">—</span>
+        <span class="text-slate-300 font-black text-lg">·</span>
+        <span id="pv-title" class="text-2xl font-black text-slate-800 truncate">—</span>
       </div>
       <button id="pv-edit" class="ml-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
       <span id="pv-note" class="ml-auto text-[11px] font-bold text-slate-400 hidden">Admins can redraw this</span>
@@ -555,7 +567,14 @@ async function loadAreas() {
    the percentages the database holds, and the SVG keeps its 0–100 viewBox;
    only the photo behind it is scaled and shifted. */
 let PV_PLOT = null;   // the plot the panel is open for
-let PV_SEL = null;    // the unit key selected inside it
+
+/* The key entry a unit is coloured by, so its swatch in the list below
+   matches its shape on the photo. */
+function pvEntry(key) {
+  const ln = lineForPlot(key);
+  const act = ln ? MJMPalms.actByN(ln.actN) : null;
+  return act ? (PAL.legend || []).find((e) => e.key === PAL.keyOf[act.name]) : null;
+}
 
 function pvUnits(plot) {
   return (MAP ? MAP.units() : []).filter((u) => u.plot === plot);
@@ -572,7 +591,6 @@ function pvPoly(u) {
 function openPlot(unit) {
   const plot = MJMPalms.plotOf(unit);
   PV_PLOT = plot;
-  PV_SEL = unit;
   $('pv-nursery').textContent = MJMPalms.nurseryOfPlot(plot) || '—';
   $('pv-title').textContent = plot;
   $('pv-edit').classList.toggle('hidden', !CAN_DRAW);
@@ -621,24 +639,22 @@ function drawPv() {
   units.forEach((u) => {
     const pts = pvPoly(u);
     const st = mapStatusOf(u.key) || {};
-    const hit = PAL.keyOf[(MJMPalms.actByN((lineForPlot(u.key) || {}).actN) || {}).name];
-    const entry = (PAL.legend || []).find((e) => e.key === hit);
-    const on = u.key === PV_SEL;
+    const entry = pvEntry(u.key);
     const late = st.tone === 'over';
     shapes.push(
       '<polygon points="' + pts.map((p) => p.x + ',' + p.y).join(' ') + '" ' +
       'fill="' + (entry ? entry.fill : 'rgba(148,163,184,.35)') + '" ' +
-      'fill-opacity="' + (on ? 0.92 : 0.5) + '" ' +
+      'fill-opacity="0.72" ' +
       /* Selected is a WHITE ring, not a thicker one in its own colour: the
          late ring is near-black, and near-black on a dark photograph is no
          ring at all — the area I had just clicked looked like the one I had
          not. Being late still reads, from the strip below and from the main
          map's outline. */
-      'stroke="' + (on ? '#ffffff' : (late ? '#111827' : (entry ? entry.stroke : '#94a3b8'))) + '" ' +
+      'stroke="' + (late ? '#111827' : (entry ? entry.stroke : '#ffffff')) + '" ' +
       /* Stroke width is in the viewBox's units, and the box is `w` wide, not
          100 — so a width meant for the full map has to be scaled DOWN by
          w/100 to look the same thickness here, not up. */
-      'stroke-width="' + ((on ? 0.9 : 0.5) * (w / 100)) + '" ' +
+      'stroke-width="' + (0.6 * (w / 100)) + '" ' +
       'class="pv-shape" data-pv-unit="' + esc(u.key) + '"/>');
     const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length;
     const cy = pts.reduce((t, p) => t + p.y, 0) / pts.length;
@@ -650,39 +666,38 @@ function drawPv() {
   drawPvStrip();
 }
 
+/* Every boundary's own line, all of them, always. Clicking to find out what
+   a shape is was a step for nothing when a plot has one or two of them —
+   and with two, the comparison IS the answer. */
 function drawPvStrip() {
-  const u = pvUnits(PV_PLOT).find((x) => x.key === PV_SEL) || pvUnits(PV_PLOT)[0];
-  if (!u) { $('pv-strip').innerHTML = ''; return; }
-  const ln = lineForPlot(u.key);
+  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u));
   const areas = AREAS[PV_PLOT] || [];
-  const area = u.area ? areas.find((a) => a.area_key === u.area) : null;
+  if (!units.length) { $('pv-strip').innerHTML = ''; return; }
 
-  const bits = [];
-  if (ln && ln.state !== 'none') {
-    bits.push(['Status', ln.status || '—', false]);
-    bits.push(['Due', MJMPalms.prettyD(ln.due), false]);
-    bits.push([ln.left < 0 ? 'Over by' : 'Days left',
-               (ln.left < 0 ? -ln.left : ln.left) + 'd', ln.left < 0]);
-    bits.push(['Last update', MJMPalms.prettyD(ln.lastDate) + (ln.lastBy ? ' · ' + ln.lastBy : ''), false]);
-  } else {
-    bits.push(['Status', 'Nothing running', false]);
-  }
-  if (area) bits.push(['Batch', area.batch_name || 'none pinned', false]);
-
-  $('pv-strip').innerHTML =
-    '<span class="pv-s-name">' + esc(u.label) + '</span>' +
-    bits.map((b) =>
-      '<span><span class="pv-s-k">' + esc(b[0]) + '</span> ' +
-      '<span class="pv-s-v' + (b[2] ? ' pv-s-late' : '') + '">' + esc(b[1]) + '</span></span>'
-    ).join('');
+  $('pv-strip').innerHTML = units.map((u) => {
+    const ln = lineForPlot(u.key);
+    const area = u.area ? areas.find((a) => a.area_key === u.area) : null;
+    const entry = pvEntry(u.key);
+    const bits = [];
+    bits.push(['Batch', area ? (area.batch_name || 'none pinned') : '—', false]);
+    if (ln && ln.state !== 'none') {
+      bits.push(['Status', ln.status || '—', false]);
+      bits.push(['Due', MJMPalms.prettyD(ln.due), false]);
+      bits.push([ln.left < 0 ? 'Overdue' : 'Days left',
+                 (ln.left < 0 ? -ln.left : ln.left) + 'd', ln.left < 0]);
+    } else {
+      bits.push(['Status', 'Nothing running', false]);
+    }
+    return '<div class="pv-line">' +
+      '<span class="pv-sw" style="background:' + esc(entry ? entry.stroke : '#94a3b8') + '"></span>' +
+      '<span class="pv-s-name">' + esc(u.label) + '</span>' +
+      bits.map((x) =>
+        '<span><span class="pv-s-k">' + esc(x[0]) + '</span> ' +
+        '<span class="pv-s-v' + (x[2] ? ' pv-s-late' : '') + '">' + esc(x[1]) + '</span></span>'
+      ).join('') +
+      '</div>';
+  }).join('');
 }
-
-$('pv-svg').addEventListener('click', (e) => {
-  const sh = e.target.closest('[data-pv-unit]');
-  if (!sh) return;
-  PV_SEL = sh.dataset.pvUnit;
-  drawPv();
-});
 
 function render() {
   LINES = new Map();
