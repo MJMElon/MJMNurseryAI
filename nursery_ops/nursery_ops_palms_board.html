@@ -35,9 +35,13 @@
      anything once the table has a width, and a layout that exists only if a
      CDN answered is a layout that cannot be checked. */
   table { table-layout:fixed; width:100%; }
+  /* Centred, headers and data alike. Every column here is a short value —
+     a plot name, a stage, a date, a count of days — and centring them makes
+     the row read as one line instead of five ragged left edges. */
   th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
-       padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
-  td { padding:11px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; vertical-align:top; }
+       padding:11px 12px; text-align:center; background:#f8fafc; white-space:nowrap; }
+  td { padding:10px 12px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9;
+       vertical-align:middle; text-align:center; }
   /* The action square is fixed, Plot is as wide as a plot name ever gets,
      Current Status takes the slack because it carries the longest text —
      two activity names joined by " + " — and the last three are equal so
@@ -51,7 +55,13 @@
      width the column actually needs is the DATA's, not the label's. That is
      what frees the room Current Status wants. */
   .c-eq     { width:auto; white-space:normal; }
-  td.wrap   { white-space:normal; }
+  /* The plot name opens the panel from here as well as from the map. A plot
+     with no boundary drawn has no polygon to click — which is exactly the
+     plot somebody wants to hide — so the map alone was not a way in. */
+  .plot-link { background:none; border:none; padding:0; font-family:inherit; font-size:13px;
+               font-weight:900; color:#0f172a; cursor:pointer; text-decoration:underline;
+               text-decoration-color:#cbd5e1; text-underline-offset:3px; }
+  .plot-link:hover { color:#0f766e; text-decoration-color:#14b8a6; }
   .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
           border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
   .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
@@ -109,15 +119,23 @@
   .pv-line + .pv-line { border-top:1px solid rgba(255,255,255,.13); }
   .pv-sw { width:11px; height:11px; border-radius:3px; border:1.5px solid rgba(255,255,255,.5); flex:none;
            align-self:center; }
-  .st-pick { width:100%; appearance:none; -webkit-appearance:none; font-family:inherit;
-             padding:7px 30px 7px 11px; border-radius:10px; border:1.5px solid #e2e8f0; background:white;
+  /* The same shape and weight as the pills beside it, so the row reads as
+     one set of things rather than a form dropped into a table. Symmetric
+     padding with the arrow drawn inside the right pad keeps the TEXT
+     centred — text-align:center on a select with one-sided padding is
+     centred within the leftover space, which looks off by exactly the
+     arrow's width. */
+  .st-pick { width:100%; max-width:238px; appearance:none; -webkit-appearance:none; font-family:inherit;
+             padding:6px 26px; border-radius:999px; border:1.5px solid #e2e8f0; background:white;
              color:#0f172a; font-weight:900; font-size:12px; cursor:pointer; outline:none;
+             text-align:center; text-align-last:center; text-overflow:ellipsis;
              background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%2394a3b8' d='M5 6L0 0h10z'/></svg>");
-             background-repeat:no-repeat; background-position:right 11px center; background-size:9px;
-             text-overflow:ellipsis; }
-  .st-pick:hover { border-color:#99f6e4; }
-  .st-pick:disabled { background-image:none; border-color:transparent; background-color:transparent;
-                      color:#334155; cursor:default; padding-left:0; font-weight:700; }
+             background-repeat:no-repeat; background-position:right 10px center; background-size:9px; }
+  .st-pick:hover { border-color:#99f6e4; background-color:#f0fdfa; }
+  .st-pick:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  /* The options themselves are drawn by the OS and cannot be centred, so
+     they are left as they come — legible beats half-styled. */
+  .st-pick option { text-align:left; font-weight:700; }
   .cf-was { background:#f8fafc; border:1.5px solid #e2e8f0; }
   .cf-now { background:#ecfdf5; border:1.5px solid #a7f3d0; }
   .cf-box { border-radius:14px; padding:12px 14px; }
@@ -365,7 +383,7 @@ function renderTable() {
         ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
         : '<span class="text-slate-300">—</span>';
       return '<tr>' +
-        '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
+        '<td><button class="plot-link" data-open="' + esc(r.plot) + '">' + esc(r.label) + '</button></td>' +
         statusCell(r.plot, ln) +
         '<td class="text-slate-300">—</td>' +
         '<td class="text-slate-300">—</td>' +
@@ -374,10 +392,10 @@ function renderTable() {
     const over = ln.state === 'overdue';
     const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
     return '<tr>' +
-      '<td class="font-black text-slate-800">' + esc(r.label) + '</td>' +
+      '<td><button class="plot-link" data-open="' + esc(r.plot) + '">' + esc(r.label) + '</button></td>' +
       statusCell(r.plot, ln) +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
-      '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
+      '<td><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
         (ln.lastBy ? ' · ' + esc(ln.lastBy) : '') + '</td>' +
       '</tr>';
@@ -623,12 +641,12 @@ function statusCell(unitKey, ln) {
   const cur = ln && ln.state !== 'none' ? MJMPalms.currentEntries(LOGS, unitKey) : [];
   const curN = cur.length === 1 ? cur[0].actN : null;
   if (!CAN_UPDATE) {
-    return '<td class="wrap">' + esc(ln && ln.status ? ln.status : '—') + '</td>';
+    return '<td>' + esc(ln && ln.status ? ln.status : '—') + '</td>';
   }
   /* Two stages running at once cannot be shown in one dropdown honestly, so
      that plot keeps plain text and stays the field app's to change. */
   if (cur.length > 1) {
-    return '<td class="wrap">' + esc(ln.status) +
+    return '<td>' + esc(ln.status) +
            '<div class="text-[10px] font-bold text-slate-400 mt-1">two at once — change in the app</div></td>';
   }
   const opts = MJMPalms.ACTIVITIES.map((a) =>
@@ -637,6 +655,11 @@ function statusCell(unitKey, ln) {
     (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
     opts + '</select></td>';
 }
+
+$('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-open]');
+  if (b) openPlot(b.dataset.open);
+});
 
 $('rows').addEventListener('change', (e) => {
   const sel = e.target.closest('[data-st]');
