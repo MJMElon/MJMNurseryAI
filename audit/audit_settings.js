@@ -49,6 +49,12 @@
   let data   = null;     // what the database holds, once read
   let loaded = false;
   let inFlight = null;
+  /* Why the last read failed, if it did. Falling back to the defaults is the
+     right thing to do on a phone in the field, but it is the wrong thing to
+     do silently on the screen where the settings are edited: the board would
+     keep the old schedule while the editor showed the new one, with nothing
+     to say which is in force. */
+  let lastError = null;
 
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -122,14 +128,25 @@
         const res = await supa.from('audit_settings').select('data').eq('id', 1).maybeSingle();
         if (res.error) throw res.error;
         row = res.data;
-      } else if (global.sb && typeof global.sb.select === 'function') {
-        // audit_supabase.js's thin REST helper, which the audit pages carry.
-        const rows = await global.sb.select('audit_settings', 'select=data&id=eq.1');
+      } else if (typeof sb !== 'undefined' && sb && typeof sb.select === 'function') {
+        /* audit_supabase.js's thin REST helper, which the audit pages carry.
+           Reached by the bare name on purpose: that file declares it with
+           `const sb`, and a top-level const is NOT a property of window. This
+           used to test global.sb, found undefined, and fell through to the
+           defaults without a request, a message or an error — so the portal
+           quietly kept the built-in schedule while the Settings screen showed
+           the saved one. */
+        const rows = await sb.select('audit_settings', 'select=data&id=eq.1');
         row = (rows && rows[0]) || null;
+      } else {
+        throw new Error('no way to read audit_settings on this page — '
+                      + 'load it after audit_supabase.js, or pass a supabase client');
       }
       data = normalise(row && row.data);
+      lastError = null;
     } catch (e) {
-      console.warn('[audit-settings] using defaults:', e && (e.message || e));
+      lastError = (e && (e.message || String(e))) || 'unknown error';
+      console.warn('[audit-settings] using defaults:', lastError);
       data = defaults();
     }
     loaded = true;
@@ -197,6 +214,7 @@
 
   global.MJMAuditSettings = {
     load, save, current, defaults, normalise,
+    error: () => lastError,
     windows, maintDays, ages, ageAllowed, ageMonths,
     MODULES, SCOPES, WORKTYPES,
     DEFAULT_SCHEDULE, DEFAULT_MAINT
