@@ -1075,6 +1075,7 @@ function persistState(n, m) {
     manuring:       s.manuring,
     weeding:        s.weeding,
     interrow:       s.interrow,
+    periods:        s.periods,
     _savedPd:       s._savedPd,
   };
   dbStateCache[stateKey(n, m)] = JSON.parse(JSON.stringify(_payload));
@@ -1174,6 +1175,8 @@ const I18N = {
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
     'badge.calc':'💊 DOSAGE CALCULATOR',
+    'period.head':'When does this round run?', 'period.from':'First day', 'period.to':'Last day',
+    'period.apply':'Set dates', 'period.reset':'Use the default week', 'period.tip':'Click to set this round\u2019s dates',
     'col.plot':'PLOT', 'hdr.week':'WEEK', 'hdr.round':'Round',
     'hdr.pSerangga':'P — PEST', 'hdr.dKulat':'D — DISEASE',
     'hdr.manuringRounds':'MANURING ROUNDS', 'hdr.interrowRounds':'INTERROW SPRAY ROUNDS',
@@ -1256,6 +1259,8 @@ const I18N = {
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
     'badge.calc':'💊 KALKULATOR DOS',
+    'period.head':'Bila pusingan ini berjalan?', 'period.from':'Hari pertama', 'period.to':'Hari terakhir',
+    'period.apply':'Tetapkan tarikh', 'period.reset':'Guna minggu asal', 'period.tip':'Klik untuk tetapkan tarikh pusingan ini',
     'col.plot':'PLOT', 'hdr.week':'MINGGU', 'hdr.round':'Pusingan',
     'hdr.pSerangga':'P — SERANGGA', 'hdr.dKulat':'D — KULAT',
     'hdr.manuringRounds':'PUSINGAN MEMBAJA', 'hdr.interrowRounds':'PUSINGAN RACUN SELINGAN',
@@ -1485,6 +1490,179 @@ function periodLabel(n, monthLabel) {
   if (from > days) return `${t('hdr.round')} ${n}`;
   const to = Math.min(from + 6, days);
   return from === to ? ordinalDay(from) : `${ordinalDay(from)} - ${ordinalDay(to)}`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WHEN A ROUND ACTUALLY RUNS
+
+   A column used to be named by where it sat: the first was the 1st–7th,
+   the second the 8th–14th, and so on, seven days each whatever the work
+   really was. That is a sensible default and a poor rule — a manuring
+   round is not a calendar week, and the second round of the month is not
+   always the second week of it.
+
+   So a round may be given its own dates, and the header says them. What
+   is stored is the two DAY NUMBERS, not two full dates: the month is
+   already chosen in the top bar, and a range that carried its own month
+   would fight the picker and break carry-forward into the next month.
+
+   Sparse on purpose — s.periods holds only the rounds somebody has
+   actually dated. A round with nothing stored falls back to the seven-day
+   block exactly as before, so every month saved before this reads the
+   same as it always did.
+══════════════════════════════════════════════════════════════ */
+const PERIOD_KINDS = ['pd', 'manuring', 'weeding', 'interrow'];
+
+function periodsOf(s, kind) {
+  if (!s.periods) s.periods = {};
+  if (!s.periods[kind]) s.periods[kind] = {};
+  return s.periods[kind];
+}
+
+/* i is 0-based. Returns null when the default block falls off the end of
+   the month, which is what makes a 5th round in February keep its number. */
+function periodRange(kind, i, n, m) {
+  const days = daysInMonthLabel(m);
+  const r = (appState[n]?.[m]?.periods?.[kind] || {})[i];
+  if (r && +r.from >= 1 && +r.to >= +r.from && +r.from <= days) {
+    return { from: +r.from, to: Math.min(+r.to, days), custom: true };
+  }
+  const from = i * 7 + 1;
+  if (from > days) return null;
+  return { from, to: Math.min(from + 6, days), custom: false };
+}
+
+function periodText(kind, i, n, m) {
+  const r = periodRange(kind, i, n, m);
+  if (!r) return `${t('hdr.round')} ${i + 1}`;
+  return r.from === r.to ? ordinalDay(r.from) : `${ordinalDay(r.from)} - ${ordinalDay(r.to)}`;
+}
+
+/* The header as a button. A dated round is marked, so it is obvious at a
+   glance which columns were set by hand and which are still the default. */
+function periodBtn(kind, i, n, m) {
+  const r = periodRange(kind, i, n, m);
+  return `<button type="button" class="period-btn${r && r.custom ? ' period-set' : ''}" ` +
+    `onclick="openPeriodPicker('${kind}',${i},event)" ` +
+    `title="${esc(t('period.tip'))}">${periodText(kind, i, n, m)}</button>`;
+}
+
+/* ── Picking the dates ──────────────────────────────────────────────
+   Two date boxes, limited to the month on screen, over the header that
+   opened them. Real date inputs rather than two "day number" boxes: the
+   question is "which days", and a calendar is how that question is
+   normally answered. Only the day numbers are kept. */
+let _periodPick = null;   // { kind, i }
+
+function monthISO(m) {
+  const mm = /^([A-Za-z]{3})\s+(\d{4})$/.exec((m || '').trim());
+  if (!mm) return null;
+  const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === mm[1].toLowerCase());
+  if (idx < 0) return null;
+  return `${mm[2]}-${String(idx + 1).padStart(2, '0')}`;
+}
+
+function openPeriodPicker(kind, i, ev) {
+  if (ev) ev.stopPropagation();
+  if (!canEditSchedule) return;
+  closePeriodPicker();
+  const n = getNursery(), m = getMonth();
+  const iso = monthISO(m);
+  if (!iso) return;                       // no month to hang dates off
+  const days = daysInMonthLabel(m);
+  const r = periodRange(kind, i, n, m) || { from: 1, to: Math.min(7, days) };
+  _periodPick = { kind, i };
+
+  const box = document.createElement('div');
+  box.className = 'period-pop';
+  box.id = 'period-pop';
+  box.innerHTML =
+    `<div class="period-pop-h">${esc(t('period.head'))}</div>` +
+    `<label>${esc(t('period.from'))}<input type="date" id="period-from" ` +
+      `min="${iso}-01" max="${iso}-${String(days).padStart(2,'0')}" ` +
+      `value="${iso}-${String(r.from).padStart(2,'0')}"></label>` +
+    `<label>${esc(t('period.to'))}<input type="date" id="period-to" ` +
+      `min="${iso}-01" max="${iso}-${String(days).padStart(2,'0')}" ` +
+      `value="${iso}-${String(r.to).padStart(2,'0')}"></label>` +
+    `<div class="period-pop-f">` +
+      `<button type="button" class="btn" onclick="clearPeriod()">${esc(t('period.reset'))}</button>` +
+      `<button type="button" class="btn" onclick="closePeriodPicker()">${esc(t('btn.cancel'))}</button>` +
+      `<button type="button" class="btn btn-primary" onclick="applyPeriod()">${esc(t('period.apply'))}</button>` +
+    `</div>`;
+  document.body.appendChild(box);
+
+  // Over the button that opened it, nudged back inside the window.
+  const btn = ev && ev.currentTarget && ev.currentTarget.getBoundingClientRect();
+  const w = box.offsetWidth || 250;
+  const left = btn ? Math.min(Math.max(8, btn.left), window.innerWidth - w - 8)
+                   : (window.innerWidth - w) / 2;
+  box.style.left = left + 'px';
+  box.style.top  = ((btn ? btn.bottom : 120) + window.scrollY + 6) + 'px';
+
+  setTimeout(() => document.addEventListener('mousedown', _periodOutside), 0);
+  document.addEventListener('keydown', _periodEsc);
+}
+
+function _periodOutside(e) {
+  const box = document.getElementById('period-pop');
+  if (box && !box.contains(e.target)) closePeriodPicker();
+}
+function _periodEsc(e) { if (e.key === 'Escape') closePeriodPicker(); }
+
+function closePeriodPicker() {
+  const box = document.getElementById('period-pop');
+  if (box) box.remove();
+  document.removeEventListener('mousedown', _periodOutside);
+  document.removeEventListener('keydown', _periodEsc);
+  _periodPick = null;
+}
+
+const _dayOf = (v) => { const d = /-(\d{2})$/.exec(v || ''); return d ? +d[1] : 0; };
+
+function applyPeriod() {
+  if (!_periodPick) return;
+  const from = _dayOf(document.getElementById('period-from')?.value);
+  const to   = _dayOf(document.getElementById('period-to')?.value);
+  if (!from || !to) return;
+  if (to < from) { alert('The last day cannot come before the first.'); return; }
+  const { kind, i } = _periodPick;
+  const n = getNursery(), m = getMonth();
+  periodsOf(getState(n, m), kind)[i] = { from, to };
+  closePeriodPicker();
+  persistStateSoon(n, m);
+  renderPeriodOwner(kind);
+}
+
+/* Back to the seven-day block. Removing the entry rather than writing the
+   default back means a round is either dated or it is not — there is no
+   third state that looks dated but is not. */
+function clearPeriod() {
+  if (!_periodPick) return;
+  const { kind, i } = _periodPick;
+  const n = getNursery(), m = getMonth();
+  delete periodsOf(getState(n, m), kind)[i];
+  closePeriodPicker();
+  persistStateSoon(n, m);
+  renderPeriodOwner(kind);
+}
+
+/* Opens the date picker over a round that has just been added. Deferred a
+   frame, because the header it points at does not exist until the table
+   that was just asked for has painted. */
+function askNewRoundDates(kind, i) {
+  setTimeout(() => {
+    const want = "'" + kind + "'," + i + ",";
+    const btn = [...document.querySelectorAll('.period-btn')]
+      .find(b => (b.getAttribute('onclick') || '').includes(want));
+    if (btn) btn.click();
+  }, 60);
+}
+
+function renderPeriodOwner(kind) {
+  if (kind === 'pd')            renderPD();
+  else if (kind === 'manuring') renderManuring();
+  else if (kind === 'weeding')  renderWeeding();
+  else if (kind === 'interrow') renderInterrow();
 }
 
 
@@ -2318,7 +2496,7 @@ function renderPD() {
   const W=['W1','W2','W3','W4'];
   let h='<thead>';
   h+=`<tr><th rowspan="4" class="plot-col-hdr">${t('col.plot')}</th>`;
-  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${periodLabel(+w[1], m)}</th>`);
+  W.forEach((w,wi)=>h+=`<th colspan="2" class="wk-th">${periodBtn('pd', wi, n, m)}</th>`);
   h+='</tr><tr>';
   W.forEach(()=>h+=`<th class="p-th">${t('hdr.pSerangga')}</th><th class="d-th">${t('hdr.dKulat')}</th>`);
   h+='</tr><tr>';
@@ -2461,11 +2639,18 @@ function addManuringRound(){
     s.manuring[p].push([false]);
   });
   renderManuring();
+  // Asked for its dates straight away: adding a round is the moment somebody
+  // knows when it runs, and a round left on the default week is a round
+  // nobody meant to schedule for the default week.
+  askNewRoundDates('manuring', s.manuringConfig.length - 1);
 }
 function removeManuringRound(){
   if(!canEditSchedule) return;
   const s = getState(getNursery(),getMonth());
   if (s.manuringConfig.length <= 1) return;
+  // The dates go with it, or the next round added would inherit the dates
+  // of the one that was removed.
+  delete periodsOf(s, 'manuring')[s.manuringConfig.length - 1];
   s.manuringConfig.pop();
   NURSERY_PLOTS[getNursery()].forEach(p => {
     if (s.manuring[p]) s.manuring[p].pop();
@@ -2519,7 +2704,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${periodLabel(ri+1, m)}</span>
+        <span class="th-title">${periodBtn('manuring', ri, n, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addManuringCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeManuringCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2554,7 +2739,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.manuring[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodText('manuring', ri, n, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -2650,7 +2835,7 @@ function renderWeeding() {
   h+=`<th rowspan="2" class="plot-col-hdr">${t('col.plot')}</th>`;
   h+=`<th colspan="2" class="wk-th">${t('hdr.weeding')}</th>`;
   h+='</tr><tr>';
-  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${periodLabel(+r[1], m)}</th>`);
+  rounds.forEach((r,ri)=>h+=`<th class="p-th" style="min-width:130px;">${periodBtn('weeding', ri, n, m)}</th>`);
   h+='</tr></thead><tbody>';
 
   // Select-all row
@@ -2727,11 +2912,15 @@ function addInterrowRound(){
     s.interrow[p].push([false]);
   });
   renderInterrow();
+  askNewRoundDates('interrow', s.interrowConfig.length - 1);
 }
 function removeInterrowRound(){
   if(!canEditSchedule) return;
   const s = getState(getNursery(),getMonth());
   if (s.interrowConfig.length <= 1) return;
+  // The dates go with it, or the next round added would inherit the dates
+  // of the one that was removed.
+  delete periodsOf(s, 'interrow')[s.interrowConfig.length - 1];
   s.interrowConfig.pop();
   NURSERY_PLOTS[getNursery()].forEach(p => {
     if (s.interrow[p]) s.interrow[p].pop();
@@ -2790,7 +2979,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${periodLabel(ri+1, m)}</span>
+        <span class="th-title">${periodBtn('interrow', ri, n, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addInterrowCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeInterrowCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2829,7 +3018,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.interrow[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodText('interrow', ri, n, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -3481,7 +3670,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*4, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     W.forEach((w, wi) => {
       const x = startX + plotColW + wi*colW*2;
-      cell(x, y, colW*2, rowH, periodLabel(+w[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW*2, rowH, periodText('pd', wi, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
 
@@ -3593,7 +3782,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     cfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodText('manuring', ri, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3693,7 +3882,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*2, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     rounds.forEach((r, i) => {
       const x = startX + plotColW + i*colW;
-      cell(x, y, colW, rowH, periodLabel(+r[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW, rowH, periodText('weeding', i, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
     rounds.forEach((r, i) => {
@@ -3737,7 +3926,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     icfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodText('interrow', ri, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -4132,9 +4321,14 @@ initDb();
 /* Every one of these lists is typed in by a person, and every one of them
    is printed straight back into innerHTML. A plot called B<img onerror=…>
    is unlikely; a fertiliser name with an ampersand in it is not. */
-const esc = v => String(v == null ? '' : v)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+/* A function declaration, not a const arrow: the schedule tables are drawn
+   by applyLang() near the foot of this file, which is above this line, and
+   a const in the temporal dead zone throws rather than being undefined. */
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 let traySize   = {};    // { nursery: seedlings per tray }
 let plotTrays  = {};    // { nursery: { plot: trays } }
