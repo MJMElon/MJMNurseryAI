@@ -87,20 +87,9 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  if(activeView==='form'){
-    if(e)e.preventDefault();
-    /* PN uses the per-plot form (no batch-list step), so back from
-       it goes to the grid. MN uses the batch list — back from the
-       per-batch form returns to that list for the same plot. */
-    if(activeTab!=='PN' && window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot);
-    else setView('list');
-    return false;
-  }
-  if(activeView==='plot'||activeView==='detail'||activeView==='multi'){
-    if(e)e.preventDefault();
-    setView('list');
-    return false;
-  }
+  /* Same as Plot Condition: auditor came in from a To Do chip on
+     audit_home, so back returns straight to that list rather than
+     the module's own view stack. The anchor href does it. */
   return true;
 }
 window.goBack=goBack;
@@ -595,11 +584,18 @@ function openMultiBatchForm(plot){
 
   /* Clear all sample + photo inputs to a fresh state. */
   ['1','2','3'].forEach(n=>{
-    const s=document.getElementById('mf-s'+n); if(s)s.value='';
+    const s=document.getElementById('mf-s'+n); if(s){s.value='';s.disabled=false;s.style.opacity='';}
     const fb=document.getElementById('mf-s'+n+'-fb'); if(fb)fb.textContent='';
     _renderPlotSlot(n, null);
+    const slot=document.getElementById('mf-photo-'+n);
+    if(slot){slot.style.opacity='';slot.style.pointerEvents='';}
   });
   const avg=document.getElementById('mf-avg'); if(avg)avg.textContent='—';
+  /* Reset the No-Audit-Needed chooser to its default (choices shown,
+     confirmation note hidden), otherwise it stays on the last plot's
+     state when the auditor moves to the next one. */
+  const _mfC=document.getElementById('mf-no-audit-choices'); if(_mfC)_mfC.style.display='';
+  const _mfN=document.getElementById('mf-no-audit-note');    if(_mfN)_mfN.style.display='none';
 
   /* Pre-fill from an existing record for the plot on the same day, so
      the auditor can amend without keying twice. batch column is now
@@ -642,21 +638,52 @@ function onPlotHeightInput(n, el){
 }
 window.onPlotHeightInput=onPlotHeightInput;
 
-/* Not-Required toggle for the whole plot. */
-function markPlotNotRequired(){
-  plotFormState.declined = plotFormState.declined ? null : 'Not Required';
-  const btn=document.getElementById('mf-notreq-btn');
-  if(btn)btn.textContent = plotFormState.declined ? '↺ Undo Not Required' : 'Mark Plot as Not Required';
+/* Not-Required chooser for the whole plot. Reason is one of
+   'Culling Plot' / 'Transplanting Plot' — same two the per-batch
+   form (view-form) offers, so a PN plot audit and a MN batch
+   audit both close out with the same taxonomy. */
+function markPlotNotRequired(reason){
+  reason = reason || 'Not Required';
+  plotFormState.declined = reason;
+  /* Chooser row swaps for the confirmation note. */
+  const choices = document.getElementById('mf-no-audit-choices');
+  const note    = document.getElementById('mf-no-audit-note');
+  const reasonEl= document.getElementById('mf-no-audit-reason');
+  if (choices) choices.style.display = 'none';
+  if (note)    note.style.display    = '';
+  if (reasonEl)reasonEl.textContent  = reason;
+  /* Grey the inputs and photo slots so it is obvious nothing more is
+     being asked for. */
   ['mf-s1','mf-s2','mf-s3'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el){ el.disabled=!!plotFormState.declined; el.style.opacity=plotFormState.declined?'.55':''; }
+    if(el){ el.disabled=true; el.style.opacity='.55'; }
   });
   ['1','2','3'].forEach(n=>{
     const slot=document.getElementById('mf-photo-'+n);
-    if(slot){ slot.style.opacity=plotFormState.declined?'.55':''; slot.style.pointerEvents=plotFormState.declined?'none':''; }
+    if(slot){ slot.style.opacity='.55'; slot.style.pointerEvents='none'; }
   });
 }
 window.markPlotNotRequired=markPlotNotRequired;
+
+/* Undo the chooser — reveal the two-option row again, un-grey the
+   inputs and photos, and clear the declined flag so a save will go
+   through the sample + photo validation. */
+function undoPlotNotRequired(){
+  plotFormState.declined = null;
+  const choices = document.getElementById('mf-no-audit-choices');
+  const note    = document.getElementById('mf-no-audit-note');
+  if (choices) choices.style.display = '';
+  if (note)    note.style.display    = 'none';
+  ['mf-s1','mf-s2','mf-s3'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=false; el.style.opacity=''; }
+  });
+  ['1','2','3'].forEach(n=>{
+    const slot=document.getElementById('mf-photo-'+n);
+    if(slot){ slot.style.opacity=''; slot.style.pointerEvents=''; }
+  });
+}
+window.undoPlotNotRequired=undoPlotNotRequired;
 
 /* Photo capture for the per-plot form — one target slot. */
 let _plotPhotoTarget=null;
@@ -763,6 +790,13 @@ async function savePlotAudit(){
   const authorName=(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'');
   const dateISO=todayISO();
   const avg=declined ? null : calcAvg(plotFormState.s1,plotFormState.s2,plotFormState.s3);
+  /* Reason rides in the photo URL as "NO_AUDIT_REQUIRED — <reason>"
+     so the schema does not need a dedicated column — same pattern
+     the per-batch form (declineAudit) uses. isSentinel + noAuditReason
+     read it back on the History tile. */
+  const why = (declined && NO_AUDIT_REASONS.indexOf(plotFormState.declined) !== -1)
+    ? plotFormState.declined : '';
+  const stamp = declined ? (why ? NO_AUDIT_SENTINEL + ' — ' + why : NO_AUDIT_SENTINEL) : null;
   const payload={
     nursery: activeTab,
     plot: multiPlot,
@@ -771,9 +805,9 @@ async function savePlotAudit(){
     sample_2: declined ? null : (plotFormState.s2?parseFloat(plotFormState.s2):null),
     sample_3: declined ? null : (plotFormState.s3?parseFloat(plotFormState.s3):null),
     avg_height: avg?parseFloat(avg):null,
-    photo_1_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p1||null),
-    photo_2_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p2||null),
-    photo_3_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p3||null),
+    photo_1_url: declined ? stamp : (plotFormState.p1||null),
+    photo_2_url: declined ? stamp : (plotFormState.p2||null),
+    photo_3_url: declined ? stamp : (plotFormState.p3||null),
     date: dateISO,
     auditor_name: authorName
   };

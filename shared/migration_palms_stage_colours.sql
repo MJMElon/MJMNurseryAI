@@ -6,34 +6,30 @@
 -- plot by the stage it is on rather than only by late / on schedule.
 -- Editable afterwards on PALMS → Settings → Ideal Work.
 --
--- WHY A RAMP AND NOT ELEVEN DIFFERENT COLOURS
+-- WHY FIVE COLOURS AND NOT ELEVEN
 --
 -- Eleven fills that are all reliably tellable apart do not exist. Measured
--- against the usual accessibility gates, a map (any two plots can sit side by
--- side, so every pair has to separate, not just neighbours) supports about
--- THREE guaranteed-distinct hues; even eight well-chosen ones fail — orange
--- against red comes out at ΔE 7.1 for normal vision, where 15 is the floor,
--- and orange against green at 3.2 for a protan reader.
+-- against the usual accessibility gates -- on a map any two plots can sit
+-- side by side, so every PAIR has to separate, not just neighbours in a list
+-- -- eleven shades of one hue leave neighbouring stages at DeltaE 4.2, and
+-- four hues in three shades each put pale blue against pale violet at 5.1.
+-- Both read as the same colour to a person.
 --
--- So the default is not eleven identities. It is one hue getting darker as a
--- plot moves through the cycle, which is the honest encoding for something
--- ORDERED: neighbouring stages look alike because they ARE alike, and a plot
--- near the end reads as obviously darker than one near the start. What the
--- colour carries is "how far through", at a glance, across the whole map.
+-- So stages SHARE a colour, in groups, and the key beside the map names the
+-- stages under each one. The board merges stages with the same hex into a
+-- single key entry by itself, so grouping is just "give these three the same
+-- colour" -- no phase has to be defined anywhere.
 --
--- The stage NAME is on the polygon either way, so nothing depends on telling
--- two blues apart.
+-- These five are the office's own choice. They validate with all pairs in
+-- play on a light surface: worst normal-vision DeltaE 16.3, all inside the
+-- lightness band and over the chroma floor. Red against green is the one
+-- soft pair for a colourblind reader at DeltaE 7.2, allowed only with a
+-- second encoding -- every plot carries its name, the key spells out its
+-- stages, and the table under the map gives the exact stage. A SIXTH colour
+-- cannot be added without re-checking that it separates from these five.
 --
--- Override any of them in Settings. Giving the one stage you care about —
--- Pengambilan, usually — a colour right off the ramp is exactly the point of
--- making this editable, and it will stand out precisely BECAUSE the rest are
--- a quiet ramp.
---
--- Blue steps 250→700 of the reference scale, plus one interpolated step to
--- reach eleven. Verified: lightness reads light→dark throughout, single hue
--- (4° spread), lightest step clears the surface at 2.06:1.
---
--- Safe to re-run: only fills a colour that is still NULL.
+-- Safe to re-run: only fills a colour that is still NULL, so an office that
+-- has since changed one in Settings keeps its change.
 -- Run in the Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
 -- ============================================================================
 
@@ -45,9 +41,16 @@ ALTER TABLE public.nops_plot_status_stages
 -- of it. A stage past the eleventh keeps NULL and the map draws it grey until
 -- somebody sets it.
 WITH ramp(pos, hex) AS (
-  VALUES (1,'#86b6ef'), (2,'#6da7ec'), (3,'#5598e7'), (4,'#3987e5'),
-         (5,'#2a78d6'), (6,'#2871cb'), (7,'#256abf'), (8,'#1c5cab'),
-         (9,'#184f95'), (10,'#104281'), (11,'#0d366b')
+  --  1-3   Saringan Anak Bibit · Tunggu buat culling · Culling
+  VALUES (1,'#e34948'), (2,'#e34948'), (3,'#e34948'),
+  --  4-6   Membersih · Meracun secara selingan · Angkat tanah
+         (4,'#2a78d6'), (5,'#2a78d6'), (6,'#2a78d6'),
+  --  7-9   Isi polibeg · Lining · Transplanting
+         (7,'#4a3aa7'), (8,'#4a3aa7'), (9,'#4a3aa7'),
+  -- 10     Membesar
+         (10,'#eda100'),
+  -- 11     Pengambilan
+         (11,'#008300')
 ),
 ordered AS (
   SELECT id, row_number() OVER (ORDER BY sort_order, name) AS pos
@@ -65,6 +68,29 @@ SELECT sort_order, name, ideal_days, color
 FROM   public.nops_plot_status_stages
 ORDER  BY sort_order, name;
 
+
+/* ── ALREADY RAN THE FIRST VERSION OF THIS FILE? ──
+   It seeded eleven shades of blue. The seed above only fills colours that
+   are still NULL, so on that database it changes nothing. This moves it
+   across. It OVERWRITES colours already set, so do not run it if somebody
+   has since chosen their own in Settings.
+
+   WITH want(pos, hex) AS (
+     VALUES (1,'#e34948'), (2,'#e34948'), (3,'#e34948'),
+            (4,'#2a78d6'), (5,'#2a78d6'), (6,'#2a78d6'),
+            (7,'#4a3aa7'), (8,'#4a3aa7'), (9,'#4a3aa7'),
+            (10,'#eda100'), (11,'#008300')
+   ),
+   ordered AS (
+     SELECT id, row_number() OVER (ORDER BY sort_order, name) AS pos
+     FROM public.nops_plot_status_stages
+   )
+   UPDATE public.nops_plot_status_stages s
+   SET    color = w.hex
+   FROM   ordered o
+   JOIN   want w ON w.pos = o.pos
+   WHERE  s.id = o.id;
+*/
 
 /* ── TO UNDO ──
    DROP the column. The map falls back to colouring by late / on schedule,

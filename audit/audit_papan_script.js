@@ -181,8 +181,9 @@ function setView(v){
 /* Outer top-bar back is context-aware: from a form → list; from list
    → audit_home (the anchor's own href takes over when we return true). */
 function goBack(e){
-  if(activeView==='batch-form'){ if(e)e.preventDefault(); setView('list');selectTab('batch'); return false; }
-  if(activeView==='audit-form'){ if(e)e.preventDefault(); setView('list');selectTab('audit'); return false; }
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
   return true;
 }
 window.goBack=goBack;
@@ -477,10 +478,36 @@ async function loadAll(){
     renderPapanAlerts();
     renderBatchTable();
     updateStats();
-    /* Arrived from a pending-plot circle on the portal? This page is a
-       list rather than a grid, so there is no plot screen to open —
-       scroll its row into view and flash it instead. */
-    MJMAuditDeepLink.reveal();
+    /* Arrived from a pending-plot circle on the portal? Open the
+       audit form for that plot directly — the module page's own
+       list is gone (see init redirect), so there is nothing else
+       here for the auditor to reach. Falls back to the reveal-and-
+       flash behaviour if no batch is standing on the plot, so a
+       stale link is not a silent dead end. */
+    (function _deepPlot(){
+      try {
+        const p = MJMAuditDeepLink.plot();
+        if (!p) return;
+        /* Find the latest batch on the plot within the active
+           nursery, matching the same "one card per plot" rule the
+           list uses. If more than one nursery holds the code
+           (never expected in practice) the auditor's current tab
+           wins. */
+        const latest = getLatestBatchPerPlot();
+        const target = latest.find(b => _canonicalPlot(b.plot) === p && b.nursery === activeNursery)
+                    || latest.find(b => _canonicalPlot(b.plot) === p);
+        if (!target) { MJMAuditDeepLink.reveal(); return; }
+        /* If the audit is already done, open its detail. Otherwise
+           open the form for a new audit. Same branch openAuditForm
+           takes when called via a card. */
+        const existing = getAuditForBatch(target.uid);
+        if (existing) openDetail(existing.uid);
+        else openAuditForm(target.uid, false, null);
+      } catch (e) {
+        console.warn('[papan] deep-link openAuditForm failed:', e);
+        try { MJMAuditDeepLink.reveal(); } catch (_) {}
+      }
+    })();
   }catch(e){
     showToast('⚠ Failed to load');console.error(e);
   }

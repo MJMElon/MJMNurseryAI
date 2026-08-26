@@ -8,6 +8,20 @@
 img{display:block;max-width:100%}
 button{cursor:pointer;font-family:inherit}
 
+/* ── SATISFIED / UNSATISFIED CHOOSER ──
+   Same dashed-tile shape the plot audit's "no audit needed" row uses,
+   so both audits pick a state with the same visual grammar. */
+.no-audit-choice{
+  padding:14px 10px;border-radius:12px;border:1.5px dashed #3d9c3d;
+  background:#f2faf2;color:#1a4d1a;font-family:inherit;
+  font-weight:800;font-size:12px;letter-spacing:.4px;line-height:1.3;
+  cursor:pointer;transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.no-audit-choice:hover{background:#e7f4e7;border-style:solid}
+.no-audit-choice.picked{background:#1a4d1a;color:#fff;border-style:solid;
+                        border-color:#1a4d1a;box-shadow:0 3px 10px rgba(26,77,26,.28)}
+
 :root{
   --g900:#0d2b0d;--g800:#1a4d1a;--g700:#236023;--g600:#2d7a2d;--g500:#3d9c3d;
   --g400:#5aab5a;--g300:#81c784;--g200:#b5dfb5;--g100:#e0f2e0;--g50:#f2faf2;
@@ -220,10 +234,14 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 .deadline-note{
   font-size:10px;color:var(--text3);margin-left:6px;
 }
-.task-card.status-pending{border-left:3px solid #f59e0b}
-.task-card.status-satisfactory{border-left:3px solid var(--g500)}
-.task-card.status-unsatisfactory{border-left:3px solid #dc2626}
-.task-card.status-not_done{border-left:3px solid #94a3b8}
+/* Border widths are the same; the colour is now set inline per card
+   based on the work type (see _taskTypeColour in the script). The
+   status-* colours below are the fallback for a card that landed
+   without a task type — the inline colour wins when it is present. */
+.task-card.status-pending{border-left:5px solid #f59e0b}
+.task-card.status-satisfactory{border-left:5px solid var(--g500)}
+.task-card.status-unsatisfactory{border-left:5px solid #dc2626}
+.task-card.status-not_done{border-left:5px solid #94a3b8}
 .task-card-top{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
 .task-nursery-tag{font-size:10px;font-weight:700;background:var(--g800);color:#fff;padding:2px 8px;border-radius:var(--r-full)}
 .task-type-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);background:var(--teal50);color:var(--teal600)}
