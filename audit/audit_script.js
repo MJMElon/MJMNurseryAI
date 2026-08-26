@@ -79,12 +79,9 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  if(activeView==='form'){
-    if(e)e.preventDefault();
-    if(window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot); else setView('list');
-    return false;
-  }
-  if(activeView==='plot'||activeView==='detail'){
+  /* Per-plot audit was cancelled, so there is no batch-list view to
+     return to. Back from a form goes straight to the plot grid. */
+  if(activeView==='form'||activeView==='plot'||activeView==='detail'){
     if(e)e.preventDefault();
     setView('list');
     return false;
@@ -417,7 +414,7 @@ function renderList(){
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
-              onclick="${onePlot ? 'openPlotAudit' : 'openPlotDetail'}('${p}')"
+              onclick="openPlotAudit('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
@@ -438,8 +435,11 @@ function renderList(){
    plot + batch pre-selected. Existing audits show an Edit button
    instead so re-auditing takes the same path everyone else uses. */
 function openPlotDetail(plot){
-  // Remember which plot is on screen so the top-bar refresh can re-open
-  // the same detail after loadRecords() completes.
+  /* The batch-list drill-down was cancelled — the audit is per-plot
+     now. Any lingering caller (deep link, refresh handler) is
+     re-aimed at the per-plot form so nobody lands on the old list
+     view any more. Falls through only for a truly missing plot. */
+  if (typeof openPlotAudit === 'function') { openPlotAudit(plot); return; }
   window._lastOpenedPlot = plot;
   // Row order: pending on top, audited in the middle, Not-Required at
   // the bottom. Within each band, batch number ascending. That way an
