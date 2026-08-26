@@ -123,6 +123,10 @@ const TRANSLATIONS = {
     photo_req:           '2 photos required',
     photo_both_req:      '⚠ Both photos are required',
     new_audit:           'New Audit',
+    plot_type:           'Plot Type',
+    culling_plot:        'Culling Plot',
+    transplanting_plot:  'Transplanting Plot',
+    err_plot_type:       '⚠ Please select the plot type',
 
     /* === HEIGHT AUDIT === */
     height_title:        'Seedling Height Audit',
@@ -547,6 +551,10 @@ const TRANSLATIONS = {
     photo_req:           '2 gambar diperlukan',
     photo_both_req:      '⚠ Kedua-dua gambar diperlukan',
     new_audit:           'Audit Baru',
+    plot_type:           'Jenis Plot',
+    culling_plot:        'Plot Culling',
+    transplanting_plot:  'Plot Pindah',
+    err_plot_type:       '⚠ Sila pilih jenis plot',
 
     /* === HEIGHT AUDIT === */
     height_title:        'Audit Ketinggian Anak Benih',

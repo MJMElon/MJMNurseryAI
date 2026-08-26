@@ -718,6 +718,8 @@ html, body {
 .tri-btn.sel-b { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); font-weight: 600; }
 .tri-btn.sel-s { background: var(--warn-bg);   color: var(--warn-text);   border-color: var(--warn-border);   font-weight: 600; }
 .tri-btn.sel-t { background: var(--ok-bg);     color: var(--ok-text);     border-color: var(--ok-border);     font-weight: 600; }
+.tri-group.two { grid-template-columns: repeat(2,1fr); }
+.tri-btn.sel-p { background: var(--g50); color: var(--g700, #1a4d1a); border-color: var(--g400); font-weight: 600; }
 
 /* warna daun */
 .warna-group {

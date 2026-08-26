@@ -12,7 +12,7 @@
    monthly report. Raise this if the cap is being hit in normal use.
 ────────────────────────────────────────────────────────────────────── */
 const RECENT_LIMIT = 400;
-/* BUILD: 2026-08-22a */
+/* BUILD: 2026-08-26a */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table

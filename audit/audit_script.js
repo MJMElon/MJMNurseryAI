@@ -30,7 +30,15 @@ function fmtDT(iso){
   if(!iso)return'—';
   return new Date(iso).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 }
-function nextID(nursery){return 'AUD-'+nursery+'-'+pad(records.filter(r=>r.nursery===nursery).length+1);}
+/* Counting the rows would restart the numbering once the list is capped at
+   the most recent slice, handing a fresh audit an ID an older one already
+   owns. Take the highest number actually on record instead — the newest
+   rows are the ones we hold, so the highest is among them. */
+function nextID(nursery){
+  const n=records.filter(r=>r.nursery===nursery)
+    .reduce((hi,r)=>Math.max(hi, parseInt(String(r.id||'').split('-').pop(),10)||0), 0);
+  return 'AUD-'+nursery+'-'+pad(n+1);
+}
 function chipClass(v){return v==='Banyak'?'mc-b':v==='Sedikit'?'mc-s':'mc-t';}
 
 function showToast(msg, ms){ window._pageShowToast=showToast;
@@ -70,20 +78,31 @@ function selectTab(nursery){
    monthly report. Raise this if the cap is being hit in normal use.
 ────────────────────────────────────────────────────────────────────── */
 const RECENT_LIMIT = 400;
+let hasPlotType = true;
 
 /* --- LOAD --- */
 async function loadRecords(){
   setLoading(true);
   try{
-    const rows=await sb.select('audit_plot_audits',
-      'select=id,audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,' +
-      'photo_url,photo_2_url,date,created_at&limit=' + RECENT_LIMIT);
+    const COLS='id,audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,' +
+               'photo_url,photo_2_url,date,created_at';
+    let rows;
+    try{
+      rows=await sb.select('audit_plot_audits',
+        'select='+COLS+',plot_type&limit='+RECENT_LIMIT);
+    }catch(e){
+      /* plot_type is new. Until the column is added the page still works —
+         it just cannot store the answer, so do not offer to. */
+      hasPlotType=false;
+      console.warn('[Plot audit] no plot_type column yet — add it to store the answer:',e.message);
+      rows=await sb.select('audit_plot_audits','select='+COLS+'&limit='+RECENT_LIMIT);
+    }
     capped = rows.length >= RECENT_LIMIT;
     records=rows.map(r=>({
       uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
       batch:r.batch,ulat:r.pest,tikus:r.tikus,bintik:r.disease,
       warna:r.warna_daun,photo:r.photo_url,photo2:r.photo_2_url||null,
-      date:r.date,createdAt:r.created_at
+      ptype:r.plot_type||null,date:r.date,createdAt:r.created_at
     }));
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
@@ -134,22 +153,19 @@ function renderList(){
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
-  formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
+  formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,ptype:null,photo1:null,photo2:null};
   populateForm();setView('form');
   document.getElementById('form-view-title').textContent=t('new_audit')+' — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
   const r=records.find(x=>x.uid===uid);if(!r)return;
   editMode=true;editId=uid;
-  formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,photo1:r.photo||null,photo2:r.photo2||null};
+  formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,ptype:r.ptype||null,photo1:r.photo||null,photo2:r.photo2||null};
   populateForm(r);setView('form');
   document.getElementById('form-view-title').textContent='Edit — '+r.id;
 }
 function populateForm(r){
-  const id=editMode?r.id:nextID(formState.nursery);
-  document.getElementById('f-id').value=id;
   document.getElementById('f-date').value=editMode?r.date:todayISO();
-  document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
@@ -157,8 +173,8 @@ function populateForm(r){
     if(r&&r.plot===p)o.selected=true;ps.appendChild(o);
   });
   document.getElementById('f-batch').value=r?r.batch||'':'';
-  const TRI={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t'};
-  ['ulat','tikus','bintik'].forEach(f=>{
+  const TRI=TRI_CLASS;
+  ['ulat','tikus','bintik','ptype'].forEach(f=>{
     const grp=document.getElementById('f-'+f+'-grp');
     grp.querySelectorAll('.tri-btn').forEach(b=>b.className='tri-btn');
     if(formState[f]){const btn=[...grp.querySelectorAll('.tri-btn')].find(b=>b.dataset.val===formState[f]);if(btn)btn.classList.add(TRI[formState[f]]);}
@@ -170,7 +186,8 @@ function populateForm(r){
   if(note){note.classList.remove('error');note.textContent=t('photo_req');}
 }
 
-const TRI_CLASS={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t'};
+const TRI_CLASS={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t',
+                 'Culling':'sel-p','Transplanting':'sel-p'};
 function pickTri(field,val,el){
   document.getElementById('f-'+field+'-grp').querySelectorAll('.tri-btn').forEach(b=>b.className='tri-btn');
   el.classList.add(TRI_CLASS[val]);formState[field]=val;
@@ -237,6 +254,7 @@ async function saveRecord(){
   if(!formState.tikus){showToast(t('err_animal'));return;}
   if(!formState.bintik){showToast(t('err_disease'));return;}
   if(!formState.warna){showToast(t('err_leaf'));return;}
+  if(!formState.ptype){showToast(t('err_plot_type'));return;}
   if(!formState.photo1||!formState.photo2){
     const note=document.getElementById('photo-req-note');
     if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
@@ -253,6 +271,7 @@ async function saveRecord(){
       date:todayISO(),
       auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
+    if(hasPlotType) payload.plot_type=formState.ptype;
     const result=await smartSave('audit_plot_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextID(formState.nursery)},
       editMode?editId:null);
@@ -280,6 +299,8 @@ function openDetail(uid){
   document.getElementById('detail-date').textContent=fmtDate(r.date);
   document.getElementById('detail-plot').textContent=r.plot;
   document.getElementById('detail-batch').textContent=r.batch?'Batch: '+r.batch:'';
+  document.getElementById('detail-ptype').textContent=
+    r.ptype?t('plot_type')+': '+t(r.ptype==='Culling'?'culling_plot':'transplanting_plot'):'';
   [['detail-ulat-val','ulat'],['detail-tikus-val','tikus'],['detail-bintik-val','bintik']].forEach(([elId,field])=>{
     const el=document.getElementById(elId);
     el.textContent=r[field]||'—';

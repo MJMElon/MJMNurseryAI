@@ -51,21 +51,19 @@
     <div class="form-view-header">
       <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="form-view-title" data-t="new_audit">New Audit</span>
-      <span class="form-view-id" id="form-view-id"></span>
     </div>
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="plot_info">Audit Information</span></div>
       <div class="form-inner">
         <div class="form-row">
-          <div class="form-field"><div class="field-label" data-t="audit_id">Audit ID</div><input id="f-id" class="input" type="text" readonly/></div>
           <div class="form-field"><div class="field-label" data-t="date">Date</div><input id="f-date" class="input" type="date" readonly/></div>
-        </div>
-        <div class="form-row">
           <div class="form-field">
             <div class="field-label"><span data-t="plot">Plot</span> <span class="req">*</span></div>
             <div class="select-wrap"><select id="f-plot" class="input"><option value="" data-t="select_plot">— Select Plot —</option></select></div>
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-field">
             <div class="field-label"><span data-t="batch">Batch</span> <span class="req">*</span></div>
             <input id="f-batch" class="input" type="text" placeholder="e.g. 231" maxlength="24"/>
@@ -147,6 +145,16 @@
       </div>
     </div>
 
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg><span data-t="plot_type">Plot Type</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-inner">
+        <div class="tri-group two" id="f-ptype-grp">
+          <button class="tri-btn" data-val="Culling"       onclick="pickTri('ptype','Culling',this)"       data-t="culling_plot">Culling Plot</button>
+          <button class="tri-btn" data-val="Transplanting" onclick="pickTri('ptype','Transplanting',this)" data-t="transplanting_plot">Transplanting Plot</button>
+        </div>
+      </div>
+    </div>
+
     <div class="form-actions">
       <button class="btn btn-cancel" onclick="cancelForm()" data-t="cancel">Cancel</button>
       <button class="btn btn-save" onclick="saveRecord()" data-t="save">Save Record</button>
@@ -168,6 +176,7 @@
       </div>
       <div class="detail-plot" id="detail-plot">—</div>
       <div class="detail-batch" id="detail-batch"></div>
+      <div class="detail-batch" id="detail-ptype"></div>
       <div class="detail-grid">
         <div class="detail-cell"><div class="detail-cell-label" data-t="pest">Pest</div><div class="detail-cell-val" id="detail-ulat-val">—</div></div>
         <div class="detail-cell"><div class="detail-cell-label" data-t="animal">Animal</div><div class="detail-cell-val" id="detail-tikus-val">—</div></div>
