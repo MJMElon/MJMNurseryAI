@@ -87,9 +87,16 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  /* Per-plot audit was cancelled, so there is no batch-list view to
-     return to. Back from any sub-view goes to the plot grid. */
-  if(activeView==='form'||activeView==='plot'||activeView==='detail'||activeView==='multi'){
+  if(activeView==='form'){
+    if(e)e.preventDefault();
+    /* PN uses the per-plot form (no batch-list step), so back from
+       it goes to the grid. MN uses the batch list — back from the
+       per-batch form returns to that list for the same plot. */
+    if(activeTab!=='PN' && window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot);
+    else setView('list');
+    return false;
+  }
+  if(activeView==='plot'||activeView==='detail'||activeView==='multi'){
     if(e)e.preventDefault();
     setView('list');
     return false;
@@ -293,10 +300,11 @@ function isBatchAudited(plot, batch){
    form (or to the record, once there is one), and the batch box is not
    on the form at all. The batches are still read behind the scenes —
    they are how we know whether anything is standing on the plot. */
-/* Both PN and MN count and audit by plot now — the multi-batch flow
-   was cancelled at the auditor's request; one record covers a plot,
-   and the batches on it are shown as chips only. */
-function byPlot(){ return true; }
+/* PN audits by plot (one record covers the whole plot, batches
+   sitting on it shown as chips). MN reverted to per-batch at the
+   auditor's request — a plot on MN carries several batches with
+   distinct ages and each needs its own record. */
+function byPlot(){ return activeTab === 'PN'; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
 }
@@ -394,21 +402,22 @@ function renderList(){
    Row ordering: pending on top, audited middle, Not-Required at the
    bottom; ascending batch number within each band. Whole row is the
    tap target (opens the form pre-linked to that batch). */
-/* Every plot — PN and MN — opens the per-plot form directly now. The
-   old batch-list step (view-plot) is cancelled: an auditor keys one
-   set of samples + photos for the whole plot, and the batches roster
-   sitting on it is shown as read-only chips inside Record Information. */
+/* PN opens the per-plot form directly (batches are chips inside it).
+   MN opens the batch list — each MN plot carries several batches
+   with distinct ages, each with its own record. */
 function openPlot(plot){
-  openMultiBatchForm(plot);
+  if(activeTab==='PN') openMultiBatchForm(plot);
+  else                 openPlotDetail(plot);
 }
 window.openPlot=openPlot;
 
 function openPlotDetail(plot){
-  /* Batch-list drill-down cancelled — the audit is per-plot now.
-     Any lingering caller (deep link, refresh handler, back button)
-     is re-aimed at the per-plot form so nobody lands on the old
-     list. Falls through only for a truly missing plot. */
-  if (typeof openMultiBatchForm === 'function') { openMultiBatchForm(plot); return; }
+  /* MN batch-list drill-down. PN routes to the per-plot form via
+     openPlot(); this function is only called for MN now. Kept
+     tolerant to a direct call for PN by delegating there. */
+  if (activeTab === 'PN' && typeof openMultiBatchForm === 'function') {
+    openMultiBatchForm(plot); return;
+  }
   window._lastOpenedPlot=plot;
   const bs=batchesOnPlot(plot).slice().sort((a,b)=>{
     const rank=x=>{

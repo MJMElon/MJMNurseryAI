@@ -79,9 +79,16 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  /* Per-plot audit was cancelled, so there is no batch-list view to
-     return to. Back from a form goes straight to the plot grid. */
-  if(activeView==='form'||activeView==='plot'||activeView==='detail'){
+  if(activeView==='form'){
+    if(e)e.preventDefault();
+    /* PN uses the per-plot form (no batch-list step), so back from
+       it goes to the grid. MN uses the batch list — back from the
+       per-batch form returns to that list for the same plot. */
+    if(activeTab!=='PN' && window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot);
+    else setView('list');
+    return false;
+  }
+  if(activeView==='plot'||activeView==='detail'){
     if(e)e.preventDefault();
     setView('list');
     return false;
@@ -247,12 +254,11 @@ async function loadRecords(){
    form (or to the record, once there is one), and the batch box is not
    on the form at all. The batches are still read behind the scenes —
    they are how we know whether anything is standing on the plot. */
-/* Both PN and MN audit by plot now — batch-by-batch was cancelled at
-   the auditor's request. The batches sitting on the plot are still
-   read from the roster (see plotHasWork) so the tile can flag empty
-   plots, and they render as read-only chips inside the form's
-   Audit Information card. */
-function byPlot(){ return true; }
+/* PN audits by plot (one record per plot, batches as chips inside
+   the form). MN reverted to per-batch at the auditor's request — a
+   plot on MN carries several batches with distinct ages and each
+   needs its own record. */
+function byPlot(){ return activeTab === 'PN'; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
 }
@@ -291,12 +297,18 @@ function _paintBatchesChips(plot){
 }
 window._paintBatchesChips = _paintBatchesChips;
 /* The batch box belongs to a batch-by-batch audit. Hide it where the
-   audit is the plot, and hide the row it sits in so nothing gaps. */
+   audit is the plot, and hide the row it sits in so nothing gaps.
+   The "Batches on this plot" chips row is the opposite: only useful
+   when the form is per-plot (PN); hidden when the auditor is on a
+   single batch (MN). */
 function syncBatchField(){
   const bf = document.getElementById('f-batch');
-  if (!bf) return;
-  const row = bf.closest('.form-field');
-  if (row) row.style.display = byPlot() ? 'none' : '';
+  if (bf) {
+    const row = bf.closest('.form-field');
+    if (row) row.style.display = byPlot() ? 'none' : '';
+  }
+  const chipsRow = document.getElementById('f-batches-row');
+  if (chipsRow) chipsRow.style.display = byPlot() ? '' : 'none';
 }
 
 /* --- RENDER LIST --- */
@@ -414,7 +426,7 @@ function renderList(){
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
-              onclick="openPlotAudit('${p}')"
+              onclick="${onePlot ? 'openPlotAudit' : 'openPlotDetail'}('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
@@ -435,11 +447,12 @@ function renderList(){
    plot + batch pre-selected. Existing audits show an Edit button
    instead so re-auditing takes the same path everyone else uses. */
 function openPlotDetail(plot){
-  /* The batch-list drill-down was cancelled — the audit is per-plot
-     now. Any lingering caller (deep link, refresh handler) is
-     re-aimed at the per-plot form so nobody lands on the old list
-     view any more. Falls through only for a truly missing plot. */
-  if (typeof openPlotAudit === 'function') { openPlotAudit(plot); return; }
+  /* MN batch-list drill-down. PN routes to the per-plot form via
+     openPlotAudit(); this function is only called for MN now. Kept
+     tolerant to a direct call for PN by delegating. */
+  if (activeTab === 'PN' && typeof openPlotAudit === 'function') {
+    openPlotAudit(plot); return;
+  }
   window._lastOpenedPlot = plot;
   // Row order: pending on top, audited in the middle, Not-Required at
   // the bottom. Within each band, batch number ascending. That way an
