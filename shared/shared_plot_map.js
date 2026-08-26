@@ -272,37 +272,46 @@
 
     /* Redraw the polygons against whatever statusOf() says now. Cheap enough
        to call on every data change — it is a few dozen shapes. */
+    /* A plot drawn as one shape, or as its areas when it has been split.
+
+       A plot carrying two batches planted weeks apart has two stages
+       running at once, and one polygon can only be one colour. So when
+       nops_plot_areas has shapes for a plot, THEY are drawn — each keyed
+       "B2#A", which is the unit key PALMS has always logged against — and
+       the plot's own map_top is not. Mixing the two would draw the halves
+       on top of the whole. */
+    const shapesOf = (p) => {
+      const areas = (AREAS[p.plot_name] || []).filter((a) => a && a.polygon);
+      if (areas.length) {
+        return areas.map((a) => ({
+        key: p.plot_name + '#' + a.area_key,
+        label: p.plot_name + ' · ' + a.area_key,
+        plot: p.plot_name,
+        area: a.area_key,
+        raw: a.polygon,
+        }));
+      }
+      return [{ key: p.plot_name, label: p.plot_name, plot: p.plot_name, area: null, raw: p.map_top }];
+    };
+
+    /* Exactly what refresh() draws, in the order it draws it. The page's
+       table reads this too — a table listing plots while the map draws
+       areas is how B1#B went missing from one and not the other. */
+    function unitList(nursery) {
+      const want = nursery || active;
+      const out = [];
+      plots.filter((p) => p.nursery_name === want).forEach((p) => {
+        shapesOf(p).forEach((u) => out.push(u));
+      });
+      return out;
+    }
+
     function refresh() {
       elSvg.innerHTML = '';
       elLabels.innerHTML = '';
       const shapes = [];
       const labels = [];
-      /* A plot drawn as one shape, or as its areas when it has been split.
-
-         A plot carrying two batches planted weeks apart has two stages
-         running at once, and one polygon can only be one colour. So when
-         nops_plot_areas has shapes for a plot, THEY are drawn — each keyed
-         "B2#A", which is the unit key PALMS has always logged against — and
-         the plot's own map_top is not. Mixing the two would draw the halves
-         on top of the whole. */
-      const shapesOf = (p) => {
-        const areas = (AREAS[p.plot_name] || []).filter((a) => a && a.polygon);
-        if (areas.length) {
-          return areas.map((a) => ({
-            key: p.plot_name + '#' + a.area_key,
-            label: p.plot_name + ' · ' + a.area_key,
-            raw: a.polygon,
-          }));
-        }
-        return [{ key: p.plot_name, label: p.plot_name, raw: p.map_top }];
-      };
-
-      const units = [];
-      plots.filter((p) => p.nursery_name === active).forEach((p) => {
-        shapesOf(p).forEach((u) => units.push(u));
-      });
-
-      units.forEach((p) => {
+      unitList().forEach((p) => {
         if (!p.raw || !String(p.raw).startsWith('[')) return;
         let pts;
         try { pts = JSON.parse(p.raw); } catch (e) { return; }
@@ -459,6 +468,8 @@
          being drawn whole. */
       setAreas: function (byPlot) { AREAS = byPlot || {}; refresh(); },
       areasOf: function (plot) { return (AREAS[plot] || []).slice(); },
+      /* Every shape on the map, as { key, label, plot, area, raw }. */
+      units: function (nursery) { return unitList(nursery); },
     };
   }
 
