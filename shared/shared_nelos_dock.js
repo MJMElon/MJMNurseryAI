@@ -249,7 +249,7 @@
                     'nursery_name,plot_name,batch_name,assignee_id,assignee_name,due_date,' +
                     'created_at,resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
-  var FULL_COLS   = ROUTED_COLS + ',photo_url';
+  var FULL_COLS   = ROUTED_COLS + ',photo_url,raised_by';
 
   /* Asked for in this order, dropping to the next on a 400 — two different
      migrations add the columns above the base set, and a database may have
@@ -742,8 +742,12 @@
      can add, and both are optional except the remark — a resolution
      nobody described is one nobody can check. */
   .nd-solve { margin-top:16px; border-top:1px solid #e9e3fb; padding-top:13px; }
-  .nd-solve-h { font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
-                color:#6d28d9; margin-bottom:9px; }
+  /* The heading over each of the two blocks — what is being asked, then
+     the answer to it. Same mark in both places so they read as a pair. */
+  .nd-d-sec { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
+              color:#6d28d9; margin-bottom:9px; }
+  .nd-solve-lab { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+                  color:#64748b; margin:12px 0 -2px; }
   .nd-shot { display:flex; gap:8px; align-items:stretch; }
   .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
                    justify-content:center; gap:3px; min-height:64px; cursor:pointer;
@@ -776,18 +780,25 @@
   .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
   .nd-detail[hidden] { display:none; }
   .nd-d-title { font-size:15px; font-weight:800; color:#0f172a; line-height:1.35; }
-  .nd-d-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
-  .nd-d-chip { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
-               padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; }
-  .nd-d-chip.hot  { background:#fee2e2; color:#b91c1c; }
-  .nd-d-chip.due  { background:#fef3c7; color:#92400e; }
+  .nd-d-meta { font-size:11px; font-weight:700; color:#94a3b8; margin-top:5px; }
+  /* Three facts across on anything wider than a narrow dock, stacked when
+     the panel is dragged small — the labels are short but the values are
+     names, and three names on one 300px line is a wall. */
+  .nd-d-facts { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+                gap:9px 10px; margin-top:12px; padding:11px 12px;
+                background:#f8fafc; border:1px solid #eef2f7; border-radius:11px; }
+  /* Three across, as one row — but not on a dock dragged down to its
+     narrowest, where three names in 300px is a column of single words. */
+  @media (max-width:340px) { .nd-d-facts { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .nd-d-fact { min-width:0; }
+  .nd-d-fact .nd-d-k { font-size:9px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+                       color:#94a3b8; }
+  .nd-d-fact .nd-d-v { font-size:12.5px; font-weight:700; color:#1e293b; margin-top:2px;
+                       line-height:1.3; word-break:break-word; }
+  .nd-d-fact .nd-d-v em { font-style:normal; color:#94a3b8; font-weight:600; }
   .nd-d-body { margin-top:12px; font-size:12.5px; line-height:1.55; color:#334155;
                white-space:pre-wrap; word-break:break-word; }
   .nd-d-none { margin-top:12px; font-size:12px; color:#94a3b8; font-style:italic; }
-  .nd-d-grid { margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px;
-               display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:11.5px; }
-  .nd-d-k { color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-  .nd-d-v { color:#334155; font-weight:600; word-break:break-word; }
   .nd-d-open { display:inline-block; margin-top:14px; font-size:11px; font-weight:800;
                color:#6d28d9; text-decoration:none; letter-spacing:.03em; }
   .nd-d-open:hover { text-decoration:underline; }
@@ -1160,9 +1171,15 @@
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
     try { localStorage.setItem(LS_OPEN, open ? '1' : '0'); } catch (_) {}
     if (open) {
-      /* Reopening lands on the list, not on a half-filled form somebody
-         walked away from — except when they minimised mid-edit and came
-         straight back, which the form pane keeps. */
+      /* Reopening lands on the list. It always said so in this comment and
+         never did it — nothing here changed the pane, so whatever was on
+         screen when the dock was minimised came back: a half-filled form, or
+         one case's detail, with the list nowhere in sight until something
+         else was pressed.
+
+         Not in a modal: newCase() opens one and shows the form immediately
+         after this, and showList() in a modal closes it. */
+      if (!modal) showList();
       applyPos(pos);
       refresh();
     }
@@ -1610,25 +1627,27 @@
   }
 
   function detailHtml(c, full) {
-    var subject = [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
-      .filter(Boolean).join(' · ');
-    var due = dueLabel(c.due_date);
-    var chips =
-      '<span class="nd-d-chip">' + esc(SOURCE_LABEL[c.source_module] || c.source_module || 'Nelos') + '</span>' +
-      '<span class="nd-d-chip' + (c.priority === 'urgent' || c.priority === 'high' ? ' hot' : '') + '">' +
-        esc(PRIORITY_LABEL[c.priority] || c.priority || 'normal') + '</span>' +
-      (c.status ? '<span class="nd-d-chip">' + esc(String(c.status).replace('_', ' ')) + '</span>' : '') +
-      (due ? '<span class="nd-d-chip' + (isOverdue(c) ? ' hot' : ' due') + '">' + esc(due) + '</span>' : '');
+    var f = full || c;
 
-    var rowsOut = [];
-    var put = function (k, v) { if (v) rowsOut.push(
-      '<div class="nd-d-k">' + esc(k) + '</div><div class="nd-d-v">' + esc(v) + '</div>'); };
-    put('Case', c.case_no);
-    put('Subject', subject);
-    put('Category', c.category);
-    put('Queue', SOURCE_LABEL[c.assigned_module] || c.assigned_module);
-    put('Assignee', c.assignee_name || 'Unassigned');
-    put('Raised', (c.created_at || '').slice(0, 10));
+    /* Where the work is. Nursery with its plot in brackets, and the batch
+       only when there is one — a batch case that did not say so would be
+       missing the one thing that identifies it. */
+    var where = f.nursery_name
+      ? esc(f.nursery_name) + (f.plot_name ? ' (' + esc(f.plot_name) + ')' : '')
+      : (f.plot_name ? esc(f.plot_name) : '');
+    if (f.batch_name) where = (where ? where + ' · ' : '') + 'Batch ' + esc(f.batch_name);
+
+    var fact = function (k, v) {
+      return '<div class="nd-d-fact"><div class="nd-d-k">' + esc(k) + '</div>' +
+             '<div class="nd-d-v">' + (v || '&#8212;') + '</div></div>';
+    };
+
+    /* Created, and by whom. raised_by is on the top column tier only, so on
+       a database that has not got it this simply reads as the date. */
+    var made = (f.created_at || '').slice(0, 10);
+    var when = made ? prettyDate(made) : '';
+    var meta = (when ? 'Created ' + esc(when) : '') +
+               (f.raised_by ? (when ? ' · ' : '') + 'by ' + esc(f.raised_by) : '');
 
     var body = full === null
       ? '<div class="nd-d-none">Could not load the detail — the case above is what the list knows.</div>'
@@ -1639,12 +1658,34 @@
           : '<div class="nd-d-none">Loading detail…</div>';
 
     var solved = (full && full.status === 'resolved') || c.status === 'resolved';
-    return '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
-           '<div class="nd-d-chips">' + chips + '</div>' +
+
+    /* Two blocks, in the order the job is done: read what is being asked,
+       then answer it. The chips that used to sit under the title — the
+       module, the priority, the status — said "Nelos · Normal · Open" on
+       almost every case, which is three words of nothing above the one
+       thing being read. The case number is in the panel heading already. */
+    return '<div class="nd-d-sec">Pending Case Details</div>' +
+           '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
+           (meta ? '<div class="nd-d-meta">' + meta + '</div>' : '') +
+           '<div class="nd-d-facts">' +
+             fact('Nursery (Plot)', where) +
+             fact('Assigned to', esc(SOURCE_LABEL[f.assigned_module || f.source_module] ||
+                                     f.assigned_module || f.source_module || '')) +
+             fact('PIC', f.assignee_name ? esc(f.assignee_name) : '<em>Unassigned</em>') +
+           '</div>' +
            body +
-           (rowsOut.length ? '<div class="nd-d-grid">' + rowsOut.join('') + '</div>' : '') +
            '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>' +
            (solved ? solvedCardHtml(full || c) : solveBlockHtml());
+  }
+
+  /* 2026-08-26 → 26 Aug 2026. Falls back to the ISO string rather than
+     printing "Invalid Date" at somebody. */
+  function prettyDate(iso) {
+    try {
+      var d = new Date(iso + 'T00:00:00');
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (_) { return iso; }
   }
 
   /* ── SOLVING ─────────────────────────────────────────────────────
@@ -1732,16 +1773,20 @@
 
   function solveBlockHtml() {
     return '<div class="nd-solve">' +
-             '<div class="nd-solve-h">Solve</div>' +
+             '<div class="nd-d-sec">Solve Case</div>' +
              '<div class="nd-shot">' +
                '<label>' +
                  '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-                 '<span>Add photo</span>' +
+                 '<span>Take or attach a photo</span>' +
                  '<input type="file" accept="image/*" capture="environment" class="nd-shot-in">' +
                '</label>' +
              '</div>' +
-             '<textarea class="nd-solve-note" maxlength="2000" ' +
-                       'placeholder="What did you do? — this is what the person closing it reads"></textarea>' +
+             /* Labelled rather than prompted from inside the box: a
+                placeholder is gone the moment anybody types, so the one
+                thing telling them what the box is for disappears exactly
+                when they start filling it in. */
+             '<div class="nd-solve-lab">Solve Case Remark</div>' +
+             '<textarea class="nd-solve-note" maxlength="2000"></textarea>' +
            '</div>';
   }
 
