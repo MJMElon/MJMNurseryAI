@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-26a */
+/* BUILD: 2026-08-26b */
 /* ================================================================
    MJM NURSERY — MAINTENANCE AUDIT
    maintenance_script.js
@@ -230,7 +230,6 @@ function openForm(taskId, isEdit, existingAuditUid){
   document.getElementById('b-completed').textContent=fmtDate(t.completedDate);
   document.getElementById('b-worker').textContent=t.worker||'—';
   document.getElementById('form-title').textContent='Audit — '+t.plot;
-  document.getElementById('form-id').textContent=editMode?editId:nextAuditID();
   // Reset tri buttons
   document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
   if(formState.result){

@@ -12,7 +12,7 @@
    monthly report. Raise this if the cap is being hit in normal use.
 ────────────────────────────────────────────────────────────────────── */
 const RECENT_LIMIT = 400;
-/* BUILD: 2026-08-26a */
+/* BUILD: 2026-08-26b */
 /* ================================================================
    MJM NURSERY — PAPAN TANDA AUDIT
    papan_script.js — auto-linked from Nursery AI batches table
@@ -78,7 +78,11 @@ function statusBadgeClass(s){return{pending:'badge-pending',pass:'badge-pass',is
 function valClass(v){if(['Good','Correct'].includes(v))return'val-ok';if(['Bad','Wrong'].includes(v))return'val-bad';if(v==='Empty')return'val-warn';return'';}
 function chipClass(v){if(['Good','Correct'].includes(v))return'cc-ok';if(['Bad','Wrong'].includes(v))return'cc-bad';if(v==='Empty')return'cc-warn';return'cc-na';}
 function getTriClass(v){if(['Good','Correct'].includes(v))return'sel-ok';if(v==='Empty')return'sel-warn';return'sel-bad';}
-function nextAuditID(){return'PTA-'+pad(audits.length+1);}
+/* Counting a capped list would reissue IDs; take the highest on record. */
+function nextAuditID(){
+  const n=audits.reduce((hi,a)=>Math.max(hi, parseInt(String(a.id||'').split('-').pop(),10)||0), 0);
+  return 'PTA-'+pad(n+1);
+}
 
 /* --- UI HELPERS --- */
 function showToast(msg, ms){ window._pageShowToast=showToast;
@@ -414,7 +418,6 @@ function openAddBatch(){
   document.getElementById('bf-date-transplant').value='';
   document.getElementById('bf-date-mature').value='';
   document.getElementById('batch-form-title').textContent='New Batch';
-  document.getElementById('batch-form-id').textContent='';
   setView('batch-form');
 }
 function openEditBatch(uid){
@@ -431,7 +434,6 @@ function openEditBatch(uid){
   document.getElementById('bf-date-transplant').value=b.dateTransplant||'';
   document.getElementById('bf-date-mature').value=b.dateMature||'';
   document.getElementById('batch-form-title').textContent='Edit Batch';
-  document.getElementById('batch-form-id').textContent=b.id;
   setView('batch-form');
 }
 async function saveBatch(){
@@ -488,7 +490,6 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   document.getElementById('banner-dt').textContent=fmtDate(b.dateTransplant);
   document.getElementById('banner-dm').textContent=fmtDate(b.dateMature);
   document.getElementById('audit-form-title').textContent='Audit — '+b.plot;
-  document.getElementById('audit-form-id').textContent=editMode?editId:nextAuditID();
 
   // Reset tri buttons
   ['presence','info','cond'].forEach(f=>{

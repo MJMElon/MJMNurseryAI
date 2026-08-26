@@ -56,17 +56,13 @@
     <div class="form-view-header">
       <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="form-view-title">New Record</span>
-      <span class="form-view-id" id="form-view-id"></span>
     </div>
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="record_info">Record Information</span></div>
       <div class="form-inner">
         <div class="form-row">
-          <div class="form-field"><div class="field-label" data-t="record_id">Record ID</div><input id="f-id" class="input" type="text" readonly/></div>
           <div class="form-field"><div class="field-label" data-t="date">Date</div><input id="f-date" class="input" type="date" readonly/></div>
-        </div>
-        <div class="form-row">
           <div class="form-field">
             <div class="field-label"><span data-t="plot">Plot</span> <span class="req">*</span></div>
             <div class="select-wrap"><select id="f-plot" class="input"><option value="">— Select Plot —</option></select></div>

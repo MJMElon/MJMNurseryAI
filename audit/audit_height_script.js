@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-26a */
+/* BUILD: 2026-08-26b */
 /* ================================================================
    MJM NURSERY — SEEDLING HEIGHT SYSTEM
    height_script.js — Supabase connected
@@ -34,7 +34,14 @@ function calcAvg(s1,s2,s3){
   const v=[s1,s2,s3].map(x=>parseFloat(x)).filter(x=>!isNaN(x)&&x>0);
   return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null;
 }
-function nextID(nursery){return 'HGT-'+nursery+'-'+pad(records.filter(r=>r.nursery===nursery).length+1);}
+/* The list holds only the most recent slice, so counting it would restart
+   the numbering and reissue IDs older records already own. Count on from the
+   highest number on record — the newest rows are the ones held. */
+function nextID(nursery){
+  const n=records.filter(r=>r.nursery===nursery)
+    .reduce((hi,r)=>Math.max(hi, parseInt(String(r.id||'').split('-').pop(),10)||0), 0);
+  return 'HGT-'+nursery+'-'+pad(n+1);
+}
 
 /* --- UI --- */
 function showToast(msg, ms){ window._pageShowToast=showToast;
@@ -175,10 +182,7 @@ function openEdit(uid){
   document.getElementById('form-view-title').textContent=t('edit_lbl')+' — '+r.id;
 }
 function populateForm(r){
-  const id=editMode?r.id:nextID(formState.nursery);
-  document.getElementById('f-id').value=id;
   document.getElementById('f-date').value=editMode?r.date:todayISO();
-  document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
