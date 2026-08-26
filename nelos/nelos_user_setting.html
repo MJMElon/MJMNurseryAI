@@ -186,7 +186,22 @@
   .sys-head { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;
               padding:12px 13px 9px; border-bottom:1px solid #f3f0fd; }
   .sys-head .sys-name { font-size:13px; font-weight:900; color:#4c1d95; }
-  .sys-head .sys-count { margin-left:auto; font-size:9.5px; font-weight:800; color:#c4b5fd; }
+  /* Where the head count used to sit. "2 people" was the list underneath
+     said again as a number; the one thing this corner is worth is the way
+     into changing it. */
+  .sys-edit { margin-left:auto; flex-shrink:0; min-width:26px; height:24px; padding:0 8px;
+              border-radius:7px; border:1.5px solid transparent; background:none;
+              font-family:inherit; font-size:12.5px; font-weight:900; color:#a78bfa;
+              cursor:pointer; transition:all .15s; }
+  .sys-card:hover .sys-edit { color:#7c3aed; border-color:#ede9fe; }
+  .sys-edit:hover { background:#ede9fe; color:#5b21b6; border-color:#ddd6fe; }
+  .sys-edit.on, .sys-card:hover .sys-edit.on {
+              background:#7c3aed; border-color:#7c3aed; color:#fff;
+              font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; }
+  .sys-edit.on:hover { background:#6d28d9; border-color:#6d28d9; }
+  /* An open card is ringed, so on a grid of four it is never a question
+     which one is being changed. */
+  .sys-card:has(.sys-edit.on) { border-color:#c4b5fd; box-shadow:0 0 0 3px rgba(124,58,237,.10); }
 
   /* ── A system's numbered slots ──────────────────────────────── */
   /* One row per number, holding a name or empty. Filling one is choosing
@@ -210,15 +225,10 @@
   .slot-empty .slot-no { color:#ddd6fe; }
   .slot-pick { padding:6px 9px; font-size:12.5px; flex:1; min-width:0; }
 
-  /* The pencil, and the grip beside the number. Both fade in on the row
-     rather than sitting on every line at full strength: a card of four
-     names should read as four names. Kept visible whenever the row has
-     focus inside it, so they do not vanish from under the keyboard. */
-  .slot-edit { flex-shrink:0; width:24px; height:24px; border-radius:7px; border:none;
-               background:none; color:#a78bfa; cursor:pointer; font-size:13px; line-height:1;
-               opacity:0; transition:opacity .15s, background .15s, color .15s; }
-  .slot:hover .slot-edit, .slot:focus-within .slot-edit { opacity:1; }
-  .slot-edit:hover { background:#ede9fe; color:#6d28d9; }
+  /* The grip beside the number fades in on the row rather than sitting on
+     every line at full strength: a card of four names should read as four
+     names. Kept visible whenever the row has focus inside it, so it does
+     not vanish from under the keyboard. */
   .grip { flex-shrink:0; width:13px; height:16px; opacity:0; cursor:grab;
           transition:opacity .15s; color:#c4b5fd; }
   .slot:hover .grip, .slot:focus-within .grip { opacity:1; }
@@ -474,7 +484,7 @@ const routeFor = (mod, cat) =>
    may do to a case — is on User Access. This tab is only the roster. */
 
 let moreSeats = {};   // module key → extra empty slots the + button opened
-let editSeat = null;  // "<module>:<n>" — the one slot showing its picker
+let editCard = null;  // the one system whose slots are showing their pickers
 let dragSeat = null;  // { key, seat } while a row is being carried
 
 /* The slots a system shows: every number somebody holds, one spare past
@@ -494,7 +504,7 @@ const GRIP = '<svg viewBox="0 0 10 16" aria-hidden="true">' +
 
 function seatSlot(key, n) {
   const holder = peopleIn(key).find(p => p.seat_no === n) || null;
-  const editing = editSeat === key + ':' + n;
+  const editing = editCard === key;
   const who = holder ? (holder.full_name || holder.email) : '';
 
   if (editing) {
@@ -532,10 +542,6 @@ function seatSlot(key, n) {
             aria-label="Move ${esc(who)} — arrow up or down"` : ''}>${holder ? GRIP : ''}</span>
       <span class="slot-no">#${n}</span>
       <span class="slot-name">${holder ? esc(who) : '— empty —'}</span>
-      <button type="button" class="slot-edit" data-edit="${esc(key)}:${n}"
-              title="${holder ? 'Change who is #' + n : 'Put somebody in #' + n}"
-              aria-label="${holder ? 'Change who is #' + n : 'Put somebody in #' + n}"
-              >&#x270E;</button>
     </div>`;
 }
 
@@ -568,7 +574,7 @@ async function moveSeat(key, fromSeat, toSeat) {
 
   const who = order[fromIdx];
   toast(`${who.full_name || who.email} is now ${seatName(key, toIdx + 1)}.`);
-  moreSeats = {}; editSeat = null;
+  moreSeats = {}; editCard = null;
   await load();
 }
 
@@ -595,9 +601,11 @@ function renderPeople() {
         <div class="sys-head">
           <span class="sys-name">${esc(m.label)}</span>
           ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
-          <span class="sys-count">${rows.length
-            ? rows.length + (rows.length === 1 ? ' person' : ' people')
-            : 'nobody'}</span>
+          <button type="button" class="sys-edit ${editCard === m.key ? 'on' : ''}"
+                  data-edit="${esc(m.key)}"
+                  title="${editCard === m.key ? 'Done' : 'Change who handles ' + m.label}"
+                  aria-label="${editCard === m.key ? 'Done' : 'Change who handles ' + m.label}"
+                  >${editCard === m.key ? 'Done' : '&#x270E;'}</button>
         </div>
         <div class="slots">${slots.join('')}</div>
         <button type="button" class="seat-add" data-more="${esc(m.key)}">+ add another person</button>
@@ -608,31 +616,41 @@ function renderPeople() {
     b.addEventListener('click', () => {
       const k = b.dataset.more;
       moreSeats[k] = seatCount(k) + 1;
-      // The new slot opens ready to pick, since asking for it is saying you
-      // have somebody to put in it.
-      editSeat = k + ':' + moreSeats[k];
+      // Asking for a slot is saying you have somebody to put in it, so the
+      // card opens ready to pick whether or not it already was.
+      editCard = k;
       renderPeople();
     }));
 
-  // The pencil turns one slot into its picker; choosing saves and closes it.
+  /* One pencil per card, not per row. A card's numbers are read together —
+     "who is Audit's #1, and who is behind them" is one question — so
+     opening it opens all of them, and the same button says Done. */
   $('people').querySelectorAll('[data-edit]').forEach(b =>
-    b.addEventListener('click', () => { editSeat = b.dataset.edit; renderPeople(); }));
+    b.addEventListener('click', () => {
+      editCard = editCard === b.dataset.edit ? null : b.dataset.edit;
+      if (!editCard) moreSeats = {};
+      renderPeople();
+    }));
 
   $('people').querySelectorAll('.slot-pick').forEach(sel => {
-    sel.addEventListener('change', () => {
-      editSeat = null;
-      setSeat(sel.dataset.mod, Number(sel.dataset.seat), sel.value);
-    });
+    // The card stays open: somebody who came here to set #1 usually sets
+    // #2 in the same breath.
+    sel.addEventListener('change', () =>
+      setSeat(sel.dataset.mod, Number(sel.dataset.seat), sel.value));
     // Escape backs out without choosing. Deliberately not on blur: a blur
     // fires before the click that caused it, so closing there would tear
     // down the pencil being clicked and swallow the click.
     sel.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
-      editSeat = null;
+      editCard = null;
+      moreSeats = {};
       renderPeople();
     });
-    sel.focus();
   });
+  // Only the first picker takes focus, so opening a card of four does not
+  // leave the cursor on the last one.
+  const first = $('people').querySelector('.slot-pick');
+  if (first) first.focus();
 
   wireDrag();
 }
@@ -735,7 +753,7 @@ async function setSeat(moduleKey, seatNo, userId) {
   toast(incoming
     ? `${incoming.full_name || incoming.email} is now ${seatName(moduleKey, seatNo)}.`
     : `${seatName(moduleKey, seatNo)} is empty.`);
-  moreSeats = {}; editSeat = null;
+  moreSeats = {};
   await load();
 }
 
