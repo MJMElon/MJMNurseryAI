@@ -137,10 +137,12 @@ function renderList(){
         <div class="record-plot">${r.plot}</div>
         <div class="record-meta">${r.id} · ${fmtDT(r.createdAt)}</div>
         <div class="record-chips">
-          <span class="mini-chip ${chipClass(r.ulat)}">Pest:${r.ulat}</span>
-          <span class="mini-chip ${chipClass(r.tikus)}">Animal:${r.tikus}</span>
-          <span class="mini-chip ${chipClass(r.bintik)}">Disease:${r.bintik}</span>
-          <span class="mc-w mini-chip" style="background:${WARNA_BG[r.warna]||'#888'}">Leaf ${r.warna}</span>
+          ${r.ptype && !r.ulat
+            ? `<span class="mini-chip mc-t">${t(r.ptype==='Culling'?'culling_plot':'transplanting_plot')}</span>`
+            : `<span class="mini-chip ${chipClass(r.ulat)}">Pest:${r.ulat||'—'}</span>
+          <span class="mini-chip ${chipClass(r.tikus)}">Animal:${r.tikus||'—'}</span>
+          <span class="mini-chip ${chipClass(r.bintik)}">Disease:${r.bintik||'—'}</span>
+          <span class="mc-w mini-chip" style="background:${WARNA_BG[r.warna]||'#888'}">Leaf ${r.warna||'—'}</span>`}
         </div>
       </div>
       <div class="record-actions" onclick="event.stopPropagation()">
@@ -182,12 +184,32 @@ function populateForm(r){
   document.querySelectorAll('.warna-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===formState.warna));
   renderPlotSlot(1,formState.photo1||null);
   renderPlotSlot(2,formState.photo2||null);
-  const note=document.getElementById('photo-req-note');
-  if(note){note.classList.remove('error');note.textContent=t('photo_req');}
+  syncRequired();
 }
 
 const TRI_CLASS={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t',
                  'Culling':'sel-p','Transplanting':'sel-p'};
+
+/* Culling and transplanting plots are not audited for condition — naming one
+   is what says so, and it is the only way back out, so tapping the chosen
+   answer again clears it and the checks above come back. */
+function pickPtype(val,el){
+  const grp=document.getElementById('f-ptype-grp');
+  const same=formState.ptype===val;
+  grp.querySelectorAll('.tri-btn').forEach(b=>b.className='tri-btn');
+  formState.ptype = same ? null : val;
+  if(!same) el.classList.add('sel-p');
+  syncRequired();
+}
+/* Requirement marks and the photo note follow the answer, so the form never
+   claims something is needed while refusing to enforce it, or the reverse. */
+function syncRequired(){
+  const lifted=!!formState.ptype;
+  document.querySelectorAll('#view-form [data-req="cond"]')
+    .forEach(e=>{e.style.display=lifted?'none':'';});
+  const note=document.getElementById('photo-req-note');
+  if(note){note.classList.remove('error');note.textContent=lifted?t('ptype_lifted'):t('photo_req');}
+}
 function pickTri(field,val,el){
   document.getElementById('f-'+field+'-grp').querySelectorAll('.tri-btn').forEach(b=>b.className='tri-btn');
   el.classList.add(TRI_CLASS[val]);formState[field]=val;
@@ -248,30 +270,35 @@ function cancelForm(){setView('list');}
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
+  /* A culling or transplanting plot is recorded as such and nothing more:
+     the condition checks and the photos are not asked of it. Which plot it
+     is still has to be said, or the record means nothing. */
+  const lifted=!!formState.ptype;
   if(!plot)           {showToast(t('err_select_plot'));return;}
-  if(!batch)          {showToast(t('err_batch'));return;}
-  if(!formState.ulat) {showToast(t('err_pest'));return;}
-  if(!formState.tikus){showToast(t('err_animal'));return;}
-  if(!formState.bintik){showToast(t('err_disease'));return;}
-  if(!formState.warna){showToast(t('err_leaf'));return;}
-  if(!formState.ptype){showToast(t('err_plot_type'));return;}
-  if(!formState.photo1||!formState.photo2){
-    const note=document.getElementById('photo-req-note');
-    if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
-    showToast(t('photo_both_req'));return;
+  if(!lifted){
+    if(!batch)          {showToast(t('err_batch'));return;}
+    if(!formState.ulat) {showToast(t('err_pest'));return;}
+    if(!formState.tikus){showToast(t('err_animal'));return;}
+    if(!formState.bintik){showToast(t('err_disease'));return;}
+    if(!formState.warna){showToast(t('err_leaf'));return;}
+    if(!formState.photo1||!formState.photo2){
+      const note=document.getElementById('photo-req-note');
+      if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
+      showToast(t('photo_both_req'));return;
+    }
   }
   setLoading(true);
   try{
     const payload={
-      nursery:formState.nursery,plot,batch,
-      pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
-      warna_daun:formState.warna,
+      nursery:formState.nursery,plot,batch:batch||null,
+      pest:formState.ulat||null,tikus:formState.tikus||null,disease:formState.bintik||null,
+      warna_daun:formState.warna||null,
       photo_url:formState.photo1||null,
       photo_2_url:formState.photo2||null,
       date:todayISO(),
       auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
-    if(hasPlotType) payload.plot_type=formState.ptype;
+    if(hasPlotType) payload.plot_type=formState.ptype||null;
     const result=await smartSave('audit_plot_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextID(formState.nursery)},
       editMode?editId:null);
@@ -309,7 +336,8 @@ function openDetail(uid){
   const wb=document.getElementById('detail-warna-box');
   wb.style.background=WARNA_BG[r.warna]||'#888';
   document.getElementById('detail-warna-label').textContent=t('leaf_cond')+' — '+(WARNA_LBL[r.warna]||'—');
-  document.getElementById('detail-warna-desc').textContent=t('ranking')+' '+r.warna+' '+t('of5');
+  document.getElementById('detail-warna-desc').textContent=
+    r.warna ? t('ranking')+' '+r.warna+' '+t('of5') : '';
   setView('detail');
 }
 function closeDetail(){setView('list');}

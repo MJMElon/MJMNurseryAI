@@ -1138,3 +1138,4 @@ html, body {
 .photo-slot-clear{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1;cursor:pointer}
 .photo-req-note{font-size:11px;color:var(--text4);text-align:center;margin-top:8px}
 .photo-req-note.error{color:var(--danger-text);font-weight:500}
+.opt-tag{margin-left:6px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text4)}

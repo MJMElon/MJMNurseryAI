@@ -65,7 +65,7 @@
         </div>
         <div class="form-row">
           <div class="form-field">
-            <div class="field-label"><span data-t="batch">Batch</span> <span class="req">*</span></div>
+            <div class="field-label"><span data-t="batch">Batch</span> <span class="req" data-req="cond">*</span></div>
             <input id="f-batch" class="input" type="text" placeholder="e.g. 231" maxlength="24"/>
           </div>
         </div>
@@ -76,7 +76,7 @@
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span data-t="plot_condition">Plot Condition</span></div>
       <div class="form-inner">
         <div class="form-field">
-          <div class="field-label"><span data-t="pest_inf">Pest Infestation</span> <span class="req">*</span></div>
+          <div class="field-label"><span data-t="pest_inf">Pest Infestation</span> <span class="req" data-req="cond">*</span></div>
           <div class="tri-group" id="f-ulat-grp">
             <button class="tri-btn" data-val="Banyak"    onclick="pickTri('ulat','Banyak',this)" data-t="banyak">Banyak</button>
             <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('ulat','Sedikit',this)" data-t="sedikit">Sedikit</button>
@@ -85,7 +85,7 @@
         </div>
         <div class="divider-line"></div>
         <div class="form-field">
-          <div class="field-label"><span data-t="animal_inf">Animal Infestation</span> <span class="req">*</span></div>
+          <div class="field-label"><span data-t="animal_inf">Animal Infestation</span> <span class="req" data-req="cond">*</span></div>
           <div class="tri-group" id="f-tikus-grp">
             <button class="tri-btn" data-val="Banyak"    onclick="pickTri('tikus','Banyak',this)" data-t="banyak">Banyak</button>
             <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('tikus','Sedikit',this)" data-t="sedikit">Sedikit</button>
@@ -94,7 +94,7 @@
         </div>
         <div class="divider-line"></div>
         <div class="form-field">
-          <div class="field-label"><span data-t="disease_inf">Disease Infestation</span> <span class="req">*</span></div>
+          <div class="field-label"><span data-t="disease_inf">Disease Infestation</span> <span class="req" data-req="cond">*</span></div>
           <div class="tri-group" id="f-bintik-grp">
             <button class="tri-btn" data-val="Banyak"    onclick="pickTri('bintik','Banyak',this)" data-t="banyak">Banyak</button>
             <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('bintik','Sedikit',this)" data-t="sedikit">Sedikit</button>
@@ -103,7 +103,7 @@
         </div>
         <div class="divider-line"></div>
         <div class="form-field">
-          <div class="field-label"><span data-t="leaf_cond">Leaf Condition</span> <span class="req">*</span></div>
+          <div class="field-label"><span data-t="leaf_cond">Leaf Condition</span> <span class="req" data-req="cond">*</span></div>
           <div class="warna-group" id="f-warna-grp">
             <div class="warna-btn" style="background:#1e3d0f" data-v="1" onclick="pickWarna(this)"><span>1</span></div>
             <div class="warna-btn" style="background:#2d6a1f" data-v="2" onclick="pickWarna(this)"><span>2</span></div>
@@ -123,7 +123,7 @@
     </div>
 
     <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg><span data-t="photo_plot">Plot Photos</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg><span data-t="photo_plot">Plot Photos</span> <span class="req" data-req="cond" style="margin-left:4px">*</span></div>
       <div class="form-inner">
         <div class="photo-slots">
           <div class="photo-slot" id="photo-slot-1" onclick="triggerPlotPhoto(1)">
@@ -146,12 +146,13 @@
     </div>
 
     <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg><span data-t="plot_type">Plot Type</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg><span data-t="plot_type">Plot Type</span> <span class="opt-tag" data-t="optional">optional</span></div>
       <div class="form-inner">
         <div class="tri-group two" id="f-ptype-grp">
-          <button class="tri-btn" data-val="Culling"       onclick="pickTri('ptype','Culling',this)"       data-t="culling_plot">Culling Plot</button>
-          <button class="tri-btn" data-val="Transplanting" onclick="pickTri('ptype','Transplanting',this)" data-t="transplanting_plot">Transplanting Plot</button>
+          <button class="tri-btn" data-val="Culling"       onclick="pickPtype('Culling',this)"       data-t="culling_plot">Culling Plot</button>
+          <button class="tri-btn" data-val="Transplanting" onclick="pickPtype('Transplanting',this)" data-t="transplanting_plot">Transplanting Plot</button>
         </div>
+        <p class="photo-req-note" id="ptype-note" data-t="ptype_note">Pick one and the checks above are no longer required. Tap it again to clear it.</p>
       </div>
     </div>
 

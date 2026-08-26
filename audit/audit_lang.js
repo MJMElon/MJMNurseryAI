@@ -126,7 +126,8 @@ const TRANSLATIONS = {
     plot_type:           'Plot Type',
     culling_plot:        'Culling Plot',
     transplanting_plot:  'Transplanting Plot',
-    err_plot_type:       '⚠ Please select the plot type',
+    ptype_note:          'Pick one and the checks above are no longer required. Tap it again to clear it.',
+    ptype_lifted:        'Not required for a culling or transplanting plot',
 
     /* === HEIGHT AUDIT === */
     height_title:        'Seedling Height Audit',
@@ -554,7 +555,8 @@ const TRANSLATIONS = {
     plot_type:           'Jenis Plot',
     culling_plot:        'Plot Culling',
     transplanting_plot:  'Plot Pindah',
-    err_plot_type:       '⚠ Sila pilih jenis plot',
+    ptype_note:          'Pilih satu dan pemeriksaan di atas tidak lagi diwajibkan. Ketik sekali lagi untuk kosongkan.',
+    ptype_lifted:        'Tidak diwajibkan bagi plot culling atau plot pindah',
 
     /* === HEIGHT AUDIT === */
     height_title:        'Audit Ketinggian Anak Benih',
