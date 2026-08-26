@@ -302,6 +302,39 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .sched-panel{display:none;animation:fadein .18s ease;}
 .sched-panel.active{display:block;}
 
+/* ─── SCHEDULE BLOCKS ───
+   The four programs, stacked. Each one is a bordered slab with its own
+   header rather than a tab: the point is that you can see there are four
+   and how much of each is set, without clicking anything. */
+.sched-jump{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.sched-jump button{font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:var(--text-muted);background:var(--bg-white);border:1.5px solid var(--border);
+  border-radius:99px;padding:6px 14px;cursor:pointer;transition:all .14s;}
+.sched-jump button:hover{color:var(--green-text);border-color:var(--green);background:var(--green-bg);}
+
+.sched-block{border:1.5px solid var(--border);border-left:4px solid var(--green);
+  border-radius:var(--r-md);background:var(--bg-white);box-shadow:var(--shadow-sm);
+  margin-bottom:16px;overflow:hidden;scroll-margin-top:96px;}
+
+/* The whole header is the toggle, so there is no small target to hunt for. */
+.sched-block-hdr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;
+  font-family:var(--font);text-align:left;background:transparent;border:none;
+  padding:14px 20px;cursor:pointer;transition:background .14s;}
+.sched-block-hdr:hover{background:var(--green-bg);}
+.sched-caret{font-size:11px;color:var(--green-text);transition:transform .16s;flex-shrink:0;}
+.sched-block.collapsed .sched-caret{transform:rotate(-90deg);}
+.sched-name{font-size:15px;font-weight:700;color:var(--text-head);letter-spacing:.3px;}
+/* Pushed hard right, so the four counts line up down the page and read as a
+   column even though each header is a different width. */
+.sched-count{margin-left:auto;font-size:11px;font-weight:700;color:var(--text-muted);
+  letter-spacing:.3px;white-space:nowrap;}
+.sched-count.is-set{color:var(--green-text);}
+
+.sched-block-body{padding:0 16px 16px;}
+.sched-block.collapsed .sched-block-body{display:none;}
+/* The grid already has the slab's border around it. */
+.sched-block-body .card{border:none;box-shadow:none;border-radius:0;}
+
 /* Big headline metric cards on the Work Record view */
 /* Fixed 4-up grid (not auto-fit) so the headline cards keep the SAME size and
    layout whichever sub-view is open - the analytics charts change the available
