@@ -93,7 +93,8 @@
              flex-shrink:0; display:flex; align-items:center; justify-content:center;
              font-weight:900; font-size:15px; }
 
-  .panel { padding:2px 16px 16px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
+  .panel { padding:2px 16px 14px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
+  .panel .lbl { margin:14px 0 4px; }
 
   /* The person being edited, ringed. The row and its panel are one block
      so the ring closes round both, and the row keeps its own tint so the
@@ -106,22 +107,31 @@
                  flex-shrink:0; }
   .editing .panel { border-top:1px solid #ddd6fe; background:#fff; }
 
-  /* One thing, one row: a tick box and a name. Used by both lists in the
-     panel — the systems and what may be done to a case — because they ask
-     the same kind of question and should not look like two designs. */
-  .acc-list { display:flex; flex-direction:column; gap:4px; }
-  .acc-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px;
-             border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
-             font-size:12.5px; font-weight:800; color:#1e293b; }
-  .acc-row:hover { border-color:#c4b5fd; }
-  .acc-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; margin:0; }
-  .acc-row:has(input:checked) { background:#f5f3ff; border-color:#c4b5fd; }
+  /* One thing, one row: a tick box and a name, and no box drawn round
+     either. A bordered card per line turned a ten-item form into a wall of
+     panels — the tick already says this is a choice, and the border only
+     said it again in 1.5px. Rows are as wide as their words (align-items:
+     flex-start), so the block stops at the text instead of ruling a line
+     to the far edge.
+
+     Used by all three lists in the panel — see-all, the role and the
+     rights — because they ask the same kind of question and should not
+     look like three designs. */
+  .acc-list { display:flex; flex-direction:column; align-items:flex-start; gap:1px; }
+  .acc-list-solo { margin-top:2px; }
+  .acc-row { display:inline-flex; align-items:center; gap:9px; padding:4px 8px 4px 2px;
+             border-radius:7px; border:none; background:none; cursor:pointer;
+             font-size:12.5px; font-weight:700; color:#334155; }
+  .acc-row:hover { background:#f5f3ff; color:#1e293b; }
+  .acc-row input { width:15px; height:15px; accent-color:#7c3aed; flex-shrink:0; margin:0; }
+  .acc-row:has(input:checked) { color:#1e293b; font-weight:800; }
   /* The home queue is Case Handlers' to set, so it is shown, ticked, and
      not editable here. */
-  .acc-row-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
-  .acc-row-home:hover { border-color:#ddd6fe; }
-  .acc-row-all { border-style:dashed; }
-  .acc-row-all:has(input:checked) { border-style:solid; }
+  .acc-row-home { cursor:default; color:#94a3b8; }
+  .acc-row-home:hover { background:none; color:#94a3b8; }
+  /* "All" is a control over the rows under it rather than one of them. */
+  .acc-row-all { font-weight:900; color:#6d28d9; }
+  .acc-row-all:has(input:checked) { color:#6d28d9; }
 
   /* The end of the form, at its end: Cancel then Save, hard right. */
   .panel-acts { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
@@ -326,6 +336,10 @@ let open = null;       // user_id whose panel is expanded
    migration_nelos_access.sql has run. Until then the system ticks are not
    drawn and the column is not saved, rather than saved as empty. */
 let hasAccessCol = false;
+/* True once nelos_people() carries sees_all_cases — i.e. once
+   migration_nelos_sees_all.sql has run. Until then the tick is not drawn
+   and the column is not saved, rather than saved as false. */
+let hasSeesAll = false;
 let openRoute = null;  // which system's routing block is open
 let me = { name: '' };
 
@@ -578,14 +592,25 @@ function panelHtml(p) {
           A Nelos admin uses every system and may do everything, whatever is ticked here.
         </p>` : ''}
 
-      <label class="lbl">Systems they may use Nelos in</label>
-      <!-- One system, one row, "All" at the top of them. A tick box and a
-           name: the name is the choice, and everything else that used to be
-           on these rows — an emoji, and a sentence repeated five times —
-           was screen spent saying nothing. The home system's row is ticked
+      ${!hasSeesAll ? '' : `
+      <!-- Above the role, because it overrules it: somebody with this
+           ticked sees every system's cases whatever their role says. The
+           system's own HQ flag still applies on top — see
+           shared/migration_nelos_sees_all.sql. -->
+      <div class="acc-list acc-list-solo">
+        <label class="acc-row">
+          <input type="checkbox" data-seesall ${p.sees_all_cases ? 'checked' : ''}>
+          <span>Can see all system cases</span>
+        </label>
+      </div>`}
+
+      <label class="lbl">Nelos role</label>
+      <!-- Which systems this person belongs to. One system, one row,
+           "All" at the top of them: a tick box and a name, and nothing
+           else — the name is the choice. The home system's row is ticked
            and not editable, and says why on hover rather than in a
            permanent subtitle. -->
-      <div class="acc-list">
+      <div class="acc-list acc-list-sys">
         <label class="acc-row acc-row-all" title="Tick every system at once">
           <input type="checkbox" data-sys-all>
           <span>All</span>
@@ -608,7 +633,7 @@ function panelHtml(p) {
       ${admin
         ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all of these whatever is ticked here.</p>'
         : ''}
-      <div class="acc-list">
+      <div class="acc-list acc-list-rights">
         ${liveRights().map(r => `
           <label class="acc-row">
             <input type="checkbox" data-right="${r.key}" ${p[r.key] ? 'checked' : ''}>
@@ -711,6 +736,10 @@ async function savePerson(userId) {
   // column is missing the boxes are not drawn either (see hasAccessCol), so
   // nothing is sent and the save still goes through.
   if (hasAccessCol) row.access_modules = sys;
+
+  // Same guard: the box is only drawn where the column exists.
+  const seesAll = panel.querySelector('input[data-seesall]');
+  if (hasSeesAll && seesAll) row.sees_all_cases = seesAll.checked;
 
   // The rights arrive with migration_nelos_case_tools.sql and
   // migration_nelos_close_right.sql. On a database missing either, those
@@ -1085,6 +1114,7 @@ async function load() {
   people = pplRes.data;
   hasRights = people.some(p => p.may_solve !== undefined);
   hasAccessCol = people.some(p => p.access_modules !== undefined);
+  hasSeesAll   = people.some(p => p.sees_all_cases !== undefined);
   renderPeople();
   renderAccess();
   renderRouting();
