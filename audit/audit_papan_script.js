@@ -1084,6 +1084,20 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Papan Tanda has no landing list of its own any more — the To Do
+     card on audit_home already carries the pending plot chips, so
+     opening the module page without a specific plot lands the auditor
+     on a redundant "Plots to Audit" strip. Redirect back to the To Do
+     list; a ?plot= deep link (or the admin ?admin=1 escape hatch)
+     still opens the form for the plot it names. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot  = !!qs.get('plot');
+    const isAdmin  = qs.get('admin') === '1';
+    const looksMissing = !hasPlot && !isAdmin;
+    if (looksMissing) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))cancelDelete();});
   selectTab('audit');setView('list');

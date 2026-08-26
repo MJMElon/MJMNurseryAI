@@ -1489,6 +1489,17 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Same treatment as Papan Tanda: the module page has no landing
+     list of its own — the pending plot chips on audit_home already
+     send the auditor here with ?plot=. Redirect to Home when no
+     plot is named; ?admin=1 keeps the escape hatch for admins. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot = !!qs.get('plot');
+    const isAdm   = qs.get('admin') === '1';
+    if (!hasPlot && !isAdm) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
   document.getElementById('fab').addEventListener('click',openAddForm);
   document.getElementById('modal-overlay').addEventListener('click',e=>{
