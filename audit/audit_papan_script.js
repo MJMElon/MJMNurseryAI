@@ -229,14 +229,22 @@ function selectNursery(nursery, el){
   setView('list');
 }
 
-/* --- STATS --- */
+/* --- STATS ---
+   The Total Plots / Pending / Passed summary strip was cancelled from
+   the page. This still computes the pending count that the nursery
+   tabs and the bottom bar's tab-badges read from — the stat cards
+   themselves are gone, so their DOM writes are guarded so an old
+   markup on a stale cache does not throw. */
 function updateStats(){
   const latest=getLatestBatchPerPlot().filter(b=>b.nursery===activeNursery);
-  document.getElementById('stat-total').textContent=fmtNum(latest.length);
+  const totalEl=document.getElementById('stat-total');
+  if(totalEl)totalEl.textContent=fmtNum(latest.length);
   const pending=latest.filter(b=>!getAuditForBatch(b.uid)).length;
   const passed=latest.filter(b=>{const a=getAuditForBatch(b.uid);return a&&overallStatus(a)==='pass';}).length;
-  document.getElementById('stat-pending').textContent=fmtNum(pending);
-  document.getElementById('stat-pass').textContent=fmtNum(passed);
+  const pEl=document.getElementById('stat-pending');
+  if(pEl)pEl.textContent=fmtNum(pending);
+  const passEl=document.getElementById('stat-pass');
+  if(passEl)passEl.textContent=fmtNum(passed);
   // Badge on audit tab — total pending across ALL nurseries
   const latestAll=getLatestBatchPerPlot();
   const allPending=latestAll.filter(b=>!getAuditForBatch(b.uid)).length;

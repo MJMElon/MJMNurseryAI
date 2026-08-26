@@ -46,11 +46,11 @@
          height, maintenance). The view toggle (Audit / Batch Info) sits
          above the list as a small segmented control — it's a content
          switch, not a nursery switch, so it stays on the page itself. -->
-    <div class="summary-strip">
-      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Plots</div></div>
-      <div class="stat-card highlight"><div class="stat-value" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-pass">0</div><div class="stat-label">Passed</div></div>
-    </div>
+    <!-- The Total Plots / Pending / Passed summary strip was cancelled
+         — the counts were already visible on each plot tile below (the
+         corner badge shows pending count or ✓ when done), so the strip
+         above was repeating a number the auditor was about to see
+         spelled out plot by plot. -->
 
     <!-- Batch tab removed. The audit list is now the only surface —
          batches are auto-detected from the operation ledger (Planted for
@@ -335,7 +335,7 @@
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_papan_script.js?v=20260824d"></script>
+<script src="audit_papan_script.js?v=20260824e"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
