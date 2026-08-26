@@ -85,8 +85,11 @@
   .sys-line { font-size:13px; font-weight:900; color:#0f172a; line-height:1.25; }
   .pic-line { font-size:11.5px; font-weight:700; color:#0f172a; }
   .pic-none { font-style:italic; color:#0f172a; }
-  .by-line { font-size:10.5px; font-weight:600; color:#0f172a; margin-top:2px; }
-  .by-line b { font-weight:800; color:#0f172a; }
+  /* Who it is with now is the working information; who raised it is
+     background. Same size, lighter ink, so the eye reads the queue and the
+     PIC first and finds this only when it goes looking. */
+  .by-line { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:2px; }
+  .by-line b { font-weight:800; color:#8792a3; }
   /* Only for the stacked phone layout — on a wide screen the column
      heading already says what this is. */
   .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
@@ -111,6 +114,11 @@
            color:#8a93a3; overflow-wrap:anywhere; }
   .d-val { font-size:12px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
   .d-row.d-free .d-val { font-weight:600; color:#0f172a; }
+  /* Prose, not a figure: the heading sits on its own line and the sentence
+     gets the whole width, instead of wrapping four words at a time beside a
+     112px label. */
+  .d-row.d-remark { grid-template-columns:1fr; gap:1px; }
+  .d-row.d-remark .d-val { font-weight:600; line-height:1.45; }
   .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
   .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
   @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
@@ -204,13 +212,27 @@
   /* ── Solve sheet ── */
   .s-case { border:1.5px solid #ede9fe; background:#faf8ff; border-radius:13px;
             padding:12px 13px; }
-  .s-case-no { font-size:11px; font-weight:900; letter-spacing:.05em; color:#0f172a;
-               font-variant-numeric:tabular-nums; }
-  .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; margin-top:2px; }
+  /* No case number in here — the sheet's own heading is "Solve NLS-0042",
+     and printing it again two lines below was the same string twice. */
+  .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; }
+  .s-case-who { font-size:11.5px; font-weight:700; color:#475569; margin-top:3px; }
+  .s-case-by { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:1px; }
+  .s-case-by b { font-weight:800; color:#8792a3; }
   .s-case-g { margin-top:9px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
               font-size:11.5px; }
   .s-case-k { color:#8a93a3; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
   .s-case-v { color:#0f172a; font-weight:700; overflow-wrap:anywhere; }
+  /* A file input renders as the browser's own grey "Choose file" control,
+     which on a phone says nothing about the camera it actually opens. The
+     real input is hidden and this label drives it. */
+  .s-shot { display:flex; align-items:center; justify-content:center; gap:9px; width:100%;
+            padding:13px 12px; border-radius:11px; cursor:pointer; box-sizing:border-box;
+            border:1.5px dashed #c4b5fd; background:#fbfaff; color:#5b21b6;
+            font-size:12.5px; font-weight:800; }
+  .s-shot:hover { background:#f5f3ff; border-color:#a78bfa; }
+  .s-shot svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:currentColor;
+                stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .s-shot-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
   .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
             display:block; border:1.5px solid #ede9fe; }
   .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
@@ -382,16 +404,23 @@
       <div id="s-case" class="s-case"></div>
 
       <div class="m-sec">
-        <div class="m-sec-h">Photo of the fix</div>
-        <input id="s-photo" class="inp" type="file" accept="image/*" capture="environment"
-               style="padding:8px 12px;font-size:12px;">
+        <div class="m-sec-h">Attach photo</div>
+        <!-- A bare file input renders as the browser's grey "Choose file",
+             which on a phone says nothing about the camera it opens. The
+             real input is hidden and this label drives it. -->
+        <label class="s-shot" for="s-photo">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.6a1.5 1.5 0 0 0 1.25-.67l.8-1.2A1.5 1.5 0 0 1 10.4 3.5h3.2a1.5 1.5 0 0 1 1.25.67l.8 1.2A1.5 1.5 0 0 0 16.9 6h1.6A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>
+            <circle cx="12" cy="13" r="3.6"/></svg>
+          <span id="s-shot-t">Take a photo or attach one</span>
+        </label>
+        <input id="s-photo" class="s-shot-file" type="file" accept="image/*" capture="environment">
         <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
       </div>
 
       <div class="m-sec">
-        <div class="m-sec-h">What was done?</div>
-        <textarea id="s-remark" class="inp" rows="3"
-                  placeholder="Enough that the person closing it can tell it was done properly."></textarea>
+        <div class="m-sec-h">Solve case remark</div>
+        <textarea id="s-remark" class="inp" rows="3"></textarea>
       </div>
 
       <div id="s-err" class="s-err hidden"></div>
@@ -606,9 +635,21 @@ function trimSum(v) {
   return String(v).replace(/\s*\((?:\s*[\d.,]+\s*[+＋]\s*)+[\d.,]+\s*\)\s*$/, '').trim() || String(v);
 }
 
+/* Nursery and plot as one line — "BNN (B1)". They are one answer to one
+   question ("where?"), and two rows spent a third of the case block
+   restating a heading. Batch keeps its own row: it is not always set, and
+   when it is, it is a different level of detail. */
+function whereOf(c) {
+  if (c.nursery_name && c.plot_name) return ['Nursery', `${c.nursery_name} (${c.plot_name})`];
+  if (c.nursery_name)                return ['Nursery', c.nursery_name];
+  if (c.plot_name)                   return ['Plot',    c.plot_name];
+  return null;
+}
+
 function detailRows(c) {
   const rows = [];
   const seen = new Set();
+  const free = [];                                   // unlabelled lines
   const add = (lab, val) => {
     const key = lab ? lab.toLowerCase().trim() : null;
     // First one wins, so a description that names the plot itself is not
@@ -618,9 +659,9 @@ function detailRows(c) {
     rows.push([lab, val]);
   };
 
-  if (c.nursery_name) add('Nursery', c.nursery_name);
-  if (c.plot_name)    add('Plot',    c.plot_name);
-  if (c.batch_name)   add('Batch',   c.batch_name);
+  const where = whereOf(c);
+  if (where) { add(where[0], where[1]); seen.add('plot'); }
+  if (c.batch_name) add('Batch', c.batch_name);
 
   String(c.description || '').split(/\r?\n/).forEach(line => {
     const t = line.trim();
@@ -628,7 +669,7 @@ function detailRows(c) {
     // A short leading label, then a colon — ASCII or the full-width one that
     // a phone keyboard set to Chinese produces.
     const m = t.match(/^([^:：]{1,40}?)\s*[:：]\s*(.+)$/);
-    if (!m) { rows.push([null, t]); return; }
+    if (!m) { free.push(t); return; }
     const lab = m[1].trim();
     if (DETAIL_SKIP.includes(lab.toLowerCase())) {
       // Still claim the label, so a later duplicate is dropped too.
@@ -637,6 +678,10 @@ function detailRows(c) {
     }
     add(lab, trimSum(m[2]));
   });
+
+  /* Whatever was written in prose, under one Remark heading at the end,
+     rather than loose lines that read like unlabelled figures. */
+  if (free.length) add('Remark', free.join(' '));
   return rows;
 }
 
@@ -647,9 +692,7 @@ function rowHtml(c) {
                     : `<div class="due-line">Due ${esc(fmtDate(c.due_date))}</div>`)
     : '';
 
-  const queue = queueOf(c);
-  const raisedIn = tierOf(c.source_module);
-  const queueIn  = tierOf(queue);
+  const queueIn = tierOf(queueOf(c));
 
   const when = new Date(c.created_at);
   const rows = detailRows(c);
@@ -687,7 +730,6 @@ function rowHtml(c) {
           : '<span class="pic-none">no PIC yet</span>'}</span>
         <span class="by-line">Created by
           <b>${c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b></span>
-        ${queue !== c.source_module ? `<span class="by-line">Raised in ${esc(raisedIn)}</span>` : ''}
       </div>
 
       <div class="td-case">
@@ -699,7 +741,7 @@ function rowHtml(c) {
                category here was printing the title twice. -->
           <div class="d-rows">
             ${shown.map(([lab, val]) => lab
-              ? `<div class="d-row"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`
+              ? `<div class="d-row${lab === 'Remark' ? ' d-remark' : ''}"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`
               : `<div class="d-row d-free"><span class="d-val">${esc(val)}</span></div>`).join('')}
             ${rows.length > DETAIL_CAP
               ? `<div class="d-row d-free"><span class="d-more">+${rows.length - DETAIL_CAP} more — open the case to read it all</span></div>`
@@ -880,6 +922,7 @@ function goPage(to, pages) {
    text over a list, with nothing of the case in it, and no way to attach
    the photo that is usually the whole evidence. */
 let solving = null;                                // the case in the sheet
+const SHOT_IDLE = 'Take a photo or attach one';
 
 function sErr(msg) {
   const box = $('s-err');
@@ -894,24 +937,30 @@ function openSolve(c) {
      left to solve. */
   $('s-remark').value = '';
   $('s-photo').value = '';
+  $('s-shot-t').textContent = SHOT_IDLE;
   $('s-photo-prev').classList.add('hidden');
   $('s-photo-prev').removeAttribute('src');
 
-  const bits = [
-    ['Status',   c.status === 'resolved' ? 'Solved' : 'Pending'],
-    ['Priority', MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || 'Normal'],
-    ['Category', c.category],
-    ['Where',    [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
-                   .filter(Boolean).join(' · ')],
-    ['PIC',      c.assignee_name],
-    ['Raised by', c.raised_by],
-    ['Due',      c.due_date]
-  ].filter(([, v]) => v);
+  /* What the case is, then who it belongs to, then where and what was
+     written — the order somebody about to solve it reads in. Status,
+     priority and category are not repeated: the sheet only opens on a case
+     you picked, its heading already names it, and the category is the
+     title.
+
+     The rows come from detailRows(), uncapped, so the sheet and the list
+     agree. Reading the description raw here instead would print "Plot
+     balance: 1,240 (30+28+30)" as part of somebody's remark. */
+  const bits = detailRows(c);
+  if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
 
   $('s-case').innerHTML =
-    `<div class="s-case-no">${esc(c.case_no || '')}</div>` +
     `<div class="s-case-t">${esc(c.title || '')}</div>` +
-    (c.description ? `<div class="s-case-v" style="margin-top:7px;font-weight:600">${esc(c.description)}</div>` : '') +
+    `<div class="s-case-who">${esc(tierOf(queueOf(c)))}${
+       c.assignee_name ? ' · ' + esc(c.assignee_name) : ' · no PIC yet'}</div>` +
+    `<div class="s-case-by">Created by <b>${
+       c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b>${
+       c.created_at ? ' · ' + esc(new Date(c.created_at).toLocaleDateString(
+         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>` +
     `<div class="s-case-g">` +
       bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
     `</div>`;
@@ -1532,6 +1581,7 @@ $('solve-scrim').addEventListener('click', e => {
 $('s-photo').addEventListener('change', function () {
   const f = this.files && this.files[0];
   const img = $('s-photo-prev');
+  $('s-shot-t').textContent = f ? 'Photo attached — tap to change' : SHOT_IDLE;
   if (!f) { img.classList.add('hidden'); return; }
   img.src = URL.createObjectURL(f);
   img.classList.remove('hidden');
