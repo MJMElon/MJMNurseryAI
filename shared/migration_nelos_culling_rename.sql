@@ -52,6 +52,7 @@ DECLARE
   new_drone CONSTANT TEXT := 'From Culling Calculator - Request Drone Flight';
   new_check CONSTANT TEXT := 'From Culling Calculator - Request Final Check For Pokok Inang';
   moved     INT;
+  moved2    INT;
 BEGIN
   -- ── PART 1: the work titles ──────────────────────────────────
   -- Renamed, not re-created: the row keeps its id, its priority, its due
@@ -91,10 +92,14 @@ BEGIN
   -- History follows the name. A case filed under the old string would
   -- otherwise sit outside its own category for ever — invisible to the
   -- category filters, and to any rule keyed on it.
+  -- GET DIAGNOSTICS can only assign a plain variable, never an expression —
+  -- "moved = moved + ROW_COUNT" is not legal PL/pgSQL, so this used to fail
+  -- outright on line 2. Each UPDATE gets its own counter instead.
   UPDATE public.nelos_cases SET category = new_drone WHERE category = old_drone;
   GET DIAGNOSTICS moved = ROW_COUNT;
   UPDATE public.nelos_cases SET category = new_check WHERE category = old_check;
-  GET DIAGNOSTICS moved = moved + ROW_COUNT;
+  GET DIAGNOSTICS moved2 = ROW_COUNT;
+  moved := moved + moved2;
   IF moved > 0 THEN
     RAISE NOTICE 'Moved % existing case(s) onto the new names.', moved;
   END IF;

@@ -65,11 +65,11 @@
   .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
 
   /* Created date, leftmost. */
-  /* One line — "12 Aug 2026". The year sat on a second row only because the
-     column was 74px wide; it is not, any more. */
+  /* One line — "12 Aug 2026", the year set like the day and the month.
+     It used to be smaller and grey, which read as a footnote on a date
+     that is three words long. */
   .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15;
             white-space:nowrap; }
-  .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
 
   /* ── Content is black ──
      The case number, the PIC block and the case details all read as
@@ -133,9 +133,6 @@
   .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
   @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
 
-  .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
-  .pi-urgent { background:#fee2e2; color:#b91c1c; } .pi-high { background:#ffedd5; color:#c2410c; }
-  .pi-normal { background:#e0f2fe; color:#0369a1; } .pi-low  { background:#f1f5f9; color:#64748b; }
   .src { background:#f5f3ff; color:#6d28d9; }
   .overdue { font-size:10.5px; font-weight:900; color:#b91c1c; margin-top:6px; }
 
@@ -558,6 +555,36 @@
   </div>
 </div>
 
+<!-- ── Viewing a case ──────────────────────────────────────────
+     The magnifier used to leave the page for nelos_case.html, which meant
+     losing the tab, the search and the page you were on to read four
+     lines. It opens here instead, in the same dialog as everything else. -->
+<div id="view-scrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="m-head">
+      <div class="m-title"><span id="v-heading">Case</span>
+        <span class="m-sub" id="v-sub"></span></div>
+      <button id="view-close" class="m-x" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="m-body">
+      <img id="v-photo" class="s-prev hidden" alt="Photo on the case">
+      <div id="v-case" class="s-case"></div>
+
+      <!-- Only on a case that has been solved. -->
+      <div class="m-sec hidden" id="v-solved">
+        <div class="m-sec-h">How it was solved</div>
+        <div id="v-res" class="s-case-v"></div>
+        <img id="v-res-photo" class="s-prev hidden" alt="Photo of the fix">
+      </div>
+    </div>
+
+    <div class="m-foot">
+      <button id="v-close" class="m-cancel">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── New case drawer ─────────────────────────────────────────── -->
 <div id="new-scrim" class="scrim hidden">
   <div class="sheet">
@@ -827,8 +854,8 @@ function rowHtml(c) {
 
       <div class="td-stack td-when">
         <span class="cell-cap">Created</span>
-        <span class="when-d">${esc(when.toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}
-          <span class="when-y">${when.getFullYear()}</span></span>
+        <span class="when-d">${esc(when.toLocaleDateString('en-MY',
+          { day:'numeric', month:'short', year:'numeric' }))}</span>
       </div>
 
       <div class="td-stack">
@@ -854,9 +881,7 @@ function rowHtml(c) {
       <div class="td-case">
         ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
         <div class="min-w-0 flex-1">
-          <div class="case-title">${esc(c.title)}${c.priority && c.priority !== 'normal'
-            ? ` <span class="pill pi-${esc(c.priority)}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority)}</span>`
-            : ''}</div>
+          <div class="case-title">${esc(c.title)}</div>
           <!-- No category line: the problem chosen when the case is raised
                becomes both its title and its category, so printing the
                category here was printing the title twice. -->
@@ -875,11 +900,11 @@ function rowHtml(c) {
       <!-- Symbols, not words and not emoji: four of these on every row, and
            the label is on the hover title where it does not cost a column. -->
       <div class="td-act">
-        <a class="act act-view" title="View" aria-label="View"
-           href="nelos_case.html?id=${encodeURIComponent(c.id)}">
+        <button class="act act-view" title="View" aria-label="View"
+           data-act="view" data-id="${esc(c.id)}">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>
-        </a>
+        </button>
         ${rights.may_edit  ? `<button class="act act-edit" title="Edit" aria-label="Edit"
            data-act="edit" data-id="${esc(c.id)}">&#x270E;</button>` : ''}
         ${pending && rights.may_solve
@@ -928,11 +953,6 @@ const FGROUPS = [
   { col:'pic', key:'assignee', title:'Person',
     of: c => c.assignee_name || '', label: v => v || 'No PIC yet' },
 
-  /* Priority followed its pill here when the Status column went. */
-  { col:'details', key:'priority', title:'Priority',
-    of: c => c.priority || 'normal',
-    label: v => MJMNelos.PRIORITY_LABEL[v] || v,
-    rank: v => ['urgent', 'high', 'normal', 'low'].indexOf(v) },
   { col:'details', key:'nursery', title:'Nursery',
     of: c => c.nursery_name || '', label: v => v || 'No nursery' },
   { col:'details', key:'due', title:'Due',
@@ -1047,6 +1067,7 @@ function render() {
     b.addEventListener('click', () => {
       const c = allCases.find(x => String(x.id) === b.dataset.id);
       if (!c) return;
+      if (b.dataset.act === 'view')  return openView(c);
       if (b.dataset.act === 'edit')  return openEdit(c);
       if (b.dataset.act === 'solve') return openSolve(c);
       if (b.dataset.act === 'del')   return deleteCase(c, b);
@@ -1140,29 +1161,7 @@ function openSolve(c) {
   $('s-photo-prev').classList.add('hidden');
   $('s-photo-prev').removeAttribute('src');
 
-  /* What the case is, then who it belongs to, then where and what was
-     written — the order somebody about to solve it reads in. Status,
-     priority and category are not repeated: the sheet only opens on a case
-     you picked, its heading already names it, and the category is the
-     title.
-
-     The rows come from detailRows(), uncapped, so the sheet and the list
-     agree. Reading the description raw here instead would print "Plot
-     balance: 1,240 (30+28+30)" as part of somebody's remark. */
-  const bits = detailRows(c);
-  if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
-
-  $('s-case').innerHTML =
-    `<div class="s-case-t">${esc(c.title || '')}</div>` +
-    `<div class="s-case-who">${esc(tierOf(queueOf(c)))}${
-       c.assignee_name ? ' · ' + esc(c.assignee_name) : ' · no PIC yet'}</div>` +
-    `<div class="s-case-by">Created by <b>${
-       c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b>${
-       c.created_at ? ' · ' + esc(new Date(c.created_at).toLocaleDateString(
-         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>` +
-    `<div class="s-case-g">` +
-      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
-    `</div>`;
+  $('s-case').innerHTML = caseBlockHtml(c);
 
   /* Already solved → nothing to save, and the only move left is closing
      it, for somebody whose ticks allow that. */
@@ -1179,6 +1178,65 @@ function openSolve(c) {
 }
 
 function closeSolve() { $('solve-scrim').classList.add('hidden'); solving = null; }
+
+/* ── The case, restated ─────────────────────────────────────────
+   What the case is, then who it belongs to, then where and what was
+   written — the order somebody who just opened it reads in. The status is
+   not in here: both dialogs that use it say that in their own heading.
+
+   The rows come from detailRows(), uncapped, so this and the list agree.
+   Reading the description raw instead would print "Plot balance: 1,240
+   (30+28+30)" as part of somebody's remark. */
+function caseBlockHtml(c) {
+  const bits = detailRows(c);
+  if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
+
+  return `<div class="s-case-t">${esc(c.title || '')}</div>` +
+    `<div class="s-case-who">${esc(tierOf(queueOf(c)))}${
+       c.assignee_name ? ' · ' + esc(c.assignee_name) : ' · no PIC yet'}</div>` +
+    `<div class="s-case-by">Created by <b>${
+       c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b>${
+       c.created_at ? ' · ' + esc(new Date(c.created_at).toLocaleDateString(
+         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>` +
+    `<div class="s-case-g">` +
+      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
+    `</div>`;
+}
+
+/* Reading a case. Everything the row shows, plus the picture and — where
+   there is one — what was done about it. Nothing here writes: the tick
+   and the pencil are the two things that do, and they are on the row. */
+const STATUS_SUB = {
+  open: 'Pending to solve', in_progress: 'Being worked on',
+  resolved: 'Solved — waiting to be closed', closed: 'Closed'
+};
+
+function openView(c) {
+  $('v-heading').textContent = c.case_no || 'Case';
+  $('v-sub').textContent = STATUS_SUB[c.status] || c.status || '';
+  $('v-case').innerHTML = caseBlockHtml(c);
+
+  const photo = $('v-photo');
+  photo.classList.toggle('hidden', !c.photo_url);
+  if (c.photo_url) photo.src = c.photo_url; else photo.removeAttribute('src');
+
+  const done = c.status === 'resolved' || c.status === 'closed';
+  $('v-solved').classList.toggle('hidden', !done);
+  if (done) {
+    const by = [c.resolved_by, c.resolved_at && fmtDate(String(c.resolved_at).slice(0, 10))]
+      .filter(Boolean).join(' · ');
+    $('v-res').innerHTML =
+      esc(c.resolution || 'Solved, with nothing written about it.') +
+      (by ? `<div class="s-case-by" style="margin-top:5px">${esc(by)}</div>` : '');
+    const rp = $('v-res-photo');
+    rp.classList.toggle('hidden', !c.resolution_photo_url);
+    if (c.resolution_photo_url) rp.src = c.resolution_photo_url; else rp.removeAttribute('src');
+  }
+
+  $('view-scrim').classList.remove('hidden');
+}
+
+function closeView() { $('view-scrim').classList.add('hidden'); }
 
 /* Uploads whatever is in the solve sheet's file box. Separate from
    uploadPhoto() because that one reads the new-case drawer's box, and
@@ -1305,13 +1363,13 @@ async function loadCases() {
         If Nelos is new, run <strong>shared/migration_nelos.sql</strong> in Supabase first.</span></div>`;
     return;
   }
-  // Worst priority first inside each status, since priority is a word in
-  // the database and cannot be ordered there.
-  const sorted = (data || []).sort((a, b) =>
-    (MJMNelos.PRIORITY_RANK[a.priority] ?? 9) - (MJMNelos.PRIORITY_RANK[b.priority] ?? 9));
   // Narrow to the modules and categories this person is set up for on the
   // User Setting page. Someone in no block at all still sees everything.
-  allCases = await MJMNelos.applyScope(sorted);
+  //
+  // Newest first, and only that: cases used to be pulled up the list by
+  // their priority, which is no longer something the list says, so it can
+  // no longer be something the list silently sorts on.
+  allCases = await MJMNelos.applyScope(data || []);
   render();
 }
 
@@ -1745,6 +1803,13 @@ $('new-close').addEventListener('click', closeNew);
 $('c-cancel').addEventListener('click', closeNew);
 
 /* ── Solve sheet ── */
+/* ── Viewing ── */
+$('view-close').addEventListener('click', closeView);
+$('v-close').addEventListener('click', closeView);
+$('view-scrim').addEventListener('click', e => {
+  if (e.target === $('view-scrim')) closeView();
+});
+
 $('solve-close').addEventListener('click', closeSolve);
 $('s-cancel').addEventListener('click', closeSolve);
 $('s-save').addEventListener('click', saveSolve);
