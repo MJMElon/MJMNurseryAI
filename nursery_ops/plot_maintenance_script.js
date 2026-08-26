@@ -4203,14 +4203,17 @@ function plotOrder(a, b) {
 
 async function loadSettingLists() {
   if (!_supabase) return;
-  const [tsRes, chRes, feRes] = await Promise.all([
+  const [tsRes, chRes, feRes, cfgRes] = await Promise.all([
     _supabase.from('nops_maint_tray_size').select('nursery, per_tray').then(r => r, () => ({ data: [] })),
     _supabase.from('nops_maint_chemicals').select('*').order('sort_order').order('name')
       .then(r => r, () => ({ data: [] })),
     _supabase.from('nops_maint_fertilisers').select('*').order('sort_order').order('name')
-      .then(r => r, () => ({ data: [] }))
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nops_maint_config').select('key, num_value').then(r => r, () => ({ data: [] }))
   ]);
   ((tsRes && tsRes.data) || []).forEach(r => { traySize[r.nursery] = +r.per_tray || 0; });
+  const cfg = ((cfgRes && cfgRes.data) || []).find(r => r.key === 'pump_coverage');
+  if (cfg && +cfg.num_value > 0) pumpCoverage = +cfg.num_value;
   chemicals   = (chRes && chRes.data) || [];
   fertilisers = (feRes && feRes.data) || [];
 }
@@ -4247,8 +4250,7 @@ function renderSetting() {
   if (!capTab || capNurseries().indexOf(capTab) === -1) capTab = capNurseries()[0] || null;
   renderCapTabs();
   renderCapacity();
-  renderChemicals('pest');
-  renderChemicals('disease');
+  renderChemBoth();
   renderFertilisers();
 }
 
@@ -4441,129 +4443,262 @@ async function saveCapEdit() {
 }
 
 /* ── Chemicals, pest and disease ───────────────────────────────────────
-   One table, one `kind`, shown as two columns of one list.
+   One table, one `kind`, shown as two columns of one list, edited as one
+   block: Edit unlocks both columns at once, Cancel throws the lot away and
+   Save writes it. Nothing reaches the database until Save — a dose is what
+   somebody mixes to, so a half-typed one must never be readable as a rate.
 
    The dosage is keyed the way it is written on the drum — so much per pump
-   — and the per-seedling figure is worked out from it rather than asked
-   for. Nobody measures a chemical per seedling; they measure it per pump,
-   and the calculator is the thing that has to divide.
+   — and per seedling is worked out from it. `coverage` is how many
+   seedlings one pump covers: 800 for a normal spray, and 1 for a chemical
+   like Asir whose dose IS per seedling. That number used to be a hardcoded
+   exception (CHEMICAL_COVERAGE) which this page did not know about, so it
+   divided Asir by 800 as well and disagreed with the Dosage Calculator. It
+   is a column now, and shown. */
+const CHEM_LABEL = { pest: 'pest', disease: 'disease', other: 'other' };
+const CHEM_KINDS = ['pest', 'disease', 'other'];
 
-   COVERAGE_PER_PUMP is the standard the rest of this file already sprays
-   to, so the two cannot disagree. */
-const CHEM_LABEL = { pest: 'pest', disease: 'disease' };
+/* How many seedlings one pump covers, for every chemical that does not name
+   its own figure. Preset in nops_maint_config so it can be changed without a
+   deploy; COVERAGE_PER_PUMP is the fallback until that row is read, and
+   stays the number the rest of this file has always used. */
+let pumpCoverage = COVERAGE_PER_PUMP;
+let presetDraft  = null;
 
-/* Enough decimal places to be worth printing. A dose of 50gm over 800
-   seedlings is 0.0625 — rounded to two it reads 0.06 and the arithmetic
-   stops adding up. */
-function perSeedling(dose) {
-  const v = (+dose || 0) / COVERAGE_PER_PUMP;
+let chemEditing = false;
+let chemDraft   = null;    // [{ id?, kind, name, dose, unit, coverage, _new }]
+let fertEditing = false;
+let fertDraft   = null;
+
+/* A chemical's own coverage when it has one, the preset when it does not.
+   NULL is not 0 here: "follow the preset" and "one seedling to a pump" are
+   different answers, and only one of them should move when the preset does. */
+function livePreset() {
+  return Math.max(1, +(presetDraft != null ? presetDraft : pumpCoverage) || COVERAGE_PER_PUMP);
+}
+function coverageOf(c) {
+  return c.coverage == null || c.coverage === '' ? livePreset() : Math.max(1, +c.coverage || 1);
+}
+
+/* Enough decimal places to be worth printing. 30gm over 800 seedlings is
+   0.0375 — rounded to two it reads 0.04 and the arithmetic stops adding up. */
+function perSeedling(dose, coverage) {
+  const v = (+dose || 0) / Math.max(1, +coverage || livePreset());
   if (!v) return null;
-  return v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(2);
+  return v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : String(+v.toFixed(2));
+}
+
+function chemRows(kind) {
+  return (chemEditing ? chemDraft : chemicals).filter(c => c.kind === kind);
 }
 
 function renderChemicals(kind) {
   const box = document.getElementById('chem-' + kind + '-list');
   if (!box) return;
-  const rows = chemicals.filter(c => c.kind === kind);
+
+  document.querySelectorAll('.chem-add').forEach(b => b.style.display = chemEditing ? '' : 'none');
+  const eb = document.getElementById('chem-edit-btn');
+  if (eb) eb.style.display = chemEditing ? 'none' : '';
+  const ac = document.getElementById('chem-actions');
+  if (ac) ac.style.display = chemEditing ? 'flex' : 'none';
+
+  const rows = chemRows(kind);
   if (!rows.length) {
     box.innerHTML = '<div class="lst-empty">No ' + CHEM_LABEL[kind] +
-      ' chemical yet — add one below.</div>';
+      (chemEditing ? ' chemical yet — add one below.' : ' chemical listed.') + '</div>';
     return;
   }
-  box.innerHTML = rows.map(c => {
-    const per = perSeedling(c.dose);
-    return '<div class="lst-row" data-id="' + esc(c.id) + '">' +
-      '<input type="text" value="' + esc(c.name) + '" placeholder="Chemical name" ' +
-        'onchange="onChemName(\'' + esc(c.id) + '\', this.value)">' +
-      '<input type="number" min="0" step="0.01" value="' + (c.dose ?? '') + '" placeholder="0" ' +
-        'oninput="onChemDose(\'' + esc(c.id) + '\', this.value)">' +
-      '<span class="lst-calc' + (per ? '' : ' none') + '" data-calc>' +
-        (per ? per + ' ' + esc(c.unit || 'gm') : '—') + '</span>' +
-      '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
-        'onclick="removeChemical(\'' + esc(c.id) + '\')">&#10005;</button>' +
+  box.innerHTML = rows.map((c, i) => {
+    const per = perSeedling(c.dose, c.coverage);
+    const val = per ? per + ' ' + esc(c.unit || 'gm') : '—';
+    return '<div class="lst-row">' + (chemEditing
+      ? '<input type="text" value="' + esc(c.name) + '" placeholder="Chemical name" ' +
+          'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'name\', this.value)">' +
+        // The unit rides with the number it belongs to. Without it a new
+        // chemical could only ever be gm, and half of these are mL.
+        '<span class="lst-dose">' +
+          '<input type="number" min="0" step="0.01" value="' + (c.dose ?? '') + '" placeholder="0" ' +
+            'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'dose\', this.value)">' +
+          '<select onchange="onChemDraft(\'' + kind + '\',' + i + ',\'unit\', this.value)">' +
+            '<option value="gm"' + ((c.unit || 'gm') === 'gm' ? ' selected' : '') + '>gm</option>' +
+            '<option value="mL"' + (c.unit === 'mL' ? ' selected' : '') + '>mL</option>' +
+          '</select>' +
+        '</span>' +
+        '<input type="number" min="1" step="1" ' +
+          'value="' + (c.coverage == null || c.coverage === '' ? '' : c.coverage) + '" ' +
+          'placeholder="' + livePreset() + '" ' +
+          'title="Leave blank to follow the preset. 1 if the dose is already per seedling." ' +
+          'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'coverage\', this.value)">' +
+        '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
+          'onclick="dropChemRow(\'' + kind + '\',' + i + ')">&#10005;</button>'
+      : '<span class="lst-txt">' + esc(c.name) + '</span>' +
+        '<span class="lst-num">' + (+c.dose || 0) + ' ' + esc(c.unit || 'gm') + '</span>' +
+        '<span class="lst-num' + (c.coverage == null || c.coverage === '' ? ' preset' : '') + '">' +
+          coverageOf(c).toLocaleString() + '</span>' +
+        '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        '<span></span>') +
     '</div>';
   }).join('');
 }
 
-/* A blank row, saved as soon as it is added so it has an id to hang the
-   rest of the typing off. Named "New chemical" rather than left empty:
-   a row with no name at all cannot be told apart from the one above it. */
-async function addChemRow(kind) {
-  const base = 'New chemical';
-  let name = base, i = 2;
-  while (chemicals.some(c => c.kind === kind && c.name.toLowerCase() === name.toLowerCase())) {
-    name = base + ' ' + (i++);
+function renderChemBoth() {
+  const inp = document.getElementById('pump-coverage');
+  if (inp) {
+    inp.disabled = !chemEditing;
+    if (document.activeElement !== inp) inp.value = livePreset();
   }
-  const row = { kind: kind, name: name, dose: 0, unit: 'gm',
-                sort_order: chemicals.filter(c => c.kind === kind).length,
-                updated_at: new Date().toISOString() };
-  if (!_supabase) chemicals.push({ ...row, id: 'local-' + Date.now() });
-  else {
-    const { data, error } = await _supabase.from('nops_maint_chemicals')
-      .insert([row]).select().then(r => r, e => ({ error: e }));
-    if (error) {
-      alert('Could not add it — ' + (error.message || 'try again') +
-            '\n\nIf this says the table is missing, run shared/migration_nops_maint_settings.sql.');
-      return;
-    }
-    chemicals.push((data && data[0]) || row);
-  }
-  renderChemicals(kind);
-  // Straight into the name box: the row was added to be named.
+  CHEM_KINDS.forEach(renderChemicals);
+}
+
+function onPresetInput(val) {
+  if (!chemEditing) return;
+  presetDraft = Math.max(1, +val || 1);
+  // Every chemical following the preset just changed, and none of the boxes
+  // did — so the derived cells redraw and the inputs are left alone.
+  CHEM_KINDS.forEach(k => {
+    const box = document.getElementById('chem-' + k + '-list');
+    if (!box) return;
+    chemRows(k).forEach((c, i) => {
+      if (c.coverage != null && c.coverage !== '') return;
+      const cell = box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
+      if (!cell) return;
+      const per = perSeedling(c.dose, null);
+      cell.textContent = per ? per + ' ' + (c.unit || 'gm') : '—';
+      cell.classList.toggle('none', !per);
+    });
+  });
+}
+
+function startChemEdit() {
+  chemDraft = chemicals.map(c => ({ id: c.id, kind: c.kind, name: c.name, dose: c.dose,
+                                    unit: c.unit || 'gm', coverage: c.coverage ?? null }));
+  presetDraft = pumpCoverage;
+  chemEditing = true;
+  renderChemBoth();
+}
+
+function cancelChemEdit() {
+  chemEditing = false; chemDraft = null; presetDraft = null;
+  renderChemBoth();
+}
+
+/* The draft is filtered per column for display, so an index within a column
+   has to be turned back into the row it names in the whole draft. */
+function draftAt(draft, kind, i) {
+  return draft.filter(c => c.kind === kind)[i];
+}
+
+function onChemDraft(kind, i, field, val) {
+  const row = draftAt(chemDraft, kind, i);
+  if (!row) return;
+  if (field === 'name') { row.name = val; return; }           // repaint would lose the caret
+  if (field === 'unit') row.unit = val === 'mL' ? 'mL' : 'gm';
+  // Blank is "follow the preset", which is why it is not coerced to a number.
+  else if (field === 'coverage') row.coverage = val === '' ? null : Math.max(1, +val || 1);
+  else row[field] = Math.max(0, +val || 0);
+  // Only the derived cell beside the box being typed in.
   const box = document.getElementById('chem-' + kind + '-list');
-  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
-  if (last) { last.focus(); last.select(); }
-}
-
-function saveChem(id, patch) {
-  if (!_supabase) return;
-  _supabase.from('nops_maint_chemicals')
-    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('[maint] chemical save failed:', error.message); });
-}
-
-function onChemName(id, val) {
-  const c = chemicals.find(x => String(x.id) === String(id));
-  if (!c) return;
-  const name = (val || '').trim();
-  if (!name) { renderChemicals(c.kind); return; }   // put the old name back
-  if (chemicals.some(x => x.kind === c.kind && String(x.id) !== String(id) &&
-                          x.name.toLowerCase() === name.toLowerCase())) {
-    alert('“' + name + '” is already on the ' + CHEM_LABEL[c.kind] + ' list.');
-    renderChemicals(c.kind);
-    return;
-  }
-  c.name = name;
-  saveChem(id, { name: name });
-}
-
-function onChemDose(id, val) {
-  const c = chemicals.find(x => String(x.id) === String(id));
-  if (!c) return;
-  c.dose = Math.max(0, +val || 0);
-  // Only the derived cell beside the box being typed in — a full repaint
-  // would take the focus out of it on every keystroke.
-  const row = document.querySelector('.lst-row[data-id="' + CSS.escape(String(id)) + '"]');
-  const cell = row && row.querySelector('[data-calc]');
+  const cell = box && box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
   if (cell) {
-    const per = perSeedling(c.dose);
-    cell.textContent = per ? per + ' ' + (c.unit || 'gm') : '—';
+    const per = perSeedling(row.dose, row.coverage);
+    cell.textContent = per ? per + ' ' + (row.unit || 'gm') : '—';
     cell.classList.toggle('none', !per);
   }
-  saveChem(id, { dose: c.dose });
 }
 
-async function removeChemical(id) {
-  const c = chemicals.find(x => String(x.id) === String(id));
-  if (!c) return;
-  if (!confirm('Remove “' + c.name + '” from the ' + CHEM_LABEL[c.kind] + ' list?')) return;
-  if (_supabase) {
-    const { error } = await _supabase.from('nops_maint_chemicals').delete().eq('id', id)
-      .then(r => r, e => ({ error: e }));
-    if (error) { alert('Could not remove it — ' + (error.message || 'try again')); return; }
+function addChemRow(kind) {
+  if (!chemEditing) return;
+  // No coverage of its own: a new chemical follows the preset until told
+  // otherwise, which is true of nearly all of them.
+  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm', coverage: null, _new: true });
+  renderChemicals(kind);
+  const box = document.getElementById('chem-' + kind + '-list');
+  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
+  if (last) last.focus();
+}
+
+function dropChemRow(kind, i) {
+  const row = draftAt(chemDraft, kind, i);
+  if (!row) return;
+  if (row.name && !confirm('Remove “' + row.name + '” from the ' + CHEM_LABEL[kind] + ' list?')) return;
+  chemDraft.splice(chemDraft.indexOf(row), 1);
+  renderChemicals(kind);
+}
+
+async function saveChemEdit() {
+  const named = chemDraft.map(c => ({ ...c, name: (c.name || '').trim() })).filter(c => c.name);
+  // Two of the same name in one column would break the table's own unique
+  // index halfway through the save, leaving half of it written.
+  for (const k of CHEM_KINDS) {
+    const seen = new Set();
+    for (const c of named.filter(x => x.kind === k)) {
+      const key = c.name.toLowerCase();
+      if (seen.has(key)) { alert('“' + c.name + '” is on the ' + CHEM_LABEL[k] + ' list twice.'); return; }
+      seen.add(key);
+    }
   }
-  chemicals = chemicals.filter(x => String(x.id) !== String(id));
-  renderChemicals(c.kind);
+
+  const btns = document.getElementById('chem-actions');
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
+  const done = () => { if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false); };
+
+  if (_supabase) {
+    const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
+    const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
+    const fresh = named.filter(c => !c.id).map(c => ({
+      kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
+      coverage: c.coverage ?? null, updated_at: new Date().toISOString() }));
+
+    let err = null;
+    if (gone.length) {
+      const { error } = await _supabase.from('nops_maint_chemicals').delete().in('id', gone)
+        .then(r => r, e => ({ error: e }));
+      err = err || error;
+    }
+    for (const c of named.filter(x => x.id)) {
+      if (err) break;
+      const { error } = await _supabase.from('nops_maint_chemicals').update({
+        name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
+        updated_at: new Date().toISOString() }).eq('id', c.id).then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (!err && fresh.length) {
+      const { error } = await _supabase.from('nops_maint_chemicals').insert(fresh)
+        .then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
+      const { error } = await _supabase.from('nops_maint_config').upsert({
+        key: 'pump_coverage', num_value: +presetDraft,
+        updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .then(r => r, e => ({ error: e }));
+      if (!error) pumpCoverage = +presetDraft;
+      else console.warn('[maint] pump coverage save failed:', error.message);
+    }
+    if (err) {
+      done();
+      alert('Could not save — ' + (err.message || 'try again') +
+            (/coverage/i.test(err.message || '')
+              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
+            (/kind/i.test(err.message || '')
+              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
+      return;
+    }
+    // Read it back, so what is on screen is what is stored — and so the new
+    // rows arrive with the ids the next edit needs.
+    const { data } = await _supabase.from('nops_maint_chemicals').select('*')
+      .order('sort_order').order('name').then(r => r, () => ({ data: null }));
+    if (data) chemicals = data;
+    else chemicals = named;
+  } else {
+    chemicals = named.map((c, i) => ({ ...c, id: c.id || 'local-' + i }));
+  }
+
+  done();
+  if (presetDraft != null) pumpCoverage = livePreset();
+  chemEditing = false; chemDraft = null; presetDraft = null;
+  renderChemBoth();
 }
 
 
@@ -4581,106 +4716,141 @@ function fertDose(f) {
 function renderFertilisers() {
   const box = document.getElementById('fert-list');
   if (!box) return;
-  if (!fertilisers.length) {
-    box.innerHTML = '<div class="lst-empty">No fertiliser yet — add one below.</div>';
+
+  const add = document.getElementById('fert-add');
+  if (add) add.style.display = fertEditing ? '' : 'none';
+  const eb = document.getElementById('fert-edit-btn');
+  if (eb) eb.style.display = fertEditing ? 'none' : '';
+  const ac = document.getElementById('fert-actions');
+  if (ac) ac.style.display = fertEditing ? 'flex' : 'none';
+
+  const rows = fertEditing ? fertDraft : fertilisers;
+  if (!rows.length) {
+    box.innerHTML = '<div class="lst-empty">No fertiliser ' +
+      (fertEditing ? 'yet — add one below.' : 'listed.') + '</div>';
     return;
   }
-  box.innerHTML = fertilisers.map(f =>
-    '<div class="lst-row fert-row" data-id="' + esc(f.id) + '">' +
-      '<input type="text" value="' + esc(f.name) + '" placeholder="Fertiliser type" ' +
-        'onchange="onFertName(\'' + esc(f.id) + '\', this.value)">' +
-      '<input type="number" min="0" step="0.0001" value="' + fertDose(f) + '" placeholder="0" ' +
-        'oninput="onFertDose(\'' + esc(f.id) + '\', this.value)">' +
-      '<span class="lst-tick"><input type="checkbox" ' +
-        (f.dose_transplant != null ? 'checked ' : '') +
-        'onchange="onFertUse(\'' + esc(f.id) + '\', \'dose_transplant\', this.checked)"></span>' +
-      '<span class="lst-tick"><input type="checkbox" ' +
-        (f.dose_monthly != null ? 'checked ' : '') +
-        'onchange="onFertUse(\'' + esc(f.id) + '\', \'dose_monthly\', this.checked)"></span>' +
+  const tick = on => '<span class="lst-tick-ro' + (on ? '' : ' off') + '">' +
+                     (on ? '&#10003;' : '&#8211;') + '</span>';
+  box.innerHTML = rows.map((f, i) => '<div class="lst-row fert-row">' + (fertEditing
+    ? '<input type="text" value="' + esc(f.name) + '" placeholder="Fertiliser type" ' +
+        'oninput="onFertDraft(' + i + ',\'name\', this.value)">' +
+      '<span class="lst-dose">' +
+        '<input type="number" min="0" step="0.0001" value="' + fertDose(f) + '" placeholder="0" ' +
+          'oninput="onFertDraft(' + i + ',\'dose\', this.value)">' +
+        '<select onchange="onFertDraft(' + i + ',\'unit\', this.value)">' +
+          '<option value="gm"' + ((f.unit || 'gm') === 'gm' ? ' selected' : '') + '>gm</option>' +
+          '<option value="mL"' + (f.unit === 'mL' ? ' selected' : '') + '>mL</option>' +
+        '</select>' +
+      '</span>' +
+      '<span class="lst-tick"><input type="checkbox" ' + (f.dose_transplant != null ? 'checked ' : '') +
+        'onchange="onFertUse(' + i + ',\'dose_transplant\', this.checked)"></span>' +
+      '<span class="lst-tick"><input type="checkbox" ' + (f.dose_monthly != null ? 'checked ' : '') +
+        'onchange="onFertUse(' + i + ',\'dose_monthly\', this.checked)"></span>' +
       '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
-        'onclick="removeFertiliser(\'' + esc(f.id) + '\')">&#10005;</button>' +
-    '</div>').join('');
+        'onclick="dropFertRow(' + i + ')">&#10005;</button>'
+    : '<span class="lst-txt">' + esc(f.name) + '</span>' +
+      '<span class="lst-num">' + (fertDose(f) === '' ? '—' : fertDose(f) + ' ' + esc(f.unit || 'gm')) + '</span>' +
+      tick(f.dose_transplant != null) + tick(f.dose_monthly != null) +
+      '<span></span>') +
+  '</div>').join('');
 }
 
-async function addFertRow() {
-  const base = 'New fertiliser';
-  let name = base, i = 2;
-  while (fertilisers.some(f => f.name.toLowerCase() === name.toLowerCase())) name = base + ' ' + (i++);
+function startFertEdit() {
+  fertDraft = fertilisers.map(f => ({ ...f }));
+  fertEditing = true;
+  renderFertilisers();
+}
+
+function cancelFertEdit() { fertEditing = false; fertDraft = null; renderFertilisers(); }
+
+function onFertDraft(i, field, val) {
+  const f = fertDraft[i];
+  if (!f) return;
+  if (field === 'name') { f.name = val; return; }
+  if (field === 'unit') { f.unit = val === 'mL' ? 'mL' : 'gm'; return; }
+  // The dosage goes to whichever usages are ticked, and only those.
+  const d = val === '' ? 0 : Math.max(0, +val || 0);
+  if (f.dose_transplant != null) f.dose_transplant = d;
+  if (f.dose_monthly    != null) f.dose_monthly    = d;
+  if (f.dose_transplant == null && f.dose_monthly == null) f._pending = d;
+}
+
+function onFertUse(i, field, on) {
+  const f = fertDraft[i];
+  if (!f) return;
+  const d = +fertDose(f) || +f._pending || 0;
+  f[field] = on ? d : null;
+  renderFertilisers();
+}
+
+function addFertRow() {
+  if (!fertEditing) return;
   // Ticked for transplanting to start with: a fertiliser used for neither
   // would never appear anywhere, which is not a useful row to have made.
-  const row = { name: name, dose_transplant: 0, dose_monthly: null, unit: 'gm',
-                sort_order: fertilisers.length, updated_at: new Date().toISOString() };
-  if (!_supabase) fertilisers.push({ ...row, id: 'local-' + Date.now() });
-  else {
-    const { data, error } = await _supabase.from('nops_maint_fertilisers')
-      .insert([row]).select().then(r => r, e => ({ error: e }));
-    if (error) {
-      alert('Could not add it — ' + (error.message || 'try again') +
-            '\n\nIf this says the table is missing, run shared/migration_nops_maint_settings.sql.');
-      return;
-    }
-    fertilisers.push((data && data[0]) || row);
-  }
+  fertDraft.push({ name: '', dose_transplant: 0, dose_monthly: null, unit: 'gm', _new: true });
   renderFertilisers();
   const box = document.getElementById('fert-list');
   const last = box && box.querySelector('.lst-row:last-child input[type=text]');
-  if (last) { last.focus(); last.select(); }
+  if (last) last.focus();
 }
 
-function saveFert(id, patch) {
-  if (!_supabase) return;
-  _supabase.from('nops_maint_fertilisers')
-    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('[maint] fertiliser save failed:', error.message); });
-}
-
-function onFertName(id, val) {
-  const f = fertilisers.find(x => String(x.id) === String(id));
+function dropFertRow(i) {
+  const f = fertDraft[i];
   if (!f) return;
-  const name = (val || '').trim();
-  if (!name) { renderFertilisers(); return; }
-  if (fertilisers.some(x => String(x.id) !== String(id) &&
-                            x.name.toLowerCase() === name.toLowerCase())) {
-    alert('“' + name + '” is already on the list.');
-    renderFertilisers();
-    return;
+  if (f.name && !confirm('Remove “' + f.name + '” from the fertiliser list?')) return;
+  fertDraft.splice(i, 1);
+  renderFertilisers();
+}
+
+async function saveFertEdit() {
+  const named = fertDraft.map(f => ({ ...f, name: (f.name || '').trim() })).filter(f => f.name);
+  const seen = new Set();
+  for (const f of named) {
+    const key = f.name.toLowerCase();
+    if (seen.has(key)) { alert('“' + f.name + '” is on the list twice.'); return; }
+    seen.add(key);
   }
-  f.name = name;
-  saveFert(id, { name: name });
-}
 
-/* The dosage goes to whichever usages are ticked, and only those. */
-function onFertDose(id, val) {
-  const f = fertilisers.find(x => String(x.id) === String(id));
-  if (!f) return;
-  const d = val === '' ? 0 : Math.max(0, +val || 0);
-  const patch = {};
-  if (f.dose_transplant != null) { f.dose_transplant = d; patch.dose_transplant = d; }
-  if (f.dose_monthly    != null) { f.dose_monthly    = d; patch.dose_monthly    = d; }
-  if (Object.keys(patch).length) saveFert(id, patch);
-}
+  const btns = document.getElementById('fert-actions');
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
+  const done = () => { if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false); };
 
-function onFertUse(id, field, on) {
-  const f = fertilisers.find(x => String(x.id) === String(id));
-  if (!f) return;
-  const d = +fertDose(f) || 0;
-  f[field] = on ? d : null;
-  const patch = {}; patch[field] = f[field];
-  saveFert(id, patch);
-  // Unticking the last one leaves a dosage the row no longer uses, so the
-  // box goes back to blank rather than showing a figure nothing reads.
-  if (f.dose_transplant == null && f.dose_monthly == null) renderFertilisers();
-}
-
-async function removeFertiliser(id) {
-  const f = fertilisers.find(x => String(x.id) === String(id));
-  if (!f) return;
-  if (!confirm('Remove “' + f.name + '” from the fertiliser list?')) return;
   if (_supabase) {
-    const { error } = await _supabase.from('nops_maint_fertilisers').delete().eq('id', id)
-      .then(r => r, e => ({ error: e }));
-    if (error) { alert('Could not remove it — ' + (error.message || 'try again')); return; }
+    const keep = new Set(named.filter(f => f.id).map(f => String(f.id)));
+    const gone = fertilisers.filter(f => !keep.has(String(f.id))).map(f => f.id);
+    const cols = f => ({ name: f.name, dose_transplant: f.dose_transplant,
+                         dose_monthly: f.dose_monthly, unit: f.unit || 'gm',
+                         updated_at: new Date().toISOString() });
+
+    let err = null;
+    if (gone.length) {
+      const { error } = await _supabase.from('nops_maint_fertilisers').delete().in('id', gone)
+        .then(r => r, e => ({ error: e }));
+      err = err || error;
+    }
+    for (const f of named.filter(x => x.id)) {
+      if (err) break;
+      const { error } = await _supabase.from('nops_maint_fertilisers').update(cols(f))
+        .eq('id', f.id).then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    const fresh = named.filter(f => !f.id).map(cols);
+    if (!err && fresh.length) {
+      const { error } = await _supabase.from('nops_maint_fertilisers').insert(fresh)
+        .then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (err) { done(); alert('Could not save — ' + (err.message || 'try again')); return; }
+
+    const { data } = await _supabase.from('nops_maint_fertilisers').select('*')
+      .order('sort_order').order('name').then(r => r, () => ({ data: null }));
+    fertilisers = data || named;
+  } else {
+    fertilisers = named.map((f, i) => ({ ...f, id: f.id || 'local-' + i }));
   }
-  fertilisers = fertilisers.filter(x => String(x.id) !== String(id));
+
+  done();
+  fertEditing = false; fertDraft = null;
   renderFertilisers();
 }
