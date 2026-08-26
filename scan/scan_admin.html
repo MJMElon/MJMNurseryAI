@@ -23,6 +23,15 @@
                 font-weight:900; font-size:14px; letter-spacing:.1em; text-transform:uppercase;
                 box-shadow:0 10px 26px -6px rgba(109,40,217,.5); transition:all .15s; }
   .portal-btn:hover { transform:translateY(-1px); box-shadow:0 14px 30px -6px rgba(109,40,217,.55); }
+  /* The worker's door in the 555 wordmark's green. Two identical purple bars
+     would be one button somebody presses twice by mistake; the colour is what
+     tells the two doors apart at arm's length. */
+  .portal-btn-worker { margin-top:12px;
+                       background:linear-gradient(135deg,#10b981,#047857);
+                       box-shadow:0 10px 26px -6px rgba(4,120,87,.45); }
+  .portal-btn-worker:hover { box-shadow:0 14px 30px -6px rgba(4,120,87,.5); }
+  .portal-note { margin:10px 2px 0; font-size:11.5px; font-weight:500; line-height:1.5;
+                 color:#64748b; }
   /* Sized here, not only by a Tailwind class: the CDN is a third-party
      script, and a page whose icons are 300px until it lands is a broken page.
      Same reason the auditor's portal button pins its own. */
@@ -55,12 +64,25 @@
 
 <div id="main" class="max-w-[860px] mx-auto px-4 md:px-6 py-7 hidden">
 
-  <!-- The way in to the field app itself. -->
+  <!-- The two ways in to the field app. Same site, two front doors: the FC
+       signs in with the e-mail account every MJM system shares, the worker
+       with the PIN on their row of the Payroll register. Kept the same size
+       because neither is the lesser door — they are just different people. -->
   <a class="portal-btn" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
     <svg viewBox="0 0 24 24" class="pb-phone"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/></svg>
     <span>Visit 555 FC Portal</span>
     <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
   </a>
+
+  <a class="portal-btn portal-btn-worker" id="worker-portal-link"
+     href="https://scan.mjmnursery.com/#/worker" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" class="pb-phone"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>
+    <span>Visit 555 Worker Portal</span>
+    <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+  </a>
+
+  <p class="portal-note">The FC Portal asks for an e-mail and password. The Worker Portal asks
+    only for a PIN — the one on the worker's row in Payroll → Worker System.</p>
 
   <div class="mt-6">
     <a class="tool" id="tool-access" href="scan_user_access.html">
@@ -79,6 +101,12 @@ const $ = (id) => document.getElementById(id);
    comes up broken after a deploy. Same trick the module card uses. */
 $('portal-link').addEventListener('click', (e) => {
   e.currentTarget.href = 'https://scan.mjmnursery.com/?cb=' + Date.now();
+});
+/* The worker portal is a route inside that same PWA, so it needs the same
+   fresh URL — and the query goes BEFORE the hash, or the router reads the
+   cache-buster as part of the route and lands nowhere. */
+$('worker-portal-link').addEventListener('click', (e) => {
+  e.currentTarget.href = 'https://scan.mjmnursery.com/?cb=' + Date.now() + '#/worker';
 });
 
 (async () => {

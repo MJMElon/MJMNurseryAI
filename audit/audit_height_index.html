@@ -60,9 +60,56 @@
   <!-- PLOT DETAIL — one plot's batches, each a row with height numbers
        when audited, "Pending" while empty, or a greyed "Not Required"
        row when the operation ledger shows the batch is out. Fed by
-       openPlotDetail(plot); back button returns to the grid. -->
+       openPlotDetail(plot); back button returns to the grid.
+
+       Used by MN. PN opens the multi-batch form below instead — the
+       intermediate "click a batch to open its own form" step was
+       cancelled at the auditor's request. -->
   <div id="view-plot" class="view page-scroll">
     <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
+  </div>
+
+  <!-- MULTI-BATCH FORM — every batch on the plot on one screen. The
+       "click a plot → click a batch → open a form" chain collapsed to
+       "click a plot → fill everything in". Fixed Date + Plot on top,
+       one batch card per pending batch, one Save All at the bottom.
+       Used for PN. Fed by openMultiBatchForm(plot). -->
+  <div id="view-multi" class="view page-scroll">
+    <div class="form-view-header">
+      <button class="back-btn" onclick="setView('list')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="form-view-title" id="multi-title">Plot P01 — PN</span>
+      <span class="form-view-id" id="multi-count">0 batches</span>
+    </div>
+
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="record_info">Record Information</span></div>
+      <div class="form-inner">
+        <div class="form-row">
+          <div class="form-field">
+            <div class="field-label" data-t="date">Date</div>
+            <input id="mf-date" class="input" type="date" readonly/>
+          </div>
+          <div class="form-field">
+            <div class="field-label"><span data-t="plot">Plot</span> <span class="req">*</span></div>
+            <input id="mf-plot" class="input" type="text" readonly/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- One card per batch, rendered by JS -->
+    <div id="multi-batches"></div>
+
+    <!-- One Save All button at the bottom -->
+    <div style="padding:14px 12px 32px">
+      <button class="btn-primary" id="btn-save-all" onclick="saveAllBatches()"
+              style="width:100%;height:50px;border-radius:12px;background:#1a4d1a;color:#fff;
+                     font-size:14px;font-weight:700;font-family:inherit;border:none;
+                     cursor:pointer;letter-spacing:.5px;text-transform:uppercase;
+                     box-shadow:0 4px 12px rgba(26,77,26,.25)">
+        <span data-t="save_all_filled">Save All Filled Batches</span>
+      </button>
+    </div>
   </div>
 
   <!-- FORM VIEW -->
@@ -275,7 +322,7 @@
 
 <script src="audit_login_guard.js?v=20260824a"></script>
 <script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
-<script src="audit_lang.js?v=20260826a"></script>
+<script src="audit_lang.js?v=20260826b"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
@@ -283,7 +330,7 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<script src="audit_height_script.js?v=20260826c"></script>
+<script src="audit_height_script.js?v=20260826d"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

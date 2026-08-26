@@ -460,6 +460,7 @@ $$;
 -- shared/add_maint_field_verify.sql; repeated here so running the files in
 -- either order leaves a working portal.
 ALTER TABLE nops_maint_field_records
+  ADD COLUMN IF NOT EXISTS worked_by   TEXT,
   ADD COLUMN IF NOT EXISTS verified_by TEXT,
   ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 
@@ -484,7 +485,7 @@ RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
                work_type TEXT, jenis TEXT, chemical TEXT, qty NUMERIC,
                remark TEXT, reported_by TEXT, batch_name TEXT,
                week_no INT, schedule_month TEXT,
-               verified_by TEXT, verified_at TIMESTAMPTZ)
+               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -496,6 +497,9 @@ BEGIN
     SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
            r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
            r.batch_name, r.week_no, r.schedule_month,
+           -- Who the conductor credited the job to, when he keyed it for
+           -- somebody whose phone was broken. NULL means reported_by did it.
+           r.worked_by,
            -- So a worker can see their morning has been checked off. Read
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
