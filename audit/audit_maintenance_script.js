@@ -194,13 +194,20 @@ function setView(v){
   activeView=v;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
-  /* One back arrow at a time. Sub-views carry their own back button in
-     the sub-header, so the outer top-bar back steps aside; on the list
-     view it returns as the only way back to audit_home. */
-  const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  /* Outer ribbon carries the context — the sub-header row inside the
+     form was removed. Show form title only when a form view is on. */
+  const ctxForm=document.getElementById('ctx-form');
+  const navToday=document.getElementById('nav-today');
+  const inForm=(v==='form');
+  if(ctxForm)ctxForm.style.display=inForm?'':'none';
+  if(navToday)navToday.style.display=inForm?'none':'';
   window.scrollTo(0,0);
 }
+function goBack(e){
+  if(activeView==='form'){ if(e)e.preventDefault(); cancelForm(); return false; }
+  return true;
+}
+window.goBack=goBack;
 /* selectTab was the old bottom "To Audit / History" toggle. That bar is
    gone (the bottom bar is now the nursery tabs), and the two sections
    (pending + audited) both sit on the page one under the other, so this
@@ -604,8 +611,11 @@ function openForm(taskId, isEdit, existingAuditUid){
   document.getElementById('b-batch').textContent=t.batch||'—';
   document.getElementById('b-completed').textContent=fmtDate(t.completedDate);
   document.getElementById('b-worker').textContent=t.worker||'—';
-  document.getElementById('form-title').textContent='Audit — '+t.plot;
-  document.getElementById('form-id').textContent=editMode?editId:nextAuditID();
+  /* Title reads on the outer ribbon; audit ID pill retired. */
+  const _ftm=document.getElementById('form-title');
+  if(_ftm)_ftm.textContent='Audit — '+t.plot;
+  const _fim=document.getElementById('form-id');
+  if(_fim)_fim.textContent='';
   // Reset tri buttons
   document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
   if(formState.result){
