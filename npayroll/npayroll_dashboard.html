@@ -203,12 +203,13 @@
         <div class="frow"><label>Status</label>
           <select id="wf-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
       </div>
-      <!-- The number this worker will key into the worker portal to sign in.
+      <!-- What this worker will key into the worker portal to sign in.
            Also settable straight from the register list. -->
       <div class="frow"><label>Worker PIN</label>
-        <input type="text" id="wf-pin" inputmode="numeric" autocomplete="off" placeholder="Digits, any length">
+        <input type="text" id="wf-pin" autocomplete="off" autocapitalize="characters"
+               autocorrect="off" spellcheck="false" placeholder="Letters or numbers, any length">
         <div style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:4px;">
-          For signing in to the worker portal. Numbers only, any length. Leave blank if they have not been given one. No two workers share a PIN.
+          For signing in to the worker portal. Letters, numbers or both, any length — letters are kept as capitals, so AB12 and ab12 are the same PIN. Leave blank if they have not been given one. No two workers share a PIN.
         </div>
       </div>
       <!-- Decides whether this person gets a column on the Work Maintenance

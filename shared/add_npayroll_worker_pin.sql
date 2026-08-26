@@ -1,30 +1,40 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- WORKER PIN — mjmnpayroll_workers.pin
 --
--- The number a worker will key into the worker portal to sign in. Set from
--- the Payroll register (Workers tab): a box on each worker's row, and the
--- same field on the Add / Edit Worker form.
+-- What a worker will key into the worker portal to sign in. Set from the
+-- Payroll register (Workers tab): a box on each worker's row, and the same
+-- field on the Add / Edit Worker form.
 --
 -- Safe to run more than once.
 -- ════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE mjmnpayroll_workers ADD COLUMN IF NOT EXISTS pin TEXT;
 
--- Digits, any number of them, or nothing at all. Text, not a number: a PIN
--- of 0412 has to keep its leading zero.
+-- Letters and numbers, any number of them, or nothing at all. Text, not a
+-- number: a PIN of 0412 has to keep its leading zero.
 --
--- This used to be capped at 4 to 6 digits. A database already carrying that
--- older constraint is loosened by shared/relax_npayroll_worker_pin.sql.
+-- Letters are stored as capitals, so AB12 and ab12 are one PIN rather than
+-- two — see shared/allow_npayroll_worker_pin_letters.sql for why that is
+-- the rule and not a preference.
+--
+-- The rule has moved twice: 4 to 6 digits, then digits of any length, now
+-- this. A database carrying either older constraint is brought up to date
+-- by shared/allow_npayroll_worker_pin_letters.sql; the drops below are what
+-- make re-running this file land in the same place.
+ALTER TABLE mjmnpayroll_workers
+  DROP CONSTRAINT IF EXISTS mjmnpayroll_workers_pin_format,
+  DROP CONSTRAINT IF EXISTS mjmnpayroll_workers_pin_digits;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
      WHERE conrelid = 'mjmnpayroll_workers'::regclass
-       AND conname  = 'mjmnpayroll_workers_pin_digits'
+       AND conname  = 'mjmnpayroll_workers_pin_chars'
   ) THEN
     ALTER TABLE mjmnpayroll_workers
-      ADD CONSTRAINT mjmnpayroll_workers_pin_digits
-      CHECK (pin IS NULL OR pin ~ '^[0-9]+$');
+      ADD CONSTRAINT mjmnpayroll_workers_pin_chars
+      CHECK (pin IS NULL OR pin ~ '^[A-Z0-9]+$');
   END IF;
 END $$;
 
@@ -48,6 +58,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS mjmnpayroll_workers_pin_key
 -- ───────────────────────────────────────────────────────────────────────
 
 SELECT 'pin column ready' AS status,
-       count(*)                              AS workers,
-       count(*) FILTER (WHERE pin IS NOT NULL) AS with_pin
+       count(*)                                AS workers,
+       count(*) FILTER (WHERE pin IS NOT NULL) AS with_pin,
+       count(*) FILTER (WHERE pin ~ '[A-Z]')   AS with_a_letter
   FROM mjmnpayroll_workers;
