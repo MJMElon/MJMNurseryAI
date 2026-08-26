@@ -119,6 +119,18 @@
   .seat-add:hover { background:#6d28d9; }
   .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
 
+  /* ── One card per system, side by side ──────────────────────── */
+  /* auto-fill rather than a fixed count: two systems should not leave three
+     empty columns, and five should wrap rather than squeeze. */
+  .sys-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(310px, 1fr)); gap:12px; }
+  .sys-card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px;
+              box-shadow:0 4px 16px rgba(124,58,237,.06); padding-bottom:14px; }
+  .sys-head { display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+              padding:15px 16px 11px; border-bottom:1.5px solid #ede9fe; }
+  .sys-head .sys-name { font-size:14px; font-weight:900; color:#4c1d95; }
+  .sys-head .sys-count { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
+                         text-transform:uppercase; color:#a78bfa; }
+
   /* ── A system's numbered slots ──────────────────────────────── */
   /* One row per number, holding a name or empty. Filling one is choosing
      from a list, and choosing somebody who sits elsewhere moves them. */
@@ -129,8 +141,6 @@
              font-weight:900; font-size:14px; }
   .slot-lab { display:block; font-size:9.5px; font-weight:900; letter-spacing:.11em;
               text-transform:uppercase; color:#94a3b8; margin-bottom:4px; }
-  .slot-note { font-size:10.5px; font-weight:600; color:#a78bfa; line-height:1.55;
-               padding:2px 16px 14px; }
 
   /* The home system on User Access: ticked, and not this screen's to change. */
   .right-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
@@ -273,7 +283,6 @@ let modules = [];      // nelos_modules rows
 let categories = [];   // active nelos_categories rows: { name, module_key }
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
-let openGrp = null;    // which system's handler block is open
 /* True once nelos_people() carries access_modules — i.e. once
    migration_nelos_access.sql has run. Until then the system ticks are not
    drawn and the column is not saved, rather than saved as empty. */
@@ -415,45 +424,30 @@ function renderPeople() {
     return;
   }
 
-  $('people').innerHTML = modules.map(m => {
+  // Blocks side by side rather than a stack of full-width rows, and every
+  // one of them open. A system holds two or three people; hiding that
+  // behind a chevron was hiding nothing, and made "who is Audit's #1" a
+  // click away on a page whose whole job is answering it.
+  $('people').innerHTML = '<div class="sys-grid">' + modules.map(m => {
     const rows = peopleIn(m.key);
-    const openHere = openGrp === m.key;
     const n = seatCount(m.key);
     const slots = [];
     for (let i = 1; i <= n; i++) slots.push(seatSlot(m.key, i));
 
     return `
-      <div class="card">
-        <div class="sys-block">
-          <button class="sys-row" data-grp="${esc(m.key)}">
-            <span class="sys-chev">${openHere ? '▾' : '▸'}</span>
-            <span class="sys-ico">${esc(m.icon || '📦')}</span>
-            <span class="sys-name">${esc(m.label)}</span>
-            ${m.sees_all_cases ? '<span class="hq-tag">HQ · sees every case</span>' : ''}
-            <span class="sys-count">${rows.length
-              ? rows.map(p => '#' + (p.seat_no || '?')).join(' ')
-              : 'nobody'}</span>
-          </button>
-          ${openHere ? `
-            <div class="grp-body">
-              <div class="slots">${slots.join('')}</div>
-              <button type="button" class="seat-add" data-more="${esc(m.key)}">
-                <span class="plus">+</span> add another person</button>
-              <p class="slot-note">
-                A case routed to a number is that person's. A case with no number
-                is the whole system's to take.
-              </p>
-            </div>` : ''}
+      <div class="sys-card">
+        <div class="sys-head">
+          <span class="sys-name">${esc(m.label)}</span>
+          ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
+          <span class="sys-count">${rows.length
+            ? rows.length + (rows.length === 1 ? ' person' : ' people')
+            : 'nobody'}</span>
         </div>
+        <div class="slots">${slots.join('')}</div>
+        <button type="button" class="seat-add" data-more="${esc(m.key)}">
+          <span class="plus">+</span> add another person</button>
       </div>`;
-  }).join('');
-
-  $('people').querySelectorAll('.sys-row').forEach(b =>
-    b.addEventListener('click', () => {
-      openGrp = openGrp === b.dataset.grp ? null : b.dataset.grp;
-      moreSeats = {};
-      renderPeople();
-    }));
+  }).join('') + '</div>';
 
   $('people').querySelectorAll('[data-more]').forEach(b =>
     b.addEventListener('click', () => {
