@@ -67,10 +67,37 @@ function setView(v){
   /* One back arrow at a time. Sub-views carry their own back button in
      the sub-header, so the outer top-bar back steps aside; on the list
      view it returns as the only way back to audit_home. */
+  /* One back arrow, and it is the ribbon's. The sub-views used to carry
+     their own under it; now the ribbon names the plot instead and its
+     arrow steps back a view at a time. */
   const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  if(topBack)topBack.style.display='';
+  const ctxP=document.getElementById('ctx-plot');
+  const ctxF=document.getElementById('ctx-form');
+  const today=document.getElementById('nav-today');
+  if(ctxP)ctxP.style.display=(v==='plot')?'':'none';
+  if(ctxF)ctxF.style.display=(v==='form')?'':'none';
+  if(today)today.style.display=(v==='plot'||v==='form')?'none':'';
   window.scrollTo(0,0);
 }
+/* The ribbon arrow: out of the form to the plot it belongs to, out of
+   the plot to the grid, and only from the grid out of the module — which
+   is the link's own href, so ?from=home still decides where that goes. */
+function goBack(e){
+  if(activeView==='form'){
+    if(e)e.preventDefault();
+    if(window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot); else setView('list');
+    return false;
+  }
+  if(activeView==='plot'||activeView==='detail'){
+    if(e)e.preventDefault();
+    setView('list');
+    return false;
+  }
+  return true;
+}
+window.goBack=goBack;
+
 function selectTab(nursery){
   activeTab=nursery;
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.n===nursery));

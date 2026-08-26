@@ -1270,3 +1270,7 @@ html, body {
   cursor:pointer;transition:all .15s;
 }
 .no-audit-choice:hover{background:var(--g100,#e7f4e7);border-style:solid}
+
+/* The plot you are on, in the ribbon where the sub-header used to be —
+   louder than the date it replaces, because it is what you navigated by. */
+#ctx-plot, #ctx-form{ font-weight:700; color:rgba(255,255,255,.9); letter-spacing:.2px }

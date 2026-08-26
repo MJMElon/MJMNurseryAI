@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#1a4d1a"/>
 <title>Plot Condition Audit — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="audit_styles.css?v=20260826a"/>
+<link rel="stylesheet" href="audit_styles.css?v=20260826b"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
@@ -25,11 +25,15 @@
 
   <nav class="top-bar">
     <div class="top-bar-logo">
-      <a href="audit_home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <a href="audit_home.html" class="top-bar-back" onclick="return goBack(event)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
       <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
       <div>
         <div class="top-bar-title"><span data-t="plot_title">Plot Condition Audit</span> &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
+        <!-- Which plot you are on, carried up from the sub-headers that
+             used to sit under the ribbon. setView shows one at a time. -->
+        <div class="top-bar-sub" id="ctx-plot" style="display:none"><span id="plot-detail-plot">—</span> · <span id="plot-detail-count">0 batches</span></div>
+        <div class="top-bar-sub" id="ctx-form" style="display:none"><span id="form-view-title" data-t="new_audit">New Audit</span></div>
       </div>
     </div>
     <div class="top-bar-actions">
@@ -55,20 +59,11 @@
   <!-- PLOT DETAIL — one plot's batches, each a row with an Audit / Edit
        button. Fed by openPlotDetail(plot); back button returns to grid. -->
   <div id="view-plot" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title"><span id="plot-detail-plot">—</span></span>
-      <span class="form-view-id" id="plot-detail-count">0 batches</span>
-    </div>
     <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
   </div>
 
   <!-- FORM VIEW -->
   <div id="view-form" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title" id="form-view-title" data-t="new_audit">New Audit</span>
-    </div>
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="plot_info">Audit Information</span></div>
@@ -293,7 +288,7 @@
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_script.js?v=20260826a"></script>
+<script src="audit_script.js?v=20260826b"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
