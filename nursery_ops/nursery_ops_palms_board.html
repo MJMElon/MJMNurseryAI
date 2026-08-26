@@ -11,6 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_palms.js"></script>
 <script src="../shared/shared_plot_map.js"></script>
+<script src="../shared/shared_plot_draw.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -81,6 +82,11 @@
   .act-name { font-weight:900; color:#1e293b; font-size:13px; flex:1; min-width:0; }
   .act-row.on .act-name { color:#065f46; }
   .act-d { font-weight:900; color:#94a3b8; font-size:11px; flex:none; }
+  .pv-row { display:flex; align-items:baseline; gap:12px; padding:7px 0; border-top:1px solid #f8fafc; }
+  .pv-row:first-child { border-top:none; }
+  .pv-k { font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.1em;
+          flex:0 0 132px; }
+  .pv-v { font-size:13px; font-weight:700; color:#334155; flex:1 1 auto; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -136,7 +142,24 @@
 
 </div>
 
-  <div id="up-modal" class="modal-bg hidden">
+  <div id="pv-modal" class="modal-bg hidden">
+  <div class="modal-card" style="max-width:440px">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+      <div>
+        <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Plot</div>
+        <div id="pv-title" class="text-lg font-black text-slate-800">—</div>
+      </div>
+      <button id="pv-close" class="ml-auto text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
+    </div>
+    <div id="pv-rows" class="px-5 py-3"></div>
+    <div class="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
+      <span id="pv-note" class="text-[11px] font-bold text-slate-400 hidden">Only an admin can redraw a boundary.</span>
+      <button id="pv-edit" class="ml-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
+    </div>
+  </div>
+</div>
+
+<div id="up-modal" class="modal-bg hidden">
   <div class="modal-card">
     <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
       <div>
@@ -170,6 +193,9 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
+let AREAS = {};      // plot_name → [{ area_key, polygon, batch_name }]
+let CAN_DRAW = false; // may this account redraw a boundary?
+let MAP_SCOPE = {};   // what MAP.load was given, so a reload matches
 let ME = '';        // the name written into anything saved from this page
 let MAP = null;
 let LINES = new Map();   // plot key → the line boardLines() built for it
@@ -182,8 +208,19 @@ let SCOPE = 'all';       // 'all', or a nursery key, or the list the user may se
    the honest answer. */
 const rankOf = (st) => (st === 'overdue' ? 0 : st === 'ontrack' ? 1 : 2);
 
+/* Answers for a plot ("B2") or for one of its areas ("B2#A").
+
+   Given an area, only that area's own log counts — the whole point of
+   splitting a plot is that its halves are on different stages, so rolling
+   them together would undo it. Given a whole plot, the worst of whatever it
+   has stands for it. */
 function lineForPlot(plot) {
   const want = String(plot).toUpperCase();
+  if (want.indexOf('#') !== -1) {
+    let hit = null;
+    LINES.forEach((ln, key) => { if (String(key).toUpperCase() === want) hit = ln; });
+    return hit;
+  }
   let best = null;
   LINES.forEach((ln, key) => {
     if (MJMPalms.plotOf(key).toUpperCase() !== want) return;
@@ -430,10 +467,88 @@ $('up-save').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
+const closePv = () => $('pv-modal').classList.add('hidden');
+$('pv-close').addEventListener('click', closePv);
+$('pv-modal').addEventListener('click', (e) => { if (e.target === $('pv-modal')) closePv(); });
+
+$('pv-edit').addEventListener('click', () => {
+  const plot = $('pv-modal').dataset.plot;
+  if (!plot) return;
+  const rec = MAP.plotsOf().find((p) => p.plot_name === plot);
+  const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
+  closePv();
+  MJMPlotDraw.open({
+    supa: _supabase,
+    plot: plot,
+    nursery: MAP.active(),
+    imageUrl: nur ? nur.map_image_url : null,
+    mapTop: rec ? rec.map_top : null,
+    by: ME,
+    // Re-read rather than patch: the editor may have added, moved and
+    // removed areas in one go, and the server is the record.
+    onSaved: async () => {
+      await MAP.load(_supabase, MAP_SCOPE);
+      await loadAreas();
+      MAP.setAreas(AREAS);
+      render();
+    },
+  });
+});
+
 $('rows').addEventListener('click', (e) => {
   const b = e.target.closest('[data-up]');
   if (b) openUpdate(b.dataset.up);
 });
+
+/* Which plots have been split, and where. Its own read and its own try: a
+   map that draws every plot whole is worth more than one that does not draw,
+   and the table below does not depend on this at all. */
+async function loadAreas() {
+  try {
+    const res = await _supabase.from('nops_plot_areas')
+      .select('plot_name, area_key, polygon, batch_name').order('plot_name').order('area_key');
+    if (res.error) throw res.error;
+    const by = {};
+    (res.data || []).forEach((a) => { (by[a.plot_name] = by[a.plot_name] || []).push(a); });
+    AREAS = by;
+  } catch (e) {
+    console.warn('[palms] plot areas not read:', (e && e.message) || e);
+    AREAS = {};
+  }
+}
+
+/* Clicking a plot on the map opens what is known about it, and — for an
+   admin — the way to redraw it. Read-only for everybody else: a boundary is
+   the shape of the nursery, not one person's view of it. */
+function openPlot(unit) {
+  const plot = MJMPalms.plotOf(unit);
+  const ln = lineForPlot(unit);
+  const areas = AREAS[plot] || [];
+  const area = unit.indexOf('#') !== -1
+    ? areas.find((a) => a.area_key === unit.split('#')[1]) : null;
+
+  const rows = [];
+  rows.push(['Nursery', MJMPalms.nurseryOfPlot(plot) || '—']);
+  if (area) rows.push(['Area', area.area_key + (area.batch_name ? ' · batch ' + area.batch_name : ' · no batch pinned')]);
+  else if (areas.length) rows.push(['Split into', areas.length + ' area' + (areas.length === 1 ? '' : 's')]);
+  if (ln && ln.state !== 'none') {
+    rows.push(['Current status', ln.status || '—']);
+    rows.push(['Expected completion', MJMPalms.prettyD(ln.due)]);
+    rows.push(['Days', ln.left < 0 ? (-ln.left) + ' over' : ln.left + ' left']);
+  } else {
+    rows.push(['Current status', 'Nothing running']);
+  }
+  if (ln) rows.push(['Last update', MJMPalms.prettyD(ln.lastDate) + (ln.lastBy ? ' · ' + ln.lastBy : '')]);
+
+  $('pv-title').textContent = MJMPalms.keyLabel(unit);
+  $('pv-rows').innerHTML = rows.map((r) =>
+    '<div class="pv-row"><span class="pv-k">' + esc(r[0]) + '</span>' +
+    '<span class="pv-v">' + esc(r[1]) + '</span></div>').join('');
+  $('pv-edit').classList.toggle('hidden', !CAN_DRAW);
+  $('pv-note').classList.toggle('hidden', CAN_DRAW);
+  $('pv-modal').dataset.plot = plot;
+  $('pv-modal').classList.remove('hidden');
+}
 
 function render() {
   LINES = new Map();
@@ -468,6 +583,14 @@ function render() {
        just because the office page is a different screen. */
     const u = MJMAccess.user();
     ME = (u && (u.full_name || u.email)) || '';
+    /* Guarded like the rest: an older cached shared_access.js has no
+       isAdminOf, and it must not take the page down. Fails closed. */
+    CAN_DRAW = (function () {
+      try {
+        return (typeof MJMAccess.isAdminOf === 'function' && MJMAccess.isAdminOf('nursery_ops'))
+            || (typeof MJMAccess.canManageUsers === 'function' && MJMAccess.canManageUsers());
+      } catch (e) { return false; }
+    })();
 
     const perms = MJMAccess.permissions() || {};
     const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
@@ -492,8 +615,12 @@ function render() {
       legendTitle: 'Current stage',
       statusOf: mapStatusOf,
       onNurseryChange: renderTable,
+      onPlotClick: openPlot,
     });
-    await MAP.load(_supabase, allowed ? { nurseries: visible } : {});
+    MAP_SCOPE = allowed ? { nurseries: visible } : {};
+    await MAP.load(_supabase, MAP_SCOPE);
+    await loadAreas();
+    MAP.setAreas(AREAS);
 
     render();
     $('loading').classList.add('hidden');

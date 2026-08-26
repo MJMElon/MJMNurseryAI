@@ -178,6 +178,10 @@
     injectCss();
 
     let plots = [];        // [{ nursery_name, plot_name, map_top }]
+    /* plot_name → [{ area_key, polygon, batch_name }], for plots that have
+       been split. Filled by the page through setAreas(); empty means every
+       plot is drawn whole, which is how this started and still behaves. */
+    let AREAS = {};
     let nurseries = [];    // [{ name, map_image_url }]
     let active = null;
     let z = { zoom: 1, panX: 0, panY: 0 };
@@ -273,13 +277,38 @@
       elLabels.innerHTML = '';
       const shapes = [];
       const labels = [];
+      /* A plot drawn as one shape, or as its areas when it has been split.
+
+         A plot carrying two batches planted weeks apart has two stages
+         running at once, and one polygon can only be one colour. So when
+         nops_plot_areas has shapes for a plot, THEY are drawn — each keyed
+         "B2#A", which is the unit key PALMS has always logged against — and
+         the plot's own map_top is not. Mixing the two would draw the halves
+         on top of the whole. */
+      const shapesOf = (p) => {
+        const areas = (AREAS[p.plot_name] || []).filter((a) => a && a.polygon);
+        if (areas.length) {
+          return areas.map((a) => ({
+            key: p.plot_name + '#' + a.area_key,
+            label: p.plot_name + ' · ' + a.area_key,
+            raw: a.polygon,
+          }));
+        }
+        return [{ key: p.plot_name, label: p.plot_name, raw: p.map_top }];
+      };
+
+      const units = [];
       plots.filter((p) => p.nursery_name === active).forEach((p) => {
-        if (!p.map_top || !String(p.map_top).startsWith('[')) return;
+        shapesOf(p).forEach((u) => units.push(u));
+      });
+
+      units.forEach((p) => {
+        if (!p.raw || !String(p.raw).startsWith('[')) return;
         let pts;
-        try { pts = JSON.parse(p.map_top); } catch (e) { return; }
+        try { pts = JSON.parse(p.raw); } catch (e) { return; }
         if (!Array.isArray(pts) || !pts.length) return;
 
-        const st = statusOf(p.plot_name) || null;
+        const st = statusOf(p.key) || null;
         /* With a legend the FILL says which stage the plot is on, and being
            late is an outline on top of it rather than a colour of its own —
            the two are different questions and a single colour could only
@@ -293,7 +322,7 @@
         const width = legend && late ? '1.1' : '.4';
         shapes.push(
           `<polygon points="${pts.map((pt) => pt.x + ',' + pt.y).join(' ')}" fill="${fill}" ` +
-          `stroke="${stroke}" stroke-width="${width}" class="pm-shape" data-pm-plot="${esc(p.plot_name)}"/>`);
+          `stroke="${stroke}" stroke-width="${width}" class="pm-shape" data-pm-plot="${esc(p.key)}"/>`);
 
         const cx = pts.reduce((s, pt) => s + pt.x, 0) / pts.length;
         const cy = pts.reduce((s, pt) => s + pt.y, 0) / pts.length;
@@ -304,7 +333,7 @@
         const line = legend ? (st && st.late ? st.late : '') : ((st && st.line) || 'no status');
         labels.push(
           `<div class="pm-label" style="left:${cx}%; top:${cy}%;">` +
-            `<div class="pm-tag">${esc(p.plot_name)}</div>` +
+            `<div class="pm-tag">${esc(p.label)}</div>` +
             (line ? `<div class="pm-line ${cls}">${esc(line)}</div>` : '') +
           `</div>`);
       });
@@ -426,6 +455,10 @@
       active: () => active,
       nurseries: () => nurseries.slice(),
       plotsOf: (name) => plots.filter((p) => p.nursery_name === (name || active)),
+      /* Which plots are split, and where. Passing {} puts every plot back to
+         being drawn whole. */
+      setAreas: function (byPlot) { AREAS = byPlot || {}; refresh(); },
+      areasOf: function (plot) { return (AREAS[plot] || []).slice(); },
     };
   }
 
