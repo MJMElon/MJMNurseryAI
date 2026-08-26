@@ -3,24 +3,44 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Audit Back End — MJM Nursery</title>
+  <title>MJM Nursery — Auditor Portal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
 
-  <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, back
-       arrow, language, sign-out. Also loaded by audit_home.html and
-       audit_nursery_select.html so the three surfaces read as one. -->
-  <link rel="stylesheet" href="audit_ribbon.css?v=20260824b"/>
+  <!-- Shared FC-style top ribbon: 555 / Auditor Portal wordmark, welcome
+       name, back to portal, sign out. Also loaded by audit_home.html and
+       audit_nursery_select.html so the three surfaces read as one — the
+       .fcr-lang pill it styles is theirs, not this page's. -->
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
 
-  <!-- Admin only, decided in the head so the page never renders for anyone
-       else. Not signed in goes to the one MJM AI login; signed in without
-       admin goes straight to the nursery chooser, since this page is what
-       the portal's Nursery Audit tile opens for everybody. -->
+  <!-- Signed in is enough to open this page now. It used to be admin
+       only, but it has become the desktop half of the audit app: the
+       four module cards live here, because the auditor portal is built
+       for a phone in a nursery and this is what somebody at a desk
+       opens. An auditor turned away at the door could not reach a
+       module outside its scheduled window at all.
+
+       What is genuinely administrative — the cross-nursery alerts, the
+       monthly report and Settings — is marked .admin-only and hidden
+       from everyone else. The class goes on <html> in the head, before
+       any of it paints, so a non-admin never sees it flash. Which
+       people may see which module card is coming as a setting on this
+       page; until it exists every signed-in auditor sees all four. -->
   <script src="audit_login_guard.js?v=20260824a"></script>
-  <script>MJMAuditLogin.requireAdmin('audit_home.html');</script>
-  <style>body{opacity:0;transition:opacity .2s ease}</style>
+  <script>
+    MJMAuditLogin.requireSignIn();
+    if (MJMAuditLogin.isAdmin())
+      document.documentElement.classList.add('is-audit-admin');
+  </script>
+  <style>
+    body{opacity:0;transition:opacity .2s ease}
+    /* Not marked admin → the admin-only blocks are not in the page's
+       layout at all. !important because the blocks carry their own
+       display (grid, flex) that would otherwise win. */
+    html:not(.is-audit-admin) .admin-only{display:none!important}
+  </style>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -93,7 +113,6 @@
       .header-logo-text{font-size:12.5px}
       .header-logo-sub{display:none}
       .hbtn{padding:0 7px}
-      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
     }
     @media (max-width:640px){
       .header-top{height:54px;gap:8px}
@@ -106,7 +125,6 @@
       /* Icon-only, the way the ribbon shows a bare back arrow. */
       .hbtn{height:30px;padding:0 9px;font-size:11px}
       .hbtn span{display:none}
-      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
       .avatar{width:26px;height:26px;font-size:11px}
       .user-chip{padding:4px}
       .uname{display:none}
@@ -120,41 +138,109 @@
     /* ── ENTER THE PORTAL ──
        Sits under the name, the way the store button does on the portal:
        a solid block, icon in front, arrow marking that it leads away. */
-    .portal-btn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;
-                padding:11px 17px;border-radius:9px;text-decoration:none;
-                background:#2d7a2d;color:#fff;
-                font-size:12px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
-                box-shadow:0 3px 10px rgba(45,122,45,.28);
-                transition:background .15s,transform .12s,box-shadow .15s}
-    .portal-btn:hover{background:#256725;box-shadow:0 5px 14px rgba(45,122,45,.34)}
+    /* The way through to the auditor view. Same shape as the FC Manage
+       page's own portal button — full width, 18px radius, the gradient
+       and the icon-label-arrow row — so the two manage pages read as
+       one family. Only the hue differs: green is the auditor portal's,
+       violet is the FC portal's. */
+    .portal-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+                padding:18px 22px;border-radius:18px;text-decoration:none;
+                background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;
+                font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+                box-shadow:0 10px 26px -6px rgba(27,107,50,.5);transition:all .15s}
+    .portal-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px -6px rgba(27,107,50,.55)}
     .portal-btn:active{transform:translateY(1px)}
-    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.1;
+    /* Sized here, not only by a class: same reason the FC page pins its own. */
+    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.2;
                     stroke-linecap:round;stroke-linejoin:round}
-    .portal-btn .pb-home{width:16px;height:16px}
-    .portal-btn .pb-out{width:13px;height:13px;opacity:.85}
+    .portal-btn .pb-home{width:20px;height:20px;flex-shrink:0}
+    .portal-btn .pb-out{width:15px;height:15px;opacity:.85;flex-shrink:0}
 
     /* ── ADMIN CARDS ──
        Scaled up to match the module cards on the other dashboards: room to
        say what the thing does, and an explicit way in rather than a chevron
        you have to know is a link. */
-    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-    .fc-card{display:flex;flex-direction:column;background:var(--card);
-             border:1px solid var(--line);border-radius:18px;padding:24px 24px 22px;
+    /* grid-auto-rows:1fr makes every ROW the height of the tallest card in
+       the grid, not just of its own row — so all four modules match even
+       though their descriptions differ in length. .fc-desc already carries
+       flex:1, which keeps every "Enter Module" line on the same baseline
+       once the boxes are equal. */
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+           grid-auto-rows:1fr;gap:16px}
+    /* Compact tiles, not full-height cards. Four fixed doors do not need a
+       paragraph each: the name is the whole message, and shrinking them
+       puts all four on one screen instead of four scrolls. The
+       descriptions are dropped rather than hidden — see .fc-desc. */
+    .fc-card{position:relative;display:flex;flex-direction:column;background:var(--card);
+             border:1px solid var(--line);border-radius:16px;padding:14px 14px 13px;
              text-decoration:none;box-shadow:0 1px 3px rgba(16,40,60,.05);
-             transition:box-shadow .18s,transform .18s;min-height:210px}
+             transition:box-shadow .18s,transform .18s;min-height:0}
     .fc-card:hover{box-shadow:0 10px 26px rgba(16,40,60,.10);transform:translateY(-2px)}
-    .fc-ico{width:52px;height:52px;border-radius:14px;flex-shrink:0;margin-bottom:18px;
+    .fc-ico{width:38px;height:38px;border-radius:11px;flex-shrink:0;margin-bottom:10px;
             display:flex;align-items:center;justify-content:center}
-    .fc-ico svg{width:25px;height:25px;fill:none;stroke-width:1.9;
+    .fc-ico svg{width:19px;height:19px;fill:none;stroke-width:1.9;
                 stroke-linecap:round;stroke-linejoin:round}
-    .fc-ttl{font-size:21px;font-weight:800;letter-spacing:.3px;line-height:1.15;
+    .fc-ttl{font-size:13px;font-weight:900;letter-spacing:.06em;line-height:1.25;
             text-transform:uppercase}
-    .fc-desc{font-size:13px;font-weight:600;color:#64748b;margin-top:12px;line-height:1.5;flex:1}
-    .fc-enter{display:inline-flex;align-items:center;gap:7px;margin-top:18px;
+    /* Kept as a rule rather than deleted from the markup: the same four
+       lines are the module descriptions elsewhere, and a tile is not the
+       place for them. */
+    .fc-desc{display:none}
+    .fc-enter{display:inline-flex;align-items:center;gap:5px;margin-top:9px;
               font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase}
     .fc-enter svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
                   stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
     .fc-card:hover .fc-enter svg{transform:translateX(4px)}
+
+    /* ── REORDERING THE MODULES ──
+       The grip is a separate target rather than the whole card, for two
+       reasons. The card is a link, so a press that turns out to be a drag
+       would otherwise have to be untangled from a press that was a click.
+       And on a phone the cards fill the screen: claiming the whole card
+       for dragging (touch-action:none) would stop the page scrolling
+       under a thumb that happened to land on one. Only the grip gives up
+       its scrolling, and it is small. */
+    .fc-grip{position:absolute;top:12px;right:12px;
+             width:30px;height:30px;border-radius:9px;
+             display:flex;align-items:center;justify-content:center;
+             color:var(--ink3);background:transparent;border:none;padding:0;
+             cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
+             opacity:.45;transition:opacity .15s,background .15s,color .15s}
+    .fc-card:hover .fc-grip{opacity:1;background:#f1f5f9}
+    .fc-grip:focus-visible{opacity:1;background:#f1f5f9;
+                           outline:2px solid var(--green);outline-offset:2px}
+    .fc-grip:active{cursor:grabbing}
+    .fc-grip svg{width:15px;height:15px;stroke:currentColor;fill:none;
+                 stroke-width:2.4;stroke-linecap:round}
+
+    /* The card being carried. Lifted and slightly transparent so the gap
+       it will drop into stays readable underneath it. */
+    .fc-card.is-dragging{
+      box-shadow:0 14px 34px rgba(16,40,60,.20);
+      transform:scale(1.02);opacity:.9;z-index:5;cursor:grabbing;
+    }
+    /* While a drag is live nothing else should respond to the pointer —
+       the hover lift on the cards being pushed past is pure noise. */
+    .cards.is-reordering .fc-card:not(.is-dragging){transition:transform .16s ease}
+    .cards.is-reordering .fc-card:hover{box-shadow:0 1px 3px rgba(16,40,60,.05);transform:none}
+    .cards.is-reordering .fc-grip{opacity:1}
+
+    /* Section head becomes a row so the reset control can sit opposite the
+       label. The button only exists once an order has actually been saved. */
+    .section-row{display:flex;align-items:center;justify-content:space-between;
+                 gap:12px;margin-bottom:10px}
+    .section-row .section-head{margin-bottom:0}
+    .order-reset{background:none;border:none;padding:0;cursor:pointer;
+                 font-family:inherit;font-size:10px;font-weight:700;
+                 letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);
+                 text-decoration:underline;text-underline-offset:3px}
+    .order-reset:hover{color:var(--ink)}
+    .order-reset[hidden]{display:none}
+
+    @media (prefers-reduced-motion:reduce){
+      .fc-card,.cards.is-reordering .fc-card:not(.is-dragging){transition:none}
+      .fc-card.is-dragging{transform:none}
+    }
 
     /* ── ALERTS ──
        Moved off the plot audit page, where only the auditor recording that
@@ -165,6 +251,34 @@
        a section label. Solid red, and it is the control that collapses the
        group, so the whole bar is the hit target. */
     .alert-wrap{margin-bottom:28px}
+
+    /* ── the scheduled-work dashboard ── */
+    .wk-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .wk-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+              color:#64748b}
+    .wk-month{font-size:10px;font-weight:700;color:#94a3b8;margin-left:auto}
+    .wk-grid{display:grid;gap:12px}
+    @media(min-width:720px){.wk-grid{grid-template-columns:1fr 1fr}}
+
+    .wk-card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+             padding:14px 15px 13px;box-shadow:0 1px 3px rgba(16,40,60,.05)}
+    .wk-card-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+    .wk-name{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .wk-pct{margin-left:auto;font-size:16px;font-weight:900;font-variant-numeric:tabular-nums}
+    .wk-track{height:7px;border-radius:999px;background:#e8eef0;overflow:hidden;margin-bottom:12px}
+    .wk-fill{height:100%;border-radius:999px;transition:width .4s ease}
+
+    .wk-row{display:flex;align-items:center;gap:8px;padding:7px 0;
+            border-top:1px dashed #eef2f4;font-size:11.5px}
+    .wk-row:first-of-type{border-top:none}
+    .wk-mod{font-weight:800;color:#334155;min-width:0;flex:1;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .wk-when{font-size:9.5px;font-weight:700;color:#94a3b8;white-space:nowrap}
+    .wk-plots{font-size:10.5px;font-weight:800;color:#475569;
+              font-variant-numeric:tabular-nums;white-space:nowrap}
+    .wk-chip{font-size:8.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+             padding:2px 6px;border-radius:5px;white-space:nowrap}
+    .wk-note{font-size:10px;font-weight:600;color:#94a3b8;margin-top:9px;line-height:1.5}
     .alert-month{font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:12px;
                  padding-left:2px;letter-spacing:.3px}
     .alert-group{margin-bottom:14px;border-radius:14px;overflow:hidden;
@@ -236,20 +350,32 @@
        arrow-plus-wordmark row is the standard way back on every module
        page this style is used on. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
-    <a class="fcr-back" href="../index.html" aria-label="Back to portal" title="Back to portal">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-    </a>
+    <!-- The left cell stays empty on purpose: it is what balances the
+         right-hand cluster and keeps the mark on the bar's centre line.
+         The way back moved into that cluster, where the FC Manage page
+         keeps its own — one place for "leave this page" on both. -->
+    <span class="fcr-spacer" aria-hidden="true"></span>
     <div class="fcr-brand">
       <div class="fcr-brand-name">555</div>
-      <div class="fcr-brand-sub">Auditor Portal</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub">Auditor Portal Manage</div>
     </div>
-    <div class="fcr-spacer"></div>
-    <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
-    <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
-      <span id="lang-toggle-label">BM</span>
-    </button>
-    <button class="fcr-signout" onclick="signOut()">Sign Out</button>
+    <div class="fcr-right">
+      <!-- Welcome first, then the way out: the same order FC Manage's bar
+           runs in, and the same order the other two auditor pages already
+           had. Portal was sitting ahead of the name here, which put the
+           only difference between the two bars in the one place a reader
+           checks first. -->
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
+      <a class="fcr-portal" href="../index.html" aria-label="Back to portal" title="Back to portal">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span class="fcr-portal-label">Portal</span>
+      </a>
+      <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
+        <span class="fcr-signout-label">Sign Out</span>
+      </button>
+    </div>
   </nav>
 
   <div class="content">
@@ -258,24 +384,129 @@
          — the nursery chooser was cancelled, and the auditor view
          defaults to whichever nursery was last chosen (or PN on a fresh
          session), with a Switch pill on the ribbon to flip PN ↔ MN. -->
-    <a class="portal-btn" href="audit_home.html" style="margin-bottom:22px">
+    <a class="portal-btn" href="audit_home.html" style="margin-bottom:24px">
       <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
-      <span>Visit Auditor Portal</span>
+      <span>Visit 555 Auditor Portal</span>
       <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
     </a>
 
 
+    <!-- ── WHAT NEEDS ATTENTION ──
+         Above the modules, because it is the reason to open one. The
+         module cards are only ever four fixed doors; what changes day to
+         day is the case list and the alerts, and those were sitting below
+         the doors where somebody had to scroll past to find them. -->
+    <!-- Nelos To-Do: audit cases still open. This sits on the back end and
+         NOT on audit_home.html on purpose — the auditor view was stripped of
+         MJMAccess and the Supabase CDN so it loads on nursery signal, and
+         Nelos is not worth putting that back. -->
+    <div id="nelos-todo" class="alert-wrap admin-only"></div>
+
     <!-- No section heading here: every group already announces itself as
          "Alerts — <nursery>", and stacking the two just repeated the word. -->
-    <div class="alert-wrap">
-      <div class="alert-month" id="alert-month">Checking this month's audits…</div>
-      <div id="alert-section">
-        <div class="alert-loading">Checking the latest audit data…</div>
+    <!-- ── SCHEDULED WORK ──
+         What the auditors are supposed to have done this month and how far
+         through it they are, pre nursery and main nursery side by side.
+         This replaced a bare "Showing August 2026 only" label over a list
+         that said nothing at all on a good month: "All Clear" is the answer
+         to a different question than "is the month's work being done".
+
+         The alert cards still render underneath, but only when something
+         is actually flagged — the month is named up here now. -->
+    <div class="alert-wrap admin-only">
+      <div class="wk-head">
+        <div class="wk-title">Scheduled Audit Work</div>
+        <div class="wk-month" id="alert-month">…</div>
       </div>
+      <div id="work-dash">
+        <div class="alert-loading">Working out this month's schedule…</div>
+      </div>
+      <div id="alert-section"></div>
     </div>
 
-    <div class="section-head">Administration</div>
-    <div class="cards">
+
+    <!-- ── AUDIT MODULES ──
+         Moved here from audit_home.html. On the phone the portal's
+         to-do list is the way into a module — it names the plots that
+         still owe work — so a second row of cards underneath it only
+         repeated the same four destinations without saying anything
+         about what was due. On a desktop there is no such list, so
+         this is where the four modules are reachable directly. -->
+    <div class="section-row">
+      <div class="section-head">Audit Modules</div>
+      <button type="button" class="order-reset" id="order-reset" hidden
+              onclick="resetModuleOrder()">Reset order</button>
+    </div>
+    <div class="cards" id="module-cards" style="margin-bottom:26px">
+
+      <a class="fc-card" href="audit_plot_audit.html" data-mod="plot" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Plot Condition Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
+        <div class="fc-ico" style="background:#e8f5e9">
+          <svg viewBox="0 0 24 24" style="stroke:#2d7a2d"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#2d7a2d">Plot Condition Audit</div>
+        <div class="fc-desc">Pest, animal damage, disease and leaf colour, recorded batch by batch across every plot.</div>
+        <div class="fc-enter" style="color:#2d7a2d">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_height_index.html" data-mod="height" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Seedling Height Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
+        <div class="fc-ico" style="background:#e0f2fe">
+          <svg viewBox="0 0 24 24" style="stroke:#0369a1"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#0369a1">Seedling Height Audit</div>
+        <div class="fc-desc">Three sample heights per batch and the average they give, plot by plot.</div>
+        <div class="fc-enter" style="color:#0369a1">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_papan_index.html" data-mod="papan" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Papan Tanda Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
+        <div class="fc-ico" style="background:#fff1e6">
+          <svg viewBox="0 0 24 24" style="stroke:#c2410c"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#c2410c">Papan Tanda Audit</div>
+        <div class="fc-desc">Whether each batch sign is there, carries the right information and is still standing properly.</div>
+        <div class="fc-enter" style="color:#c2410c">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <a class="fc-card" href="audit_maintenance_index.html" data-mod="maint" draggable="false">
+        <button type="button" class="fc-grip" tabindex="0"
+                aria-label="Reorder Maintenance Audit — hold and drag, or use the arrow keys">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+        </button>
+        <div class="fc-ico" style="background:#e8eefc">
+          <svg viewBox="0 0 24 24" style="stroke:#1e3a8a"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#1e3a8a">Maintenance Audit</div>
+        <div class="fc-desc">Manuring, weeding and interrow spraying checked against what the field recorded.</div>
+        <div class="fc-enter" style="color:#1e3a8a">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+    </div>
+
+
+    <div class="section-head admin-only">Administration</div>
+    <div class="cards admin-only">
 
       <a class="fc-card" href="audit_report.html">
         <div class="fc-ico" style="background:#e7f6e7">
@@ -289,15 +520,17 @@
         </div>
       </a>
 
-      <!-- Revealed only for a portal user who may change other people's
-           access — the same rule the auditor home used. Being an audit admin
-           is not on its own enough to hand out user management. -->
+      <!-- Settings: user access, and the settings that belong to the
+           installation rather than to a person. Revealed only for a portal
+           user who may change other people's access — the same rule the
+           auditor home used. Being an audit admin is not on its own enough
+           to hand out user management. -->
       <a class="fc-card" id="card-user-access" href="audit_user_access.html" style="display:none">
         <div class="fc-ico" style="background:#fdeaea">
           <svg viewBox="0 0 24 24" style="stroke:#b91c4a"><path d="M12 11a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 20v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1"/></svg>
         </div>
-        <div class="fc-ttl" style="color:#b91c4a">User Access</div>
-        <div class="fc-desc">Set which audits each person may open and record, per nursery and per module.</div>
+        <div class="fc-ttl" style="color:#b91c4a">Settings</div>
+        <div class="fc-desc">User access — which audits each person may open and record — and the system settings for this installation.</div>
         <div class="fc-enter" style="color:#b91c4a">
           <span>Enter Module</span>
           <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
@@ -305,24 +538,37 @@
       </a>
     </div>
 
-    <div class="note">Auditors go straight to the auditor portal — the report and user access are not shown to them.</div>
+    <div class="note admin-only">The alerts, the monthly report and Settings are shown to audit admins only.
+         Every signed-in auditor sees the module cards above and can open the auditor portal.</div>
   </div>
 </div>
 
 <script src="audit_supabase.js"></script>
-<!-- Language store + welcome-name fill for the shared FC ribbon. Admin
-     has nothing to translate here, but persisting the toggle means the
-     rest of the audit pages honour whatever was picked. -->
-<script src="audit_lang.js?v=20260823o"></script>
+<!-- Which plots still owe work — the same helper the auditor to-do uses,
+     so this page and that one count progress the same way. -->
+<script src="audit_pending.js?v=20260825a"></script>
+<!-- Rounds and windows, shared with the auditor's to-do list. -->
+<script src="audit_settings.js?v=2"></script>
+<!-- Welcome-name fill for the shared FC ribbon.
+
+     audit_lang.js is deliberately NOT loaded here. This page had the
+     BM/EN toggle and the translation pass without having anything of
+     its own to translate — the four module titles and two captions
+     below carried a data-t each, and that was the whole of it. The
+     toggle is the phone app's, and it stays there; a back-office page
+     is not where a field auditor changes language. The other audit
+     pages keep both, and the stored mjm_lang key is untouched, so
+     nothing they do changes. -->
 <script src="audit_ribbon.js?v=20260824b"></script>
 
-<!-- The portal permission layer, for the User Access card only. An admin who
+<!-- The portal permission layer, for the Settings card only. An admin who
      signed in through the audit login has no portal session, so the card
      stays hidden — it fails closed. -->
 <script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
 
 <script>
 /* The guard already ran in the head; this only reveals the page it let
@@ -401,6 +647,135 @@ function latestPerPlot(rows){
   return Object.values(seen);
 }
 
+/* ══ SCHEDULED WORK ═══════════════════════════════════════════════
+   How much of this month's audit routine is done, pre nursery and main
+   nursery side by side.
+
+   The schedule is the same one audit_home.html shows an auditor, copied
+   rather than imported — that file builds it inside loadAuditTodo(),
+   wired to the one scope the auditor chose on the way in, and this page
+   needs both at once. The windows below and the SET arrays there are
+   the same routine and MUST be kept in step; if a window moves, it
+   moves in both.
+
+   Progress is counted in PLOTS, not in rounds. A round is not half done
+   because one of fifty-two plots was walked, and an admin asking "are we
+   getting through it" is asking about the plots. MJMAuditPending answers
+   which plots still owe work inside a window — the same helper, and the
+   same answer, as the circles under the auditor's own to-do rows.
+   ═══════════════════════════════════════════════════════════════════ */
+const WORK_GROUPS = [
+  { key:'PN', name:'Pre Nursery',  tone:'#1f7a3d', nurseries:['PN'] },
+  { key:'MN', name:'Main Nursery', tone:'#1558a8', nurseries:['BNN','UNN1','UNN2'] }
+];
+
+/* Day-of-month windows, from Settings → System Setting — the same source
+   the auditor's own to-do list reads, so the two boards can never quote
+   different days for one audit. This used to be a second hardcoded copy of
+   PN_SET / MN_SET, which is exactly how it came to say the 10th while the
+   settings said the 9th.
+
+   A module with no rounds left drops out of the board, the same way it
+   drops off the to-do list. */
+const WORK_MOD_NAME = { plot:'Plot Condition', height:'Seedling Height', papan:'Papan Tanda' };
+const workSchedule = (scope) => Object.keys(WORK_MOD_NAME)
+  .map(mod => ({ mod, name: WORK_MOD_NAME[mod], windows: MJMAuditSettings.windows(scope, mod) }))
+  .filter(sc => sc.windows.length);
+
+const WORK_CHIP = {
+  done:     { label:'Done',     bg:'#dcfce7', fg:'#15803d' },
+  due:      { label:'Due now',  bg:'#fee2e2', fg:'#991b1b' },
+  overdue:  { label:'Overdue',  bg:'#fee2e2', fg:'#7f1d1d' },
+  soon:     { label:'Soon',     bg:'#fef9c3', fg:'#854d0e' },
+  upcoming: { label:'Upcoming', bg:'#e0f2fe', fg:'#075985' }
+};
+
+async function loadWorkDashboard(){
+  const host = document.getElementById('work-dash');
+  if (!host) return;
+
+  /* The rounds come from the database now, so read them before drawing.
+     A failure leaves MJMAuditSettings on its defaults, which is the
+     schedule this board carried before it was settable. */
+  try { await MJMAuditSettings.load(); }
+  catch (e) { console.warn('[work-dash] settings:', e); }
+
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), today = now.getDate();
+  const last = new Date(y, m + 1, 0).getDate();
+  const iso = d => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  /* Every nursery at once — this page is the both-sides view. */
+  try {
+    await MJMAuditPending.load(['PN','BNN','UNN1','UNN2']);
+  } catch (e) {
+    console.warn('[work-dash] roster load failed:', e);
+  }
+
+  const cards = WORK_GROUPS.map(g => {
+    let gTotal = 0, gDone = 0, anyBasis = false;
+
+    const rows = workSchedule(g.key).map(sc => {
+      return sc.windows.map((w, i) => {
+        const start = Math.min(w[0], last), end = Math.min(w[1], last);
+        let total = 0, owed = 0, basis = false;
+
+        g.nurseries.forEach(n => {
+          if (!MJMAuditPending.covers(sc.mod, n)) return;
+          basis = true;
+          total += MJMAuditPending.plotsAll(sc.mod, n).length;
+          owed  += MJMAuditPending.plots(sc.mod, n, iso(start), iso(end)).length;
+        });
+        const done = Math.max(0, total - owed);
+        if (basis) { anyBasis = true; gTotal += total; gDone += done; }
+
+        /* Where the window stands. A finished window is finished whatever
+           the date; an unfinished one that has closed is overdue. */
+        let state;
+        if (basis && total > 0 && owed === 0) state = 'done';
+        else if (today > end) state = 'overdue';
+        else if (today >= start) state = 'due';
+        else state = (start - today) <= 3 ? 'soon' : 'upcoming';
+
+        const chip = WORK_CHIP[state];
+        const when = start === end
+          ? start + ' ' + MONTHS[m]
+          : (start === 1 && end === last ? 'All month' : start + '–' + end + ' ' + MONTHS[m]);
+        const round = sc.windows.length > 1 ? ' ' + (i + 1) : '';
+
+        return '<div class="wk-row">' +
+                 '<span class="wk-mod">' + sc.name + round + '</span>' +
+                 '<span class="wk-when">' + when + '</span>' +
+                 (basis && total
+                   ? '<span class="wk-plots">' + done + '/' + total + '</span>'
+                   : '') +
+                 '<span class="wk-chip" style="background:' + chip.bg + ';color:' + chip.fg + '">' +
+                   chip.label + '</span>' +
+               '</div>';
+      }).join('');
+    }).join('');
+
+    const pct = gTotal ? Math.round(gDone / gTotal * 100) : 0;
+    return '<div class="wk-card">' +
+             '<div class="wk-card-head">' +
+               '<span class="wk-name" style="color:' + g.tone + '">' + g.name + '</span>' +
+               '<span class="wk-pct" style="color:' + g.tone + '">' +
+                 (anyBasis ? pct + '%' : '—') + '</span>' +
+             '</div>' +
+             '<div class="wk-track"><div class="wk-fill" style="width:' +
+               (anyBasis ? pct : 0) + '%;background:' + g.tone + '"></div></div>' +
+             rows +
+             (anyBasis
+               ? '<div class="wk-note">' + gDone + ' of ' + gTotal + ' plot audits done this month.</div>'
+               : '<div class="wk-note">No plot roster could be read for this nursery, so ' +
+                 'progress is not being guessed at.</div>') +
+           '</div>';
+  }).join('');
+
+  host.innerHTML = '<div class="wk-grid">' + cards + '</div>';
+}
+
 async function loadAlerts(){
   const section = document.getElementById('alert-section');
   if (!section) return;
@@ -416,7 +791,7 @@ async function loadAlerts(){
     ]);
 
     const monthEl = document.getElementById('alert-month');
-    if (monthEl) monthEl.textContent = 'Showing ' + label + ' only';
+    if (monthEl) monthEl.textContent = label;
 
     const plots = latestPerPlot(plotRows || []);
     const papan = latestPerPlot(papanRows || []);
@@ -450,14 +825,11 @@ async function loadAlerts(){
     localStorage.setItem(ALERT_KEY, fingerprint);
 
     if (total === 0) {
-      section.innerHTML =
-        '<div class="all-clear">' +
-          '<div class="all-clear-ico"><svg viewBox="0 0 24 24">' +
-            '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>' +
-            '<polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
-          '<div><div class="all-clear-ttl">All Clear</div>' +
-          '<div class="all-clear-sub">Nothing flagged in any nursery for ' + label + '</div>' +
-        '</div></div>';
+      /* Nothing to say. The old "All Clear" card answered "is anything
+         flagged"; the dashboard above answers "is the work being done",
+         which is the question this page is for. An empty list is not
+         worth a card of its own under it. */
+      section.innerHTML = '';
       return;
     }
 
@@ -532,15 +904,24 @@ function notifyAlerts(kinds){
   } catch (e) {}
 }
 
+/* Everything below feeds the .admin-only region. A non-admin auditor
+   has none of it on screen, so running it would be a handful of
+   cross-nursery queries answering nobody — and the RLS policies would
+   filter most of them to nothing anyway. */
+if (MJMAuditLogin.isAdmin()) {
+
+loadWorkDashboard();
 loadAlerts();
 /* Long shifts leave this page open, so it refreshes — but only while
    somebody is actually looking at it. A tab left open on a back-office
    machine for a week would otherwise keep querying all week for nobody. */
 setInterval(function(){
-  if (document.visibilityState === 'visible') loadAlerts();
+  if (document.visibilityState === 'visible') { loadWorkDashboard(); loadAlerts(); }
 }, 5 * 60 * 1000);
 
-/* User Access needs the portal's own permission, not just audit admin. */
+/* Settings holds User Access, so it needs the portal's own permission —
+   not just audit admin. The element id is unchanged so nothing else that
+   looks for it breaks. */
 (async () => {
   try {
     const supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
@@ -548,8 +929,185 @@ setInterval(function(){
     if (MJMAccess.user() && MJMAccess.canManageUsers()) {
       document.getElementById('card-user-access').style.display = 'flex';
     }
+    // Open audit cases, for people who hold Nelos.
+    if (MJMAccess.canAccess('nelos')) {
+      MJMNelos.init(supa, { root: '../' });
+      /* Shown even when empty. It used to remove itself on a clean month
+         so the alerts below did not appear to jump — but it now sits at
+         the top as the page's to-do list, and a to-do list that is absent
+         when there is nothing to do cannot be trusted to be absent for
+         that reason. Empty, it reads "clear". */
+      MJMNelos.mountTodo('#nelos-todo', {
+        module:       'audit',
+        title:        'Auditor NELOS',
+        newCase:      'top',        /* own row under the heading */
+        newCaseLabel: '+ Case',
+        openLink:     false,        /* was "Open Nelos →" */
+        hideIfEmpty:  false
+      });
+    }
   } catch (e) { /* no portal session — card stays hidden */ }
 })();
+
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODULE CARD ORDER
+   ══════════════════════════════════════════════════════════════════
+   Four people use this page for four different jobs, and each of them
+   opens one module far more than the other three. The order is theirs
+   to set: drag a card by its grip, and where it lands is where it
+   stays.
+
+   Stored per account in localStorage, keyed the same way the auditor
+   portal keys the chosen nursery — the office machine is shared, and a
+   flat key would hand the next person to sign in the last person's
+   layout. It does not follow anyone to a second device; that would
+   need a column on shared_profiles, and this is a preference, not a
+   record.
+
+   A module missing from a saved order — a fifth one added later —
+   lands at the end rather than vanishing or jumping to the front.
+   ══════════════════════════════════════════════════════════════════ */
+(function moduleOrder(){
+  const grid  = document.getElementById('module-cards');
+  const reset = document.getElementById('order-reset');
+  if (!grid) return;
+
+  const cards = () => Array.prototype.slice.call(grid.querySelectorAll('.fc-card'));
+
+  function storeKey(){
+    let u = {};
+    try { u = JSON.parse(localStorage.getItem('mjm_user') || '{}'); } catch (e) {}
+    return 'mjm_audit_module_order:' + (u.id || u.email || 'anon');
+  }
+
+  function save(){
+    try {
+      localStorage.setItem(storeKey(),
+        JSON.stringify(cards().map(c => c.dataset.mod)));
+    } catch (e) {}
+    if (reset) reset.hidden = false;
+  }
+
+  function restore(){
+    let order = [];
+    try { order = JSON.parse(localStorage.getItem(storeKey()) || '[]'); } catch (e) {}
+    if (!Array.isArray(order) || !order.length) return;
+    /* Work out the strangers BEFORE moving anything, then append the
+       known ones in the saved order and the strangers after them. */
+    const tail = cards().filter(c => order.indexOf(c.dataset.mod) === -1);
+    order.forEach(mod => {
+      const el = grid.querySelector('.fc-card[data-mod="' + mod + '"]');
+      if (el) grid.appendChild(el);
+    });
+    tail.forEach(el => grid.appendChild(el));
+    if (reset) reset.hidden = false;
+  }
+  /* Stamp the authored positions BEFORE restore() moves anything, or
+     "reset" would sort the cards back into whatever order was last
+     saved — which is what it is meant to undo. */
+  cards().forEach((c, i) => { c.dataset.order = i; });
+  restore();
+
+  window.resetModuleOrder = function(){
+    try { localStorage.removeItem(storeKey()); } catch (e) {}
+    /* data-order holds the order the page was authored in, so resetting
+       does not depend on reloading. */
+    cards().sort((a, b) => (+a.dataset.order || 0) - (+b.dataset.order || 0))
+           .forEach(el => grid.appendChild(el));
+    if (reset) reset.hidden = true;
+  };
+
+  /* ── DRAGGING ──
+     Pointer events, so a mouse and a finger take the same path. The
+     card follows nothing — it is moved in the DOM as the pointer
+     passes other cards, so the grid itself shows the result and there
+     is no floating clone to keep in sync. */
+  let drag = null;
+
+  grid.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('.fc-grip');
+    if (!grip || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const card = grip.closest('.fc-card');
+    if (!card) return;
+    e.preventDefault();                       /* no text selection, no link drag */
+    drag = { card: card, id: e.pointerId, moved: false };
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  grid.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.card.classList.add('is-dragging');
+      grid.classList.add('is-reordering');
+    }
+    /* Nearest other card by straight-line distance to its centre. A grid
+       wraps, so "before or after" cannot be decided on the x axis alone —
+       but once the nearest card is known, which side of ITS centre the
+       pointer sits on is the whole answer. */
+    let best = null, bestDist = Infinity;
+    cards().forEach(c => {
+      if (c === drag.card) return;
+      const r = c.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width  / 2);
+      const dy = e.clientY - (r.top  + r.height / 2);
+      const d  = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) { bestDist = d; best = c; }
+    });
+    if (!best) return;
+    const r = best.getBoundingClientRect();
+    const after = (e.clientY > r.top + r.height / 2)
+               || (e.clientY >= r.top && e.clientX > r.left + r.width / 2);
+    grid.insertBefore(drag.card, after ? best.nextSibling : best);
+  });
+
+  function endDrag(e){
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    const moved = drag.moved;
+    drag.card.classList.remove('is-dragging');
+    grid.classList.remove('is-reordering');
+    drag = null;
+    if (moved) save();
+  }
+  grid.addEventListener('pointerup', endDrag);
+  grid.addEventListener('pointercancel', endDrag);
+
+  /* ── KEYBOARD ──
+     Drag-only reordering cannot be done without a pointer, so the grip
+     is a real button and the arrow keys move the card it belongs to.
+     Focus rides along with it, or the next press would move whatever
+     card happened to take its place. */
+  grid.addEventListener('keydown', e => {
+    const grip = e.target.closest('.fc-grip');
+    if (!grip) return;
+    const card = grip.closest('.fc-card');
+    if (!card) return;
+    let moved = false;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (card.nextElementSibling) {
+        grid.insertBefore(card.nextElementSibling, card); moved = true;
+      }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      if (card.previousElementSibling) {
+        grid.insertBefore(card, card.previousElementSibling); moved = true;
+      }
+    } else return;
+    e.preventDefault();
+    if (moved) { save(); grip.focus(); }
+  });
+
+  /* A grip lives inside the card's <a>. Without this, releasing a drag —
+     or pressing the button at all — would follow the link. */
+  grid.addEventListener('click', e => {
+    if (e.target.closest('.fc-grip')) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

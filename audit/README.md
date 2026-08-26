@@ -20,12 +20,54 @@ do nothing.
 | `audit_height_index.html` | `audit_height_script.js` | `audit_height_styles.css` |
 | `audit_papan_index.html` | `audit_papan_script.js` | `audit_papan_styles.css` |
 | `audit_maintenance_index.html` | `audit_maintenance_script.js` | `audit_maintenance_styles.css` |
-| `audit_report.html` | inline | inline |
+| `audit_report.html` | inline | inline + `audit_ribbon.css` |
 | `audit_user_access.html` | `../shared/shared_module_access.js` | — |
 
 Shared by all of them: `audit_supabase.js` (REST helpers), `audit_lang.js`
 (EN/BM strings), `audit_dexie_offline.js` + `audit_dexie.min.js` (offline
 queue), `audit_sw.js` (service worker), `audit_manifest.json`.
+
+`audit_ribbon.css` + `audit_ribbon.js` are the shared 555 / MJM Nursery top
+bar carried by the desk-facing pages — `audit_admin.html`,
+`audit_home.html`, `audit_nursery_select.html` and `audit_report.html`. A
+page adopts it with a stylesheet link, the script tag, and the `.fcr`
+markup copied across; the script only fills in the welcome name. It is the
+FC portal's bar written out longhand, so a change to one belongs on the
+other in the same pass.
+
+`audit_pending.js` works out which plots still owe work, for the circles
+under each row of the portal's to-do list. `audit_deeplink.js` is the other
+half: it reads the `?plot=` those circles link with and either opens that
+plot (Plot Condition, Seedling Height) or scrolls to its row and flashes it
+(Papan Tanda, Maintenance).
+
+## Where the modules are reached from
+
+The portal's to-do list, by tapping a row or one of its plot circles. There
+is no Audit Modules card row on `audit_home.html` any more — it repeated the
+four destinations the list above it already linked to, without saying which
+were due. The cards live on `audit_admin.html`, which is the desktop half of
+the app.
+
+That page is therefore **not admin-only any more**: any signed-in auditor may
+open it. What is genuinely administrative — the cross-nursery alerts, the
+monthly report, User Access — carries `.admin-only`, which a head script
+hides unless `MJMAuditLogin.isAdmin()`. `applyAuditAccess()` already hides an
+individual module card from anyone without that page's permission, so the
+per-person control asked for on this page is partly built.
+
+## When a to-do row counts as done
+
+When no plot in it is still owed, per `MJMAuditPending.plots()` for the row's
+own date window. It used to be done as soon as one record landed anywhere in
+the window, which was reasonable while the row said nothing about plots —
+but once the row lists them, auditing the first of fifty-two would strike the
+row out and take the other fifty-one circles with it.
+
+The batch roster has to have answered for that nursery first
+(`MJMAuditPending.covers()`). Otherwise the old date rule applies: "no plots
+known" and "no plots left" look identical from here, and reading a failed
+read as a finished month is the one way to lose work silently.
 
 Note the naming: the audit pages are `*_index.html`, not `*.html`. Everything in
 this folder carries the `audit_` prefix, including `audit_icon-192.png` and

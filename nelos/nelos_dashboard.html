@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NELOS</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #ddd6fe; color:#6d28d9; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s;
+              box-shadow:0 3px 10px rgba(124,58,237,.10); cursor:pointer; }
+  .tool-btn:hover { background:#ede9fe; transform:translateY(-1px); }
+  .tool-btn-primary { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+  .tool-btn-primary:hover { background:#6d28d9; }
+  .tool-btn-access { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
+  .tool-btn-access:hover { background:#ffe4e6; }
+  /* A plain plus at the button's own weight, rather than the emoji one,
+     which drew at whatever size the font felt like. */
+  .plus { font-size:17px; font-weight:900; line-height:0; margin-top:-1px; }
+
+  /* User Setting, beside New Case. A cog is enough — the words were most of
+     the button. */
+  .cog { display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px;
+         border-radius:999px; background:#fff; border:1.5px solid #ddd6fe; color:#6d28d9;
+         font-size:18px; line-height:1; text-decoration:none;
+         box-shadow:0 3px 10px rgba(124,58,237,.10); }
+  .cog:hover { background:#ede9fe; }
+
+  .toolbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+
+  /* ── The case list, as one box ──────────────────────────────── */
+  /* A bordered box with its own heading, so the list is obviously a list
+     even on a day when nothing is in it. */
+  .list-box { background:#fff; border:1.5px solid #ddd6fe; border-radius:16px; overflow:hidden;
+              box-shadow:0 5px 20px rgba(124,58,237,.07); }
+  .list-head { display:flex; align-items:center; gap:11px; padding:15px 18px;
+               border-bottom:1.5px solid #ede9fe; background:#faf5ff; }
+  .list-title { font-size:15px; font-weight:900; color:#4c1d95; letter-spacing:.01em; }
+  /* Five columns, the same grid for the header strip and every row. */
+  /* Five columns now. Status went with the tabs — a row in the Solved tab
+     saying "Solved" was answering a question the tab had already answered —
+     and the width it held went to the four that were tightest. */
+  .th, .tr { display:grid; grid-template-columns:108px 104px 214px 1fr 150px; gap:17px; }
+  /* align-items:center, or the two headings carrying a funnel sit a few
+     pixels below the four that do not. */
+  .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe;
+        align-items:center; }
+  .th span { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#6d28d9; }
+  .tr { padding:14px 18px; border-bottom:1px dashed #ede9fe; align-items:start; }
+  .tr:last-child { border-bottom:none; }
+  .tr:hover { background:#fdfcff; }
+  .tr.is-overdue { background:#fffbfb; }
+
+  .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
+
+  /* Created date, leftmost. */
+  /* One line — "12 Aug 2026". The year sat on a second row only because the
+     column was 74px wide; it is not, any more. */
+  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15;
+            white-space:nowrap; }
+  .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
+
+  /* ── Content is black ──
+     The case number, the PIC block and the case details all read as
+     content, and colour was doing no work on any of them — a violet
+     case number is not a different kind of case, and a grey "created
+     by" is not less true than the name beside it. Size and weight
+     carry the hierarchy instead. Status keeps its colour, because
+     there the colour IS the information. */
+  /* System and person on one line — "Auditor · Auditor Two" — each keeping
+     its own weight so the queue still leads. Two rows for two words was the
+     158px column talking. */
+  .pic-top { display:flex; align-items:baseline; flex-wrap:wrap; gap:5px; line-height:1.25; }
+  .pic-dot { color:#aab3c0; font-weight:800; }
+  .sys-line { font-size:13px; font-weight:900; color:#0f172a; line-height:1.25; }
+  .pic-line { font-size:11.5px; font-weight:700; color:#0f172a; }
+  .pic-none { font-style:italic; color:#0f172a; }
+  /* Who it is with now is the working information; who raised it is
+     background. Same size, lighter ink, so the eye reads the queue and the
+     PIC first and finds this only when it goes looking. */
+  .by-line { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:2px; }
+  .by-line b { font-weight:800; color:#8792a3; }
+  /* Only for the stacked phone layout — on a wide screen the column
+     heading already says what this is. */
+  .cell-cap { display:none; font-size:9px; font-weight:900; letter-spacing:.11em;
+              text-transform:uppercase; color:#c4b5fd; }
+
+  .td-case { display:flex; gap:11px; min-width:0; }
+  .thumb { width:58px; height:58px; border-radius:9px; object-fit:cover; flex-shrink:0;
+           border:1.5px solid #ede9fe; background:#f8fafc; }
+  .case-no { font-size:12px; font-weight:900; letter-spacing:.04em; color:#0f172a;
+             font-variant-numeric:tabular-nums; }
+  .case-title { font-size:14px; font-weight:800; color:#0f172a; line-height:1.35; }
+
+  /* The detail lines, one per row: a label on the left and its value on the
+     right, so figures line up down the column instead of running together
+     in a paragraph. */
+  /* Capped: the column got wider when Status left, and a dotted rule
+     running 800px to meet a four-character value reads as an empty table. */
+  .d-rows { margin-top:7px; display:flex; flex-direction:column; gap:2px; max-width:560px; }
+  .d-row { display:grid; grid-template-columns:112px 1fr; gap:8px; align-items:baseline;
+           padding:2px 0; border-bottom:1px dotted #f1eafe; }
+  .d-row:last-child { border-bottom:none; }
+  .d-row.d-free { grid-template-columns:1fr; }
+  .d-lab { font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+           color:#8a93a3; overflow-wrap:anywhere; }
+  /* One grey for everything under the title, whichever module wrote it.
+     The figures a raising module fills in were arriving black while the
+     prose beside them was grey, so two cases from two modules read as two
+     different kinds of thing. The title is the black line; this is all
+     supporting detail. */
+  .d-val { font-size:12px; font-weight:700; color:#8a93a3; overflow-wrap:anywhere; }
+  .d-row.d-free .d-val { font-weight:600; }
+  /* Prose, not a figure: the heading sits on its own line and the sentence
+     gets the whole width, instead of wrapping four words at a time beside a
+     112px label. */
+  .d-row.d-remark { grid-template-columns:1fr; gap:1px; }
+  /* Prose in the same grey as its heading: it is context, and at full black
+     it pulled the eye away from the figures above it. */
+  .d-row.d-remark .d-val { font-weight:600; line-height:1.45; }
+  .d-more { font-size:10.5px; font-weight:800; font-style:italic; color:#c4b5fd; }
+  .due-line { font-size:10.5px; font-weight:800; color:#94a3b8; margin-top:6px; }
+  @media (max-width:520px) { .d-row { grid-template-columns:1fr; gap:0; } }
+
+  .pill { font-size:9px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
+  .pi-urgent { background:#fee2e2; color:#b91c1c; } .pi-high { background:#ffedd5; color:#c2410c; }
+  .pi-normal { background:#e0f2fe; color:#0369a1; } .pi-low  { background:#f1f5f9; color:#64748b; }
+  .src { background:#f5f3ff; color:#6d28d9; }
+  .overdue { font-size:10.5px; font-weight:900; color:#b91c1c; margin-top:6px; }
+
+  /* ── Row actions ────────────────────────────────────────────── */
+  /* Which of these appear is decided by the person's rights, read once from
+     nelos_my_rights() — see migration_nelos_case_tools.sql. */
+  /* Symbols only — four of these on every row, so the words were most of
+     the column. The name is on the hover title instead. */
+  /* nowrap, and a column wide enough to mean it: 4 x 28px + 3 x 6px is
+     130, against a column that was 126. One pixel short of the fourth
+     button put it on its own line on every row in the table. */
+  .td-act { display:flex; flex-wrap:nowrap; gap:6px; align-items:flex-start; }
+  .act { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
+         border-radius:8px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
+         font-size:15px; line-height:1; color:#6d28d9; text-decoration:none; padding:0; }
+  .act:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  /* The other three actions are typographic glyphs; this one is drawn,
+     because no character in the set reads as a magnifying glass — the
+     nearest, ⊚, read as a dot. */
+  .act-view svg, .act-close svg { width:15px; height:15px; fill:none; stroke:currentColor;
+                  stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .act-close { color:#065f46; border-color:#a7f3d0; }
+  .act-close:hover { background:#ecfdf5; border-color:#6ee7b7; }
+  .act-solve  { color:#15803d; border-color:#bbf7d0; } .act-solve:hover  { background:#f0fdf4; border-color:#86efac; }
+  .act-del    { color:#b91c1c; border-color:#fecaca; } .act-del:hover    { background:#fef2f2; border-color:#fca5a5; }
+  .act:disabled { opacity:.5; cursor:wait; }
+
+  .empty { text-align:center; padding:52px 16px; color:#a5b4c4; font-weight:700; font-size:13px; }
+
+  /* ── Pager ──────────────────────────────────────────────────── */
+  /* Ten to a page. A long list is not more readable for being longer, and
+     the filters above are how you find one case — this is how you walk the
+     rest. */
+  .pager { display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+           padding:13px 18px; border-top:1.5px solid #ede9fe; background:#fdfcff; }
+  .pager:empty { display:none; }
+  .pg { min-width:32px; height:32px; padding:0 9px; border-radius:9px; cursor:pointer;
+        border:1.5px solid #e5e7eb; background:#fff; color:#374151;
+        font-size:12px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .pg:hover:not(:disabled) { background:#f3f4f6; border-color:#9ca3af; }
+  .pg.on { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+  .pg:disabled { opacity:.35; cursor:not-allowed; }
+  .pg-gap { color:#9ca3af; font-weight:900; padding:0 2px; }
+  .pg-of { margin-left:auto; display:flex; align-items:center; gap:7px;
+           font-size:11px; font-weight:700; color:#6b7280; }
+  .pg-jump { width:56px; height:32px; border-radius:9px; border:1.5px solid #e5e7eb;
+             background:#fff; color:#111827; font-size:12px; font-weight:800;
+             text-align:center; outline:none; }
+  .pg-jump:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+
+  /* ── The two doors under the list ───────────────────────────── */
+  .doors { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .door { display:flex; flex-direction:column; justify-content:center; gap:3px;
+          min-width:210px; padding:16px 20px; border-radius:16px;
+          border:1.5px solid #ddd6fe; background:#fff; color:#4c1d95;
+          text-decoration:none; box-shadow:0 4px 16px rgba(124,58,237,.06); }
+  .door:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  .door-ico { font-size:24px; line-height:1; color:#7c3aed; }
+  .door-name { font-size:14px; font-weight:900; letter-spacing:.02em; }
+  .door-note { font-size:11px; font-weight:600; color:#94a3b8; }
+
+  /* ── Page tabs, under the list ──────────────────────────────── */
+  .tabs { display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; }
+  .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
+         font-size:10.5px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+         text-decoration:none; cursor:pointer; }
+  .tab:hover { background:#f5f3ff; }
+  .tab.on { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+
+  /* ── Status tabs ─────────────────────────────────────────────
+     Pending / Solved / Closed. Three tabs rather than a status dropdown:
+     they are the three states of a case anybody actually asks about, and a
+     tab shows which one you are in without being opened. */
+  /* Drawn as tabs, not as three words with a line under one of them: each
+     has its own edge, and the open one loses its bottom edge so it reads as
+     the front of the panel below rather than a button above it. */
+  .stabs { display:flex; gap:5px; padding:11px 14px 0; flex-wrap:wrap;
+           background:#faf5ff; border-bottom:1.5px solid #ede9fe; }
+  /* One third each, so the three read as one bar rather than three labels
+     of whatever length their words happened to be. */
+  .stab { flex:1 1 0; min-width:0; justify-content:center;
+          position:relative; margin-bottom:-1.5px; padding:9px 16px 10px; cursor:pointer;
+          border:1.5px solid #e4dbfa; border-radius:11px 11px 0 0; background:#f2ecfd;
+          font-family:inherit; font-size:11px; font-weight:900; letter-spacing:.06em;
+          text-transform:uppercase; color:#8b83a6; display:inline-flex; align-items:center; gap:7px; }
+  .stab:hover { background:#e9e0fb; color:#6d28d9; }
+  /* Same fill as the heading strip below, so the two share one surface. */
+  .stab.on { background:#fdfcff; border-color:#ede9fe; border-bottom-color:#fdfcff;
+             color:#4c1d95; }
+  .stab-short { display:none; }
+  .stab-n { font-size:9.5px; font-weight:900; letter-spacing:.03em; padding:2px 7px;
+            border-radius:999px; background:#e4dbfa; color:#7c6aa8; }
+  .stab.on .stab-n { background:#ede9fe; color:#6d28d9; }
+
+  /* Only when something is narrowing the list, because it is the only place
+     left that says how many rows there are — the tab counts deliberately
+     ignore the column ticks. */
+  .narrowed { display:flex; align-items:center; gap:10px; padding:9px 18px;
+              background:#fdfcff; border-bottom:1.5px solid #f4f0ff;
+              font-size:11px; font-weight:800; color:#7c6aa8; }
+  .narrowed button { margin-left:auto; border:1.5px solid #ddd6fe; background:#fff; cursor:pointer;
+                     font-family:inherit; font-size:9.5px; font-weight:900; letter-spacing:.07em;
+                     text-transform:uppercase; color:#7c3aed; padding:5px 11px; border-radius:999px; }
+  .narrowed button:hover { background:#f5f3ff; }
+
+  /* ── Search, in the list's own head ──────────────────────────
+     The one filter that cannot live in a column, because it looks across
+     all of them. Everything else moved into the headings. */
+  .srch { position:relative; flex:0 1 330px; min-width:110px; margin-left:auto; }
+  .srch input { width:100%; box-sizing:border-box; font-family:inherit; font-size:12px;
+                font-weight:700; color:#1e293b; background:#fff; border:1.5px solid #e9d5ff;
+                border-radius:999px; padding:8px 28px 8px 31px; outline:none; }
+  .srch input::placeholder { color:#a5aec0; font-weight:600; }
+  .srch input:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  .srch-i { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px;
+            fill:none; stroke:#a78bfa; stroke-width:2; stroke-linecap:round; pointer-events:none; }
+  .srch-x { position:absolute; right:7px; top:50%; transform:translateY(-50%); border:none;
+            background:none; cursor:pointer; color:#a3adbb; font-size:16px; line-height:1;
+            padding:1px 4px; border-radius:6px; }
+  .srch-x:hover { color:#475569; background:#f1f5f9; }
+
+  /* ── Filters, in the column headings ─────────────────────────
+     A funnel beside the heading of the column it narrows, so the filter is
+     where the thing being filtered already is. */
+  .th-f { display:inline-flex; align-items:center; gap:5px; }
+  .th-fb { border:none; background:none; cursor:pointer; padding:2px; line-height:0; color:#a78bfa;
+           border-radius:6px; display:inline-flex; align-items:center; gap:3px; }
+  .th-fb:hover { color:#7c3aed; background:#f5f3ff; }
+  .th-fb svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2;
+               stroke-linecap:round; stroke-linejoin:round; }
+  .th-fb.on { color:#7c3aed; background:#ede9fe; }
+  .th-fn { font-size:9px; font-weight:900; letter-spacing:0; line-height:1; padding-right:2px; }
+
+  .fmenu { position:absolute; z-index:70; min-width:214px; max-width:290px; max-height:66vh;
+           overflow-y:auto; background:#fff; border:1.5px solid #ede9fe; border-radius:14px;
+           box-shadow:0 14px 40px rgba(76,29,149,.18); padding:8px; }
+  .fm-sec + .fm-sec { margin-top:7px; border-top:1px solid #f4f0ff; padding-top:7px; }
+  .fm-h { display:flex; align-items:center; gap:8px; padding:4px 8px 3px; }
+  .fm-t { font-size:9.5px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:#a78bfa; }
+  .fm-a { margin-left:auto; display:flex; gap:2px; }
+  .fm-a button { border:none; background:none; cursor:pointer; font-family:inherit; font-size:9.5px;
+                 font-weight:900; letter-spacing:.04em; text-transform:uppercase; color:#7c3aed;
+                 padding:3px 6px; border-radius:7px; }
+  .fm-a button:hover { background:#f5f3ff; }
+  .fm-o { display:flex; align-items:center; gap:9px; width:100%; border:none; background:none;
+          cursor:pointer; font-family:inherit; text-align:left; padding:7px 8px; border-radius:9px; }
+  .fm-o:hover { background:#faf8ff; }
+  .fm-o input { width:15px; height:15px; accent-color:#7c3aed; flex-shrink:0; pointer-events:none; }
+  .fm-o-l { font-size:12px; font-weight:700; color:#1e293b; min-width:0;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fm-o-n { margin-left:auto; font-size:10px; font-weight:800; color:#a3adbb;
+            font-variant-numeric:tabular-nums; }
+  .fm-none { padding:11px 10px; font-size:11px; font-weight:700; color:#a3adbb; text-align:center; }
+
+  /* On a narrow screen the head's three parts stop fitting on one line, so
+     the search takes a line of its own under the title and the count. */
+  @media (max-width:640px) {
+    .list-head { flex-wrap:wrap; gap:9px; }
+    .srch { order:3; flex:1 0 100%; max-width:none; }
+  }
+  /* All three tabs on one line at 390px, which is the phone this is read on. */
+  @media (max-width:520px) {
+    .stabs { padding:8px 6px 0; gap:3px; }
+    .stab { padding:8px 9px 9px; font-size:10px; gap:5px; letter-spacing:.03em; }
+    .stab-long { display:none; }
+    .stab-short { display:inline; }
+    .stab-n { padding:2px 6px; }
+  }
+
+  /* Stacked on a phone: the column headings mean nothing once the columns
+     are gone — but their filters still do, so the strip stays behind as a
+     row of chips instead of disappearing with them. */
+  @media (max-width:820px) {
+    .th { display:flex; flex-wrap:wrap; gap:8px; padding:11px 16px; }
+    .th > span:not(.th-f) { display:none; }
+    .th-f { border:1.5px solid #ede9fe; border-radius:999px; background:#fff;
+            padding:5px 6px 5px 11px; }
+    .tr { grid-template-columns:1fr; gap:9px; padding:15px 16px; }
+    .cell-cap { display:block; }
+  }
+
+  /* ── New-case drawer ────────────────────────────────────────── */
+  /* ── Solve sheet ── */
+  .s-case { border:1.5px solid #ede9fe; background:#faf8ff; border-radius:13px;
+            padding:12px 13px; }
+  /* No case number in here — the sheet's own heading is "Solve NLS-0042",
+     and printing it again two lines below was the same string twice. */
+  .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; }
+  .s-case-who { font-size:11.5px; font-weight:700; color:#475569; margin-top:3px; }
+  .s-case-by { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:1px; }
+  .s-case-by b { font-weight:800; color:#8792a3; }
+  .s-case-g { margin-top:9px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
+              font-size:11.5px; }
+  .s-case-k { color:#8a93a3; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+  .s-case-v { color:#0f172a; font-weight:700; overflow-wrap:anywhere; }
+  /* A file input renders as the browser's own grey "Choose file" control,
+     which on a phone says nothing about the camera it actually opens. The
+     real input is hidden and this label drives it. */
+  .s-shot { display:flex; align-items:center; justify-content:center; gap:9px; width:100%;
+            padding:13px 12px; border-radius:11px; cursor:pointer; box-sizing:border-box;
+            border:1.5px dashed #c4b5fd; background:#fbfaff; color:#5b21b6;
+            font-size:12.5px; font-weight:800; }
+  .s-shot:hover { background:#f5f3ff; border-color:#a78bfa; }
+  .s-shot svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:currentColor;
+                stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .s-shot-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
+            display:block; border:1.5px solid #ede9fe; }
+  .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
+           padding:9px 11px; font-size:12px; font-weight:700; }
+
+  /* ── Modals ─────────────────────────────────────────────────── */
+  /* The Admin Portal's dialog, in Nelos violet: a centred card with a
+     gradient head, labelled fields, and a footer that separates leaving
+     from doing. The same shape on a phone and on a desktop — it used to
+     slide up from the bottom on a phone and sit in the middle otherwise,
+     which is two dialogs to think about for no gain. */
+  @keyframes popIn { from { opacity:0; transform:scale(.95) translateY(12px); }
+                     to   { opacity:1; transform:scale(1) translateY(0); } }
+  .scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
+           display:flex; align-items:center; justify-content:center; padding:16px; }
+  .sheet { background:#fff; border-radius:24px; width:100%; max-width:560px; max-height:93vh;
+           overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,.35);
+           animation:popIn .25s ease both; }
+
+  .m-head { background:linear-gradient(135deg,#4c1d95,#6d28d9); padding:22px 24px;
+            border-radius:24px 24px 0 0; display:flex; align-items:flex-start;
+            justify-content:space-between; gap:16px; }
+  .m-title { font-size:15px; font-weight:900; color:#ddd6fe;
+             text-transform:uppercase; letter-spacing:.13em; line-height:1.35; }
+  .m-sub { display:block; margin-top:5px; font-size:11px; font-weight:600;
+           letter-spacing:.02em; text-transform:none; color:rgba(255,255,255,.62); }
+  .m-x { width:36px; height:36px; border-radius:12px; background:rgba(255,255,255,.12); color:#fff;
+         border:none; cursor:pointer; font-size:19px; font-weight:900; line-height:1; flex-shrink:0;
+         display:flex; align-items:center; justify-content:center; }
+  .m-x:hover { background:rgba(255,255,255,.24); }
+
+  .m-body { padding:20px; display:flex; flex-direction:column; gap:17px; }
+  @media (min-width:640px) { .m-body { padding:24px; } }
+  /* A section is only a grouping — the spacing between them is the body's
+     gap. It carries a class so a step can be hidden by the field inside it
+     (.closest('.m-sec')) without every step needing its own id. */
+  .m-sec { min-width:0; }
+  .m-sec-h { font-size:11px; font-weight:900; color:#7c3aed; text-transform:uppercase;
+             letter-spacing:.13em; margin-bottom:9px; }
+  .m-row  { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .m-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media (max-width:520px) { .m-row, .m-row3 { grid-template-columns:1fr; } }
+  .m-note { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:7px; line-height:1.5; }
+  .m-note.warn { color:#b45309; font-weight:800; }
+
+  .m-foot { padding:18px 20px 22px; display:flex; gap:12px; justify-content:flex-end;
+            flex-wrap:wrap; border-top:1px solid #f1f5f9; }
+  @media (min-width:640px) { .m-foot { padding:20px 24px 24px; } }
+  .m-cancel { padding:12px 26px; border-radius:999px; border:1px solid #e2e8f0; background:#f8fafc;
+              color:#64748b; font-size:10px; font-weight:900; letter-spacing:.13em;
+              text-transform:uppercase; cursor:pointer; }
+  .m-cancel:hover { color:#1e293b; background:#f1f5f9; }
+  .m-go { padding:12px 32px; border-radius:14px; border:none; background:#7c3aed; color:#fff;
+          font-size:11px; font-weight:900; letter-spacing:.13em; text-transform:uppercase;
+          cursor:pointer; }
+  .m-go:hover:not(:disabled) { background:#6d28d9; }
+  .m-go:disabled { opacity:.4; cursor:not-allowed; }
+  .m-go-x { background:#065f46; } .m-go-x:hover:not(:disabled) { background:#047857; }
+  .lbl { font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin-bottom:5px; }
+  .inp { width:100%; font-size:14px; font-weight:600; color:#1e293b; background:#fff;
+         border:2px solid #e2e8f0; border-radius:14px; padding:10px 14px; outline:none;
+         box-sizing:border-box; transition:all .2s; font-family:'Outfit', sans-serif; }
+  .inp:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.10); }
+  .inp::placeholder { color:#94a3b8; }
+  textarea.inp { min-height:88px; resize:vertical; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+
+<!-- Standardised MJM Nursery AI ribbon — see shared/shared_ribbon.js -->
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+
+<div id="loading" class="max-w-[1426px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[1426px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <!-- New Case is the one thing done from here often, so it leads on the
+       right where the eye ends up, with the setting cog beside it. -->
+  <div class="toolbar">
+    <button class="tool-btn tool-btn-primary" id="new-case-btn" style="margin-left:auto">
+      <span class="plus">+</span> New Case</button>
+  </div>
+
+  <!-- One list, in three tabs. Search looks across every column so it sits
+       in the head; everything else narrows one column, so it lives in that
+       column's heading. -->
+  <div class="list-box">
+    <div class="list-head">
+      <span class="list-title">Nursery Cases</span>
+      <!-- Where the case count used to sit. The tabs carry the counts now,
+           so this corner was saying twice what they say once. -->
+      <div class="srch">
+        <svg class="srch-i" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>
+        <input id="f-q" placeholder="Search title, batch, plot…" aria-label="Search cases">
+        <button id="f-q-x" class="srch-x hidden" aria-label="Clear search">&times;</button>
+      </div>
+    </div>
+
+    <div class="stabs" id="stabs" role="tablist">
+      <!-- Equal thirds are narrow on a phone, and "Pending to solve" is the
+           only label that does not fit one. The tab it names is the one you
+           are looking at, so the two words it drops are the two you already
+           know. -->
+      <!-- No count on this one. It is the tab everybody is already looking
+           at, and the list underneath IS the number — said twice, and one of
+           them in a badge that redraws on every keystroke of the search.
+           Solved and Closed keep theirs: those are tabs you are deciding
+           whether to open, and there the figure is the whole answer. The
+           count writer skips a tab with no badge, so nothing else changes. -->
+      <button class="stab on" data-tab="pending"  role="tab"><span
+        class="stab-long">Pending to solve</span><span class="stab-short">Pending</span></button>
+      <button class="stab"    data-tab="resolved" role="tab">Solved
+        <span class="stab-n" data-n="resolved">0</span></button>
+      <button class="stab"    data-tab="closed"   role="tab">Closed
+        <span class="stab-n" data-n="closed">0</span></button>
+    </div>
+
+    <div class="narrowed hidden" id="narrowed">
+      <span id="narrowed-t"></span>
+      <button type="button" id="narrowed-x">Clear filters</button>
+    </div>
+
+    <div class="th">
+      <span>Created</span>
+      <span>Case No</span>
+      <span class="th-f" data-col="pic">PIC<button class="th-fb" type="button"
+        title="Filter PIC" aria-label="Filter PIC"><svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3.5 5h17l-6.6 7.8v5.6l-3.8 2.1v-7.7z"/></svg></button></span>
+      <span class="th-f" data-col="details">Case Details<button class="th-fb" type="button"
+        title="Filter case details" aria-label="Filter case details"><svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3.5 5h17l-6.6 7.8v5.6l-3.8 2.1v-7.7z"/></svg></button></span>
+      <span>Actions</span>
+    </div>
+    <div id="list"></div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <!-- The two other places to go, under the list rather than above it: the
+       list is what the page is for, and these are what you do afterwards. -->
+  <div class="doors" id="doors">
+    <a class="door hidden" id="user-setting-btn" href="nelos_user_setting.html">
+      <span class="door-ico">&#x2699;</span>
+      <span class="door-name">User Setting</span>
+      <span class="door-note">Handlers, access and routing</span>
+    </a>
+    <a class="door hidden" id="automation-btn" href="nelos_automation.html">
+      <span class="door-ico">&#x21BB;</span>
+      <span class="door-name">Automation Cases</span>
+      <span class="door-note">Work that repeats, raised on schedule</span>
+    </a>
+  </div>
+
+</div>
+
+<div id="fmenu" class="fmenu hidden" role="dialog" aria-label="Column filter"></div>
+
+<!-- ── Solve sheet ─────────────────────────────────────────────
+     What the tick opens. The case is restated at the top because
+     solving is a judgement about it, and a prompt() box asking "what
+     was done?" over a list showed none of it. Below, the two things
+     the field can add: a photo of the fix and a line about it. -->
+<div id="solve-scrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="m-head">
+      <!-- The heading and its line of explanation are separate elements
+           because the heading is rewritten per case, and setting
+           textContent on a parent would take the subtitle with it. -->
+      <div class="m-title"><span id="s-heading">Solve Case</span>
+        <span class="m-sub" id="s-sub">Say what was done, and show it</span></div>
+      <button id="solve-close" class="m-x" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="m-body">
+      <div id="s-case" class="s-case"></div>
+
+      <div class="m-sec">
+        <div class="m-sec-h">Attach photo</div>
+        <!-- A bare file input renders as the browser's grey "Choose file",
+             which on a phone says nothing about the camera it opens. The
+             real input is hidden and this label drives it. -->
+        <label class="s-shot" for="s-photo">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.6a1.5 1.5 0 0 0 1.25-.67l.8-1.2A1.5 1.5 0 0 1 10.4 3.5h3.2a1.5 1.5 0 0 1 1.25.67l.8 1.2A1.5 1.5 0 0 0 16.9 6h1.6A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>
+            <circle cx="12" cy="13" r="3.6"/></svg>
+          <span id="s-shot-t">Take a photo or choose from album</span>
+        </label>
+        <input id="s-photo" class="s-shot-file" type="file" accept="image/*">
+        <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
+      </div>
+
+      <div class="m-sec">
+        <div class="m-sec-h">Solve case remark</div>
+        <textarea id="s-remark" class="inp" rows="3"></textarea>
+      </div>
+
+      <div id="s-err" class="s-err hidden"></div>
+    </div>
+
+    <div class="m-foot">
+      <button id="s-cancel" class="m-cancel">Cancel</button>
+      <button id="s-save" class="m-go">Save &amp; Solve</button>
+      <!-- Only for somebody whose ticks include closing. Solving says the
+           work is done; closing accepts it — usually a different person. -->
+      <button id="s-close-case" class="m-go m-go-x hidden">Close Case</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── New case drawer ─────────────────────────────────────────── -->
+<div id="new-scrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="m-head">
+      <div class="m-title"><span id="c-heading">Add New Case</span></div>
+      <button id="new-close" class="m-x" aria-label="Close">&times;</button>
+    </div>
+
+    <!-- Who it goes to, what it is, where it is, a picture, a remark. The
+         system a case was raised FROM is no longer asked for: it is the
+         page it was raised on, and the only thing anybody was ever doing
+         with that answer was working out who to send it to — which is now
+         the first thing the form asks outright. -->
+    <div class="m-body">
+
+      <div class="m-sec" id="step-who">
+        <div class="m-sec-h">Assigned to</div>
+        <div class="m-row">
+          <div><label class="lbl" for="c-dest">System</label>
+            <select id="c-dest" class="inp"></select></div>
+          <div><label class="lbl" for="c-pic">Person in charge</label>
+            <select id="c-pic" class="inp"></select></div>
+        </div>
+      </div>
+
+      <div class="m-sec" id="step-problem">
+        <div class="m-sec-h">Case category</div>
+        <!-- Nelos's own categories, set on User Setting &rarr; Case Routing.
+             "Other" is always last, for something not listed yet. -->
+        <select id="c-problem" class="inp"></select>
+        <input id="c-problem-other" class="inp hidden" maxlength="120"
+               placeholder="Name the case in a few words" style="margin-top:8px;">
+      </div>
+
+      <div class="m-sec" id="step-where">
+        <div class="m-sec-h">Nursery</div>
+        <div class="m-row">
+          <div><label class="lbl" for="c-nursery">Nursery *</label>
+            <select id="c-nursery" class="inp"></select></div>
+          <div><label class="lbl" for="c-plot">Plot</label>
+            <select id="c-plot" class="inp"><option value="">— any —</option></select></div>
+        </div>
+      </div>
+
+      <div class="m-sec" id="step-photo">
+        <div class="m-sec-h">Attach photo</div>
+        <!-- One button, and deliberately no capture attribute: capture
+             pins the box to the camera, and without it a phone offers the
+             camera AND the album in the same sheet — which is the whole
+             choice, in one tap. -->
+        <label class="s-shot" for="c-photo">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.6a1.5 1.5 0 0 0 1.25-.67l.8-1.2A1.5 1.5 0 0 1 10.4 3.5h3.2a1.5 1.5 0 0 1 1.25.67l.8 1.2A1.5 1.5 0 0 0 16.9 6h1.6A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>
+            <circle cx="12" cy="13" r="3.6"/></svg>
+          <span id="c-shot-t">Take a photo or choose from album</span>
+        </label>
+        <input id="c-photo" class="s-shot-file" type="file" accept="image/*">
+        <div id="c-photo-now" class="hidden" style="margin-top:12px;display:flex;align-items:center;gap:11px;">
+          <img id="c-photo-thumb" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:12px;border:1.5px solid #ede9fe;">
+          <span id="c-photo-name" style="font-size:11.5px;font-weight:700;color:#475569;overflow-wrap:anywhere;flex:1;"></span>
+          <button type="button" id="c-photo-drop"
+                  style="font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#b91c1c;background:none;border:none;cursor:pointer;flex-shrink:0;">
+            Remove</button>
+        </div>
+      </div>
+
+      <div class="m-sec" id="step-desc">
+        <div class="m-sec-h">New case remark</div>
+        <textarea id="c-desc" class="inp"></textarea>
+      </div>
+
+    </div>
+
+    <div class="m-foot">
+      <button id="c-cancel" class="m-cancel">Cancel</button>
+      <button id="c-save" class="m-go">Add New Case</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+let allCases = [];      // everything we are allowed to see, loaded once
+let categories = [];    // nelos_categories — the problems, per system
+let modules = [];       // nelos_modules — the linked systems
+let plots = [];         // shared_plots — { plot_name, nursery_name }
+let handlers = [];      // nelos_handlers — who works in which system
+let routes = [];        // nelos_routes — where a system's cases go
+let me = { id: null, name: null };
+
+/* What this person may press. Read once from nelos_my_rights(). The
+   fallback is what everybody could do before that function existed, so a
+   database that has not run migration_nelos_case_tools.sql still works —
+   with Edit and Delete simply absent, which is what they were. */
+let rights = { is_admin: false, may_solve: true, may_edit: false, may_delete: false,
+               may_create: true, may_close: false };
+
+let editingId = null;   // case being edited, or null when raising a new one
+let photoUrl  = null;   // the photo on the case in the drawer, once uploaded
+
+/* The system a case is raised FROM. The form no longer asks — a case
+   raised here is a Nelos case — but a deep link still says so
+   (…nelos_dashboard.html?source=fc&title=…), which is how the FC Portal's
+   culling calculator files its own cases, and the case list filters on it. */
+let newSource = 'nelos';
+
+/* Facts a case has that the form does not ask for. They come from the
+   problem's house settings, from the case being edited, or from a deep
+   link — never from a field, so Save reads them from here. */
+let quiet = { priority: 'normal', dueDate: null, batch: null };
+
+/* Whether the person picked the destination themselves. Until they do, it
+   follows the routing rule for whatever category is chosen; after, it is
+   their choice and nothing moves it. */
+let destTouched = false;
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const isPending = c => c.status === 'open' || c.status === 'in_progress';
+const isOverdue = c => isPending(c) && c.due_date && c.due_date < todayISO();
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ── Rendering ─────────────────────────────────────────────────── */
+
+function fmtDate(d) {
+  return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
+}
+
+/* Which system has to deal with it — where it was routed to, falling back
+   to where it was raised. */
+const queueOf = c => c.assigned_module || c.source_module;
+
+/* The short name for a system in a narrow column — Auditor, FC, Admin, HQ —
+   rather than "Seedling Stock System", which does not fit, or the raw key
+   ("fc_portal"), which reads like a database.
+
+   It comes from nelos_modules.tier_label (migration_nelos_tier.sql). The
+   fallback below is the same rule the migration seeds with, so the column
+   reads properly on a database that has not run it yet, and matches on the
+   key OR the label because the keys have been renamed once already. */
+const TIER_BY_WORD = [
+  ['audit',  'Auditor'], ['scan',  'FC'],    ['fc',      'FC'],
+  ['mobile', 'Admin'],   ['admin', 'Admin'],
+  ['operation', 'HQ'],   ['stock', 'HQ'],    ['ops',     'HQ'], ['nursery', 'HQ']
+];
+
+function tierOf(key) {
+  if (!key) return '';
+  const m = modules.find(x => x.key === key);
+  if (m && m.tier_label) return m.tier_label;
+
+  const hay = ((key || '') + ' ' + ((m && m.label) || '')).toLowerCase();
+  const hit = TIER_BY_WORD.find(([word]) => hay.includes(word));
+  if (hit) return hit[1];
+  // Nothing matched: the label's first word beats printing a key.
+  return (m && m.label) ? m.label.split(' ')[0] : key;
+}
+
+/* Somebody's name with the tier they work at after it — "Coco (HQ)". The
+   tier comes from their handler row; without one there is nothing to add,
+   so the name stands alone. */
+function withTier(name, userId) {
+  if (!name) return '';
+  const h = userId && handlers.find(x => x.user_id === userId);
+  const tier = h && tierOf(h.primary_module);
+  return tier ? `${name} (${tier})` : name;
+}
+
+
+/* The lines under a case's title, one per row. The three place columns come
+   first, then whatever the description holds.
+
+   A raising module writes its own figures as "Label: value", one per line —
+   Plot balance, Pokok inang, Estimate culling rate and so on — and each of
+   those becomes its own row here. A line without a label is shown as it was
+   written. Long descriptions are trimmed, since the case page shows the
+   whole thing. */
+const DETAIL_CAP = 8;
+
+/* Labels the row already carries elsewhere. Who raised it is in the PIC
+   column, so a description repeating it would print it twice. */
+const DETAIL_SKIP = ['raised by', 'created by', 'reported by', 'raised from', 'nursery', 'plot', 'batch'];
+
+/* A count that shows its working — "88 (30+28+30)" — is the total plus the
+   arithmetic that got there. The list wants the total. Only a parenthetical
+   that is purely a sum is dropped; anything with words in it is kept,
+   because that is a note, not working. */
+function trimSum(v) {
+  return String(v).replace(/\s*\((?:\s*[\d.,]+\s*[+＋]\s*)+[\d.,]+\s*\)\s*$/, '').trim() || String(v);
+}
+
+/* Nursery and plot as one line — "BNN (B1)". They are one answer to one
+   question ("where?"), and two rows spent a third of the case block
+   restating a heading. Batch keeps its own row: it is not always set, and
+   when it is, it is a different level of detail. */
+function whereOf(c) {
+  if (c.nursery_name && c.plot_name) return ['Nursery', `${c.nursery_name} (${c.plot_name})`];
+  if (c.nursery_name)                return ['Nursery', c.nursery_name];
+  if (c.plot_name)                   return ['Plot',    c.plot_name];
+  return null;
+}
+
+function detailRows(c) {
+  const rows = [];
+  const seen = new Set();
+  const free = [];                                   // unlabelled lines
+  const add = (lab, val) => {
+    const key = lab ? lab.toLowerCase().trim() : null;
+    // First one wins, so a description that names the plot itself is not
+    // printed again under the column's own value.
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    rows.push([lab, val]);
+  };
+
+  const where = whereOf(c);
+  if (where) { add(where[0], where[1]); seen.add('plot'); }
+  if (c.batch_name) add('Batch', c.batch_name);
+
+  String(c.description || '').split(/\r?\n/).forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    // A short leading label, then a colon — ASCII or the full-width one that
+    // a phone keyboard set to Chinese produces.
+    const m = t.match(/^([^:：]{1,40}?)\s*[:：]\s*(.+)$/);
+    if (!m) { free.push(t); return; }
+    const lab = m[1].trim();
+    if (DETAIL_SKIP.includes(lab.toLowerCase())) {
+      // Still claim the label, so a later duplicate is dropped too.
+      seen.add(lab.toLowerCase());
+      return;
+    }
+    add(lab, trimSum(m[2]));
+  });
+
+  /* Whatever was written in prose, under one Remark heading at the end,
+     rather than loose lines that read like unlabelled figures. */
+  if (free.length) add('Remark', free.join(' '));
+  return rows;
+}
+
+function rowHtml(c) {
+  const pending = isPending(c);
+  const due = c.due_date
+    ? (isOverdue(c) ? `<div class="overdue">Overdue — was due ${esc(fmtDate(c.due_date))}</div>`
+                    : `<div class="due-line">Due ${esc(fmtDate(c.due_date))}</div>`)
+    : '';
+
+  const queueIn = tierOf(queueOf(c));
+
+  const when = new Date(c.created_at);
+  const rows = detailRows(c);
+  const shown = rows.slice(0, DETAIL_CAP);
+
+  return `
+    <div class="tr ${isOverdue(c) ? 'is-overdue' : ''}" data-case="${esc(c.id)}">
+
+      <div class="td-stack td-when">
+        <span class="cell-cap">Created</span>
+        <span class="when-d">${esc(when.toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}
+          <span class="when-y">${when.getFullYear()}</span></span>
+      </div>
+
+      <div class="td-stack">
+        <span class="cell-cap">Case No</span>
+        <span class="case-no">${esc(c.case_no || '')}</span>
+      </div>
+
+      <!-- Who it is with now, not where it came from: a case raised in the FC
+           Portal and routed to the auditors is the auditors' work. -->
+      <div class="td-stack">
+        <span class="cell-cap">PIC</span>
+        <span class="pic-top">
+          <span class="sys-line">${esc(queueIn)}</span>
+          <span class="pic-dot">·</span>
+          <span class="pic-line">${c.assignee_name
+            ? esc(c.assignee_name)
+            : '<span class="pic-none">no PIC yet</span>'}</span>
+        </span>
+        <span class="by-line">Created by
+          <b>${c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b></span>
+      </div>
+
+      <div class="td-case">
+        ${c.photo_url ? `<img class="thumb" src="${esc(c.photo_url)}" alt="" loading="lazy">` : ''}
+        <div class="min-w-0 flex-1">
+          <div class="case-title">${esc(c.title)}${c.priority && c.priority !== 'normal'
+            ? ` <span class="pill pi-${esc(c.priority)}">${esc(MJMNelos.PRIORITY_LABEL[c.priority] || c.priority)}</span>`
+            : ''}</div>
+          <!-- No category line: the problem chosen when the case is raised
+               becomes both its title and its category, so printing the
+               category here was printing the title twice. -->
+          <div class="d-rows">
+            ${shown.map(([lab, val]) => lab
+              ? `<div class="d-row${lab === 'Remark' ? ' d-remark' : ''}"><span class="d-lab">${esc(lab)}</span><span class="d-val">${esc(val)}</span></div>`
+              : `<div class="d-row d-free"><span class="d-val">${esc(val)}</span></div>`).join('')}
+            ${rows.length > DETAIL_CAP
+              ? `<div class="d-row d-free"><span class="d-more">+${rows.length - DETAIL_CAP} more — open the case to read it all</span></div>`
+              : ''}
+          </div>
+          ${due}
+        </div>
+      </div>
+
+      <!-- Symbols, not words and not emoji: four of these on every row, and
+           the label is on the hover title where it does not cost a column. -->
+      <div class="td-act">
+        <a class="act act-view" title="View" aria-label="View"
+           href="nelos_case.html?id=${encodeURIComponent(c.id)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>
+        </a>
+        ${rights.may_edit  ? `<button class="act act-edit" title="Edit" aria-label="Edit"
+           data-act="edit" data-id="${esc(c.id)}">&#x270E;</button>` : ''}
+        ${pending && rights.may_solve
+          ? `<button class="act act-solve" title="Solve" aria-label="Solve"
+           data-act="solve" data-id="${esc(c.id)}">&#x2713;</button>`
+          : ''}
+        <!-- A solved case has nothing left to solve, so the tick becomes a
+             double tick — done, and accepted — for whoever may close it.
+             Same sheet either way: it restates the case and offers what is
+             actually available. A closed case shows neither: there is
+             nothing left to do to it. -->
+        ${c.status === 'resolved' && rights.may_close
+          ? `<button class="act act-close" title="Close case" aria-label="Close case"
+           data-act="solve" data-id="${esc(c.id)}">
+             <svg viewBox="0 0 24 24" aria-hidden="true">
+               <path d="M1.8 12.6l4.2 4.2 7.4-8"/><path d="M9.6 16.8l1.4 1.4 8.8-9.6"/></svg>
+           </button>`
+          : ''}
+        ${rights.may_delete ? `<button class="act act-del" title="Delete" aria-label="Delete"
+           data-act="del" data-id="${esc(c.id)}">&#x2715;</button>` : ''}
+      </div>
+
+    </div>`;
+}
+
+
+/* ── Tabs and column filters ─────────────────────────────────────
+
+   Three tabs for the case's own state, because that is the question the
+   list is opened with — what still needs solving, what has been solved,
+   what is finished. Everything else narrows one column, so it hangs off
+   that column's heading instead of a bar of dropdowns above the list. */
+const TABS = {
+  pending:  c => isPending(c),
+  resolved: c => c.status === 'resolved',
+  closed:   c => c.status === 'closed'
+};
+let tab = 'pending';
+
+/* Each group belongs to the column it narrows, and knows how to read its
+   value off a case, how to name that value, and — where the values have a
+   natural order rather than an alphabet — how to rank them. */
+const FGROUPS = [
+  { col:'pic', key:'system', title:'System',
+    of: c => queueOf(c) || '', label: v => tierOf(v) || 'No system' },
+  { col:'pic', key:'assignee', title:'Person',
+    of: c => c.assignee_name || '', label: v => v || 'No PIC yet' },
+
+  /* Priority followed its pill here when the Status column went. */
+  { col:'details', key:'priority', title:'Priority',
+    of: c => c.priority || 'normal',
+    label: v => MJMNelos.PRIORITY_LABEL[v] || v,
+    rank: v => ['urgent', 'high', 'normal', 'low'].indexOf(v) },
+  { col:'details', key:'nursery', title:'Nursery',
+    of: c => c.nursery_name || '', label: v => v || 'No nursery' },
+  { col:'details', key:'due', title:'Due',
+    of: c => isOverdue(c) ? 'late' : 'ok',
+    label: v => v === 'late' ? 'Overdue' : 'Not overdue',
+    rank: v => v === 'late' ? 0 : 1 }
+];
+
+/* An empty set means "not filtering on this", not "nothing passes" — the
+   same thing a dropdown said with its blank first option. */
+const picked = {};
+FGROUPS.forEach(g => picked[g.key] = new Set());
+
+function matchQ(c) {
+  const q = $('f-q').value.trim().toLowerCase();
+  if (!q) return true;
+  return [c.title, c.case_no, c.category, c.batch_name, c.plot_name,
+          c.nursery_name, c.assignee_name, c.description]
+    .filter(Boolean).join(' ').toLowerCase().includes(q);
+}
+
+/* skipKey lets a group ask "what would be left if I were not filtering?",
+   which is what its own option list has to count. */
+function matchPicks(c, skipKey) {
+  return FGROUPS.every(g =>
+    g.key === skipKey || !picked[g.key].size || picked[g.key].has(g.of(c)));
+}
+
+function visibleCases() {
+  return allCases.filter(c => TABS[tab](c) && matchQ(c) && matchPicks(c));
+}
+
+/* The options a column's menu offers, with a count each.
+
+   Which options exist comes from the tab and the search alone, so the list
+   holds still while it is being clicked. Faceting that too — only listing
+   values that survive the ticks so far — made a whole section disappear on
+   the first tick, with no way back to it.
+
+   The count does face the other groups' ticks: it is how many rows this
+   option would leave given everything else already narrowing the list, and
+   a zero is worth seeing before it is clicked. Its own group is excluded,
+   so ticking a second person adds to the list rather than emptying it. */
+function optionsFor(g) {
+  const n = new Map();
+  allCases.forEach(c => {
+    if (!TABS[tab](c) || !matchQ(c)) return;
+    const v = g.of(c);
+    if (!n.has(v)) n.set(v, 0);
+    if (matchPicks(c, g.key)) n.set(v, n.get(v) + 1);
+  });
+  picked[g.key].forEach(v => { if (!n.has(v)) n.set(v, 0); });
+  return [...n.entries()].sort((a, b) => g.rank
+    ? g.rank(a[0]) - g.rank(b[0])
+    : String(g.label(a[0])).localeCompare(String(g.label(b[0])), 'en'));
+}
+
+/* Switching tab drops any tick that names something the new tab has none
+   of — an auditor with pending cases but nothing closed, say. Without this
+   the Closed tab would open empty with no visible reason why. */
+function prunePicks() {
+  FGROUPS.forEach(g => {
+    const live = new Set();
+    allCases.forEach(c => { if (TABS[tab](c)) live.add(g.of(c)); });
+    [...picked[g.key]].forEach(v => { if (!live.has(v)) picked[g.key].delete(v); });
+  });
+}
+
+/* Ten to a page. `page` is 1-based and survives a re-render, but not a
+   change of filter — narrowing the list while standing on page 7 of the old
+   one lands you somewhere arbitrary, so filters reset it (see the wiring). */
+const PER_PAGE = 10;
+let page = 1;
+
+function render() {
+  // Overdue first, then the rest — one list, worst at the top, rather than
+  // an overdue block sitting apart from the queue it belongs to.
+  const rows = visibleCases().sort((a, b) => (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0));
+
+  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+  // Deleting the last case on the last page would otherwise leave you on a
+  // page that no longer exists, looking at nothing.
+  if (page > pages) page = pages;
+  const from = (page - 1) * PER_PAGE;
+  const shown = rows.slice(from, from + PER_PAGE);
+
+  syncTabs();
+  syncFBtns();
+
+  /* The tab counts answer "how much is in each state" and deliberately do
+     not move when a funnel is touched. So when one has been, this says what
+     the list is actually showing, and offers the way back out. */
+  const inTab = allCases.filter(TABS[tab]).length;
+  const narrowed = rows.length !== inTab;
+  $('narrowed').classList.toggle('hidden', !narrowed);
+  if (narrowed) {
+    const overdue = rows.filter(isOverdue).length;
+    $('narrowed-t').textContent =
+      `Showing ${rows.length} of ${inTab}${overdue ? ` · ${overdue} overdue` : ''}`;
+  }
+
+  renderPager(rows.length, pages, from, shown.length);
+
+  $('list').innerHTML = shown.length
+    ? shown.map(rowHtml).join('')
+    : `<div class="empty">No cases match this filter.<br>
+         <span class="text-[11px] font-semibold text-slate-400">
+           ${allCases.length ? 'Try widening it, or clear the search box.' : 'Nothing has been raised yet — press “New Case”.'}
+         </span></div>`;
+
+  $('list').querySelectorAll('[data-act]').forEach(b =>
+    b.addEventListener('click', () => {
+      const c = allCases.find(x => String(x.id) === b.dataset.id);
+      if (!c) return;
+      if (b.dataset.act === 'edit')  return openEdit(c);
+      if (b.dataset.act === 'solve') return openSolve(c);
+      if (b.dataset.act === 'del')   return deleteCase(c, b);
+    }));
+}
+
+/* Which page numbers to draw. All of them while there are few; otherwise
+   the first, the last, and a window around where you are, with … standing
+   in for the rest. Thirty pages of buttons is not navigation. */
+function pageNumbers(pages, at) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const near = [at - 1, at, at + 1].filter(n => n > 1 && n < pages);
+  const out = [1, ...near, pages];
+  const withGaps = [];
+  out.forEach((n, i) => {
+    if (i && n - out[i - 1] > 1) withGaps.push('…');
+    withGaps.push(n);
+  });
+  return withGaps;
+}
+
+function renderPager(total, pages, from, count) {
+  if (total <= PER_PAGE) { $('pager').innerHTML = ''; return; }
+
+  const btn = (label, to, opts) => `
+    <button class="pg ${opts && opts.on ? 'on' : ''}" data-page="${to}"
+            ${opts && opts.off ? 'disabled' : ''}
+            ${opts && opts.title ? `title="${esc(opts.title)}"` : ''}>${label}</button>`;
+
+  $('pager').innerHTML =
+    btn('&lsaquo;', page - 1, { off: page === 1, title: 'Previous page' }) +
+    pageNumbers(pages, page).map(n =>
+      n === '…' ? '<span class="pg-gap">…</span>' : btn(n, n, { on: n === page })).join('') +
+    btn('&rsaquo;', page + 1, { off: page === pages, title: 'Next page' }) +
+    `<span class="pg-of">
+       <span>${from + 1}–${from + count} of ${total}</span>
+       <span>Go to</span>
+       <input class="pg-jump" id="pg-jump" type="number" min="1" max="${pages}"
+              placeholder="${page}" aria-label="Jump to page">
+     </span>`;
+
+  $('pager').querySelectorAll('[data-page]').forEach(b =>
+    b.addEventListener('click', () => goPage(Number(b.dataset.page), pages)));
+
+  // Typing a number and pressing enter, which is the whole point of the box
+  // — a change event alone would jump on every keystroke of "14".
+  const jump = $('pg-jump');
+  jump.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    goPage(Number(jump.value), pages);
+  });
+  jump.addEventListener('blur', () => { if (jump.value) goPage(Number(jump.value), pages); });
+}
+
+function goPage(to, pages) {
+  if (!Number.isFinite(to)) return;
+  const want = Math.min(Math.max(1, Math.round(to)), pages);
+  if (want === page) return;
+  page = want;
+  render();
+  // The list is below the fold on a long page; jumping without this leaves
+  // you looking at the pager of a page you have already left.
+  const box = document.querySelector('.list-box');
+  if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Solve and delete ──────────────────────────────────────────── */
+
+/* Solving is a judgement about a case, so the sheet restates the case
+   before it asks anything. This used to be a prompt() box — one line of
+   text over a list, with nothing of the case in it, and no way to attach
+   the photo that is usually the whole evidence. */
+let solving = null;                                // the case in the sheet
+const SHOT_IDLE = 'Take a photo or choose from album';
+
+function sErr(msg) {
+  const box = $('s-err');
+  box.classList.toggle('hidden', !msg);
+  box.textContent = msg || '';
+}
+
+function openSolve(c) {
+  solving = c;
+  sErr('');
+  /* Heading set below, once the sheet knows whether there is anything
+     left to solve. */
+  $('s-remark').value = '';
+  $('s-photo').value = '';
+  $('s-shot-t').textContent = SHOT_IDLE;
+  $('s-photo-prev').classList.add('hidden');
+  $('s-photo-prev').removeAttribute('src');
+
+  /* What the case is, then who it belongs to, then where and what was
+     written — the order somebody about to solve it reads in. Status,
+     priority and category are not repeated: the sheet only opens on a case
+     you picked, its heading already names it, and the category is the
+     title.
+
+     The rows come from detailRows(), uncapped, so the sheet and the list
+     agree. Reading the description raw here instead would print "Plot
+     balance: 1,240 (30+28+30)" as part of somebody's remark. */
+  const bits = detailRows(c);
+  if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
+
+  $('s-case').innerHTML =
+    `<div class="s-case-t">${esc(c.title || '')}</div>` +
+    `<div class="s-case-who">${esc(tierOf(queueOf(c)))}${
+       c.assignee_name ? ' · ' + esc(c.assignee_name) : ' · no PIC yet'}</div>` +
+    `<div class="s-case-by">Created by <b>${
+       c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b>${
+       c.created_at ? ' · ' + esc(new Date(c.created_at).toLocaleDateString(
+         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>` +
+    `<div class="s-case-g">` +
+      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
+    `</div>`;
+
+  /* Already solved → nothing to save, and the only move left is closing
+     it, for somebody whose ticks allow that. */
+  const done = c.status === 'resolved';
+  $('s-heading').textContent = (done ? 'Close ' : 'Solve ') + (c.case_no || 'Case');
+  $('s-sub').textContent = done ? 'The work is done — accept it and close the case'
+                                : 'Say what was done, and show it';
+  $('s-save').classList.toggle('hidden', done);
+  $('s-remark').closest('.m-sec').classList.toggle('hidden', done);
+  $('s-photo').closest('.m-sec').classList.toggle('hidden', done);
+  $('s-close-case').classList.toggle('hidden', !(rights.may_close && done));
+
+  $('solve-scrim').classList.remove('hidden');
+}
+
+function closeSolve() { $('solve-scrim').classList.add('hidden'); solving = null; }
+
+/* Uploads whatever is in the solve sheet's file box. Separate from
+   uploadPhoto() because that one reads the new-case drawer's box, and
+   both sheets can be filled in the same session. */
+async function uploadSolvePhoto() {
+  const file = $('s-photo').files && $('s-photo').files[0];
+  if (!file) return undefined;
+  if (file.size > 8 * 1024 * 1024) throw new Error('That photo is over 8 MB — take a smaller one.');
+  const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `solve/${new Date().toISOString().slice(0, 10)}/${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await _supabase.storage.from('nelos-photos')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error('Photo upload failed — ' + error.message);
+  return _supabase.storage.from('nelos-photos').getPublicUrl(path).data.publicUrl;
+}
+
+async function saveSolve() {
+  if (!solving) return;
+  const what = $('s-remark').value.trim();
+  if (!what) { sErr('Say what was done, in a line.'); $('s-remark').focus(); return; }
+
+  const btn = $('s-save');
+  btn.disabled = true; sErr('');
+  let url;
+  try { url = await uploadSolvePhoto(); }
+  catch (e) { btn.disabled = false; sErr(e.message); return; }
+
+  const patch = {
+    status: 'resolved',
+    resolution: what,
+    resolved_by: me.name,
+    resolved_at: new Date().toISOString(),
+    updated_by: me.name,
+    updated_at: new Date().toISOString()
+  };
+  if (url) patch.resolution_photo_url = url;
+
+  let { error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id);
+  /* No resolution_photo_url column → this database has not run
+     shared/migration_nelos_solve_photo.sql. The remark and the status
+     matter more than the picture, so save them. */
+  if (error && url && /resolution_photo_url/.test(error.message || '')) {
+    delete patch.resolution_photo_url;
+    ({ error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id));
+    if (!error) toast('Solved — run migration_nelos_solve_photo.sql to keep the photo.', false);
+  }
+  btn.disabled = false;
+  if (error) { sErr('Could not solve it — ' + error.message); return; }
+
+  const no = solving.case_no || 'Case';
+  closeSolve();
+  toast(`${no} solved.`);
+  await loadCases();
+}
+
+async function closeCase() {
+  if (!solving) return;
+  const btn = $('s-close-case');
+  btn.disabled = true; sErr('');
+  const { error } = await _supabase.from('nelos_cases').update({
+    status: 'closed',
+    closed_by: me.name,
+    closed_at: new Date().toISOString(),
+    updated_by: me.name,
+    updated_at: new Date().toISOString()
+  }).eq('id', solving.id);
+  btn.disabled = false;
+  if (error) { sErr('Could not close it — ' + error.message); return; }
+  const no = solving.case_no || 'Case';
+  closeSolve();
+  toast(`${no} closed.`);
+  await loadCases();
+}
+
+/* Deleting is the one action that loses something, so it names the case
+   and says the word rather than asking "are you sure?" about nothing. */
+async function deleteCase(c, btn) {
+  if (!confirm(`Delete ${c.case_no || 'this case'} — “${c.title}” — for good?\n\n` +
+               'This cannot be undone. To retire a case and keep the record, solve it instead.')) return;
+
+  btn.disabled = true;
+  const { error } = await _supabase.from('nelos_cases').delete().eq('id', c.id);
+  if (error) {
+    btn.disabled = false;
+    toast('Could not delete it — ' + error.message, false);
+    return;
+  }
+  toast(`${c.case_no || 'Case'} deleted.`);
+  await loadCases();
+}
+
+/* ── Loading ───────────────────────────────────────────────────── */
+
+/* Edit, Solve and Delete are per-person rights set on the User Setting
+   page. A database without migration_nelos_case_tools.sql has no such
+   function; there the fallback below applies, which is what everybody could
+   do before — solve yes, delete no — plus admin, read from the portal. */
+async function loadRights() {
+  const { data, error } = await _supabase.rpc('nelos_my_rights').then(r => r, e => ({ error: e }));
+  const row = data && data[0];
+  if (error || !row) {
+    const admin = MJMAccess.isAdminOf('nelos');
+    rights = { is_admin: admin, may_solve: true, may_edit: admin, may_delete: admin,
+               may_create: true, may_close: admin };
+    return;
+  }
+  rights = row;
+}
+
+/* What this person may press. The three tabs stay put whatever the ticks
+   say — everybody can look at what is pending, solved and closed; the ticks
+   decide what can be done to a case, not what can be seen. */
+function applyRights() {
+  $('new-case-btn').classList.toggle('hidden', !rights.may_create);
+}
+
+async function loadCases() {
+  const { data, error } = await _supabase.from('nelos_cases').select('*')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  if (error) {
+    $('list').innerHTML = `<div class="empty">Could not load cases — ${esc(error.message)}
+      <br><span class="text-[11px] font-semibold text-slate-400">
+        If Nelos is new, run <strong>shared/migration_nelos.sql</strong> in Supabase first.</span></div>`;
+    return;
+  }
+  // Worst priority first inside each status, since priority is a word in
+  // the database and cannot be ordered there.
+  const sorted = (data || []).sort((a, b) =>
+    (MJMNelos.PRIORITY_RANK[a.priority] ?? 9) - (MJMNelos.PRIORITY_RANK[b.priority] ?? 9));
+  // Narrow to the modules and categories this person is set up for on the
+  // User Setting page. Someone in no block at all still sees everything.
+  allCases = await MJMNelos.applyScope(sorted);
+  render();
+}
+
+async function loadCategories() {
+  const { data } = await _supabase.from('nelos_categories').select('*')
+    .eq('active', true).order('sort_order').then(r => r, () => ({ data: [] }));
+  categories = data || [];
+  fillProblems(newSource);
+}
+
+/* The case categories. A category belongs to one system since
+   migration_nelos_category_system.sql, and the form offers Nelos's own —
+   which is the whole list on an older database that has no such column, as
+   it always was. A deep link raising a case for another system passes that
+   system's key instead, so its own categories are the ones offered.
+   "Other" is always last so something not listed yet can still be raised. */
+function fillProblems(systemKey) {
+  const scoped = categories.some(c => c.module_key)
+    ? categories.filter(c => c.module_key === systemKey)
+    : categories;
+  const keep = $('c-problem').value;
+
+  $('c-problem').innerHTML =
+    '<option value="">— choose a category —</option>' +
+    scoped.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('') +
+    '<option value="__other">Other — not listed</option>';
+
+  if (keep && (keep === '__other' || scoped.some(c => c.name === keep))) $('c-problem').value = keep;
+  syncOther();
+}
+
+/* The free-text box appears only for "Other". */
+function syncOther() {
+  $('c-problem-other').classList.toggle('hidden', $('c-problem').value !== '__other');
+}
+
+/* What was actually chosen — a listed category, or the typed one. */
+function problemName() {
+  return $('c-problem').value === '__other'
+    ? $('c-problem-other').value.trim()
+    : $('c-problem').value;
+}
+
+/* ── Where: nursery → plot ──────────────────────────────────────
+   Both are stored and matched by NAME across this codebase, not by id, so
+   the option values are the names themselves. */
+
+function fillNurseries() {
+  const names = [...new Set(plots.map(p => p.nursery_name).filter(Boolean))].sort();
+  $('c-nursery').innerHTML = '<option value="">— choose a nursery —</option>' +
+    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+
+/* Plot names run B1, B2 … B10, so they sort numerically or B10 lands
+   before B2 — the same comparison every other picker in the portal uses. */
+function fillPlots() {
+  const nursery = $('c-nursery').value;
+  const mine = plots
+    .filter(p => p.plot_name && (!nursery || p.nursery_name === nursery))
+    .map(p => p.plot_name)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  $('c-plot').innerHTML = '<option value="">— any plot —</option>' +
+    [...new Set(mine)].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+
+async function loadPlaces() {
+  const { data } = await _supabase.from('shared_plots').select('plot_name,nursery_name')
+    .then(r => r, () => ({ data: [] }));
+  plots = data || [];
+  fillNurseries();
+  fillPlots();
+}
+
+/* ── Assigned to: the system, and the person in it ──────────────
+   The handler list is readable by anybody holding Nelos (migration_nelos_rls
+   grants SELECT on the config tables), so this works for an ordinary user —
+   nelos_people() would not, being admin-only. */
+
+async function loadHandlers() {
+  const [hRes, rRes] = await Promise.all([
+    _supabase.from('nelos_handlers').select('user_id,full_name,email,primary_module,seat_no')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nelos_routes').select('source_module,category,to_module,to_seat_no')
+      .then(r => r, () => ({ data: [] }))
+  ]);
+  handlers = hRes.data || [];
+  routes = rRes.data || [];
+}
+
+/* Everybody tagged to one system, lowest number first. */
+const handlersIn = key => handlers
+  .filter(h => h.primary_module === key && key)
+  .sort((a, b) => (a.seat_no || 99) - (b.seat_no || 99));
+
+/* Where the routing rules would send this case — the exact-category rule
+   first, then the system's catch-all, then back to the system that raised
+   it, which is where a case with no rule has always stayed.
+
+   Except a Nelos case: Nelos is the case log, not a queue anybody works,
+   so there is nothing to fall back to and the form asks instead. */
+function routedTo(systemKey, problem) {
+  const rule = routes.find(r => r.source_module === systemKey && r.category === problem) ||
+               routes.find(r => r.source_module === systemKey && r.category === null);
+  if (rule) return rule.to_module;
+  return systemKey === 'nelos' ? '' : systemKey;
+}
+
+/* Draws the system list and selects `want`, or the placeholder if that is
+   not one of them. Deciding what `want` should be is refreshDest's job —
+   this one only renders, so a caller that knows the answer (an edit, say)
+   is not second-guessed. */
+function fillDest(want) {
+  const keep = want === undefined ? $('c-dest').value : want;
+  // A case can sit with a system that has since been switched off in
+  // nelos_modules. That is still where it is, so it is offered here rather
+  // than dropped — otherwise saving an edit would quietly re-assign it.
+  const known = modules.some(m => m.key === keep);
+  $('c-dest').innerHTML = '<option value="">— choose a system —</option>' +
+    modules.map(m =>
+      `<option value="${esc(m.key)}">${esc(m.label)}${m.sees_all_cases ? '  (HQ)' : ''}</option>`).join('') +
+    (keep && !known
+      ? `<option value="${esc(keep)}">${esc(MJMNelos.SOURCE_LABEL[keep] || keep)}</option>` : '');
+  $('c-dest').value = keep || '';
+}
+
+/* The people in the destination system. Left on the placeholder, the case
+   still goes to the lowest-numbered handler there — the #1 — which is what
+   a queue's #1 is for; the toast on Save names whoever that turned out to
+   be, so nothing is decided without being said. */
+function fillPics() {
+  const staff = handlersIn($('c-dest').value);
+  const keep = $('c-pic').value;
+
+  $('c-pic').innerHTML = '<option value="">— choose a PIC —</option>' +
+    staff.map(h => `<option value="${esc(h.user_id)}">#${h.seat_no || '—'} ${
+      esc(h.full_name || h.email)}</option>`).join('');
+  if (staff.some(h => h.user_id === keep)) $('c-pic').value = keep;
+}
+
+/* Who the case will actually go to: the person picked, or the #1 of the
+   destination system when the picker is left on Auto. */
+function pickedPic() {
+  const staff = handlersIn($('c-dest').value);
+  if (!staff.length) return null;
+  return staff.find(h => h.user_id === $('c-pic').value) || staff[0];
+}
+
+/* The linked systems. Everything active can be assigned to — a system with
+   can_create off may not RAISE a case, which is a different question from
+   whether work can be sent to it. */
+async function loadModules() {
+  const { data } = await _supabase.from('nelos_modules').select('*')
+    .eq('active', true).order('sort_order')
+    .then(r => r, () => ({ data: [] }));
+  modules = data || [];
+}
+
+/* ── New case ──────────────────────────────────────────────────── */
+
+function clearDrawer() {
+  ['c-desc', 'c-problem-other', 'c-nursery', 'c-plot'].forEach(id => $(id).value = '');
+  $('c-problem').value = '';
+  $('c-pic').value = '';
+  $('c-photo').value = '';
+  newSource = 'nelos';
+  quiet = { priority: 'normal', dueDate: null, batch: null };
+  destTouched = false;
+  setPhoto(null);
+  syncOther();
+}
+
+/* Shows (or clears) the photo currently attached to whatever is in the
+   drawer. photoUrl is what Save will write; name is only what to call it
+   on screen, and an already-saved photo has no name to show. */
+function setPhoto(url, name) {
+  photoUrl = url || null;
+  $('c-photo-now').classList.toggle('hidden', !photoUrl);
+  $('c-shot-t').textContent = photoUrl ? 'Photo attached — tap to change' : SHOT_IDLE;
+  if (photoUrl) {
+    $('c-photo-thumb').src = photoUrl;
+    $('c-photo-name').textContent = name || 'Photo attached';
+  }
+}
+
+/* The house settings a category carries, now that neither is a field.
+   Not applied while editing: changing an open case's category should not
+   quietly move its priority or its due date under the person working it. */
+function applyCategoryDefaults() {
+  if (editingId) return;
+  const cat = categories.find(c => c.name === $('c-problem').value);
+  quiet.priority = (cat && cat.default_priority) || 'normal';
+  quiet.dueDate = null;
+  if (cat && cat.default_days != null) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(cat.default_days));
+    quiet.dueDate = d.toISOString().slice(0, 10);
+  }
+}
+
+/* Re-draws the destination and its people. A category's routing rule seeds
+   "Assigned to" — but only once there is a category, so the drawer opens on
+   "— choose a system —" rather than on whatever a catch-all rule would have
+   said about a case nobody has described yet. Once somebody picks a system
+   themselves it is their answer, and the rule stops overriding it. */
+function refreshDest() {
+  fillDest(destTouched ? $('c-dest').value
+                       : (problemName() ? routedTo(newSource, problemName()) : ''));
+  fillPics();
+}
+
+async function openNew(prefill) {
+  editingId = null;
+  clearDrawer();
+  $('c-heading').textContent = 'Add New Case';
+  $('c-save').textContent = 'Add New Case';
+  // Shown before anything is fetched — a drawer that waits on a round trip
+  // before appearing reads as a button that did nothing.
+  $('new-scrim').classList.remove('hidden');
+
+  // A deep link may say which system the case came from, and carry a batch
+  // the form no longer asks for. Neither is typed here; both are kept.
+  newSource = (prefill && prefill.source) || 'nelos';
+  quiet.batch = (prefill && prefill.batch) || null;
+  fillProblems(newSource);
+
+  // It may also name the case (…&title=Broken+tray). If that matches one of
+  // the offered categories, use it; otherwise it goes in as "Other".
+  if (prefill && prefill.title) {
+    if ([...$('c-problem').options].some(o => o.value === prefill.title)) {
+      $('c-problem').value = prefill.title;
+    } else {
+      $('c-problem').value = '__other';
+      $('c-problem-other').value = prefill.title;
+    }
+    syncOther();
+  }
+  applyCategoryDefaults();
+  refreshDest();
+
+  fillNurseries();
+  $('c-nursery').value = (prefill && prefill.nursery) || '';
+  fillPlots();
+  if (prefill && prefill.plot) $('c-plot').value = prefill.plot;
+
+  setTimeout(() => $('c-dest').focus(), 60);
+}
+
+/* The same drawer, filled in. Priority, due date and batch are not fields
+   any more, so an edit carries the case's own through untouched rather
+   than blanking what it cannot show. */
+async function openEdit(c) {
+  editingId = c.id;
+  clearDrawer();
+  $('c-heading').textContent = 'Edit ' + (c.case_no || 'Case');
+  $('c-save').textContent = 'Save Changes';
+  $('new-scrim').classList.remove('hidden');
+
+  newSource = c.source_module || 'nelos';
+  quiet = {
+    priority: c.priority || 'normal',
+    dueDate:  c.due_date || null,
+    batch:    c.batch_name || null
+  };
+  fillProblems(newSource);
+
+  // A category that has since been renamed or removed is still this case's
+  // problem, so it goes in the free-text box rather than being lost.
+  if (c.category && [...$('c-problem').options].some(o => o.value === c.category)) {
+    $('c-problem').value = c.category;
+  } else if (c.title) {
+    $('c-problem').value = '__other';
+    $('c-problem-other').value = c.title;
+  }
+  syncOther();
+
+  $('c-desc').value = c.description || '';
+
+  fillNurseries();
+  $('c-nursery').value = c.nursery_name || '';
+  fillPlots();
+  $('c-plot').value = c.plot_name || '';
+
+  // Where it already sits, not where the rule would send it.
+  destTouched = true;
+  fillDest(c.assigned_module || c.source_module || '');
+  $('c-pic').value = '';
+  fillPics();
+  if (c.assignee_id && [...$('c-pic').options].some(o => o.value === c.assignee_id)) {
+    $('c-pic').value = c.assignee_id;
+    fillPics();
+  }
+
+  setPhoto(c.photo_url);
+  setTimeout(() => $('c-problem').focus(), 60);
+}
+
+function closeNew() { $('new-scrim').classList.add('hidden'); }
+
+/* Uploads whatever is in the file box and returns its public URL, or
+   undefined if nothing was chosen. Throws with a readable message so the
+   Save handler can show it and leave the drawer open. */
+async function uploadPhoto() {
+  const file = $('c-photo').files && $('c-photo').files[0];
+  if (!file) return undefined;
+  if (file.size > 8 * 1024 * 1024) throw new Error('That photo is over 8 MB — take a smaller one.');
+
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `${new Date().toISOString().slice(0, 10)}/${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await _supabase.storage.from('nelos-photos')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error('Photo upload failed — ' + error.message);
+
+  return _supabase.storage.from('nelos-photos').getPublicUrl(path).data.publicUrl;
+}
+
+/* ── Wiring the drawer together ────────────────────────────────── */
+
+$('c-problem').addEventListener('change', () => {
+  syncOther();
+  applyCategoryDefaults();
+  refreshDest();
+});
+
+$('c-nursery').addEventListener('change', () => fillPlots());
+$('c-dest').addEventListener('change', () => { destTouched = true; fillPics(); });
+$('c-pic').addEventListener('change', () => fillPics());
+
+$('c-photo').addEventListener('change', () => {
+  const f = $('c-photo').files && $('c-photo').files[0];
+  // Show the chosen file straight away, before it is uploaded, so the
+  // drawer confirms what was picked rather than waiting for Save.
+  if (f) setPhoto(URL.createObjectURL(f), f.name);
+});
+$('c-photo-drop').addEventListener('click', () => { $('c-photo').value = ''; setPhoto(null); });
+
+$('c-save').addEventListener('click', async () => {
+  const problem = problemName();
+  if (!problem) {
+    toast('Choose the case category.', false);
+    ($('c-problem').value === '__other' ? $('c-problem-other') : $('c-problem')).focus();
+    return;
+  }
+  if (!$('c-dest').value) { toast('Choose which system this goes to.', false); $('c-dest').focus(); return; }
+  if (!$('c-nursery').value) { toast('Choose which nursery.', false); $('c-nursery').focus(); return; }
+
+  const btn = $('c-save');
+  const wording = editingId ? 'Save Changes' : 'Add New Case';
+  btn.disabled = true; btn.textContent = editingId ? 'Saving…' : 'Adding…';
+
+  let uploaded;
+  try {
+    uploaded = await uploadPhoto();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = wording;
+    toast(e.message, false);
+    return;
+  }
+
+  // Who it goes to: the person picked under Assigned to, or the #1 of that
+  // system when the picker is left on Auto.
+  const pic = pickedPic();
+  const listed = $('c-problem').value !== '__other';
+
+  if (editingId) {
+    const row = {
+      title:         problem,
+      description:   $('c-desc').value.trim() || null,
+      category:      listed ? problem : null,
+      priority:      quiet.priority,
+      nursery_name:  $('c-nursery').value || null,
+      plot_name:     $('c-plot').value || null,
+      batch_name:    quiet.batch,
+      assigned_module:  $('c-dest').value || null,
+      assigned_seat_no: pic ? (pic.seat_no || null) : null,
+      assignee_id:   pic ? pic.user_id : null,
+      assignee_name: pic ? (pic.full_name || pic.email) : null,
+      due_date:      quiet.dueDate,
+      updated_by:    me.name,
+      updated_at:    new Date().toISOString()
+    };
+    // A photo is only written when it changed: uploaded means a new one,
+    // photoUrl === null after Remove means clear it, and neither means
+    // leave whatever is there — including on a database with no such column.
+    if (uploaded) row.photo_url = uploaded;
+    else if (photoUrl === null) row.photo_url = null;
+
+    const { error } = await _supabase.from('nelos_cases').update(row).eq('id', editingId);
+    btn.disabled = false; btn.textContent = wording;
+    if (error) { toast('Could not save — ' + error.message, false); return; }
+
+    toast('Case saved.');
+    closeNew();
+    await loadCases();
+    return;
+  }
+
+  const { data, error } = await MJMNelos.raise({
+    photoUrl:    uploaded || null,
+    title:       problem,
+    description: $('c-desc').value.trim() || null,
+    category:    listed ? problem : null,
+    priority:    quiet.priority,
+    source:      newSource,
+    nursery:     $('c-nursery').value || null,
+    plot:        $('c-plot').value || null,
+    batch:       quiet.batch,
+    assignedModule:  $('c-dest').value || null,
+    assignedSeatNo:  pic ? pic.seat_no : null,
+    assigneeId:      pic ? pic.user_id : null,
+    assigneeName:    pic ? (pic.full_name || pic.email) : null,
+    dueDate:     quiet.dueDate
+  });
+
+  btn.disabled = false; btn.textContent = wording;
+  if (error) { toast('Could not create the case — ' + error.message, false); return; }
+
+  toast(pic
+    ? `Case ${data.case_no || ''} created — it is now in ${pic.full_name || pic.email}'s to-do list.`
+    : `Case ${data.case_no || ''} created.`);
+  closeNew();
+  clearDrawer();
+  await loadCases();
+});
+
+
+/* ── Wiring ────────────────────────────────────────────────────── */
+
+$('new-case-btn').addEventListener('click', () => openNew());
+$('new-close').addEventListener('click', closeNew);
+$('c-cancel').addEventListener('click', closeNew);
+
+/* ── Solve sheet ── */
+$('solve-close').addEventListener('click', closeSolve);
+$('s-cancel').addEventListener('click', closeSolve);
+$('s-save').addEventListener('click', saveSolve);
+$('s-close-case').addEventListener('click', closeCase);
+/* Tapping the dimmed area behind the sheet closes it, the way the eye
+   expects — but only the area, not a click that started inside. */
+$('solve-scrim').addEventListener('click', e => {
+  if (e.target === $('solve-scrim')) closeSolve();
+});
+/* Show the picture before it is sent, so a thumb over the lens is
+   caught here rather than by whoever closes the case. */
+$('s-photo').addEventListener('change', function () {
+  const f = this.files && this.files[0];
+  const img = $('s-photo-prev');
+  $('s-shot-t').textContent = f ? 'Photo attached — tap to change' : SHOT_IDLE;
+  if (!f) { img.classList.add('hidden'); return; }
+  img.src = URL.createObjectURL(f);
+  img.classList.remove('hidden');
+});
+$('new-scrim').addEventListener('click', e => { if (e.target === $('new-scrim')) closeNew(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNew(); });
+
+/* Any filter change starts at the top again: page 7 of the old list is
+   nowhere in particular in the new one. */
+const refilter = () => { page = 1; render(); };
+
+$('f-q').addEventListener('input', () => {
+  $('f-q-x').classList.toggle('hidden', !$('f-q').value);
+  refilter();
+});
+$('narrowed-x').addEventListener('click', () => {
+  FGROUPS.forEach(g => picked[g.key].clear());
+  $('f-q').value = '';
+  $('f-q-x').classList.add('hidden');
+  closeFMenu();
+  refilter();
+});
+
+$('f-q-x').addEventListener('click', () => {
+  $('f-q').value = '';
+  $('f-q-x').classList.add('hidden');
+  $('f-q').focus();
+  refilter();
+});
+
+/* ── The tabs ──────────────────────────────────────────────────── */
+$('stabs').addEventListener('click', e => {
+  const b = e.target.closest('.stab');
+  if (!b || b.dataset.tab === tab) return;
+  tab = b.dataset.tab;
+  prunePicks();
+  closeFMenu();
+  refilter();
+});
+
+function syncTabs() {
+  $('stabs').querySelectorAll('.stab').forEach(b =>
+    b.classList.toggle('on', b.dataset.tab === tab));
+  /* Counted against the search only, not the column ticks: this is the
+     headline "how much is in each tab", and a number that moved every time
+     a funnel was touched would stop being that. */
+  Object.keys(TABS).forEach(k => {
+    const el = $('stabs').querySelector(`[data-n="${k}"]`);
+    if (el) el.textContent = allCases.filter(c => TABS[k](c) && matchQ(c)).length;
+  });
+}
+
+/* ── The column filter menus ───────────────────────────────────── */
+let openFBtn = null;               // the funnel whose menu is showing
+
+function closeFMenu() {
+  $('fmenu').classList.add('hidden');
+  openFBtn = null;
+  syncFBtns();
+}
+
+/* Which funnels are doing something, and to how many values. The heading is
+   the only place this shows once the menu is shut. */
+function syncFBtns() {
+  document.querySelectorAll('.th-f').forEach(cell => {
+    const n = FGROUPS.filter(g => g.col === cell.dataset.col)
+                     .reduce((t, g) => t + picked[g.key].size, 0);
+    const btn = cell.querySelector('.th-fb');
+    btn.classList.toggle('on', n > 0);
+    const tag = btn.querySelector('.th-fn');
+    if (n > 0 && !tag) btn.insertAdjacentHTML('beforeend', `<span class="th-fn">${n}</span>`);
+    else if (n > 0) tag.textContent = n;
+    else if (tag) tag.remove();
+  });
+}
+
+function drawFMenu(col) {
+  const html = FGROUPS.filter(g => g.col === col).map(g => {
+    const opts = optionsFor(g);
+    // One option filters nothing — every row already has that value.
+    if (opts.length < 2 && !picked[g.key].size) return '';
+    return `<div class="fm-sec">
+        <div class="fm-h"><span class="fm-t">${esc(g.title)}</span>
+          <span class="fm-a">
+            <button type="button" data-all="${esc(g.key)}">Select all</button>
+            <button type="button" data-clr="${esc(g.key)}">Clear all</button>
+          </span></div>
+        ${opts.map(([v, n]) => `<button type="button" class="fm-o"
+            data-g="${esc(g.key)}" data-v="${esc(v)}">
+            <input type="checkbox" tabindex="-1" ${picked[g.key].has(v) ? 'checked' : ''}>
+            <span class="fm-o-l">${esc(g.label(v))}</span>
+            <span class="fm-o-n">${n}</span></button>`).join('')}
+      </div>`;
+  }).join('');
+  $('fmenu').innerHTML = html || '<div class="fm-none">Nothing to filter here yet.</div>';
+}
+
+function openFMenu(btn) {
+  const col = btn.closest('.th-f').dataset.col;
+  const m = $('fmenu');
+  drawFMenu(col);
+  m.dataset.col = col;
+  m.classList.remove('hidden');
+
+  /* Under the funnel, pulled back inside the window if it would hang off
+     the right — which it does on a phone, where the strip is chips. */
+  const r = btn.getBoundingClientRect();
+  const room = document.documentElement.clientWidth - m.offsetWidth - 10;
+  m.style.left = Math.max(10, Math.min(r.left, room)) + window.scrollX + 'px';
+  m.style.top  = (r.bottom + 6 + window.scrollY) + 'px';
+
+  openFBtn = btn;
+  syncFBtns();
+}
+
+document.addEventListener('click', e => {
+  const funnel = e.target.closest('.th-fb');
+  if (funnel) { funnel === openFBtn ? closeFMenu() : openFMenu(funnel); return; }
+  if (e.target.closest('#fmenu')) return;
+  if (openFBtn) closeFMenu();
+});
+
+$('fmenu').addEventListener('click', e => {
+  /* Held back from the outside-click handler above. This listener replaces
+     the menu's contents, so by the time the click reached the document its
+     target was a detached node, stopped answering closest('#fmenu'), and
+     read as a click outside — which shut the menu on every tick. */
+  e.stopPropagation();
+
+  const all = e.target.closest('[data-all]');
+  const clr = e.target.closest('[data-clr]');
+  const opt = e.target.closest('.fm-o');
+  if (!all && !clr && !opt) return;
+
+  if (all) {
+    const g = FGROUPS.find(x => x.key === all.dataset.all);
+    // Every option currently on offer, which is what the menu is showing.
+    optionsFor(g).forEach(([v]) => picked[g.key].add(v));
+  } else if (clr) {
+    picked[clr.dataset.clr].clear();
+  } else {
+    const set = picked[opt.dataset.g];
+    const v = opt.dataset.v;
+    set.has(v) ? set.delete(v) : set.add(v);
+  }
+
+  refilter();
+  // Redrawn where it stands: the counts have all just moved.
+  drawFMenu($('fmenu').dataset.col);
+  syncFBtns();
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && openFBtn) closeFMenu(); });
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nelos')) {
+      alert('You do not have access to Nelos.');
+      window.location.href = '../index.html';
+      return;
+    }
+    const u = MJMAccess.user();
+    me = { id: u.id, name: u.full_name || u.email || '' };
+    MJMNelos.init(_supabase, { root: '../' });
+
+    // User Setting decides who sees which module's cases. Only a Nelos
+    // admin (or a portal admin who manages users) may open it.
+    if (MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers()) {
+      $('user-setting-btn').classList.remove('hidden');
+      $('automation-btn').classList.remove('hidden');
+    }
+
+    // What this person may press, before the first render draws buttons.
+    await loadRights();
+    applyRights();
+
+    // Anything a schedule owes gets raised before the list is read, so a
+    // case that came due overnight is on the screen rather than waiting for
+    // whoever next opens the page after it. Fails quiet: on a database
+    // without migration_nelos_automation.sql there is nothing to run, and a
+    // schedule that cannot fire must not stop the list from loading.
+    await _supabase.rpc('nelos_run_automations').then(r => r, () => ({}));
+
+    // Modules first: the problem list, the destination list and the PIC
+    // list all read from it, so the drawer's steps have nothing to draw
+    // until it is in.
+    await loadModules();
+    await Promise.all([loadCases(), loadCategories(), loadHandlers(), loadPlaces()]);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+
+    // Deep link from another module's To-Do widget:
+    //   nelos_dashboard.html?new=1&source=operation&batch=264
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('new')) {
+      openNew({
+        source:  qs.get('source'), batch: qs.get('batch'),
+        plot:    qs.get('plot'),   nursery: qs.get('nursery'),
+        title:   qs.get('title')
+      });
+    }
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

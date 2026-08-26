@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>User Access — Nursery Operation Management</title>
+<title>User Access — Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,7 +16,7 @@
 <script>
 MJMModuleAccess.init({
   module: 'nursery_ops',
-  title:  'Nursery Operation Management',
+  title:  'Nursery Operation Manage',
   moduleLabel: 'Nursery Ops',
   icon:   '🌿',
   accent: 'teal',
@@ -45,9 +45,18 @@ MJMModuleAccess.init({
     { key:'motion', label:'Motion Study Settings', desc:'Standard timings used to plan the work',
       actions:[
         { key:'manage', label:'Edit motion study timings', desc:'Change the standard time allowed for each job' }
-      ]}
+      ]},
+    /* PALMS is recorded in the field on the 555 FC Portal; these two pages
+       READ that record. There is no action under either — the office does not
+       key plot status in, so open or closed is the whole question. */
+    { key:'palms_board', label:'PALMS Plot Status Map', desc:'What every plot is on today, and what is running late' },
+    { key:'palms_motion', label:'PALMS Plot Motion Study', desc:'What the work actually costs in days, off the field plot log' }
   ]
 });
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

@@ -3,7 +3,10 @@
    ═══════════════════════════════════════════════════════════════
    Mounts the same header strip on every module page:
 
-       [AI] MJM NURSERY AI          Welcome, name   [← Portal]  [Sign Out]
+       [AI] MJM NURSERY AI    <title>    Welcome, name  [← Portal] [Sign Out]
+
+   The wordmark, an optional centred module title, and whether the square
+   badge shows are all read off the mount point — see ribbonHtml().
 
    Usage:
      <div id="mjm-ribbon"></div>                 <!-- where the ribbon renders -->
@@ -41,19 +44,91 @@
 
   // ── Ribbon markup — inline styles so it renders identically on
   //    Tailwind and non-Tailwind pages ────────────────────────────
-  var RIBBON_HTML =
-    '<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
-              'display:flex;justify-content:space-between;align-items:center;position:sticky;' +
+  /* The ribbon reads its wording off the mount point, so a module can put
+     its own name in the middle without forking this file:
+
+       <div id="mjm-ribbon"
+            data-brand="MJM Nursery"     left-hand wordmark
+            data-center="NELOS"          centred module title, optional
+            data-sub="Nursery Case Log"   line under it, optional
+            data-center-scale="0.7"       shrink the centred title, optional
+            data-logo="off"></div>       drop the square badge
+
+     With no attributes it renders exactly as it always did. */
+  function ribbonHtml(host) {
+    var d = (host && host.dataset) || {};
+    /* An explicitly empty data-brand means "no wordmark here" — the FC
+       Portal's own pages set it that way so the left cell is the bare
+       spacer their centred mark is measured against. `||` treated that
+       as absent and printed the default, which the old flex bar hid by
+       squeezing the cell to nothing; the moment the cell was allowed its
+       own width the words came back. Present-but-empty and absent are
+       different answers, so they are read differently. */
+    var brand  = ('brand' in d) ? d.brand : 'MJM Nursery AI';
+    var centre = d.center || '';
+    var sub    = d.sub    || '';
+    var logo   = d.logo !== 'off';
+
+    /* A module with a long name needs it set smaller than "NELOS" does.
+       One scale rather than a size, because the title has two sizes — the
+       desk one and the phone one — and a module that set only the first
+       would be back to a title too big to fit a phone. Both move together.
+       Absent, nothing changes: every page that does not ask for this
+       renders at exactly the sizes it always did. */
+    var scale = parseFloat(d.centerScale);
+    if (!(scale > 0)) scale = 1;
+    var px = function (n) { return (Math.round(n * scale * 10) / 10) + 'px'; };
+
+    var left =
+      '<div class="mjm-rb-left" style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">' +
+        (logo
+          ? '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
+                        'display:flex;align-items:center;justify-content:center;color:#fff;' +
+                        'font-weight:900;font-size:11px;flex-shrink:0;">AI</div>'
+          : '') +
+        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
+                     'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          _esc(brand) + '</span>' +
+      '</div>';
+
+    // Centred by being its own flex child between two flex:1 siblings, so it
+    // stays put whatever the wordmark and the buttons are doing either side.
+    var middle = centre
+      ? '<div class="mjm-rb-centre" style="text-align:center;padding:0 12px;min-width:0;">' +
+          '<div class="mjm-rb-title" style="font-weight:900;color:#1e293b;text-transform:uppercase;' +
+                     'letter-spacing:.3em;font-size:' + px(30) + ';line-height:1.05;white-space:nowrap;">' +
+            _esc(centre) + '</div>' +
+          (sub
+            ? '<div class="mjm-rb-sub" style="font-size:' + px(13.5) + ';font-weight:700;color:#94a3b8;' +
+                         'letter-spacing:.08em;white-space:nowrap;margin-top:3px;">' +
+                _esc(sub) + '</div>'
+            : '') +
+        '</div>'
+      : '';
+
+    /* With a centred mark the bar becomes a three-column grid with equal
+       flexible columns either side, so the mark lands on the bar's real
+       centre line rather than the middle of whatever space the buttons
+       leave over. Flex could not do it here: the button group is
+       flex-shrink:0 and the left spacer is min-width:0, so on a phone the
+       left side gave way, the right side did not, and the "centred" slot
+       ended up ~90px left. The phone app's own TopNav centres its wordmark
+       the same way — same portal, same bar, same method.
+
+       Only when there IS a centred mark. Every other page keeps the
+       original two-ended flex bar untouched. */
+    var barLayout = centre
+      ? 'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;'
+      : 'display:flex;justify-content:space-between;align-items:center;';
+
+    return '' +
+    '<div class="mjm-rb-bar' + (centre ? ' mjm-rb-has-centre' : '') + '" ' +
+        'style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;' +
+              barLayout + 'position:sticky;' +
               'top:0;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.06);' +
               'font-family:Outfit,system-ui,-apple-system,sans-serif;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;">' +
-        '<div style="width:32px;height:32px;background:#10b981;border-radius:8px;' +
-                    'display:flex;align-items:center;justify-content:center;color:#fff;' +
-                    'font-weight:900;font-size:11px;flex-shrink:0;">AI</div>' +
-        '<span style="font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:.15em;' +
-                     'font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MJM Nursery AI</span>' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">' +
+      left + middle +
+      '<div class="mjm-rb-right" style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex:1;justify-content:flex-end;">' +
         '<span id="welcome-text" style="font-size:12px;font-weight:700;color:#94a3b8;white-space:nowrap;" class="mjm-rb-hide-sm"></span>' +
         '<a id="portal-link" href="' + PORTAL + '" ' +
            'style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.15em;' +
@@ -68,8 +143,51 @@
     '<style>' +
       '#mjm-ribbon a#portal-link:hover{background:#ecfdf5;color:#059669;border-color:#a7f3d0;}' +
       '#mjm-ribbon button#logout-btn:hover{background:#fef2f2;color:#dc2626;border-color:#fecaca;}' +
-      '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}}' +
+      '@media(max-width:640px){#mjm-ribbon .mjm-rb-hide-sm{display:none !important;}' +
+                              '#mjm-ribbon .mjm-rb-centre{padding:0 6px;}' +
+                              /* !important for the same reason the layout rules below carry it:
+                                 the title's size and tracking are written inline, and an
+                                 inline declaration outranks a stylesheet one whatever its
+                                 selector. Without it neither of these ever applied, so the
+                                 phone kept the 30px desk title — measured at 412px, a
+                                 867px-wide title clipped into 372px of bar. */
+                              '#mjm-ribbon .mjm-rb-title{letter-spacing:.16em !important;font-size:' + px(21) + ' !important;}' +
+                              '#mjm-ribbon .mjm-rb-sub{font-size:' + px(11.5) + ' !important;}' +
+      /* The centred mark takes its own row on a phone. Three columns of
+         1fr auto 1fr can only hold the mark on the bar's centre line
+         while BOTH side columns fit the same width — and the button
+         cluster is far wider than the empty left spacer, so on a phone
+         the spacer gave way, the cluster did not, and the mark was
+         pushed off centre and then clipped. Measured on FC Manage at
+         412px: the mark sat 107px left of the bar's centre and its
+         widest line was cut to 126px.
+
+         Two rows instead: the back slot and the buttons on the first,
+         the mark centred across the full width on the second. The
+         auditor bar (audit/audit_ribbon.css) stacks identically — the
+         two are the same bar wearing different captions and must not
+         drift. Only pages with a centred mark stack; every other page
+         keeps the one-row bar it always had. */
+      /* !important throughout: the bar and its three cells carry inline
+         styles — this file writes them that way so the ribbon renders
+         the same on pages with Tailwind and without — and an inline
+         declaration outranks a stylesheet one. Without it grid-area
+         lands (it is not set inline) while the columns and padding do
+         not, which stacks the rows against a three-column track and
+         leaves the mark off centre anyway. */
+                              '#mjm-ribbon .mjm-rb-has-centre{padding:8px 12px !important;row-gap:6px;' +
+                                'grid-template-columns:auto 1fr !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-left{grid-area:1/1;flex:0 0 auto !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-right{grid-area:1/2;flex:0 0 auto !important;}' +
+                              '#mjm-ribbon .mjm-rb-has-centre .mjm-rb-centre{grid-area:2/1/3/3;padding:0 !important;}}' +
     '</style>';
+  }
+
+  function _esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   // ── Mount ripple: render into the fixed mount point ────────────
   function mount() {
@@ -77,7 +195,7 @@
     if (!host) return;                            // page didn't ask for the ribbon
     if (host.dataset.mjmRbMounted === '1') return; // idempotent
     host.dataset.mjmRbMounted = '1';
-    host.innerHTML = RIBBON_HTML;
+    host.innerHTML = ribbonHtml(host);
     // Portal click: replace() (fresh navigator-lock context) instead of an
     // in-place navigation that could keep the auth mutex held.
     var link = host.querySelector('#portal-link');
@@ -90,12 +208,30 @@
     _fillWelcome();
   }
 
-  // ── Welcome text — best-effort read from Supabase session.
-  //    Pages load shared_supabase.js at different points in the body
-  //    (audit_home.html, for instance, loads it after this script), so
-  //    poll for it briefly before giving up. ─────────────────────
+  // ── Welcome text ───────────────────────────────────────────────
+  //    The name every module writes to localStorage at sign-in comes
+  //    first: it is the profile's own full_name, it is there before any
+  //    network call, and it is what the module pages used to print in
+  //    their own sub-headers. The Supabase session is the fallback, and
+  //    is polled for a few seconds because pages load shared_supabase.js
+  //    at different points in the body (audit_home.html loads it after
+  //    this script).
+  function _say(name) {
+    var el = document.getElementById('welcome-text');
+    if (el && name) { el.innerText = 'Welcome, ' + name; return true; }
+    return false;
+  }
+
   async function _fillWelcome(retries) {
     if (retries === undefined) retries = 20;   // ~4 s of grace
+    try {
+      var u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+      // First two words at most: a five-word name would push the buttons
+      // off the row on a phone.
+      var stored = String(u.full_name || u.name || '').split(' ').slice(0, 2).join(' ');
+      if (_say(stored)) return;
+    } catch (_) { /* fall through to the session */ }
+
     if (!window._supabase) {
       if (retries > 0) return setTimeout(function () { _fillWelcome(retries - 1); }, 200);
       return;
@@ -107,8 +243,7 @@
       var name = (sess.user && sess.user.user_metadata && sess.user.user_metadata.full_name)
               || (sess.user && sess.user.email)
               || '';
-      var el = document.getElementById('welcome-text');
-      if (el && name) el.innerText = 'Welcome, ' + name;
+      _say(String(name).split(' ').slice(0, 2).join(' '));
     } catch (_) { /* silent */ }
   }
 

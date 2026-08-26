@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PALMS Plot Status Map — Nursery Operation Manage</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
+<script src="../shared/shared_plot_map.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f0fdfa; margin:0; }
+  .card { background:white; border:1px solid #ccfbf1; border-radius:20px; box-shadow:0 4px 16px rgba(13,148,136,.07); }
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #99f6e4; color:#0f766e; font-weight:900; font-size:11px;
+              letter-spacing:.08em; text-transform:uppercase; text-decoration:none; transition:all .15s; }
+  .tool-btn:hover { background:#ccfbf1; }
+  .pick { appearance:none; -webkit-appearance:none; padding:9px 34px 9px 14px; border-radius:12px; border:1.5px solid #99f6e4;
+          background:white; color:#0f766e; font-weight:900; font-size:12px; cursor:pointer; outline:none;
+          background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%230f766e' d='M5 6L0 0h10z'/></svg>");
+          background-repeat:no-repeat; background-position:right 12px center; background-size:10px; }
+  .stat { border-radius:16px; padding:14px 16px; border:1.5px solid; }
+  .stat-n { font-size:26px; font-weight:900; line-height:1; }
+  .stat-l { font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; margin-top:5px; }
+  .s-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
+  .s-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .s-idle { background:#f8fafc; border-color:#e2e8f0; color:#475569; }
+  /* width:100% here, not Tailwind's w-full: table-layout:fixed only means
+     anything once the table has a width, and a layout that exists only if a
+     CDN answered is a layout that cannot be checked. */
+  table { table-layout:fixed; width:100%; }
+  th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
+       padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
+  td { padding:11px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; vertical-align:top; }
+  /* The action square is fixed, Plot is as wide as a plot name ever gets,
+     Current Status takes the slack because it carries the longest text —
+     two activity names joined by " + " — and the last three are equal so
+     the eye can run down them. */
+  .c-act    { width:56px; }
+  .c-plot   { width:88px; }
+  .c-status { width:auto; min-width:190px; }
+  /* Narrower than the header text, so the header wraps to two lines and the
+     width the column actually needs is the DATA's, not the label's. That is
+     what frees the room Current Status wants. */
+  .c-eq     { width:16%; white-space:normal; }
+  td.wrap   { white-space:normal; }
+  .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+          border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
+  .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
+  .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+  .up-btn { width:30px; height:30px; border-radius:9px; border:1.5px solid #99f6e4; background:white;
+            color:#0f766e; cursor:pointer; padding:0; line-height:1;
+            display:inline-flex; align-items:center; justify-content:center; transition:all .15s; }
+  .up-btn svg { width:14px; height:14px; display:block; }
+  .up-btn:hover { background:#ccfbf1; }
+  .up-btn[disabled] { opacity:.4; cursor:default; }
+  .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60;
+              display:flex; align-items:center; justify-content:center; padding:16px; }
+  .modal-card { background:white; border-radius:22px; width:100%; max-width:520px; max-height:88vh;
+                display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.28); }
+  /* min-height:0 is what actually makes the list scroll. A flex item's floor
+     is its content, so without it the list refuses to shrink, the card grows
+     past max-height and the OK button ends up off the bottom of the screen —
+     with eleven stages that is every time. */
+  #up-list { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #up-modal .modal-card > :not(#up-list) { flex:none; }
+  .act-row { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:11px 14px;
+             border-radius:14px; border:1.5px solid #e2e8f0; background:white; cursor:pointer;
+             transition:all .12s; font-family:inherit; }
+  .act-row:hover { border-color:#99f6e4; }
+  .act-row.on { border-color:#10b981; background:#ecfdf5; }
+  .act-n { width:28px; height:28px; border-radius:999px; background:#f1f5f9; color:#64748b; font-weight:900;
+           font-size:11px; display:flex; align-items:center; justify-content:center; flex:none; }
+  .act-row.on .act-n { background:#059669; color:white; }
+  .act-name { font-weight:900; color:#1e293b; font-size:13px; flex:1; min-width:0; }
+  .act-row.on .act-name { color:#065f46; }
+  .act-d { font-weight:900; color:#94a3b8; font-size:11px; flex:none; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+
+<div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[1280px] mx-auto px-4 md:px-6 py-7 hidden palms-frame">
+
+  <aside id="palms-nav" data-page="board" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body">
+
+  <!-- The map, and the same plots as a table under it — the Life of Plot
+       layout, because that is how the office already reads a nursery. -->
+  <div id="plot-map" class="card overflow-hidden mb-5"></div>
+
+  <div class="card overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
+        Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
+      </h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="c-act"></th>
+            <th class="c-plot">Plot</th>
+            <th class="c-status">Current Status</th>
+            <th class="c-eq">Expected Completion</th>
+            <th class="c-eq text-right">Days Left / Over</th>
+            <th class="c-eq">Last Update</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="hidden px-6 py-14 text-center">
+      <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plots registered for this nursery</p>
+      <p class="text-[12px] text-slate-500 mt-2 max-w-[440px] mx-auto leading-relaxed">
+        Plots are kept in Seedling Stock Management → System Settings, and their status is
+        recorded on the 555 FC Portal.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+  <div id="up-modal" class="modal-bg hidden">
+  <div class="modal-card">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+      <div>
+        <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Update status</div>
+        <div id="up-plot" class="text-lg font-black text-slate-800">—</div>
+      </div>
+      <button id="up-close" class="ml-auto text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
+    </div>
+    <div class="px-5 py-3 text-[12px] text-slate-500 leading-relaxed border-b border-slate-100">
+      Choose what this plot is on today — up to two at once.
+      <strong class="text-slate-700">Anything you leave out is recorded as finished today.</strong>
+      This writes the same record the Field Conductor's app writes.
+    </div>
+    <div id="up-list" class="px-5 py-4 space-y-2 overflow-y-auto"></div>
+    <div class="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
+      <span id="up-msg" class="text-[11px] font-bold text-slate-400"></span>
+      <button id="up-save" class="ml-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest cursor-pointer">OK</button>
+    </div>
+  </div>
+</div>
+
+<p class="text-[11px] text-slate-400 text-center mt-7">
+    Page access is granted on this module's
+    <a href="nursery_ops_user_access.html" class="text-teal-700 font-bold underline underline-offset-2">User Access</a>.
+  </p>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let LOGS = {};
+let ME = '';        // the name written into anything saved from this page
+let MAP = null;
+let LINES = new Map();   // plot key → the line boardLines() built for it
+let SCOPE = 'all';       // 'all', or a nursery key, or the list the user may see
+
+/* PALMS logs work against a UNIT, which is the plot while it is whole ("B2")
+   and "B2#A" once it is split into areas. The map has one polygon per plot,
+   so a split plot's areas are rolled back up to their plot for the map and
+   the table: the office asks "how is B2 doing", and the worst of its areas is
+   the honest answer. */
+const rankOf = (st) => (st === 'overdue' ? 0 : st === 'ontrack' ? 1 : 2);
+
+function lineForPlot(plot) {
+  const want = String(plot).toUpperCase();
+  let best = null;
+  LINES.forEach((ln, key) => {
+    if (MJMPalms.plotOf(key).toUpperCase() !== want) return;
+    if (!best || rankOf(ln.state) < rankOf(best.state)
+        || (rankOf(ln.state) === rankOf(best.state)
+            && (ln.left == null ? 1e9 : ln.left) < (best.left == null ? 1e9 : best.left))) {
+      best = ln;
+    }
+  });
+  return best;
+}
+
+/* What the map paints. 'over' is red, 'ok' green, anything else grey. */
+/* The key beside the map: which stages share a colour, and what colour.
+   Grouped by stage NUMBER rather than by name, so renaming a stage in
+   Settings keeps its colour and the key picks the new name up on its own.
+
+   Colours chosen by the office. Blue is the one they left open — the three
+   ground-preparation stages — and it is the hue that separates cleanest
+   from the other four. The set is validated with all pairs in play: worst
+   normal-vision ΔE 16.3, all inside the lightness band and over the chroma
+   floor. Red against green is the one soft pair at CVD ΔE 7.2, which is
+   legal only with a second encoding — every plot carries its name, the key
+   spells its stages out and the table under the map gives the exact stage,
+   so it holds. Do not add a sixth colour without re-running that check. */
+/* The colours come from the office now — one per work status, set on
+   PALMS → Settings → Ideal Work (nops_plot_status_stages.color).
+
+   Stages that share a colour merge into ONE key entry, which is the useful
+   property: give three stages the same colour and they read as one phase on
+   the map and one line in the key, without anybody defining a "phase". Give
+   the one stage you care about its own colour and it stands out.
+
+   A stage with no colour set is grey. That is deliberate and visible — a
+   wrong colour on a map is worse than an obviously unassigned one. */
+function buildPhases() {
+  const acts = MJMPalms.ACTIVITIES || [];
+  const groups = [];
+  acts.forEach((a) => {
+    const c = String(a.color || '#94a3b8').toLowerCase();
+    let g = groups.find((x) => x.color === c);
+    if (!g) { g = { color: c, stages: [] }; groups.push(g); }
+    g.stages.push(a.name);
+  });
+  return MJMPlotMap.phases(groups);
+}
+
+let PAL = { legend: [], keyOf: {} };
+
+/* What the map paints a plot. `key` picks the colour off the key beside it;
+   `late` is the only words left on the map, and only where there are any. */
+function mapStatusOf(plot) {
+  const ln = lineForPlot(plot);
+  if (!ln || ln.state === 'none') return { tone: 'none', line: 'no status' };
+  const act = MJMPalms.actByN(ln.actN);
+  return {
+    tone: ln.state === 'overdue' ? 'over' : 'ok',
+    key: act ? PAL.keyOf[act.name] : null,
+    late: ln.left < 0 ? (-ln.left) + 'd over' : '',
+    // Kept for anything that still wants the whole sentence.
+    line: (ln.status || '—') + ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left'),
+  };
+}
+
+/* Every plot the nursery has, not only the ones with a log. A plot nobody has
+   keyed in is exactly what the office is looking for, so it gets a row saying
+   so rather than being left out of the table. */
+function renderTable() {
+  const nursery = MAP ? MAP.active() : null;
+  $('tbl-nursery').textContent = nursery || '—';
+  const plots = MAP ? MAP.plotsOf(nursery) : [];
+
+  $('empty').classList.toggle('hidden', plots.length > 0);
+  if (!plots.length) { $('rows').innerHTML = ''; return; }
+
+  /* Plot order, B1 · B2 · B3 — asked for, and right: the map above is laid
+     out in space and the eye moves between the two. A worst-first table makes
+     you hunt for the plot you just clicked. Urgency is carried by the red
+     pill and the red polygon, which is where it belongs. shared_plot_map
+     already sorts on the number, so this order is simply the map's. */
+  const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }));
+
+  $('rows').innerHTML = rows.map((r) => {
+    const ln = r.ln;
+    if (!ln || ln.state === 'none') {
+      const seen = ln
+        ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
+        : '<span class="text-slate-300">—</span>';
+      return '<tr>' +
+        upCell(r.plot) +
+        '<td class="font-black text-slate-800">' + esc(r.plot) + '</td>' +
+        '<td colspan="3"><span class="pill p-idle">Nothing running</span></td>' +
+        '<td class="text-slate-500">' + seen + '</td></tr>';
+    }
+    const over = ln.state === 'overdue';
+    const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
+    return '<tr>' +
+      upCell(MJMPalms.plotOf(ln.key)) +
+      '<td class="font-black text-slate-800">' + esc(ln.label) + '</td>' +
+      '<td class="wrap">' + esc(ln.status || '—') + '</td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
+      '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
+      '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
+        (ln.lastBy ? ' · ' + esc(ln.lastBy) : '') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+/* ── Updating a plot's status from here ──────────────────────────────────
+   The same record the Field Conductor's app writes: what is running now is
+   an OPEN entry (end_date null), finishing it is stamping today's date on
+   its end. So "update the status" is close what is no longer running, open
+   what is — which is exactly what applyDailySelection does on the phone.
+
+   The office writing this is new. It is meant for the day a Field Conductor
+   cannot key it in, not as the normal route: the person standing in the plot
+   is the one who knows. Whoever saves here has their own name recorded, so
+   the log says where the entry came from. */
+const upCell = (plot) =>
+  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status" aria-label="Update status">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 20h9"></path>' +
+      '<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>' +
+    '</svg></td>';
+
+let UP_PLOT = null;    // the plot the modal is open for
+let UP_SEL = [];       // act numbers ticked in the modal
+const MAX_AT_ONCE = 2; // matches MAX_CONCURRENT in the field app's data.js
+
+function openUpdate(plot) {
+  UP_PLOT = plot;
+  // The plot may be split into areas; the modal edits the plot as a whole,
+  // which is the unit the office reads. An area-split plot keeps its areas —
+  // this opens whichever unit key the board is showing for it.
+  const ln = lineForPlot(plot);
+  const key = ln ? ln.key : plot;
+  UP_PLOT = key;
+  UP_SEL = MJMPalms.currentEntries(LOGS, key).map((e) => e.actN);
+  $('up-plot').textContent = MJMPalms.keyLabel(key);
+  $('up-msg').textContent = '';
+  renderUpList();
+  $('up-modal').classList.remove('hidden');
+}
+
+function renderUpList() {
+  $('up-list').innerHTML = MJMPalms.ACTIVITIES.map((a) => {
+    const on = UP_SEL.indexOf(a.n) !== -1;
+    return '<button type="button" class="act-row' + (on ? ' on' : '') + '" data-act="' + a.n + '">' +
+      '<span class="act-n">' + (on ? '✓' : a.n) + '</span>' +
+      '<span class="act-name">' + esc(a.name) + '</span>' +
+      '<span class="act-d">' + (a.days == null ? '—' : a.days + 'd') + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+$('up-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const n = Number(b.dataset.act);
+  const i = UP_SEL.indexOf(n);
+  if (i !== -1) UP_SEL.splice(i, 1);
+  else {
+    // Oldest tick drops off rather than refusing the new one: on the phone
+    // this is a thumb correcting itself, and a dead tap reads as broken.
+    UP_SEL.push(n);
+    while (UP_SEL.length > MAX_AT_ONCE) UP_SEL.shift();
+  }
+  renderUpList();
+});
+
+const closeUpdate = () => { $('up-modal').classList.add('hidden'); UP_PLOT = null; };
+$('up-close').addEventListener('click', closeUpdate);
+$('up-modal').addEventListener('click', (e) => { if (e.target === $('up-modal')) closeUpdate(); });
+
+function newUid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+$('up-save').addEventListener('click', async () => {
+  if (!UP_PLOT) return;
+  const btn = $('up-save');
+  btn.disabled = true;
+  $('up-msg').textContent = 'Saving…';
+  const today = MJMPalms.todayStr();
+  const key = UP_PLOT;
+  const open = MJMPalms.currentEntries(LOGS, key);
+  const sel = UP_SEL.slice().sort((a, b) => a - b);
+
+  // Finished: open, and no longer ticked.
+  const finish = open.filter((e) => sel.indexOf(e.actN) === -1);
+  // Started: ticked, and not already open.
+  const startN = sel.filter((n) => !open.some((e) => e.actN === n));
+
+  try {
+    if (!finish.length && !startN.length) { $('up-msg').textContent = 'Nothing changed.'; btn.disabled = false; return; }
+
+    for (const e of finish) {
+      if (!e.uid) continue;   // never synced, so there is no server row to close
+      const res = await _supabase.from('fcportal_palms_plot_logs')
+        .update({ end_date: today, updated_at: new Date().toISOString() })
+        .eq('client_uid', e.uid);
+      if (res.error) throw res.error;
+    }
+
+    if (startN.length) {
+      // seq_no orders a plot's log; the motion study reads it back in that
+      // order to tell one cycle from the next, so a new entry goes after
+      // everything this plot already has.
+      let seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0);
+      const rows = startN.map((n) => {
+        const act = MJMPalms.actByN(n);
+        return {
+          client_uid: newUid(),
+          nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
+          plot_name: key,
+          act_n: n,
+          start_date: today,
+          end_date: null,
+          ideal_days: act && act.days != null ? act.days : null,
+          recorded_by: ME || 'Office',
+          seq_no: ++seq,
+          updated_at: new Date().toISOString(),
+        };
+      });
+      const res = await _supabase.from('fcportal_palms_plot_logs').insert(rows);
+      if (res.error) throw res.error;
+    }
+
+    // Re-read rather than patching the copy in memory: the server is the
+    // record, and a board that disagrees with it is worse than a slow one.
+    LOGS = await MJMPalms.loadLogs(_supabase);
+    render();
+    closeUpdate();
+  } catch (err) {
+    console.warn(err);
+    // The likeliest failure by far is the row-level policy: writing the plot
+    // log needs the FC Portal module, which an office-only account may not
+    // hold. Saying so beats "something went wrong".
+    $('up-msg').textContent = (err && err.message) || 'Could not save.';
+    $('up-msg').className = 'text-[11px] font-bold text-rose-600';
+  }
+  btn.disabled = false;
+});
+
+$('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-up]');
+  if (b) openUpdate(b.dataset.up);
+});
+
+function render() {
+  LINES = new Map();
+  MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
+  if (MAP) MAP.refresh();
+  renderTable();
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nursery_ops')) {
+      alert('You do not have access to Nursery Operation Manage.');
+      window.location.href = '../index.html';
+      return;
+    }
+
+    /* The dashboard hides the button, but a URL is typeable and a bookmark
+       outlives a permission. Fails OPEN when shared_access.js is an older
+       cached copy without canOpenPage: a stale script must not lock somebody
+       out of a page they are entitled to. */
+    if (typeof MJMAccess.canOpenPage === 'function' &&
+        !MJMAccess.canOpenPage('nursery_ops', 'palms_board')) {
+      alert('You do not have access to this page. Ask an admin to grant it in User Access.');
+      window.location.href = 'nursery_ops_dashboard.html';
+      return;
+    }
+
+    /* The same nursery scope the field app obeys, from the main portal's
+       User Access. Someone narrowed to BNN must not read UNN's board here
+       just because the office page is a different screen. */
+    const u = MJMAccess.user();
+    ME = (u && (u.full_name || u.email)) || '';
+
+    const perms = MJMAccess.permissions() || {};
+    const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
+    const KEYS = ['BNN', 'UNN1', 'UNN2'];
+    const visible = allowed
+      ? KEYS.filter((k) => allowed.some((n) => String(n).replace(/[^a-z0-9]/gi, '').toUpperCase() === k))
+      : KEYS;
+    SCOPE = allowed ? visible : 'all';
+
+    /* Stages BEFORE logs, always: logsFromRows falls back to the activity's
+       ideal days for a row that did not store its own, so the office's list
+       has to be in place by the time the log is parsed or the due dates are
+       computed against the built-in eleven. */
+    await MJMPalms.loadStages(_supabase);
+    LOGS = await MJMPalms.loadLogs(_supabase);
+
+    PAL = buildPhases();
+    MAP = MJMPlotMap.create({
+      mount: $('plot-map'),
+      title: 'Plot Status Map',
+      legend: PAL.legend,
+      legendTitle: 'Current stage',
+      statusOf: mapStatusOf,
+      onNurseryChange: renderTable,
+    });
+    await MAP.load(_supabase, allowed ? { nurseries: visible } : {});
+
+    render();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    // The tables may simply not exist yet. That is a message, not a bounce —
+    // sending an admin back to the module selection tells them nothing.
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+    $('empty').classList.remove('hidden');
+    $('rows').innerHTML = '';
+  }
+})();
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seeds Management — Nursery Operation Management</title>
+<title>Seeds Management — Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -412,7 +412,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
     if (!MJMAccess.canAccess('nursery_ops')) {
-      alert('You do not have access to Nursery Operation Management.');
+      alert('You do not have access to Nursery Operation Manage.');
       window.location.href = '../index.html';
       return;
     }
@@ -427,5 +427,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
   }
 })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings · Status Stages — Nursery Operation Manage</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#f0fdfa; margin:0; }
+  .card { background:white; border:1px solid #ccfbf1; border-radius:20px; box-shadow:0 4px 16px rgba(13,148,136,.08); }
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; font-size:11px;
+         font-weight:900; letter-spacing:.08em; text-transform:uppercase; border:none; cursor:pointer; transition:all .15s; }
+  .btn-teal  { background:linear-gradient(135deg,#14b8a6,#0d9488); color:white; box-shadow:0 6px 14px -4px rgba(13,148,136,.4); }
+  .btn-teal:hover { transform:translateY(-1px); }
+  .btn-ghost { background:white; color:#475569; border:1.5px solid #e2e8f0; }
+  .btn-ghost:hover { background:#f8fafc; }
+  .btn-danger { background:white; color:#be123c; border:1.5px solid #fecdd3; }
+  .btn-danger:hover { background:#fff1f2; }
+  .btn-mini { padding:6px 9px; border-radius:9px; font-size:12px; }
+  .inp { width:100%; background:white; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px;
+         font-size:15px; font-weight:600; outline:none; }
+  .inp:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  .lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+         color:#64748b; margin-bottom:5px; }
+
+  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
+            align-items:center; padding:5px 6px; border-radius:12px; border:1.5px solid transparent; }
+  .iw-row + .iw-row { margin-top:2px; }
+  .iw-row.edit { border-color:#f1f5f9; }
+  .iw-row.dragging { background:#f0fdfa; border-color:#5eead4; opacity:.85; }
+  .iw-row.over { border-color:#14b8a6; }
+  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
+             padding:0 6px 6px; font-size:10px; font-weight:900; letter-spacing:.1em;
+             text-transform:uppercase; color:#94a3b8; }
+  .iw-handle { cursor:grab; touch-action:none; user-select:none; color:#cbd5e1; font-size:15px;
+               text-align:center; line-height:1; padding:4px 0; border-radius:6px; }
+  .iw-handle:hover { color:#0d9488; background:#f0fdfa; }
+  .iw-row.dragging .iw-handle { cursor:grabbing; }
+  .iw-n { width:30px; height:30px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
+          color:#0f766e; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center; }
+  .iw-name { font-weight:900; color:#1e293b; font-size:13px; }
+  .iw-in { width:100%; background:white; border:1.5px solid #e2e8f0; border-radius:10px; padding:7px 10px;
+           font-size:14px; font-weight:900; color:#0f172a; outline:none; font-family:inherit; text-align:right; }
+  .iw-in.name { text-align:left; font-size:13px; }
+  .iw-in:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  .iw-in.dirty { border-color:#f59e0b; background:#fffbeb; }
+  .iw-ro { font-weight:900; color:#0f766e; font-size:14px; text-align:right; }
+  /* A swatch, not a colour box with chrome: the point is to see the colour
+     the map will paint, so the control IS the colour. */
+  .iw-sw { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; padding:0;
+           background:none; cursor:pointer; display:block; }
+  .iw-sw::-webkit-color-swatch-wrapper { padding:2px; }
+  .iw-sw::-webkit-color-swatch { border:none; border-radius:6px; }
+  .iw-sw::-moz-color-swatch { border:none; border-radius:6px; }
+  .iw-sw[disabled] { cursor:default; }
+  .iw-sw.dirty { border-color:#f59e0b; box-shadow:0 0 0 2px #fef3c7; }
+  .iw-dot { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; display:block; }
+  .iw-row.no-map, .iw-head.no-map { grid-template-columns:24px 34px minmax(150px,1fr) 106px; }
+  .iw-head.no-map .iw-mapcol { display:none; }
+  .iw-add { display:flex; align-items:center; gap:8px; width:100%; margin-top:6px; padding:9px 12px;
+            border-radius:12px; border:1.5px dashed #99f6e4; background:#f0fdfa; color:#0f766e;
+            font-weight:900; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+            cursor:pointer; font-family:inherit; }
+  .iw-add:hover { background:#ccfbf1; }
+  .iw-btn { padding:9px 16px; border-radius:11px; font-size:11px; font-weight:900; letter-spacing:.08em;
+            text-transform:uppercase; cursor:pointer; border:1.5px solid transparent; font-family:inherit; }
+  .iw-btn-dark { background:#0f172a; color:white; }
+  .iw-btn-dark:hover { background:#1e293b; }
+  .iw-btn-ghost { background:white; color:#475569; border-color:#e2e8f0; }
+  .iw-btn-ghost:hover { background:#f8fafc; }
+  .iw-icon { width:34px; height:34px; border-radius:11px; background:white; border:1.5px solid #99f6e4;
+             color:#0f766e; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+             padding:0; transition:all .15s; }
+  .iw-icon:hover { background:#ccfbf1; }
+  .iw-icon svg { width:16px; height:16px; display:block; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div id="loading" class="max-w-[1000px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
+
+<div id="main" class="max-w-[1240px] mx-auto px-4 md:px-6 py-8 hidden palms-frame">
+
+  <aside id="palms-nav" data-page="settings" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body space-y-6">
+
+  <div class="card p-5 mb-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h2 class="text-base font-black text-slate-800 uppercase tracking-widest">⏱️ Ideal Work — the standard days</h2>
+      <span id="iw-rest-msg" class="text-[11px] font-bold text-slate-400 ml-auto mr-2"></span>
+      <button id="iw-edit" class="iw-icon hidden" title="Edit the standard days" aria-label="Edit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
+
+    <div class="iw-head">
+      <div></div><div>#</div><div>Work status</div><div class="iw-mapcol">Map</div><div class="text-right">Ideal days</div>
+    </div>
+    <div id="iw-list"></div>
+    <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
+
+    <div id="iw-actions" class="hidden items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+      <span id="iw-msg" class="text-[11px] font-bold text-slate-400 mr-auto"></span>
+      <button id="iw-cancel" class="iw-btn iw-btn-ghost">Cancel</button>
+      <button id="iw-save" class="iw-btn iw-btn-dark">Save</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 hidden z-[80] px-5 py-3 rounded-xl font-bold text-sm shadow-lg"></div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+let IW_ADMIN = false;  // may this person change the standard?
+let IW_ROWS = [];      // [{ id, name, days }] as the office last saved them
+let IW_EDIT = false;   // is the card in edit mode?
+
+/* ── Ideal Work: the standard days ────────────────────────────────────
+   These are nops_plot_status_stages — the same rows the PALMS Settings page
+   holds and the field app reads. They are edited HERE too because this is
+   the page where you find out a standard is wrong: the Shortest / Average /
+   Longest columns right below are what tell you two days was never
+   realistic, and having to leave for another page to act on that is how a
+   stale standard survives for a year.
+
+   The card is READ-ONLY until Edit is pressed. Nothing on this page is
+   changed by accident: no boxes, no drag, no Save to mis-click. Edit turns
+   all three on together, Cancel throws the draft away, and only Save writes.
+
+   IW_ROWS is what the office last saved. IW_WORK is the draft — a copy made
+   when Edit is pressed, mutated freely, and diffed against IW_ROWS on save
+   so an untouched row is never written. */
+let IW_WORK = [];      // the draft, only while editing
+let IW_SEQ = 0;        // ids for rows added but not yet saved
+
+function iwEditable() {
+  return IW_ADMIN && MJMPalms.ACTIVITIES.some((a) => a.stageId != null);
+}
+
+/* The colour column exists only after migration_palms_stage_colours.sql.
+   Until then the Map column is not drawn at all — a swatch that cannot be
+   saved is worse than no swatch. */
+const iwColours = () => typeof MJMPalms.hasStageColours !== 'function' || MJMPalms.hasStageColours();
+
+function renderIdealWork() {
+  // The grid has one fewer column when there is nowhere to store a colour.
+  document.querySelectorAll('.iw-head').forEach(function (el) {
+    el.classList.toggle('no-map', !iwColours());
+  });
+  IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, name: a.name, days: a.days, color: a.color }));
+
+  /* No stageId means shared_palms fell back to its built-in eleven, because
+     nops_plot_status_stages is empty or could not be read. There would be
+     nothing to save a change to, so editing is not offered and the reason is
+     said rather than left as a dead button. */
+  const fromOffice = IW_ROWS.some((r) => r.id != null);
+  const note = $('iw-note');
+  if (!fromOffice) {
+    note.className = 'text-[12px] font-bold text-amber-700 leading-relaxed mb-3';
+    /* This IS the Settings page, so "go to Settings" would be nonsense. Say
+       what is actually true: the table is empty or the read was refused. */
+    note.textContent = 'Showing the built-in defaults. The stage list could not be read — either the ' +
+      'table is empty, or your account is not allowed to read it. Nothing here can be saved until ' +
+      'that is sorted; run create_palms_tables.sql and migration_palms_stages_seed.sql if this ' +
+      'nursery has never been set up.';
+  } else {
+    note.className = 'hidden';
+  }
+
+  $('iw-edit').classList.toggle('hidden', IW_EDIT || !iwEditable());
+  $('iw-add').classList.toggle('hidden', !IW_EDIT);
+  // The action bar is display:flex when shown; toggling `hidden` alone would
+  // leave a flex container that is still laid out.
+  const bar = $('iw-actions');
+  bar.classList.toggle('hidden', !IW_EDIT);
+  bar.classList.toggle('flex', IW_EDIT);
+
+  const list = IW_EDIT ? IW_WORK : IW_ROWS;
+  $('iw-list').innerHTML = list.map((r, i) => {
+    if (!IW_EDIT) {
+      return '<div class="iw-row' + (iwColours() ? '' : ' no-map') + '">' +
+        '<div></div>' +
+        '<div class="iw-n">' + (i + 1) + '</div>' +
+        '<div class="iw-name">' + esc(r.name) + '</div>' +
+        (iwColours() ? '<span class="iw-dot" style="background:' + esc(r.color || '#94a3b8') + '"></span>' : '') +
+        '<div class="iw-ro">' + (r.days == null ? '—' : esc(r.days) + 'd') + '</div>' +
+        '</div>';
+    }
+    const was = r.id != null ? IW_ROWS.find((x) => String(x.id) === String(r.id)) : null;
+    const dDays = !was || String(r.days) !== String(was.days);
+    const dName = !was || String(r.name || '') !== String(was.name || '');
+    const dColor = !was || String(r.color || '') !== String(was.color || '');
+    /* Renaming is allowed here. It does NOT rewrite history: a plot log
+       stores the stage NUMBER, not its name, so past records simply start
+       reading under the new one. Moving a stage is the operation that
+       changes what a stored number means — which is why the drag handle,
+       not this box, is the one worth pausing over. */
+    return '<div class="iw-row edit' + (iwColours() ? '' : ' no-map') + '" draggable="false" data-key="' + esc(r.key) + '">' +
+      '<div class="iw-handle" data-iw-drag="' + esc(r.key) + '" title="Drag to reorder">⠿</div>' +
+      '<div class="iw-n">' + (i + 1) + '</div>' +
+      '<input class="iw-in name' + (dName ? ' dirty' : '') + '" data-iw-name="' + esc(r.key) + '" ' +
+        'placeholder="Work status name" value="' + esc(r.name || '') + '">' +
+      (iwColours()
+        ? '<input class="iw-sw' + (dColor ? ' dirty' : '') + '" type="color" ' +
+            'data-iw-color="' + esc(r.key) + '" value="' + esc(r.color || '#94a3b8') + '" ' +
+            'title="Colour on the Plot Status Map">'
+        : '') +
+      '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
+        'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
+      '</div>';
+  }).join('');
+}
+
+function iwEnter() {
+  // Every draft row carries a stable `key` — the database id for a saved
+  // stage, a made-up one for a new row. Drag and the boxes are addressed by
+  // it, so a row keeps its identity through reordering, when its INDEX does
+  // not and its id may not exist yet.
+  IW_WORK = IW_ROWS.map((r) => ({ id: r.id, key: 'k' + r.id, name: r.name, days: r.days,
+                                  color: r.color, isNew: false }));
+  IW_EDIT = true;
+  $('iw-msg').textContent = '';
+  $('iw-rest-msg').textContent = '';
+  renderIdealWork();
+}
+
+function iwLeave() {
+  IW_EDIT = false;
+  IW_WORK = [];
+  renderIdealWork();
+}
+
+$('iw-edit').addEventListener('click', iwEnter);
+$('iw-cancel').addEventListener('click', () => { $('iw-msg').textContent = ''; iwLeave(); });
+
+$('iw-add').addEventListener('click', () => {
+  // A new work starts grey rather than borrowing a colour already in use —
+  // two stages the same colour is a decision, not a default.
+  IW_WORK.push({ id: null, key: 'new' + (++IW_SEQ), name: '', days: null,
+                 color: '#94a3b8', isNew: true });
+  renderIdealWork();
+  const boxes = $('iw-list').querySelectorAll('[data-iw-name]');
+  if (boxes.length) boxes[boxes.length - 1].focus();
+});
+
+$('iw-list').addEventListener('input', (e) => {
+  const d = e.target.closest('[data-iw-days]');
+  if (d) {
+    const row = IW_WORK.find((r) => r.key === d.dataset.iwDays);
+    if (row) row.days = d.value === '' ? null : Number(d.value);
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    d.classList.toggle('dirty', !was || (row && String(row.days) !== String(was.days)));
+  }
+  const c = e.target.closest('[data-iw-color]');
+  if (c) {
+    const row = IW_WORK.find((r) => r.key === c.dataset.iwColor);
+    if (row) row.color = c.value;
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    c.classList.toggle('dirty', !was || (row && String(row.color || '') !== String(was.color || '')));
+  }
+  const n = e.target.closest('[data-iw-name]');
+  if (n) {
+    const row = IW_WORK.find((r) => r.key === n.dataset.iwName);
+    if (row) row.name = n.value;
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    n.classList.toggle('dirty', !was || (row && String(row.name || '') !== String(was.name || '')));
+  }
+  $('iw-msg').textContent = '';
+});
+
+/* ── Drag to reorder ──────────────────────────────────────────────
+   Pointer events, not HTML5 drag-and-drop: this has to work under a finger
+   on the tablet the office actually uses, and dragstart never fires there.
+
+   The DOM node is moved as the pointer passes each row's midpoint and the
+   draft array is kept in step, rather than re-rendering — a re-render mid
+   drag destroys the element the pointer is captured on and the drag dies on
+   the first move. Numbers are refreshed in place instead. */
+(function wireDrag() {
+  const list = $('iw-list');
+  let node = null, key = null;
+
+  const renumber = () => {
+    [].forEach.call(list.querySelectorAll('.iw-row'), (el, i) => {
+      const n = el.querySelector('.iw-n');
+      if (n) n.textContent = i + 1;
+    });
+  };
+
+  list.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest('[data-iw-drag]');
+    if (!h || !IW_EDIT) return;
+    key = h.dataset.iwDrag;
+    node = h.closest('.iw-row');
+    if (!node) { key = null; return; }
+    node.classList.add('dragging');
+    h.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  list.addEventListener('pointermove', (e) => {
+    if (!node) return;
+    const rows = [].slice.call(list.querySelectorAll('.iw-row'));
+    for (const other of rows) {
+      if (other === node) continue;
+      const r = other.getBoundingClientRect();
+      if (e.clientY > r.top && e.clientY < r.bottom) {
+        const before = other.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING;
+        list.insertBefore(node, before ? other : other.nextSibling);
+        renumber();
+        break;
+      }
+    }
+  });
+
+  const drop = () => {
+    if (!node) return;
+    node.classList.remove('dragging');
+    // The DOM is the order now; the draft follows it.
+    const order = [].map.call(list.querySelectorAll('.iw-row'), (el) => el.dataset.key);
+    IW_WORK.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    node = null; key = null;
+    $('iw-msg').textContent = '';
+  };
+  list.addEventListener('pointerup', drop);
+  list.addEventListener('pointercancel', drop);
+})();
+
+$('iw-save').addEventListener('click', async () => {
+  const msg = $('iw-msg');
+  msg.className = 'text-[11px] font-bold text-slate-400';
+
+  // A blank Add-new row the user never filled in is a mind changed, so it is
+  // dropped. An EXISTING stage emptied of its name is a mistake, and saying
+  // so beats silently keeping the old name or writing an unnamed stage.
+  const named = IW_WORK.filter((r) => !r.isNew || String(r.name || '').trim());
+  const blank = named.find((r) => !String(r.name || '').trim());
+  if (blank) {
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = 'A work status needs a name.';
+    return;
+  }
+  const bad = named.find((r) => r.days == null || !(r.days >= 0));
+  if (bad) {
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = 'Give ' + (String(bad.name || '').trim() || 'the new work') + ' a number of days.';
+    return;
+  }
+  // A blank Add-new row the user never filled in is a mind changed, not an
+  // error: it is dropped rather than refused.
+  const drafts = named;
+
+  const inserts = drafts.filter((r) => r.isNew).map((r) => ({
+    name: String(r.name).trim(), ideal_days: r.days, color: r.color || null,
+    sort_order: drafts.indexOf(r) + 1,
+  }));
+  const updates = drafts.filter((r) => !r.isNew).map((r, _i) => {
+    const was = IW_ROWS.find((x) => String(x.id) === String(r.id));
+    const pos = drafts.indexOf(r) + 1;
+    const patch = {};
+    if (!was || String(was.days) !== String(r.days)) patch.ideal_days = r.days;
+    if (!was || String(was.name || '') !== String(r.name || '')) patch.name = String(r.name).trim();
+    if (!was || String(was.color || '') !== String(r.color || '')) patch.color = r.color || null;
+    // sort_order is rewritten for every row whose position moved, not just
+    // the dragged one — everything after it shifts up or down by one.
+    if (IW_ROWS.findIndex((x) => String(x.id) === String(r.id)) !== pos - 1) patch.sort_order = pos;
+    return Object.keys(patch).length ? { id: r.id, patch: patch } : null;
+  }).filter(Boolean);
+
+  if (!inserts.length && !updates.length) { iwLeave(); return; }
+
+  $('iw-save').disabled = true;
+  msg.textContent = 'Saving…';
+  try {
+    for (const u of updates) {
+      const res = await _supabase.from('nops_plot_status_stages').update(u.patch).eq('id', u.id);
+      if (res.error) throw res.error;
+    }
+    if (inserts.length) {
+      const res = await _supabase.from('nops_plot_status_stages').insert(inserts);
+      if (res.error) throw res.error;
+    }
+    /* Re-read the stages and re-parse the log against them. The log stores
+       each entry's own ideal, so a FINISHED stage keeps the number it was
+       judged against — only the aggregates and anything still running move. */
+    /* No log to re-measure here — that happens on the Plot Status Map and
+       the Plot Motion Study, which read these same rows when they load. */
+    await MJMPalms.loadStages(_supabase);
+    iwLeave();
+    msg.textContent = '';
+    const rest = $('iw-rest-msg');
+    rest.className = 'text-[11px] font-bold text-emerald-600 ml-auto mr-2';
+    rest.textContent = 'Saved.';
+    setTimeout(() => { rest.textContent = ''; }, 4000);
+  } catch (err) {
+    console.warn(err);
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = (err && err.message) || 'Could not save.';
+  }
+  $('iw-save').disabled = false;
+});
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('nursery_ops')) {
+      alert('You do not have access to Nursery Operation Manage.');
+      window.location.href = '../index.html';
+      return;
+    }
+    /* Reading the list is for anyone in the module — the board and the motion
+       study are read against it, so seeing it explains them. Changing it is
+       admin only: these numbers decide what "late" means everywhere. */
+    IW_ADMIN = (function () {
+      /* Guarded the same way canOpenPage is below: a browser holding an
+         older cached shared_access.js has no isAdminOf, and an unguarded
+         call there takes the whole page down — every figure on it, not just
+         the edit button. Fails CLOSED: no admin rights from a script that
+         cannot answer the question. */
+      try {
+        return (typeof MJMAccess.isAdminOf === 'function' && MJMAccess.isAdminOf('nursery_ops'))
+            || (typeof MJMAccess.canManageUsers === 'function' && MJMAccess.canManageUsers());
+      } catch (e) { return false; }
+    })();
+    await MJMPalms.loadStages(_supabase);
+    renderIdealWork();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+    $('iw-list').innerHTML = '<div class="text-center text-slate-400 text-sm py-10">Could not load the stages.</div>';
+  }
+})();
+</script>
+</body>
+</html>

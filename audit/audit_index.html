@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#2b241d" />
+  <meta name="theme-color" content="#241f1c" />
   <title>555 Auditor Portal</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2712%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3E555%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,49 +12,46 @@
 
   <style>
     /* ══════════════════════════════════════════════════════════════════
-       THE 555 AUDIT BOOK
+       THE 555 EXERCISE BOOK — COVER
 
-       Every auditor in the nursery already carries one of these: the little
-       red 555 book, ruled pages, written in by hand at the end of a round.
-       So the login page is one — red cover spine down the left, gold 555 on
-       it, a taped title label, and the sign-in written on the lines.
+       The real thing: a soft coloured cover, the red 555 logotype printed
+       across the top, a lot of empty cover, and "Name……………" ruled near the
+       foot. Signing in is filling that line in.
 
-       The Scan portal is a different book on purpose (kraft cover, graph
-       paper, top spiral) so nobody opens the wrong one by muscle memory.
+       One design for both portals. Only the cover colour changes — pink
+       for the Auditor Portal, blue for the FC Scan Portal — the way the
+       books themselves come in a pile of colours.
        ══════════════════════════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --ink:      #1d3557;   /* pen */
-      --ink-soft: #5a7391;
-      --rule:     rgba(58,102,143,.23);
-      --paper:    #fffdf4;
-      --paper-2:  #f7f2e2;
-      --red:      #c1121f;
-      --red-dark: #8d0d18;
-      --gold:     #e9c46a;
-      --stamp:    #1a4d1a;
-      --pitch:    34px;      /* one ruled line */
+      /* the only line that differs between the two portals */
+      --cover:    #e8a9bd;
+      --cover-2:  #dc97ad;
+      --cover-3:  #cf8ba3;
+
+      --ink:      #23303f;   /* what you write with */
+      --quiet:    rgba(35,48,63,.62);  /* both lines on the cover */
+      /* The logotype and every button on this page are MJM's dark green,
+         not the printer's red the books themselves are stamped with. */
+      --green:    #1f7a45;
+      --green-2:  #155c33;
+      --green-3:  #0f4a29;
+      --green-4:  #0b3d21;
       --hand:     'Caveat', 'Bradley Hand', 'Segoe Script', 'Comic Sans MS', cursive;
-      --ruling:   repeating-linear-gradient(to bottom,
-                    transparent 0 calc(var(--pitch) - 1px),
-                    var(--rule) calc(var(--pitch) - 1px) var(--pitch));
     }
 
     html, body {
       min-height: 100%;
       font-family: 'DM Sans', sans-serif;
-      background: #2b241d;
+      background: #241f1c;
       color: var(--ink);
       -webkit-font-smoothing: antialiased;
     }
-
-    /* ── The desk the book is lying on ── */
     body::before {
       content: '';
       position: fixed; inset: 0;
-      background:
-        radial-gradient(ellipse at 50% 35%, #3b3227 0%, #241e18 62%, #17130f 100%);
+      background: radial-gradient(ellipse at 50% 34%, #3a322b 0%, #221d19 62%, #14100e 100%);
       z-index: 0;
     }
 
@@ -63,205 +60,153 @@
       min-height: 100vh;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      padding: 26px 14px 22px;
+      padding: 26px 16px 20px;
     }
 
-    /* ── The book ── */
+    /* ── the book, with the inside pages showing past the cover ── */
     .book {
-      width: 100%; max-width: 430px;
-      display: flex;
-      border-radius: 3px 16px 16px 3px;
-      overflow: hidden;
-      transform: rotate(-0.35deg);
-      box-shadow:
-        0 26px 60px rgba(0,0,0,.55),
-        0 3px 0 #e6dfcd,
-        0 6px 0 #cfc7b2;
+      position: relative;
+      width: 100%; max-width: 400px;
       animation: bookIn .5s ease both;
     }
+    /* cream, yellow and green sheets stacked a little proud of the cover */
+    .edges { position: absolute; inset: 0; }
+    .edges i {
+      position: absolute; top: 7px; bottom: 5px;
+      border-radius: 0 3px 3px 0;
+      box-shadow: 2px 2px 5px rgba(0,0,0,.35);
+    }
+    .edges i:nth-child(1) { right: -13px; width: 15px; background: #d7dfb8; }
+    .edges i:nth-child(2) { right:  -9px; width: 13px; background: #f2ea9e; top: 12px; bottom: 10px; }
+    .edges i:nth-child(3) { right:  -5px; width: 11px; background: #fdf9e6; top: 17px; bottom: 15px; }
 
-    /* red cover, seen edge-on */
-    .spine {
-      flex: 0 0 40px;
+    .cover {
+      position: relative;
       background:
-        linear-gradient(90deg, var(--red-dark) 0%, var(--red) 42%, #a9101c 78%, #6f0b14 100%);
-      position: relative;
-      display: flex; align-items: center; justify-content: center;
-      padding: 14px 0;
+        /* the paper is never evenly printed */
+        radial-gradient(ellipse at 32% 62%, rgba(255,255,255,.18), transparent 46%),
+        radial-gradient(ellipse at 78% 18%, rgba(0,0,0,.05), transparent 52%),
+        repeating-linear-gradient(101deg, rgba(255,255,255,.045) 0 2px, transparent 2px 6px),
+        linear-gradient(160deg, var(--cover) 0%, var(--cover-2) 78%, var(--cover-3) 100%);
+      border-radius: 3px 6px 6px 3px;
+      padding: 30px 26px 26px;
+      box-shadow:
+        0 26px 60px rgba(0,0,0,.55),
+        inset 0 0 0 1px rgba(255,255,255,.16),
+        inset 3px 0 0 rgba(0,0,0,.10);
+      transform: rotate(-.4deg);
     }
-    /* the black gummed tape down the fold */
-    .spine::after {
+    /* the fold, and the staple that holds it */
+    .cover::before {
       content: '';
-      position: absolute; top: 0; bottom: 0; right: 0;
-      width: 7px;
-      background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.18));
+      position: absolute; left: 0; top: 0; bottom: 0; width: 9px;
+      background: linear-gradient(90deg, rgba(0,0,0,.16), transparent);
+      border-radius: 3px 0 0 3px;
     }
-    .spine-num {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      font-weight: 900;
-      font-size: 21px;
-      letter-spacing: .22em;
-      color: var(--gold);
-      text-shadow: 0 1px 0 rgba(0,0,0,.35);
-    }
-    .spine-word {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      font-size: 8px; font-weight: 700;
-      letter-spacing: .34em;
-      text-transform: uppercase;
-      color: rgba(255,235,210,.55);
-      margin-top: 14px;
+    /* the thumbed-over smudge every one of these books picks up */
+    .smudge {
+      position: absolute; left: 26%; top: 56%;
+      width: 46%; height: 15%;
+      background: radial-gradient(ellipse, rgba(90,60,50,.13), transparent 68%);
+      transform: rotate(-7deg);
+      pointer-events: none;
     }
 
-    /* ── The page ── */
-    .paper {
-      flex: 1; min-width: 0;
-      background: var(--paper);
-      padding: 22px 20px 0 30px;
-      position: relative;
-    }
-    /* margin rule, drawn twice the way a printed exercise book does */
-    .paper::before {
-      content: '';
-      position: absolute; left: 19px; top: 0; bottom: 0;
-      width: 4px;
-      border-left: 1.5px solid rgba(193,18,31,.30);
-      border-right: 1px solid rgba(193,18,31,.16);
-    }
-
-    /* the 555 seal, inked on by hand */
-    .seal {
-      position: absolute; top: 16px; right: 14px;
-      width: 62px; height: 44px;
-      border: 2px solid rgba(193,18,31,.42);
-      border-radius: 50%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      transform: rotate(9deg);
-      color: rgba(193,18,31,.5);
-      opacity: .9;
-    }
-    .seal b { font-size: 13px; font-weight: 900; letter-spacing: .08em; line-height: 1; }
-    .seal i { font-style: normal; font-size: 6px; font-weight: 700; letter-spacing: .18em; margin-top: 2px; }
-
-    /* ── Title block, above the first line ── */
+    /* ── the 555 logotype ── */
+    /* A centred, letter-spaced line is NOT centred: CSS puts the space
+       after the last letter too, so the ink sits half a letter-space left
+       of the box. An equal text-indent cancels it, and one --ls feeds both
+       so a breakpoint cannot change one and forget the other. */
     .brand {
-      padding-right: 74px;
-      padding-bottom: 10px;
-      background-image: var(--ruling);
-      background-position: left bottom;
+      --ls: .26em;
+      text-align: center;
+      font-size: 19px; font-weight: 900;
+      letter-spacing: var(--ls); text-indent: var(--ls);
+      text-transform: uppercase;
+      color: var(--quiet);
+      margin-bottom: 2px;
     }
-    .tape {
+    .logo-wrap { text-align: center; margin-bottom: 4px; }
+    .logo555 {
       display: inline-block;
-      background: var(--paper-2);
-      border: 1.5px solid #d9cfb4;
-      box-shadow: 0 0 0 3px var(--paper), 1px 2px 0 rgba(0,0,0,.06);
-      padding: 5px 12px 4px;
-      transform: rotate(-1.4deg);
-      margin-bottom: 12px;
-    }
-    .tape span {
-      display: block;
-      font-size: 9.5px; font-weight: 900;
-      letter-spacing: .3em; text-transform: uppercase;
-      color: #6b5b3e;
-    }
-    .tape em {
-      display: block;
-      font-style: normal;
-      font-size: 8px; font-weight: 700;
-      letter-spacing: .22em; text-transform: uppercase;
-      color: #a08f6c; margin-top: 2px;
-    }
-    .brand-name {
-      font-family: var(--hand);
-      font-size: 34px; line-height: .95;
-      white-space: nowrap;
-      color: var(--ink);
-    }
-    .brand-name span { color: var(--red); }
-    .brand-sub {
-      font-size: 9.5px; font-weight: 700;
-      letter-spacing: .1em; text-transform: uppercase;
-      color: var(--ink-soft);
-      margin-top: 4px; white-space: nowrap;
-    }
-
-    .login-heading {
-      font-family: var(--hand);
-      font-size: 25px; color: var(--ink);
-      margin-top: 12px;
-    }
-    .login-sub {
-      font-size: 11.5px; color: var(--ink-soft);
-      margin-top: 1px;
-    }
-
-    /* ── Ruled writing area ────────────────────────────────────────────
-       The ruling and the fields share one rhythm (--pitch), so a field's
-       bottom edge lands exactly on a printed line and the value is written
-       ON the line rather than in a box floating over it. ── */
-    .sheet {
-      background-image: var(--ruling);
-      background-position: left top;
-      padding-top: var(--pitch);        /* one clear line under the title */
-    }
-
-    .field { height: calc(var(--pitch) * 2); }
-    .field-label {
-      display: block;
-      height: var(--pitch);
-      line-height: calc(var(--pitch) - 4px);
-      font-size: 10px; font-weight: 900;
-      letter-spacing: .16em; text-transform: uppercase;
-      color: var(--ink-soft);
-    }
-    .field-input-wrap { position: relative; height: var(--pitch); }
-    .field-input {
-      width: 100%; height: var(--pitch);
-      padding: 0 34px 4px 2px;
-      border: 0; background: transparent; outline: none;
-      font-family: var(--hand);
-      font-size: 22px; color: var(--ink);
-      -webkit-appearance: none;
-      border-radius: 0;
-    }
-    .field-input::placeholder {
       font-family: 'DM Sans', sans-serif;
-      font-size: 12.5px; color: #b9b3a2;
+      font-weight: 900;
+      /* Grows with the phone, the way the Admin and FC covers do. */
+      font-size: clamp(74px, 24vw, 100px); line-height: .9;
+      letter-spacing: -.02em;
+      font-style: italic;
+      color: var(--green);
+      -webkit-text-stroke: 1.5px #f4fbf6;
+      paint-order: stroke fill;
+      text-shadow:
+        1px 1px 0 var(--green-2), 2px 2px 0 var(--green-2),
+        3px 3px 0 var(--green-2), 4px 4px 0 var(--green-2),
+        5px 5px 0 var(--green-3), 6px 6px 0 var(--green-3),
+        7px 7px 0 var(--green-4), 8px 8px 0 var(--green-4),
+        10px 12px 16px rgba(6,42,22,.4);
+      /* The Admin cover's nudge, and it applies here for the same reason
+         it applies there: with a house name above it the 555 sits below the
+         cover's centre, where the -.4deg tilt swings ink right rather than
+         left, and the glyphs' own lean adds to it. This cover used to have
+         no nudge because the 555 was its top line and the two effects
+         cancelled — that stopped being true the moment MJM NURSERY went
+         above it. */
+      transform: translateX(calc(2.7px - .108em)) rotate(-1.2deg);
     }
-    /* focus marks the line being written on — no glowing box */
-    .field-input:focus { background: linear-gradient(rgba(233,196,106,.11), rgba(233,196,106,.11)); }
-    .field-input:focus + .pw-toggle svg,
-    .field-input-wrap:focus-within .rule-strong { opacity: 1; }
-    .rule-strong {
-      position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
-      background: var(--ink); opacity: 0; transition: opacity .15s;
+    /* A centred, letter-spaced line is NOT centred: CSS puts the space
+       after the last letter too, so the ink sits half a letter-space left
+       of the box. An equal text-indent puts it back — indent and trailing
+       space cancel. Both come off one --ls so the pair cannot drift. */
+    .portal-name {
+      --ls: .3em;
+      margin-top: 14px;
+      text-align: center;
+      font-size: 14px; font-weight: 900;
+      letter-spacing: var(--ls); text-indent: var(--ls);
+      text-transform: uppercase;
+      color: var(--quiet);
     }
 
-    .pw-toggle {
-      position: absolute; right: 2px; bottom: 5px;
-      background: none; border: none; padding: 4px; cursor: pointer;
-    }
-    .pw-toggle svg {
-      width: 17px; height: 17px;
-      stroke: #a9a293; fill: none; stroke-width: 1.7;
-      stroke-linecap: round; stroke-linejoin: round;
-      transition: stroke .15s;
-    }
-    .pw-toggle:hover svg { stroke: var(--ink); }
+    /* The cover asks for your name on a ruled line; a phone in a nursery
+       asks for a box big enough to hit with a thumb. Boxes win — drawn
+       freehand, so they still belong on the cover. */
+    .lines { margin-top: 34px; }
 
-    /* ── Marked in red pen ── */
+    .row { position: relative; margin-bottom: 13px; }
+    .write {
+      display: block; width: 100%; height: 54px;
+      padding: 0 15px;
+      background: rgba(255,255,255,.6);
+      border: 1.5px solid rgba(35,48,63,.32);
+      border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
+      font-family: var(--hand);
+      font-size: 23px; color: var(--ink);
+      outline: none; -webkit-appearance: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .write::placeholder {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 700; letter-spacing: .02em;
+      color: rgba(35,48,63,.42);
+    }
+    .write:focus {
+      background: rgba(255,255,255,.82);
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(31,122,69,.16);
+    }
+    /* the label is inside the box now, so the tag beside it is retired */
+    .row-tag { display: none; }
+
+
+    /* ── marked in red pen ── */
     .error-msg {
       display: none;
       font-family: var(--hand);
       font-size: 19px; line-height: 1.15;
-      color: #b3261e;
-      padding: 4px 2px 6px;
-      border-bottom: 2px solid rgba(179,38,30,.4);
-      margin-bottom: 8px;
+      color: #8f1120;
+      padding: 2px 2px 4px;
+      border-bottom: 2px solid rgba(143,17,32,.45);
+      margin: 0 0 14px;
       animation: shake .35s ease;
     }
     .error-msg.show { display: block; }
@@ -273,32 +218,28 @@
       80% { transform: translateX(4px); }
     }
 
-    /* ── Rubber stamp ── */
+    /* ── the button, printed on the cover like the logo ── */
     .btn-login {
-      width: 100%; height: calc(var(--pitch) * 1.5);
-      margin-top: calc(var(--pitch) / 2);
-      background: var(--stamp);
-      color: #fdf8e9;
-      border: 2px solid #0e2b0e;
-      /* uneven radii: drawn, not printed */
-      border-radius: 11px 8px 13px 7px / 8px 13px 7px 11px;
-      box-shadow: 3px 3px 0 rgba(14,43,14,.32);
-      transform: rotate(-.7deg);
+      width: 100%; height: 50px;
+      margin-top: 22px;
+      background: var(--green-2);
+      color: #f2fbf5;
+      border: 2px solid rgba(9,58,32,.9);
+      border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
+      box-shadow: 3px 3px 0 rgba(7,45,25,.35);
+      transform: rotate(-.5deg);
       font-family: 'DM Sans', sans-serif;
       font-size: 13px; font-weight: 900;
-      letter-spacing: .18em; text-transform: uppercase;
+      letter-spacing: .2em; text-transform: uppercase;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 9px;
-      transition: box-shadow .12s, transform .12s, background .15s;
+      transition: transform .12s, box-shadow .12s, background .15s;
     }
-    .btn-login:hover { background: #236023; }
-    .btn-login:active {
-      transform: rotate(-.7deg) translate(3px, 3px);
-      box-shadow: 0 0 0 rgba(14,43,14,.32);
-    }
+    .btn-login:hover { background: var(--green); }
+    .btn-login:active { transform: rotate(-.5deg) translate(3px,3px); box-shadow: 0 0 0; }
     .btn-login svg {
       width: 16px; height: 16px;
-      stroke: #fdf8e9; fill: none; stroke-width: 2;
+      stroke: #fff3f4; fill: none; stroke-width: 2;
       stroke-linecap: round; stroke-linejoin: round;
     }
     .btn-login.loading { pointer-events: none; opacity: .85; }
@@ -315,35 +256,26 @@
     .btn-login.loading .btn-icon { display: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Pencilled notes at the foot of the page ── */
+    /* ── pencilled at the foot of the cover ── */
     .auth-links {
       display: flex; justify-content: space-between;
       align-items: baseline;
-      height: var(--pitch);
-      margin-top: calc(var(--pitch) / 2);
-      background-image: var(--ruling);
+      margin-top: 16px;
     }
     .auth-link {
       font-family: var(--hand);
       font-size: 18px;
       color: var(--ink);
       background: none; border: none;
-      border-bottom: 1.5px dashed rgba(29,53,87,.45);
+      border-bottom: 1.5px dashed rgba(35,48,63,.4);
       padding: 0 1px; cursor: pointer;
-      text-decoration: none;
     }
-    .auth-link:hover { color: var(--red); border-bottom-color: rgba(193,18,31,.6); }
+    .auth-link:hover { color: var(--print); border-bottom-color: rgba(156,28,44,.6); }
 
-    /* Lines carry on to the foot of the page — a ruled book does not stop
-       ruling where the writing stops. */
-    .tail {
-      height: calc(var(--pitch) * 2);
-      background-image: var(--ruling);
-    }
 
     .demo-hint { display: none; }
 
-    /* ── Slips torn out of the book (modals) ── */
+    /* ── a sheet pulled out of the book (modals) ── */
     .modal-bg {
       position: fixed; inset: 0;
       background: rgba(20,15,10,.72);
@@ -354,74 +286,67 @@
     }
     .modal-bg.show { opacity: 1; pointer-events: all; }
     .modal-sheet {
-      width: 100%; max-width: 460px;
-      background: var(--paper);
+      width: 100%; max-width: 440px;
+      background: #fffdf3;
       color: var(--ink);
-      border-top: 5px solid var(--red);
+      border-top: 6px solid var(--green-2);
       border-radius: 14px 14px 0 0;
-      padding: 22px 20px 34px 26px;
-      position: relative;
+      padding: 22px 22px 34px;
       transform: translateY(22px);
       transition: transform .25s;
       max-height: 92vh; overflow-y: auto;
     }
     .modal-bg.show .modal-sheet { transform: translateY(0); }
-    .modal-sheet::before {
-      content: '';
-      position: absolute; left: 13px; top: 0; bottom: 0;
-      width: 4px;
-      border-left: 1.5px solid rgba(193,18,31,.28);
-      border-right: 1px solid rgba(193,18,31,.14);
-    }
     .modal-title {
       font-family: var(--hand);
       font-size: 27px; color: var(--ink); margin-bottom: 2px;
     }
     .modal-sub {
-      font-size: 11.5px; color: var(--ink-soft);
-      margin-bottom: 16px; line-height: 1.5;
+      font-size: 11.5px; color: #78807f;
+      margin-bottom: 18px; line-height: 1.5;
     }
-    .modal-field { margin-bottom: 6px; }
+    .modal-field {
+      border-bottom: 2px dotted rgba(80,35,45,.35);
+      margin-bottom: 14px; padding-bottom: 2px;
+    }
     .modal-label {
       display: block;
-      font-size: 9.5px; font-weight: 900;
-      letter-spacing: .18em; text-transform: uppercase;
-      color: var(--ink-soft);
-      margin-bottom: 2px;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 15px; font-weight: 700;
+      color: var(--print);
+      text-transform: lowercase;
     }
+    .modal-label::first-letter { text-transform: uppercase; }
     .modal-input {
-      width: 100%; height: var(--pitch);
-      padding: 0 2px 4px;
-      border: 0; border-bottom: 1.5px solid var(--rule);
-      background: transparent; outline: none;
+      width: 100%; height: 34px;
+      border: 0; background: transparent; outline: none;
       font-family: var(--hand);
-      font-size: 21px; color: var(--ink);
+      font-size: 22px; color: var(--ink);
       border-radius: 0; -webkit-appearance: none;
     }
     .modal-input::placeholder {
       font-family: 'DM Sans', sans-serif;
       font-size: 12px; color: #bdb7a6;
     }
-    .modal-input:focus { border-bottom-color: var(--ink); }
     .modal-btn {
-      width: 100%; height: 48px; margin-top: 16px;
-      background: var(--stamp); color: #fdf8e9;
-      border: 2px solid #0e2b0e;
-      border-radius: 11px 8px 13px 7px / 8px 13px 7px 11px;
-      box-shadow: 3px 3px 0 rgba(14,43,14,.3);
-      transform: rotate(-.6deg);
+      width: 100%; height: 48px; margin-top: 10px;
+      background: var(--green-2); color: #f2fbf5;
+      border: 2px solid rgba(9,58,32,.9);
+      border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
+      box-shadow: 3px 3px 0 rgba(7,45,25,.3);
+      transform: rotate(-.5deg);
       font-family: 'DM Sans', sans-serif;
       font-size: 12px; font-weight: 900;
-      letter-spacing: .16em; text-transform: uppercase;
+      letter-spacing: .18em; text-transform: uppercase;
       cursor: pointer;
     }
-    .modal-btn:hover { background: #236023; }
+    .modal-btn:hover { background: var(--green); }
     .modal-btn.loading { opacity: .6; pointer-events: none; }
     .modal-cancel {
       width: 100%; height: 40px; margin-top: 10px;
       background: none; border: none;
       font-family: var(--hand);
-      font-size: 18px; color: var(--ink-soft);
+      font-size: 18px; color: #78807f;
       cursor: pointer;
     }
     .modal-cancel:hover { color: var(--ink); }
@@ -429,42 +354,31 @@
       display: none;
       font-family: var(--hand);
       font-size: 18px; line-height: 1.2;
-      padding: 4px 2px 6px; margin-bottom: 8px;
+      padding: 3px 2px 5px; margin-bottom: 10px;
       border-bottom: 2px solid;
     }
-    .modal-error   { color: #b3261e; border-bottom-color: rgba(179,38,30,.4); }
+    .modal-error   { color: #8f1120; border-bottom-color: rgba(143,17,32,.45); }
     .modal-success { color: #1a4d1a; border-bottom-color: rgba(26,77,26,.4); }
     .modal-error.show, .modal-success.show { display: block; }
 
-    /* ── Foot of the desk ── */
-    .login-footer {
-      margin-top: 22px;
-      font-family: var(--hand);
-      font-size: 15px;
-      color: rgba(255,248,231,.32);
-      text-align: center;
-      animation: fadeUp .6s .25s ease both;
-    }
 
     @keyframes bookIn {
-      from { opacity: 0; transform: rotate(-2.4deg) translateY(16px) scale(.985); }
-      to   { opacity: 1; transform: rotate(-.35deg) translateY(0) scale(1); }
+      from { opacity: 0; transform: translateY(16px) scale(.985); }
+      to   { opacity: 1; transform: none; }
     }
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Small phones: keep the page from feeling cramped ── */
     @media (max-width: 360px) {
-      .spine { flex-basis: 32px; }
-      .paper { padding-left: 26px; padding-right: 16px; }
-      .brand-name { font-size: 33px; }
-      .seal { width: 54px; height: 40px; }
-      .brand { padding-right: 62px; }
+      .cover { padding: 26px 20px 22px; }
+      .portal-name { --ls: .26em; font-size: 12px; }
+      .brand { --ls: .2em; font-size: 16px; }
     }
-    @media (min-height: 780px) {
-      .page { padding-top: 40px; padding-bottom: 34px; }
+    @media (min-height: 800px) {
+      .lines { margin-top: 48px; }
+      .cover { padding-top: 40px; padding-bottom: 32px; }
     }
   </style>
 </head>
@@ -472,100 +386,72 @@
 
 <div class="page">
 
-  <!-- ══ The 555 audit book ══ -->
+  <!-- ══ The 555 exercise book, cover up ══ -->
   <div class="book">
 
-    <!-- red cover, seen down the fold -->
-    <div class="spine">
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <span class="spine-num">555</span>
-        <span class="spine-word">Audit</span>
+    <!-- the inside pages, showing past the cover -->
+    <div class="edges" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <div class="cover">
+      <div class="smudge" aria-hidden="true"></div>
+
+      <!-- The Admin Portal's order, line for line: whose book it is, the
+           book, then the portal it opens. The third line this cover used to
+           carry ("Sign in to the 555 Auditor Portal") said what the portal
+           name already says. -->
+      <div class="brand">MJM Nursery</div>
+      <div class="logo-wrap">
+        <div class="logo555">555</div>
       </div>
-    </div>
+      <div class="portal-name" data-t="auditor_portal">Auditor Portal</div>
 
-    <div class="paper">
+      <div class="lines">
 
-      <!-- inked seal -->
-      <div class="seal"><b>MJM</b><i>NURSERY</i></div>
-
-      <div class="brand">
-        <div class="tape">
-          <span>555</span>
-          <em>Buku Audit</em>
-        </div>
-        <div class="brand-name">Auditor <span>Portal</span></div>
-        <div class="brand-sub">MJM Nursery · Mega Jutamas Sdn Bhd</div>
-        <div class="login-heading" data-t="login_welcome">Welcome back</div>
-        <div class="login-sub" data-t="login_sub">Sign in to the 555 Auditor Portal</div>
-      </div>
-
-      <div class="error-msg" id="error-msg">
-        Incorrect username or password. Please try again.
-      </div>
-
-      <!-- written on the lines -->
-      <div class="sheet">
-
-        <div class="field">
-          <label class="field-label" for="email" data-t="email_label">Email</label>
-          <div class="field-input-wrap">
-            <input
-              class="field-input"
-              id="email"
-              type="email"
-              placeholder="your@email.com"
-              autocomplete="email"
-              autocapitalize="none"
-              onkeydown="if(event.key==='Enter') document.getElementById('password').focus()"
-            />
-            <div class="rule-strong"></div>
-          </div>
+        <div class="error-msg" id="error-msg">
+          Incorrect username or password. Please try again.
         </div>
 
-        <div class="field">
-          <label class="field-label" for="password" data-t="password_label">Password</label>
-          <div class="field-input-wrap">
-            <input
-              class="field-input"
-              id="password"
-              type="password"
-              placeholder="••••••"
-              autocomplete="current-password"
-              onkeydown="if(event.key==='Enter') doLogin()"
-            />
-            <button class="pw-toggle" type="button" onclick="togglePw()" title="Show / hide password">
-              <svg id="pw-icon" viewBox="0 0 24 24">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
-            <div class="rule-strong"></div>
-          </div>
+        <div class="row">
+          <span class="row-tag" data-t="email_label">Email</span>
+          <input
+            class="write"
+            id="email"
+            placeholder="Email Address"
+            type="email"
+            autocomplete="email"
+            autocapitalize="none"
+            onkeydown="if(event.key==='Enter') document.getElementById('password').focus()"
+          />
+        </div>
+
+        <div class="row">
+          <span class="row-tag" data-t="password_label">Password</span>
+          <input
+            class="write"
+            id="password"
+            placeholder="Password"
+            type="password"
+            autocomplete="current-password"
+            onkeydown="if(event.key==='Enter') doLogin()"
+          />
+        </div>
+
+        <button class="btn-login" id="btn-login" onclick="doLogin()">
+          <div class="spinner"></div>
+          <span class="btn-text" data-t="login_btn">Login</span>
+        </button>
+
+        <div class="auth-links">
+          <button class="auth-link" onclick="showForgotPassword()" data-t="forgot_password">Forgot Password?</button>
+          <button class="auth-link" onclick="showSignUp()" data-t="sign_up_btn">Create Account</button>
         </div>
 
       </div>
-
-      <button class="btn-login" id="btn-login" onclick="doLogin()">
-        <div class="spinner"></div>
-        <svg class="btn-icon" viewBox="0 0 24 24">
-          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
-          <polyline points="10 17 15 12 10 7"/>
-          <line x1="15" y1="12" x2="3" y2="12"/>
-        </svg>
-        <span class="btn-text" data-t="login_btn">Sign In</span>
-      </button>
-
-      <div class="auth-links">
-        <button class="auth-link" onclick="showForgotPassword()" data-t="forgot_password">Forgot Password?</button>
-        <button class="auth-link" onclick="showSignUp()" data-t="sign_up">Sign Up</button>
-      </div>
-
-      <div class="tail"></div>
 
     </div>
   </div>
 
-  <!-- FORGOT PASSWORD — a slip torn out of the book -->
+  <!-- FORGOT PASSWORD -->
   <div class="modal-bg" id="forgot-modal" onclick="if(event.target===this)hideForgotPassword()">
     <div class="modal-sheet">
       <div class="modal-title" data-t="forgot_title">Reset Password</div>
@@ -574,7 +460,7 @@
       <div class="modal-success" id="forgot-success"></div>
       <div class="modal-field">
         <label class="modal-label" data-t="email_label">Email</label>
-        <input class="modal-input" id="forgot-email" type="email" placeholder="your@email.com" autocomplete="email"/>
+        <input class="modal-input" id="forgot-email" type="email" placeholder="Email Address" autocomplete="email"/>
       </div>
       <button class="modal-btn" id="forgot-btn" onclick="doForgotPassword()" data-t="send_reset">Send Reset Link</button>
       <button class="modal-cancel" onclick="hideForgotPassword()" data-t="cancel">Cancel</button>
@@ -590,26 +476,25 @@
       <div class="modal-success" id="signup-success"></div>
       <div class="modal-field">
         <label class="modal-label" data-t="full_name_label">Full Name</label>
-        <input class="modal-input" id="signup-name" type="text" placeholder="e.g. Ahmad bin Ali" autocomplete="name"/>
+        <input class="modal-input" id="signup-name" type="text" autocomplete="name"/>
       </div>
       <div class="modal-field">
         <label class="modal-label" data-t="email_label">Email</label>
-        <input class="modal-input" id="signup-email" type="email" placeholder="your@email.com" autocomplete="email"/>
+        <input class="modal-input" id="signup-email" type="email" autocomplete="email"/>
       </div>
       <div class="modal-field">
         <label class="modal-label" data-t="password_label">Password</label>
-        <input class="modal-input" id="signup-password" type="password" placeholder="Min. 6 characters" autocomplete="new-password"/>
+        <input class="modal-input" id="signup-password" type="password" autocomplete="new-password"/>
       </div>
       <button class="modal-btn" id="signup-btn" onclick="doSignUp()" data-t="sign_up_btn">Create Account</button>
       <button class="modal-cancel" onclick="hideSignUp()" data-t="cancel">Cancel</button>
     </div>
   </div>
 
-  <div class="login-footer">© 2025 Mega Jutamas Sdn Bhd · Miri, Sarawak</div>
 
 </div>
 
-<script src="audit_lang.js?v=20260823o"></script>
+<script src="audit_lang.js?v=20260825b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
@@ -620,9 +505,23 @@
      with the way through to the audit portal); everyone else goes straight
      to the auditor view. Kept here rather than imported because this page
      deliberately does not load audit_supabase.js. */
+  /* The portal an admin set for this auditor on Settings → User Access.
+     Applied at sign-in rather than only as a default, so an auditor who
+     switched nursery once still starts each session where their work is.
+     The key matches scopeKey() in audit_login_guard.js — keep the two in
+     step; this page deliberately does not load that file. */
+  function applyLandingScope(u){
+    try{
+      const want = String((u.permissions && u.permissions.audit_landing) || '').toUpperCase();
+      if (want !== 'PN' && want !== 'MN') return;
+      localStorage.setItem('mjm_nursery_scope:' + (u.id || u.email || 'anon'), want);
+    }catch(e){}
+  }
+
   function auditLanding(){
     try{
       const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+      applyLandingScope(u);
       const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
       const role = (u.audit_role || u.role || '').toLowerCase();
       if (mod === 'admin' || role === 'admin' || role === 'administrator')
@@ -655,17 +554,6 @@
   window.addEventListener('online', updateOfflineBar);
   window.addEventListener('offline', updateOfflineBar);
 
-  function togglePw() {
-    const input = document.getElementById('password');
-    const icon  = document.getElementById('pw-icon');
-    if (input.type === 'password') {
-      input.type = 'text';
-      icon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
-    } else {
-      input.type = 'password';
-      icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
-    }
-  }
 
   async function doLogin() {
     const email    = document.getElementById('email').value.trim().toLowerCase();
@@ -863,8 +751,5 @@
 
 </script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
-<div style="position:fixed;top:14px;right:14px;z-index:100">
-  <button class="lang-toggle-btn" onclick="toggleLang()" style="height:30px;padding:0 14px;border-radius:4px 4px 10px 10px;background:#f6efdd;border:1.5px solid #d9cfb4;color:#6b5b3e;font-size:11px;font-weight:900;letter-spacing:.14em;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.35);transform:rotate(1.2deg)">BM</button>
-</div>
 </body>
 </html>

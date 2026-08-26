@@ -280,7 +280,10 @@ mainBtn.addEventListener('click', async () => {
 
   if (isSignUpMode) {
     const name = document.getElementById('user-name').value.trim();
-    const { error } = await _supabase.auth.signUp({ email, password: pw, options: { data: { full_name: name } } });
+    // user_type must be stamped at signup: handle_new_user() defaults a
+    // missing one to 'system', which is what _mjm_is_staff() reads as staff.
+    const { error } = await _supabase.auth.signUp({ email, password: pw,
+      options: { data: { full_name: name, user_type: 'customer' } } });
     if (error) { alert('Signup Error: ' + error.message); mainBtn.innerText = 'Sign Up'; }
     else {
       alert('Account created! You can now log in.');
@@ -351,5 +354,9 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 // ── Enter key ─────────────────────────────────────────────
 document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') mainBtn.click(); });
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

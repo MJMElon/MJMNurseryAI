@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NELOS — User Setting</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_nelos.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .hidden { display:none !important; }
+  /* The way out sits above the title, as a button rather than a link — it
+     is pressed as often as anything else on the page. */
+  .backlink { display:inline-flex; align-items:center; gap:7px; margin-bottom:14px;
+              padding:9px 16px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff;
+              color:#6d28d9; font-size:10.5px; font-weight:900; letter-spacing:.08em;
+              text-transform:uppercase; text-decoration:none;
+              box-shadow:0 3px 10px rgba(124,58,237,.10); }
+  .backlink:hover { background:#ede9fe; }
+
+  .page-title { font-size:18px; font-weight:900; color:#1e293b; text-align:center; margin:0 0 14px; }
+
+  /* Tabs, not buttons: one strip, the live one underlined. Three pills in a
+     row read as three things to press; a tab strip reads as one thing with
+     three faces, which is what this is. */
+  .tabs { display:flex; gap:26px; margin-bottom:18px; flex-wrap:wrap;
+          border-bottom:1.5px solid #ede9fe; justify-content:center; }
+  .tab { padding:0 2px 10px; border:none; background:none; cursor:pointer;
+         color:#94a3b8; font-size:12.5px; font-weight:800; letter-spacing:.01em;
+         border-bottom:2.5px solid transparent; margin-bottom:-1.5px; }
+  .tab:hover { color:#6d28d9; }
+  .tab.on { color:#4c1d95; font-weight:900; border-bottom-color:#7c3aed; }
+
+  .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:12px;
+          box-shadow:0 4px 16px rgba(124,58,237,.06); overflow:hidden; }
+
+  /* ── Person row ─────────────────────────────────────────────── */
+  .person { display:flex; align-items:center; gap:11px; padding:13px 16px; cursor:pointer; }
+  .person:hover { background:#faf5ff; }
+  .av { width:36px; height:36px; border-radius:10px; background:#ede9fe; color:#6d28d9; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12.5px; }
+  .av-admin { background:#7c3aed; color:#fff; }
+  .p-name { font-size:13.5px; font-weight:800; color:#1e293b; }
+  .p-mail { font-size:11px; font-weight:600; color:#94a3b8; }
+  .p-pin  { font-size:10.5px; font-weight:900; letter-spacing:.05em; margin-top:3px; }
+  .pin-set   { color:#6d28d9; }
+  .pin-unset { color:#b45309; }
+  .lvl { font-size:8.5px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+         padding:2px 7px; border-radius:5px; background:#f1f5f9; color:#64748b; margin-left:6px; }
+  .lvl-admin { background:#ede9fe; color:#6d28d9; }
+  .chev { margin-left:auto; color:#c4b5fd; font-size:17px; flex-shrink:0; }
+
+  /* ── System group ───────────────────────────────────────────── */
+  /* Handlers are grouped the way routing is: one closed block per system,
+     opened only when somebody in it needs editing. */
+  .grp-body { border-top:1.5px solid #ede9fe; background:#fdfcff; }
+  .person + .person { border-top:1px dashed #ede9fe; }
+  .grp-empty { font-size:12px; font-weight:700; color:#cbd5e1; padding:14px 18px; }
+
+  /* ── Pending allocation ─────────────────────────────────────── */
+  /* Always on the page and always open, whether or not anybody is waiting —
+     it is where somebody is brought into Nelos, not a leftovers pile. */
+  .pend-block { border-color:#fde68a; background:#fffbeb; }
+  .pend-head { padding:14px 18px 8px; }
+  .pend-name { font-size:14px; font-weight:900; color:#92400e; }
+  .find { padding:0 18px 16px; }
+  .find .inp { border-color:#fde68a; background:#fff; }
+  .find .inp:focus { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.18); }
+  .res { margin-top:7px; border:1.5px solid #fde68a; border-radius:11px; background:#fff; overflow:hidden;
+         max-height:250px; overflow-y:auto; }
+  .res-row { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px dashed #fef3c7; }
+  .res-row:last-child { border-bottom:none; }
+  .res-name { font-size:12.5px; font-weight:800; color:#1e293b; }
+  .res-mail { font-size:10.5px; font-weight:600; color:#94a3b8; }
+  .res-add { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center; gap:6px;
+             padding:7px 14px; border-radius:999px; border:none; cursor:pointer;
+             background:#7c3aed; color:#fff; font-size:9.5px; font-weight:900;
+             letter-spacing:.08em; text-transform:uppercase; }
+  .res-add:hover { background:#6d28d9; }
+  .res-add:disabled { opacity:.5; cursor:wait; }
+  .res-has { margin-left:auto; flex-shrink:0; font-size:9.5px; font-weight:900; letter-spacing:.06em;
+             text-transform:uppercase; color:#cbd5e1; }
+  .res-msg { padding:12px; font-size:12px; font-weight:700; color:#94a3b8; }
+
+  /* The handler's number, standing in for the avatar once they have one. */
+  .seat-no { width:36px; height:36px; border-radius:10px; background:#7c3aed; color:#fff;
+             flex-shrink:0; display:flex; align-items:center; justify-content:center;
+             font-weight:900; font-size:15px; }
+
+  .panel { padding:2px 16px 14px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
+  .panel .lbl { margin:14px 0 4px; }
+
+  /* The person being edited, ringed. The row and its panel are one block
+     so the ring closes round both, and the row keeps its own tint so the
+     name stays attached to the settings under it. */
+  .editing { border:1.5px solid #a78bfa; border-radius:14px; overflow:hidden; margin:6px 0;
+             box-shadow:0 6px 20px -8px rgba(124,58,237,.35); }
+  .person-editing { background:#f5f3ff; }
+  .editing-tag { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                 color:#6d28d9; background:#ede9fe; padding:3px 9px; border-radius:999px;
+                 flex-shrink:0; }
+  .editing .panel { border-top:1px solid #ddd6fe; background:#fff; }
+
+  /* One thing, one row: a tick box and a name, and no box drawn round
+     either. A bordered card per line turned a ten-item form into a wall of
+     panels — the tick already says this is a choice, and the border only
+     said it again in 1.5px. Rows are as wide as their words (align-items:
+     flex-start), so the block stops at the text instead of ruling a line
+     to the far edge.
+
+     Used by all three lists in the panel — see-all, the role and the
+     rights — because they ask the same kind of question and should not
+     look like three designs. */
+  .acc-list { display:flex; flex-direction:column; align-items:flex-start; gap:1px; }
+  .acc-list-solo { margin-top:2px; }
+  .acc-row { display:inline-flex; align-items:center; gap:9px; padding:4px 8px 4px 2px;
+             border-radius:7px; border:none; background:none; cursor:pointer;
+             font-size:12.5px; font-weight:700; color:#334155; }
+  .acc-row:hover { background:#f5f3ff; color:#1e293b; }
+  .acc-row input { width:15px; height:15px; accent-color:#7c3aed; flex-shrink:0; margin:0; }
+  .acc-row:has(input:checked) { color:#1e293b; font-weight:800; }
+  /* The home queue is Case Handlers' to set, so it is shown, ticked, and
+     not editable here. */
+  .acc-row-home { cursor:default; color:#94a3b8; }
+  .acc-row-home:hover { background:none; color:#94a3b8; }
+  /* "All" is a control over the rows under it rather than one of them. */
+  .acc-row-all { font-weight:900; color:#6d28d9; }
+  .acc-row-all:has(input:checked) { color:#6d28d9; }
+
+  /* The end of the form, at its end: Cancel then Save, hard right. */
+  .panel-acts { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+         display:block; margin:12px 0 6px; }
+  .inp { width:100%; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
+         border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; box-sizing:border-box; }
+  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+
+  /* ── Number ticks ───────────────────────────────────────────── */
+  .seat-list { display:flex; flex-direction:column; gap:5px; }
+  .seat-row { display:flex; align-items:center; gap:9px; padding:7px 11px; border-radius:10px;
+              border:1.5px solid #e9e3fb; background:#fff; cursor:pointer; }
+  .seat-row:hover { border-color:#c4b5fd; }
+  .seat-row.on { border-color:#7c3aed; background:#f5f3ff; }
+  .seat-row.taken { opacity:.55; cursor:not-allowed; background:#f8fafc; }
+  .seat-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; }
+  .seat-badge { width:24px; height:24px; border-radius:7px; background:#ede9fe; color:#6d28d9;
+                display:flex; align-items:center; justify-content:center;
+                font-size:12px; font-weight:900; flex-shrink:0; }
+  .seat-row.on .seat-badge { background:#7c3aed; color:#fff; }
+  .seat-who { font-size:12.5px; font-weight:700; color:#475569; }
+  /* A plain plus at the button's own weight — the full-width one drew thin
+     and pale, and these are the buttons people are looking for. */
+  .plus { font-size:15px; font-weight:900; line-height:0; }
+  /* Plain text under the names rather than a solid button. It is the least
+     used control on the card and was the loudest thing on it. */
+  /* Pinned to the floor of the card by the margin, not left to float up
+     under whatever the last row happened to be. */
+  .seat-add { display:flex; align-items:center; justify-content:center; gap:6px;
+              margin:auto 9px 0; padding:8px 10px; border-radius:9px; cursor:pointer;
+              border:1.5px dashed #ddd6fe; background:none; box-sizing:border-box;
+              font-family:inherit; color:#8b5cf6; font-size:11.5px; font-weight:800;
+              transition:all .15s; }
+  .seat-add:hover { color:#6d28d9; border-color:#a78bfa; background:#faf8ff; }
+  .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
+
+  /* ── One card per system, side by side ──────────────────────── */
+  /* auto-fill rather than a fixed count: two systems should not leave three
+     empty columns, and five should wrap rather than squeeze. */
+  /* Narrow enough for four across a 980px page, and auto-fill so two
+     systems do not leave two empty columns. */
+  .sys-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(216px, 1fr)); gap:10px;
+              align-items:stretch; }
+  /* A column, so the add button can be pushed to the floor of the card and
+     every card in a row shows it on the same line — a system with one
+     handler and one with four end at the same place. */
+  .sys-card { background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+              box-shadow:0 3px 12px rgba(124,58,237,.05); padding-bottom:9px;
+              display:flex; flex-direction:column; }
+  .sys-head { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;
+              padding:12px 13px 9px; border-bottom:1px solid #f3f0fd; }
+  .sys-head .sys-name { font-size:13px; font-weight:900; color:#4c1d95; }
+  .sys-head .sys-count { margin-left:auto; font-size:9.5px; font-weight:800; color:#c4b5fd; }
+
+  /* ── A system's numbered slots ──────────────────────────────── */
+  /* One row per number, holding a name or empty. Filling one is choosing
+     from a list, and choosing somebody who sits elsewhere moves them. */
+  /* A number, then who holds it. No badge and no boxed label — "#1" said
+     plainly is the whole of what the badge was saying.
+
+     A slot reads as a line of text until the pencil is clicked, at which
+     point it becomes the picker. Four cards of open dropdowns was four
+     cards of grey boxes saying nothing; the names are the information, and
+     the dropdown is only needed at the moment somebody is changing one. */
+  .slots { display:flex; flex-direction:column; gap:2px; padding:9px 9px 4px; flex:1; }
+  .slot { display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:9px;
+          border:1.5px solid transparent; }
+  .slot:hover { background:#faf8ff; }
+  .slot-no { flex-shrink:0; width:20px; font-size:12px; font-weight:900; color:#7c3aed;
+             font-variant-numeric:tabular-nums; }
+  .slot-name { flex:1; min-width:0; font-size:12.5px; font-weight:800; color:#1e293b;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slot-empty .slot-name { font-weight:700; color:#cbd5e1; }
+  .slot-empty .slot-no { color:#ddd6fe; }
+  .slot-pick { padding:6px 9px; font-size:12.5px; flex:1; min-width:0; }
+
+  /* The pencil, and the grip beside the number. Both fade in on the row
+     rather than sitting on every line at full strength: a card of four
+     names should read as four names. Kept visible whenever the row has
+     focus inside it, so they do not vanish from under the keyboard. */
+  .slot-edit { flex-shrink:0; width:24px; height:24px; border-radius:7px; border:none;
+               background:none; color:#a78bfa; cursor:pointer; font-size:13px; line-height:1;
+               opacity:0; transition:opacity .15s, background .15s, color .15s; }
+  .slot:hover .slot-edit, .slot:focus-within .slot-edit { opacity:1; }
+  .slot-edit:hover { background:#ede9fe; color:#6d28d9; }
+  .grip { flex-shrink:0; width:13px; height:16px; opacity:0; cursor:grab;
+          transition:opacity .15s; color:#c4b5fd; }
+  .slot:hover .grip, .slot:focus-within .grip { opacity:1; }
+  .grip:active { cursor:grabbing; }
+  .grip svg { width:13px; height:16px; fill:currentColor; display:block; }
+  .slot-empty .grip { visibility:hidden; }
+
+  /* Dragging: the row being carried goes pale, and the row it would land
+     on grows a violet edge on the side it would land — above when it is
+     moving up the list, below when it is moving down. */
+  .slot.dragging { opacity:.4; }
+  .slot.over-up   { box-shadow:inset 0 2.5px 0 #7c3aed; background:#f5f3ff; }
+  .slot.over-down { box-shadow:inset 0 -2.5px 0 #7c3aed; background:#f5f3ff; }
+
+  /* The home system on User Access: ticked, and not this screen's to change. */
+  .right-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
+  .right-home:hover { border-color:#ddd6fe; }
+
+  /* ── What they may do to a case ─────────────────────────────── */
+  .rights { display:flex; flex-direction:column; gap:5px; }
+  .right-row { display:flex; align-items:flex-start; gap:9px; padding:8px 11px; border-radius:10px;
+               border:1.5px solid #e9e3fb; background:#fff; cursor:pointer; }
+  .right-row:hover { border-color:#c4b5fd; }
+  .right-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; margin-top:2px; }
+  .right-ico { font-size:14px; flex-shrink:0; }
+  .right-name { display:block; font-size:12.5px; font-weight:800; color:#1e293b; }
+  .right-note { display:block; font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:1px; line-height:1.45; }
+
+
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 17px; border-radius:10px;
+         border:none; cursor:pointer; font-size:10px;
+         font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+  .btn-save { background:#7c3aed; color:#fff; } .btn-save:hover { background:#6d28d9; }
+  .btn-ghost { background:#ede9fe; color:#6d28d9; }
+
+  /* ── Routing ────────────────────────────────────────────────── */
+  .sys-block { border-bottom:1.5px solid #ede9fe; }
+  .sys-block:last-child { border-bottom:none; }
+  .sys-row { width:100%; display:flex; align-items:center; gap:10px; padding:15px 18px;
+             background:#fff; border:none; cursor:pointer; text-align:left; font:inherit; }
+  .sys-row:hover { background:#faf5ff; }
+  .sys-chev { color:#a78bfa; font-size:13px; width:12px; flex-shrink:0; }
+  .sys-ico { font-size:17px; }
+  .sys-name { font-size:14px; font-weight:900; color:#4c1d95; }
+  .sys-count { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
+               text-transform:uppercase; color:#a78bfa; }
+  .hq-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+            padding:2px 8px; border-radius:999px; background:#dcfce7; color:#15803d; }
+
+  /* The table inside an open block. Four columns: number, case category,
+     destination system, PIC. */
+  .rt { padding:0 18px 16px; background:#fdfcff; }
+  .rt-band, .rt-sub, .rt-row { display:grid; grid-template-columns:38px 1fr 1.05fr 1.05fr; gap:12px;
+                               align-items:center; }
+  .rt-band { padding:14px 0 8px; }
+  .rt-band span:first-child { grid-column:1 / 3; }
+  .rt-band span:last-child  { grid-column:3 / 5; }
+  .rt-band span { font-size:13px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                  color:#4c1d95; border-bottom:2.5px solid #7c3aed; padding-bottom:6px; }
+  .rt-sub { padding:8px 0; border-bottom:1.5px solid #ede9fe; }
+  .rt-sub span { font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                 color:#94a3b8; }
+  .rt-row { padding:9px 0; border-bottom:1px dashed #ede9fe; align-items:start; }
+  .rt-row:last-child { border-bottom:none; }
+  .rt-row.is-default { background:#f8fafc; }
+  .rt-row.is-default .rt-cat { font-style:italic; color:#64748b; }
+  .rt-n { font-size:12px; font-weight:900; color:#a78bfa; padding-top:8px;
+          font-variant-numeric:tabular-nums; }
+  .rt-cat { font-size:13px; font-weight:800; color:#1e293b; padding-top:7px; }
+  .cell { display:flex; flex-direction:column; gap:4px; }
+  .cell .inp { padding:7px 10px; font-size:12.5px; }
+  .cell-note { font-size:10px; font-weight:700; color:#94a3b8; }
+  .warn-txt { color:#b45309; }
+  .rt-foot { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:14px 0 2px; }
+  .rt-fallback { font-size:11px; font-weight:700; color:#94a3b8; flex:1; min-width:180px; }
+  .rt-empty { padding:18px 0 6px; font-size:12.5px; font-weight:700; color:#94a3b8; }
+  .rt-empty a { color:#7c3aed; font-weight:900; }
+  /* Case titles used to live on their own page. They belong to the system
+     that raises them, so they are added here, in that system's own block. */
+  .rt-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+            padding:13px 0 2px; border-top:1.5px dashed #ede9fe; margin-top:4px; }
+  .rt-add .inp { flex:1; min-width:170px; padding:7px 10px; font-size:12.5px; }
+  .pend-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+              padding:2px 8px; border-radius:999px; background:#fef3c7; color:#a16207; }
+  .cell-note.pend { color:#a16207; font-weight:900; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+  .r-clear { align-self:flex-start; background:none; border:none; cursor:pointer; padding:0;
+             font-size:10px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
+             color:#b91c1c; }
+  .r-clear:hover { text-decoration:underline; }
+  @media (max-width:760px) {
+    .rt-band, .rt-sub { display:none; }
+    .rt-row { grid-template-columns:34px 1fr; gap:6px 10px; padding:12px 0; }
+    .rt-row .cell { grid-column:2; }
+  }
+
+  .note { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; padding:13px 15px; margin-bottom:18px; }
+  .note-h { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#a78bfa; margin-bottom:4px; }
+  .note-p { font-size:12px; font-weight:600; color:#4c1d95; line-height:1.6; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
+           padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
+           box-shadow:0 8px 26px rgba(0,0,0,.25); max-width:88vw; text-align:center; }
+</style>
+</head>
+<body>
+
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
+<div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <!-- The way back leads, above the title. -->
+  <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Nelos Main Page</a>
+
+  <h1 class="page-title">User Setting</h1>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="people">Case Handlers</button>
+    <button class="tab"    data-tab="access">User Access</button>
+    <button class="tab"    data-tab="routing">Case Routing</button>
+  </div>
+
+  <!-- ── Case Handlers: the roster, system by system ─────────── -->
+  <div id="tab-people">
+    <div id="people"></div>
+  </div>
+
+  <!-- ── User Access: who may use Nelos where ─────────────────── -->
+  <div id="tab-access" class="hidden">
+    <div id="access"></div>
+  </div>
+
+  <!-- ── Routing ─────────────────────────────────────────────── -->
+  <div id="tab-routing" class="hidden">
+    <div class="card"><div id="routing"></div></div>
+  </div>
+
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = id => document.getElementById(id);
+const esc = MJMNelos.esc;
+
+let people = [];       // nelos_people() rows
+/* True once nelos_people() carries the three case rights — i.e. once
+   migration_nelos_case_tools.sql has run. Until then the ticks are not
+   drawn and the columns are not saved, rather than saved as false. */
+let hasRights = false;
+let modules = [];      // nelos_modules rows
+let categories = [];   // active nelos_categories rows: { name, module_key }
+let routes = [];       // nelos_routes rows
+let open = null;       // user_id whose panel is expanded
+/* True once nelos_people() carries access_modules — i.e. once
+   migration_nelos_access.sql has run. Until then the system ticks are not
+   drawn and the column is not saved, rather than saved as empty. */
+let hasAccessCol = false;
+/* True once nelos_people() carries sees_all_cases — i.e. once
+   migration_nelos_sees_all.sql has run. Until then the tick is not drawn
+   and the column is not saved, rather than saved as false. */
+let hasSeesAll = false;
+let openRoute = null;  // which system's routing block is open
+let me = { name: '' };
+
+/* The search on User Access. nelos_directory() is the staff list — every
+   account that is not a Salesweb customer, the same population the main
+   portal's own User Access screen shows (migration_nelos_directory_staff
+   .sql). Fetched once, then filtered here, so typing does not hit the
+   network. */
+let directory = null;  // null until the first search asks for it
+let findQ = '';
+
+function toast(msg, ok) {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.style.background = ok === false ? '#dc2626' : '#16a34a';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3600);
+}
+
+/* What a person may do with a case, and so which buttons they are shown.
+   Drawn in the order a case actually moves through them: raised, edited,
+   solved, closed — and delete last, because it is the only one that
+   destroys rather than advances.
+
+   Names only. Each of these used to carry an emoji and a sentence
+   explaining it, which is a paragraph of screen to say five things a
+   reader of this page already knows.
+
+   may_create and may_close arrive with shared/migration_nelos_close_right
+   .sql. Closing is deliberately its own tick rather than part of solving:
+   solving says "I did the work", closing says "and it was done properly",
+   and the second is somebody else's judgement of the first. */
+const RIGHTS = [
+  { key:'may_create', name:'Add New Case' },
+  { key:'may_edit',   name:'Edit Case' },
+  { key:'may_solve',  name:'Solve Case' },
+  { key:'may_close',  name:'Close Case' },
+  { key:'may_delete', name:'Delete Case' }
+];
+
+/* Only the ticks this database actually has a column for. may_create and
+   may_close arrive with a migration that may not have been run yet, and a
+   checkbox for a column that does not exist would save into a 400. The
+   save already skips any right whose box was never drawn, so filtering
+   here is the whole guard. */
+const liveRights = () =>
+  RIGHTS.filter(r => people.some(p => p[r.key] !== undefined));
+
+const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const labelOf = key => (modules.find(m => m.key === key) || {}).label || key || '';
+const handlerCount = key => people.filter(p => p.primary_module === key).length;
+/* What one handler in a system is called, e.g. 'Admin' — always shown with
+   their number after it, so "Admin 1". */
+/* A system's name as it reads in a picker. HQ is marked so it is obvious in
+   the list that everyone there oversees every case, not just this queue. */
+/* A system's own case titles, in order. Categories carry module_key since
+   migration_nelos_category_system.sql; a row without one (an older database)
+   is treated as belonging to nowhere rather than to everywhere. */
+const categoriesIn = key => categories.filter(c => c.module_key === key).map(c => c.name);
+const pickLabel = m => m.label + (m.sees_all_cases ? '  (HQ)' : '');
+const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
+const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
+/* Everyone tagged to a system, in number order — the shape the list uses. */
+const peopleIn = key => people
+  .filter(p => p.primary_module === key)
+  .sort((a, b) => (a.seat_no || 99) - (b.seat_no || 99));
+/* The rule for one (section, category), or the section default when that
+   category has none of its own — the same order the database trigger uses. */
+const routeFor = (mod, cat) =>
+  routes.find(r => r.source_module === mod && r.category === cat) ||
+  routes.find(r => r.source_module === mod && r.category === null) || null;
+
+/* ── Case Handlers ─────────────────────────────────────────────────
+   System first, not person first.
+
+   The old screen asked the question backwards: you opened a PERSON and
+   told them which system and number they were. But a system's numbers are
+   a fixed little set — #1, #2, and one more when it grows — and what an
+   admin actually wants to know is "who is Audit's #1", which that shape
+   could only answer by opening people one at a time until you found them.
+
+   So a system is a list of numbered slots, each holding a name or empty,
+   and filling one is choosing from a list. Moving somebody is the same
+   act: picking them into a slot takes them out of wherever they were,
+   because a person handles one queue.
+
+   Everything else about a person — which systems they may use, what they
+   may do to a case — is on User Access. This tab is only the roster. */
+
+let moreSeats = {};   // module key → extra empty slots the + button opened
+let editSeat = null;  // "<module>:<n>" — the one slot showing its picker
+let dragSeat = null;  // { key, seat } while a row is being carried
+
+/* The slots a system shows: every number somebody holds, one spare past
+   the highest so it can always grow, plus whatever + has asked for. */
+function seatCount(key) {
+  const held = peopleIn(key).map(p => p.seat_no || 0);
+  const highest = Math.max(0, ...held);
+  return Math.max(highest + 1, moreSeats[key] || 0, 1);
+}
+
+/* Six dots. A grip is the one thing on this card that has to say "pick me
+   up", and it has to say it without being read. */
+const GRIP = '<svg viewBox="0 0 10 16" aria-hidden="true">' +
+  '<circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/>' +
+  '<circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/>' +
+  '<circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></svg>';
+
+function seatSlot(key, n) {
+  const holder = peopleIn(key).find(p => p.seat_no === n) || null;
+  const editing = editSeat === key + ':' + n;
+  const who = holder ? (holder.full_name || holder.email) : '';
+
+  if (editing) {
+    // Whoever could go here: everybody holding Nelos. Somebody already in
+    // another system is offered too — choosing them moves them, which is
+    // the only way to move anybody.
+    const options = people.map(p => {
+      const where = p.primary_module && p.primary_module !== key
+        ? ` — now ${seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module)}`
+        : '';
+      const sel = holder && holder.id === p.id ? 'selected' : '';
+      return `<option value="${esc(p.id)}" ${sel}>${esc(p.full_name || p.email)}${esc(where)}</option>`;
+    }).join('');
+
+    return `
+      <div class="slot">
+        <span class="grip"></span>
+        <span class="slot-no">#${n}</span>
+        <select class="inp slot-pick" data-mod="${esc(key)}" data-seat="${n}"
+                aria-label="${esc(handlerLabel(key))} ${n}">
+          <option value="">— empty —</option>
+          ${options}
+        </select>
+      </div>`;
+  }
+
+  /* Read mode. Draggable only when there is a name to carry, and the grip
+     also takes the keyboard: arrow up and down move the row, which is the
+     same act as a drag for anybody not using a mouse — and the only one
+     available on a touchscreen, where HTML5 drag does not fire at all. */
+  return `
+    <div class="slot ${holder ? 'filled' : 'slot-empty'}"
+         data-mod="${esc(key)}" data-seat="${n}" ${holder ? 'draggable="true"' : ''}>
+      <span class="grip" ${holder ? `tabindex="0" role="button"
+            aria-label="Move ${esc(who)} — arrow up or down"` : ''}>${holder ? GRIP : ''}</span>
+      <span class="slot-no">#${n}</span>
+      <span class="slot-name">${holder ? esc(who) : '— empty —'}</span>
+      <button type="button" class="slot-edit" data-edit="${esc(key)}:${n}"
+              title="${holder ? 'Change who is #' + n : 'Put somebody in #' + n}"
+              aria-label="${holder ? 'Change who is #' + n : 'Put somebody in #' + n}"
+              >&#x270E;</button>
+    </div>`;
+}
+
+/* ── Moving somebody up or down the list ────────────────────────
+   The numbers are a running order, so moving one row renumbers the rows it
+   passed and nothing else. Empty slots close up: a gap between #1 and #3
+   is not a fact about anything, and leaving one would mean a drag could
+   land somebody on a number nobody is looking at. */
+async function moveSeat(key, fromSeat, toSeat) {
+  const order = peopleIn(key);
+  const fromIdx = order.findIndex(p => p.seat_no === fromSeat);
+  if (fromIdx < 0) return;
+
+  // Dropping on one of the empty slots past the end means "go last".
+  let toIdx = order.findIndex(p => p.seat_no === toSeat);
+  if (toIdx < 0) toIdx = order.length - 1;
+  if (toIdx === fromIdx) return;
+
+  const moved = order.slice();
+  moved.splice(toIdx, 0, moved.splice(fromIdx, 1)[0]);
+
+  const rows = moved
+    .map((p, i) => ({ p, seat: i + 1 }))
+    .filter(x => x.p.seat_no !== x.seat)
+    .map(x => handlerRow(x.p, key, x.seat));
+  if (!rows.length) return;
+
+  const { error } = await _supabase.from('nelos_handlers').upsert(rows, { onConflict: 'user_id' });
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+
+  const who = order[fromIdx];
+  toast(`${who.full_name || who.email} is now ${seatName(key, toIdx + 1)}.`);
+  moreSeats = {}; editSeat = null;
+  await load();
+}
+
+function renderPeople() {
+  if (!modules.length) {
+    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         No systems yet — run <strong>shared/migration_nelos_all.sql</strong>.
+       </div>`;
+    return;
+  }
+
+  // Blocks side by side rather than a stack of full-width rows, and every
+  // one of them open. A system holds two or three people; hiding that
+  // behind a chevron was hiding nothing, and made "who is Audit's #1" a
+  // click away on a page whose whole job is answering it.
+  $('people').innerHTML = '<div class="sys-grid">' + modules.map(m => {
+    const rows = peopleIn(m.key);
+    const n = seatCount(m.key);
+    const slots = [];
+    for (let i = 1; i <= n; i++) slots.push(seatSlot(m.key, i));
+
+    return `
+      <div class="sys-card">
+        <div class="sys-head">
+          <span class="sys-name">${esc(m.label)}</span>
+          ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
+          <span class="sys-count">${rows.length
+            ? rows.length + (rows.length === 1 ? ' person' : ' people')
+            : 'nobody'}</span>
+        </div>
+        <div class="slots">${slots.join('')}</div>
+        <button type="button" class="seat-add" data-more="${esc(m.key)}">+ add another person</button>
+      </div>`;
+  }).join('') + '</div>';
+
+  $('people').querySelectorAll('[data-more]').forEach(b =>
+    b.addEventListener('click', () => {
+      const k = b.dataset.more;
+      moreSeats[k] = seatCount(k) + 1;
+      // The new slot opens ready to pick, since asking for it is saying you
+      // have somebody to put in it.
+      editSeat = k + ':' + moreSeats[k];
+      renderPeople();
+    }));
+
+  // The pencil turns one slot into its picker; choosing saves and closes it.
+  $('people').querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => { editSeat = b.dataset.edit; renderPeople(); }));
+
+  $('people').querySelectorAll('.slot-pick').forEach(sel => {
+    sel.addEventListener('change', () => {
+      editSeat = null;
+      setSeat(sel.dataset.mod, Number(sel.dataset.seat), sel.value);
+    });
+    // Escape backs out without choosing. Deliberately not on blur: a blur
+    // fires before the click that caused it, so closing there would tear
+    // down the pencil being clicked and swallow the click.
+    sel.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      editSeat = null;
+      renderPeople();
+    });
+    sel.focus();
+  });
+
+  wireDrag();
+}
+
+/* ── Carrying a row up or down ──────────────────────────────────
+   The payload is held here rather than in dataTransfer: dataTransfer is
+   only set for the browsers that want it, and reading it back on dragover
+   is not allowed anyway. */
+function wireDrag() {
+  const slots = [...$('people').querySelectorAll('.slot[data-mod]')];
+
+  const clearMarks = () => slots.forEach(s => s.classList.remove('over-up', 'over-down'));
+
+  slots.forEach(el => {
+    const key = el.dataset.mod, seat = Number(el.dataset.seat);
+
+    el.addEventListener('dragstart', e => {
+      dragSeat = { key, seat };
+      el.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', key + ':' + seat); } catch (_) {}
+      }
+    });
+    el.addEventListener('dragend', () => {
+      dragSeat = null;
+      el.classList.remove('dragging');
+      clearMarks();
+    });
+
+    el.addEventListener('dragover', e => {
+      // Only within one system: a number belongs to its own queue, and
+      // dragging across cards would be a move plus a re-queue in one
+      // gesture, which is what the pencil is for.
+      if (!dragSeat || dragSeat.key !== key || dragSeat.seat === seat) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      clearMarks();
+      el.classList.add(seat < dragSeat.seat ? 'over-up' : 'over-down');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('over-up', 'over-down'));
+
+    el.addEventListener('drop', e => {
+      if (!dragSeat || dragSeat.key !== key) return;
+      e.preventDefault();
+      const from = dragSeat.seat;
+      dragSeat = null;
+      clearMarks();
+      if (from !== seat) moveSeat(key, from, seat);
+    });
+
+    // Arrow keys on the grip do the same job — the only way to reorder on
+    // a touchscreen, where HTML5 drag never fires.
+    const grip = el.querySelector('.grip[tabindex]');
+    if (!grip) return;
+    grip.addEventListener('keydown', e => {
+      const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const to = seat + step;
+      if (to >= 1 && to <= seatCount(key)) moveSeat(key, seat, to);
+    });
+  });
+}
+
+/* One person's handler row, as the table wants it. A person handles one
+   queue, so this is the whole row every time — there is nothing to merge. */
+function handlerRow(p, mod, seat) {
+  return {
+    user_id: p.id,
+    email: p.email,
+    full_name: p.full_name,
+    primary_module: mod,
+    seat_no: seat,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  };
+}
+
+/* Put somebody in a system's numbered slot, or empty it.
+
+   Whoever was there leaves first, and so does whatever the incoming person
+   was holding — both are the same single row per person, so this is two
+   writes at most and never leaves two people on one number. */
+async function setSeat(moduleKey, seatNo, userId) {
+  const sitting = peopleIn(moduleKey).find(p => p.seat_no === seatNo) || null;
+  if (sitting && sitting.id === userId) { renderPeople(); return; }   // nothing changed
+
+  const rows = [];
+  if (sitting) rows.push(handlerRow(sitting, null, null));   // they step out
+
+  const incoming = userId ? people.find(p => p.id === userId) : null;
+  if (incoming) rows.push(handlerRow(incoming, moduleKey, seatNo));
+
+  if (!rows.length) { renderPeople(); return; }
+
+  const { error } = await _supabase.from('nelos_handlers').upsert(rows, { onConflict: 'user_id' });
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+
+  toast(incoming
+    ? `${incoming.full_name || incoming.email} is now ${seatName(moduleKey, seatNo)}.`
+    : `${seatName(moduleKey, seatNo)} is empty.`);
+  moreSeats = {}; editSeat = null;
+  await load();
+}
+
+/* ── User Access ───────────────────────────────────────────────────
+   Person first, and the other half of the split: which systems somebody
+   may USE Nelos in, and what they may do to a case once they are in it.
+
+   Everything starts off. Somebody added here can open Nelos and see
+   nothing until a system is ticked for them, which is what makes the tick
+   worth anything — a default of "everything" is not access control, it is
+   a list. */
+
+/* Name and email, and nothing else. What somebody's access adds up to is
+   several lines to say and is right there the moment the row is opened —
+   summarising it on every closed row made a list of people read as a wall
+   of settings. */
+function personHtml(p) {
+  const admin = p.nelos_level === 'admin';
+  const editing = open === p.id;
+  /* The open person is drawn as one bounded block — their row and their
+     panel inside a single ring — so on a list of twenty it is never a
+     question whose access is being changed. Closed, they are a plain row
+     as before. */
+  return `
+    <div class="${editing ? 'editing' : ''}">
+      <div class="person ${editing ? 'person-editing' : ''}" data-person="${esc(p.id)}">
+        <div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>
+        <div class="min-w-0 flex-1">
+          <div class="p-name">${esc(p.full_name || p.email.split('@')[0])}</div>
+          <div class="p-mail">${esc(p.email)}</div>
+        </div>
+        ${editing ? '<span class="editing-tag">Editing</span>' : ''}
+        <span class="chev">${editing ? '▾' : '›'}</span>
+      </div>
+      ${editing ? panelHtml(p) : ''}
+    </div>`;
+}
+
+function panelHtml(p) {
+  const admin = p.nelos_level === 'admin';
+  const on = new Set(Array.isArray(p.access_modules) ? p.access_modules : []);
+
+  return `
+    <div class="panel" data-panel="${esc(p.id)}">
+      ${admin ? `
+        <p class="text-[11.5px] font-bold text-violet-700 mt-3">
+          A Nelos admin uses every system and may do everything, whatever is ticked here.
+        </p>` : ''}
+
+      ${!hasSeesAll ? '' : `
+      <!-- Above the role, because it overrules it: somebody with this
+           ticked sees every system's cases whatever their role says. The
+           system's own HQ flag still applies on top — see
+           shared/migration_nelos_sees_all.sql. -->
+      <div class="acc-list acc-list-solo">
+        <label class="acc-row">
+          <input type="checkbox" data-seesall ${p.sees_all_cases ? 'checked' : ''}>
+          <span>Can see all system cases</span>
+        </label>
+      </div>`}
+
+      <label class="lbl">Nelos role</label>
+      <!-- Which systems this person belongs to. One system, one row,
+           "All" at the top of them: a tick box and a name, and nothing
+           else — the name is the choice. The home system's row is ticked
+           and not editable, and says why on hover rather than in a
+           permanent subtitle. -->
+      <div class="acc-list acc-list-sys">
+        <label class="acc-row acc-row-all" title="Tick every system at once">
+          <input type="checkbox" data-sys-all>
+          <span>All</span>
+        </label>
+        ${modules.map(m => {
+          const home = p.primary_module === m.key;
+          return `
+          <label class="acc-row ${home ? 'acc-row-home' : ''}"${home
+            ? ' title="The queue they handle — theirs whatever is ticked. Change it on Case Handlers."'
+            : ''}>
+            <input type="checkbox" data-sys="${esc(m.key)}" ${on.has(m.key) || home ? 'checked' : ''}
+                   ${home ? 'disabled' : ''}>
+            <span>${esc(m.label)}</span>
+          </label>`;
+        }).join('')}
+      </div>
+
+      ${!hasRights ? '' : `
+      <label class="lbl">What they may do to a case</label>
+      ${admin
+        ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all of these whatever is ticked here.</p>'
+        : ''}
+      <div class="acc-list acc-list-rights">
+        ${liveRights().map(r => `
+          <label class="acc-row">
+            <input type="checkbox" data-right="${r.key}" ${p[r.key] ? 'checked' : ''}>
+            <span>${esc(r.name)}</span>
+          </label>`).join('')}
+      </div>`}
+
+      <!-- Cancel then Save, and both at the foot on the right, where the
+           end of a form is. -->
+      <div class="panel-acts">
+        <button class="btn btn-ghost" data-act="close-person">Cancel</button>
+        <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
+      </div>
+    </div>`;
+}
+
+/* The search that brings somebody in leads the tab: adding a person is the
+   first thing done here, and it is the only way into the list. */
+function renderAccess() {
+  const finder = `
+    <div class="card pend-block">
+      <div class="pend-head">
+        <span class="pend-name">Add Nelos user</span>
+      </div>
+      <div class="find">
+        <input class="inp" id="find" type="search" autocomplete="off"
+               placeholder="Search staff by name or email…" value="${esc(findQ)}">
+        <div id="find-res"></div>
+      </div>
+    </div>`;
+
+  const list = people.length
+    ? `<div class="card">${people.map(personHtml).join('')}</div>`
+    : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         Nobody has Nelos yet.<br>
+         <span class="text-[11px] font-semibold">Search above to add the first person.</span>
+       </div>`;
+
+  $('access').innerHTML = finder + list;
+  wireAccess();
+}
+
+function wireAccess() {
+  $('access').querySelectorAll('.person').forEach(row =>
+    row.addEventListener('click', () => {
+      open = open === row.dataset.person ? null : row.dataset.person;
+      renderAccess();
+    }));
+
+  $('access').querySelectorAll('[data-act]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      if (b.dataset.act === 'save-person')  return savePerson(b.dataset.person);
+      if (b.dataset.act === 'close-person') { open = null; renderAccess(); }
+    }));
+
+  const panel = $('access').querySelector('.panel');
+  if (panel) {
+    panel.addEventListener('click', e => e.stopPropagation());
+
+    /* "All" is a shortcut, not a stored value: it ticks and unticks the
+       systems, and nothing reads it on save — savePerson() collects
+       [data-sys], and this box has none. It also follows them, so a person
+       who already has every system open opens the panel with All ticked
+       rather than looking un-set.
+
+       The home system is deliberately outside both: it is ticked and
+       disabled, Case Handlers owns it, and "All" cannot turn it off. */
+    const all = panel.querySelector('input[data-sys-all]');
+    const boxes = [...panel.querySelectorAll('input[data-sys]')].filter(b => !b.disabled);
+    const sync = () => { if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked); };
+    if (all) all.addEventListener('change', () => boxes.forEach(b => { b.checked = all.checked; }));
+    boxes.forEach(b => b.addEventListener('change', sync));
+    sync();
+  }
+
+  wireFind();
+}
+
+async function savePerson(userId) {
+  const p = people.find(x => x.id === userId);
+  const panel = $('access').querySelector(`.panel[data-panel="${userId}"]`);
+  if (!p || !panel) return;
+
+  // The home system is ticked and disabled — it belongs to Case Handlers —
+  // so a disabled box is read as "not part of what this screen sets" and
+  // left out of the array rather than written into it twice.
+  const sys = [...panel.querySelectorAll('input[data-sys]')]
+    .filter(b => b.checked && !b.disabled)
+    .map(b => b.dataset.sys);
+
+  const row = {
+    user_id: userId,
+    email: p.email,
+    full_name: p.full_name,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  };
+  // access_modules arrives with migration_nelos_access.sql. Where the
+  // column is missing the boxes are not drawn either (see hasAccessCol), so
+  // nothing is sent and the save still goes through.
+  if (hasAccessCol) row.access_modules = sys;
+
+  // Same guard: the box is only drawn where the column exists.
+  const seesAll = panel.querySelector('input[data-seesall]');
+  if (hasSeesAll && seesAll) row.sees_all_cases = seesAll.checked;
+
+  // The rights arrive with migration_nelos_case_tools.sql and
+  // migration_nelos_close_right.sql. On a database missing either, those
+  // boxes are not drawn (see liveRights) and their columns are not sent.
+  RIGHTS.forEach(r => {
+    const box = panel.querySelector(`input[data-right="${r.key}"]`);
+    if (box) row[r.key] = box.checked;
+  });
+
+  // Deliberately NOT sending primary_module or seat_no: this screen does
+  // not set them, and an upsert naming them would blank whatever Case
+  // Handlers had put there.
+  const { error } = await _supabase.from('nelos_handlers').upsert([row], { onConflict: 'user_id' });
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+
+  toast(sys.length
+    ? `${p.full_name || p.email} can use Nelos in ${sys.length} system${sys.length === 1 ? '' : 's'}.`
+    : `${p.full_name || p.email} has no system open yet.`);
+  open = null;
+  await load();
+}
+
+/* ── Finding somebody to add ───────────────────────────────────── */
+
+/* True while the search box is the thing being used, so re-rendering the
+   list around it does not throw the cursor out mid-word. */
+let findFocus = false;
+
+function wireFind() {
+  const box = $('find');
+  if (!box) return;
+
+  box.addEventListener('input', async () => {
+    findQ = box.value;
+    findFocus = true;
+    if (directory === null) {
+      renderFind('Loading the company list…');
+      const { data, error } = await _supabase.rpc('nelos_directory');
+      // An older database has no nelos_directory(); say so rather than
+      // leaving the box looking broken.
+      directory = error ? [] : (data || []);
+      if (error) { renderFind('Could not load the company list — ' + error.message); return; }
+    }
+    renderFind();
+  });
+
+  box.addEventListener('blur', () => { findFocus = false; });
+
+  if (findFocus) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+  if (findQ.trim().length >= 2 && directory !== null) renderFind();
+}
+
+function renderFind(message) {
+  const out = $('find-res');
+  if (!out) return;
+
+  if (message) { out.innerHTML = `<div class="res"><div class="res-msg">${esc(message)}</div></div>`; return; }
+
+  const q = findQ.trim().toLowerCase();
+  if (q.length < 2) { out.innerHTML = ''; return; }
+
+  const has = new Set(people.map(p => p.id));
+  const hits = (directory || [])
+    .filter(d => (d.full_name || '').toLowerCase().includes(q) ||
+                 (d.email     || '').toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!hits.length) {
+    out.innerHTML = `<div class="res"><div class="res-msg">Nobody matches “${esc(findQ.trim())}”.</div></div>`;
+    return;
+  }
+
+  out.innerHTML = `<div class="res">${hits.map(d => `
+    <div class="res-row">
+      <div class="av">${esc(initials(d.full_name || d.email))}</div>
+      <div class="min-w-0">
+        <div class="res-name">${esc(d.full_name || d.email.split('@')[0])}</div>
+        <div class="res-mail">${esc(d.email)}</div>
+      </div>
+      ${has.has(d.id)
+        ? '<span class="res-has">already in Nelos</span>'
+        : `<button class="res-add" data-add="${esc(d.id)}"><span class="plus">+</span> Add</button>`}
+    </div>`).join('')}</div>`;
+
+  out.querySelectorAll('[data-add]').forEach(b =>
+    b.addEventListener('click', () => {
+      b.disabled = true;
+      b.textContent = 'Adding…';
+      addPerson(hits.find(d => d.id === b.dataset.add));
+    }));
+}
+
+/* Two halves, both needed for somebody to actually work in Nelos: the module
+   grant on the main portal, and a handler row here. Doing only the second is
+   what left people tagged but unable to open the module. */
+async function addPerson(person) {
+  if (!person) return;
+
+  const { data: level, error: grantErr } = await _supabase.rpc('nelos_grant_access', { p_user_id: person.id });
+  if (grantErr) {
+    toast('Could not grant Nelos — ' + grantErr.message, false);
+    renderFind();
+    return;
+  }
+
+  const { error } = await _supabase.from('nelos_handlers').upsert([{
+    user_id: person.id,
+    email: person.email,
+    full_name: person.full_name,
+    primary_module: null,
+    seat_no: null,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  }], { onConflict: 'user_id' });
+
+  if (error) { toast('Could not add — ' + error.message, false); renderFind(); return; }
+
+  toast(level === 'admin'
+    ? `${person.full_name || person.email} already had Nelos as an admin — added to the list.`
+    : `${person.full_name || person.email} can open Nelos now. Tag them to a system below.`);
+  await load();
+}
+
+/* ── Routing ───────────────────────────────────────────────────── */
+
+/* Edits are held here until Save, keyed "system|title", so a block can be
+   changed and then abandoned. Empty means nothing is pending. */
+let draft = {};
+const draftKey = (mod, cat) => mod + '|' + cat;
+const draftOf = (mod, cat) => draft[draftKey(mod, cat)];
+const dirty = mod => Object.keys(draft).some(k => k.split('|')[0] === mod);
+
+/* SOLVE BY — which system takes the case, and which person in it. Reads the
+   pending edit if there is one, so the row shows what Save would write. */
+function solveCells(mod, cat) {
+  const pend = draftOf(mod, cat);
+  const rule = pend || routes.find(r => r.source_module === mod && r.category === cat);
+  const toModule = rule ? rule.to_module : mod;
+  const toSeat = rule ? rule.to_seat_no : null;
+  const staff = peopleIn(toModule).filter(p => p.seat_no);
+  const n = handlerCount(toModule);
+
+  return `
+    <div class="cell">
+      <select class="inp r-dest" data-rule="${esc(mod)}" data-cat="${esc(cat)}">
+        ${modules.map(x =>
+          `<option value="${esc(x.key)}" ${toModule === x.key ? 'selected' : ''}>${esc(pickLabel(x))}</option>`).join('')}
+      </select>
+      ${n ? '' : '<span class="cell-note warn-txt">⚠ nobody tagged there</span>'}
+    </div>
+    <div class="cell">
+      <select class="inp r-seat" data-rule="${esc(mod)}" data-cat="${esc(cat)}"
+              ${staff.length ? '' : 'disabled'}>
+        <option value="">${staff.length ? 'Anyone' : 'Nobody tagged'}</option>
+        ${staff.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
+          esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
+      </select>
+      ${pend ? '<span class="cell-note pend">unsaved</span>' : ''}
+    </div>`;
+}
+
+/* Each system is a closed block holding its own case titles. Routing is set
+   once and read rarely, so five systems' rules open at once was noise. */
+function renderRouting() {
+  if (!modules.length) {
+    $('routing').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         No systems yet — run <strong>shared/migration_nelos_all.sql</strong>.
+       </div>`;
+    return;
+  }
+
+  $('routing').innerHTML = modules.map(m => {
+    const openHere = openRoute === m.key;
+    const titles = categoriesIn(m.key);
+    let inner = '';
+
+    if (openHere) {
+      const addRow = `
+        <div class="rt-add">
+          <input class="inp cat-new" data-mod="${esc(m.key)}" maxlength="60"
+                 placeholder="Add a case category for ${esc(m.label)}…">
+          <button class="btn btn-save cat-add" data-mod="${esc(m.key)}"><span class="plus">+</span> Add</button>
+        </div>`;
+
+      inner = titles.length ? `
+        <div class="rt">
+          <div class="rt-band"><span>From</span><span>Solve by</span></div>
+          <div class="rt-sub"><span>#</span><span>Case Category</span><span>System</span><span>PIC</span></div>
+          ${titles.map((cat, i) => `
+            <div class="rt-row">
+              <span class="rt-n">${i + 1}.</span>
+              <span class="rt-cat">${esc(cat)}</span>
+              ${solveCells(m.key, cat)}
+            </div>`).join('')}
+          ${addRow}
+          <div class="rt-foot">
+            <span class="rt-fallback">A case with no rule set stays with ${esc(m.label)}.</span>
+            <button class="btn btn-save rt-save" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Save</button>
+            <button class="btn btn-ghost rt-cancel" data-mod="${esc(m.key)}" ${dirty(m.key) ? '' : 'disabled'}>Cancel</button>
+          </div>
+        </div>`
+      : `<div class="rt">
+           <div class="rt-empty">No case categories for ${esc(m.label)} yet.</div>
+           ${addRow}
+         </div>`;
+    }
+
+    return `
+      <div class="sys-block">
+        <button class="sys-row" data-open="${esc(m.key)}">
+          <span class="sys-chev">${openHere ? '▾' : '▸'}</span>
+          <span class="sys-ico">${esc(m.icon || '📦')}</span>
+          <span class="sys-name">${esc(m.label)}</span>
+          ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
+          ${dirty(m.key) ? '<span class="pend-tag">unsaved</span>' : ''}
+        </button>
+        ${inner}
+      </div>`;
+  }).join('');
+
+  $('routing').querySelectorAll('.sys-row').forEach(b =>
+    b.addEventListener('click', () => {
+      // Leaving a block with pending edits would lose them silently.
+      if (dirty(openRoute) && openRoute !== b.dataset.open &&
+          !confirm('Discard the unsaved routing changes?')) return;
+      if (openRoute !== b.dataset.open) draft = {};
+      openRoute = openRoute === b.dataset.open ? null : b.dataset.open;
+      renderRouting();
+    }));
+
+  /* Staging an edit, rather than writing it. Changing the system clears the
+     PIC, because a number belongs to one system and whoever was chosen in
+     the old one would route nowhere. */
+  const stage = (mod, cat, toModule, toSeatNo) => {
+    draft[draftKey(mod, cat)] = { to_module: toModule, to_seat_no: toSeatNo };
+    renderRouting();
+  };
+
+  $('routing').querySelectorAll('.r-dest').forEach(el =>
+    el.addEventListener('change', () => stage(el.dataset.rule, el.dataset.cat, el.value, null)));
+
+  $('routing').querySelectorAll('.r-seat').forEach(el =>
+    el.addEventListener('change', () => {
+      const dest = $('routing').querySelector(
+        `.r-dest[data-rule="${el.dataset.rule}"][data-cat="${el.dataset.cat}"]`);
+      stage(el.dataset.rule, el.dataset.cat, dest.value, el.value || null);
+    }));
+
+  $('routing').querySelectorAll('.rt-save').forEach(b =>
+    b.addEventListener('click', () => saveBlock(b.dataset.mod)));
+  $('routing').querySelectorAll('.rt-cancel').forEach(b =>
+    b.addEventListener('click', () => { draft = {}; renderRouting(); }));
+
+  $('routing').querySelectorAll('.cat-add').forEach(b =>
+    b.addEventListener('click', () => addCategory(b.dataset.mod)));
+  $('routing').querySelectorAll('.cat-new').forEach(el =>
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addCategory(el.dataset.mod); }
+    }));
+}
+
+/* A new case category for one system. It is written straight away rather
+   than staged with the routing edits — a title has to exist before there is
+   a row to set a rule on. */
+async function addCategory(mod) {
+  const box = $('routing').querySelector(`.cat-new[data-mod="${mod}"]`);
+  const name = (box ? box.value : '').trim();
+  if (!name) { if (box) box.focus(); return; }
+
+  // Unique per system, case-insensitively (migration_nelos_category_system).
+  if (categories.some(c => c.module_key === mod && c.name.toLowerCase() === name.toLowerCase())) {
+    toast(`${labelOf(mod)} already has “${name}”.`, false);
+    return;
+  }
+
+  const { error } = await _supabase.from('nelos_categories').insert([{
+    name,
+    module_key: mod,
+    default_priority: 'normal',
+    sort_order: categories.reduce((mx, c) => Math.max(mx, c.sort_order || 0), 0) + 10
+  }]);
+  if (error) { toast('Could not add — ' + error.message, false); return; }
+
+  toast(`Added “${name}” to ${labelOf(mod)}.`);
+  await load();
+}
+
+/* Write every pending edit for one system, then reload. */
+async function saveBlock(mod) {
+  const pending = Object.entries(draft).filter(([k]) => k.split('|')[0] === mod);
+  if (!pending.length) return;
+
+  for (const [k, val] of pending) {
+    const cat = k.slice(k.indexOf('|') + 1);
+    const ok = await saveRule(mod, cat, val.to_module, val.to_seat_no);
+    if (!ok) return;                       // stop on the first failure
+  }
+  draft = {};
+  toast(`Routing saved for ${labelOf(mod)}.`);
+  await load();
+}
+
+/* Write one rule. Returns true on success — saveBlock() does the toast and
+   the reload once for the whole block, rather than per row. */
+async function saveRule(mod, cat, toModule, toSeatNo) {
+  const existing = routes.find(r => r.source_module === mod && r.category === cat);
+  const row = {
+    source_module: mod,
+    category: cat,
+    to_module: toModule,
+    to_seat_no: toSeatNo ? Number(toSeatNo) : null,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  };
+  const { error } = existing
+    ? await _supabase.from('nelos_routes').update(row).eq('id', existing.id)
+    : await _supabase.from('nelos_routes').insert([row]);
+  if (error) { toast('Could not save — ' + error.message, false); return false; }
+  return true;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  ['people', 'access', 'routing'].forEach(name =>
+    $('tab-' + name).classList.toggle('hidden', t.dataset.tab !== name));
+}));
+
+/* ── Loading ───────────────────────────────────────────────────── */
+
+async function load() {
+  const [pplRes, modRes, catRes, routeRes] = await Promise.all([
+    _supabase.rpc('nelos_people').then(r => r, e => ({ error: e, data: [] })),
+    _supabase.from('nelos_modules').select('*').eq('active', true).order('sort_order'),
+    _supabase.from('nelos_categories').select('name,module_key,sort_order').eq('active', true).order('sort_order')
+      .then(r => r, () => ({ data: [] })),
+    // Routes arrive with the routing migration. On a database that has not
+    // run it yet this comes back empty and the page still works.
+    _supabase.from('nelos_routes').select('*')
+      .then(r => r, () => ({ data: [] }))
+  ]);
+
+  if (modRes.error) {
+    const msg = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+      Could not load sections — ${esc(modRes.error.message)}<br>
+      <span class="text-[11px] font-semibold">Run the Nelos migrations in Supabase first.</span></div>`;
+    $('people').innerHTML = msg;
+    $('access').innerHTML = msg;
+    return;
+  }
+
+  modules = modRes.data || [];
+  categories = catRes.data || [];
+  routes = routeRes.data || [];
+
+  if (pplRes.error || !pplRes.data) {
+    people = [];
+    const msg = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+      Could not load the people list.<br>
+      <span class="text-[11px] font-semibold">
+        Run <strong>shared/migration_nelos_routing.sql</strong> in Supabase — it adds nelos_people().</span></div>`;
+    $('people').innerHTML = msg;
+    $('access').innerHTML = msg;
+    renderRouting();
+    return;
+  }
+
+  people = pplRes.data;
+  hasRights = people.some(p => p.may_solve !== undefined);
+  hasAccessCol = people.some(p => p.access_modules !== undefined);
+  hasSeesAll   = people.some(p => p.sees_all_cases !== undefined);
+  renderPeople();
+  renderAccess();
+  renderRouting();
+}
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+
+    const allowed = MJMAccess.isAdminOf('nelos') || MJMAccess.canManageUsers();
+    if (!allowed) {
+      alert('Only a Nelos admin can open User Setting.');
+      window.location.href = 'nelos_dashboard.html';
+      return;
+    }
+
+    const u = MJMAccess.user();
+    me = { name: u.full_name || u.email || '' };
+    MJMNelos.init(_supabase, { root: '../' });
+
+    await load();
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

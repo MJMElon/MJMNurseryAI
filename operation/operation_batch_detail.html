@@ -67,6 +67,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="../shared/shared_supabase.js"></script>
     <script src="../shared/shared_access.js"></script>
+    <script src="../shared/shared_nelos.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         /* Earthy Theme Colors */
@@ -4156,9 +4157,24 @@
                 const needsFollowUp = !followUpBanner.classList.contains('hidden');
                 
                 if (needsFollowUp) {
-                    const payload = { batch_name: batchId, issue_type: "Planting Discrepancy", status: "Pending Investigation" };
-                    const { error } = await _supabase.from('operation_follow_up_cases').insert([payload]);
-                    if (error) console.warn("Follow-up case table not found, skipping insert.");
+                    // Raised into Nelos, not the old operation_follow_up_cases —
+                    // that table had no screen, so a case went in and was never
+                    // seen again. A Nelos case lands on the module To-Do lists.
+                    //
+                    // dedupe:true because this runs on every save of the planting
+                    // report: re-saving a batch that still has a discrepancy must
+                    // update nothing rather than file a second identical case.
+                    const { error } = await MJMNelos.raise({
+                        title:       `Planting discrepancy — batch ${batchId}`,
+                        description: `The planted quantities on batch ${batchId} do not reconcile. Raised automatically when the planting report was saved.`,
+                        category:    'Planting Discrepancy',
+                        priority:    'high',
+                        source:      'operation',
+                        sourceRef:   `../operation/operation_batch_detail.html?batch=${encodeURIComponent(batchId)}`,
+                        batch:       batchId,
+                        dedupe:      true
+                    });
+                    if (error) console.warn('Could not raise the Nelos case:', error.message);
                 }
 
                 await savePhotosToStorage(batchId);
@@ -8574,6 +8590,9 @@ Thank you.`;
         if (booted) { await refresh(); return; }
         booted = true;
         await MJMAccess.load(_supabase);
+        // Share this page's client with the Nelos bridge, so a case raised
+        // on save goes out over the same authenticated connection.
+        MJMNelos.init(_supabase, { root: '../' });
         // Gate the operation module entirely.
         if (!MJMAccess.canAccess('operation')) {
           alert('You do not have access to the Operation module.');
@@ -8653,5 +8672,9 @@ Thank you.`;
                            rowVerify, rowUnverify, rowReject, clearRowRejection };
     })();
     </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

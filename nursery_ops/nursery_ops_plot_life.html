@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Life of Plot — Nursery Operation Management</title>
+<title>Life of Plot — Nursery Operation Manage</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d9488%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENO%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_palms.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -81,15 +82,19 @@
 </head>
 <body>
 
-<div class="bg-white border-b border-teal-100 px-6 py-4 grid grid-cols-3 items-center sticky top-0 z-30 shadow-sm">
-  <a href="nursery_ops_dashboard.html" class="justify-self-start text-[10px] font-bold text-slate-500 hover:text-teal-600 uppercase tracking-widest bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-200 no-underline transition-colors">&#8592; Back</a>
-  <span class="justify-self-center text-center font-black text-slate-800 uppercase tracking-widest text-sm">Life of Plot</span>
-  <div class="justify-self-end"><div class="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-black text-xs">NO</div></div>
-</div>
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="PALMS"
+     data-sub="Plot Age Logging &amp; Manage System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
 
 <div id="loading" class="max-w-[1150px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading…</div>
 
-<div id="main" class="max-w-[1150px] mx-auto px-4 md:px-6 py-8 hidden">
+<div id="main" class="max-w-[1390px] mx-auto px-4 md:px-6 py-8 hidden palms-frame">
+
+  <aside id="palms-nav" data-page="life" class="mb-5 md:mb-0"></aside>
+  <script src="../shared/shared_palms_nav.js"></script>
+
+  <div class="palms-body">
+
 
   <!-- ── Over-ideal-time Alert Board ─────────────────────────── -->
   <div class="card overflow-hidden mb-6" style="border-color:#fecdd3;">
@@ -150,7 +155,7 @@
       <div class="p-4 border-b border-slate-100 space-y-3">
         <div class="flex items-center justify-between gap-2">
           <h2 class="font-black text-slate-800 uppercase tracking-widest text-[12px]">📍 Plots</h2>
-          <button id="stages-btn" class="btn btn-ghost !py-1.5 !px-3 !text-[10px]" title="Set the plot status stages the FC Portal reports against">🚦 Status Stages</button>
+          <button id="stages-btn" class="btn btn-ghost !py-1.5 !px-3 !text-[10px]" title="The stages PALMS on the 555 FC Portal lets a Field Conductor pick from">🚦 Status Stages</button>
         </div>
         <select id="nursery-filter" class="inp !py-2 text-[13px]"><option value="">All nurseries</option></select>
         <input id="plot-search" class="inp !py-2 text-[13px]" placeholder="🔎 Search plot…">
@@ -187,6 +192,8 @@
       </div>
     </div>
   </div>
+
+</div>
 </div>
 
 <!-- ── Ad-hoc work log modal ─────────────────────────────────── -->
@@ -224,9 +231,16 @@
   </div>
   <div class="p-6 space-y-5">
     <p class="text-[12px] text-slate-500 leading-relaxed -mt-1">
-      The stages a plot moves through, in order. Field Conductors report against these daily on the FC Portal's
-      <strong>Plot Status</strong>. Set the <strong>ideal days</strong> a plot should stay in each stage before
-      moving to the next — the day counter (and the coming over-time alert) uses it.
+      The stages a plot moves through, in order. This is the list a Field Conductor picks from every morning in
+      <strong>PALMS</strong> on the 555 FC Portal — set it here, not in the app. Set the <strong>ideal days</strong>
+      a plot should stay in each stage before moving to the next: the day counter, the over-time alert and the
+      PALMS Motion Study all measure the real duration against it.
+      <br><br>
+      <span class="inline-block bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-[11px] leading-relaxed">
+        <strong>The order is the meaning.</strong> Every daily entry is stored against a stage's <em>position</em>,
+        not its name. Renaming a stage is free, and so is adding one at the end. <strong>Moving</strong> a stage
+        re-reads every past entry against the new order — do that only when the work itself has changed.
+      </span>
     </p>
 
     <!-- add / edit form -->
@@ -244,7 +258,7 @@
     </div>
 
     <div id="stages-list" class="space-y-2"></div>
-    <p class="text-[11px] text-slate-400">Deleting a stage keeps its name on past daily entries — only the reusable stage is removed.</p>
+    <p class="text-[11px] text-slate-400">Deleting a stage keeps its name on past daily entries — only the reusable stage is removed. Field Conductors pick the new list up the next time PALMS is opened with a signal.</p>
   </div>
 </div>
 
@@ -304,6 +318,7 @@ let statusStages = [];  // nops_plot_status_stages
 let plotRounds = [];    // nops_plot_rounds of selected plot (ascending round_no)
 let expandedRounds = new Set(); // completed rounds the user opened
 let mapNurseries = [];  // operation_nurseries (name, map_image_url)
+let PALMS_LOGS = {};   // the parsed PALMS plot log, kept for the history popup
 let statusByPlot = new Map(); // plot_name → current status summary
 let mapActive = null;   // nursery shown on the map
 let mapZoom = { zoom: 1, panX: 0, panY: 0 };
@@ -541,41 +556,74 @@ function closeModals() { ['log-back','log-modal','stages-back','stages-modal','p
 // Same map as Seedling Stock Management → Stock Management → Inventory
 // Map: the nursery's uploaded map image with the plot polygons drawn in
 // System Settings (shared_plots.map_top) — here colored by plot status.
-function computeCurrentStatus(entries) { // entries sorted newest first
-  if (!entries || !entries.length) return null;
-  const cur = entries[0];
-  let since = cur.entry_date;
-  for (const e of entries) {
-    if (e.stage_name !== cur.stage_name) break;
-    since = e.entry_date;
-  }
-  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-  const days = Math.max(1, Math.round((t0 - new Date(since + 'T00:00:00')) / 86400000) + 1);
-  const stage = statusStages.find(s => s.id === cur.stage_id) || statusStages.find(s => s.name === cur.stage_name);
-  const ideal = stage && stage.ideal_days != null ? Number(stage.ideal_days) : null;
-  return { stage_name: cur.stage_name, since, days, ideal, over: ideal != null && days > ideal,
-           last: cur.entry_date, reported_by: cur.reported_by || null };
-}
+/* Where this page's plot status comes from — read this before changing it.
 
+   It used to read nops_plot_status_entries, the old Plot Status module's
+   table. That module was retired when PALMS replaced it, and NOTHING has
+   written that table since: every plot on the map has been grey and every
+   row of the status table has said "no status reported" ever since, whatever
+   the Field Conductors keyed in.
+
+   The live record is the PALMS plot log — fcportal_palms_plot_logs, written
+   by the train on the 555 FC Portal and read here through shared_palms.js,
+   the same source the PALMS Monitoring Board reads.
+
+   The shape below is kept EXACTLY as computeCurrentStatus used to return it
+   ({ stage_name, since, days, ideal, over, last, reported_by }) so the map,
+   the status table and the over-time alert board carry on unchanged. Only
+   where the numbers come from has moved. */
 async function loadAllStatuses() {
   statusByPlot = new Map();
   try {
-    const { data, error } = await _supabase
-      .from('nops_plot_status_entries')
-      .select('plot_name, entry_date, stage_id, stage_name, reported_by')
-      .order('entry_date', { ascending: false })
-      .limit(5000);
-    if (error || !data) return;
-    const grouped = new Map();
-    data.forEach(e => {
-      if (!grouped.has(e.plot_name)) grouped.set(e.plot_name, []);
-      grouped.get(e.plot_name).push(e);
+    // Stages first: the log falls back to the activity's ideal days for a row
+    // that did not store its own, so the office's list has to be in place
+    // before the log is parsed.
+    await MJMPalms.loadStages(_supabase);
+    const logs = await MJMPalms.loadLogs(_supabase);
+    PALMS_LOGS = logs;
+
+    /* PALMS logs against a UNIT — the plot while it is whole ("B2") and
+       "B2#A" once split into areas. This page draws one polygon per plot, so
+       a split plot's areas roll back up and the worst of them stands for the
+       plot. */
+    const best = new Map();
+    const rank = { overdue: 0, ontrack: 1, none: 2 };
+    MJMPalms.boardLines(logs, 'all').forEach((ln) => {
+      const plot = MJMPalms.plotOf(ln.key);
+      const cur = best.get(plot);
+      if (!cur || rank[ln.state] < rank[cur.state]
+          || (rank[ln.state] === rank[cur.state]
+              && (ln.left == null ? 1e9 : ln.left) < (cur.left == null ? 1e9 : cur.left))) {
+        best.set(plot, ln);
+      }
     });
-    grouped.forEach((list, plot) => {
-      const st = computeCurrentStatus(list);
-      if (st) statusByPlot.set(plot, st);
+
+    best.forEach((ln, plot) => {
+      if (ln.state === 'none') {
+        // Logged before, nothing running now. The map wants that in grey, but
+        // the table can still say who was last here.
+        statusByPlot.set(plot, { stage_name: '— nothing running —', since: ln.lastDate,
+          days: 0, ideal: null, over: false, last: ln.lastDate, reported_by: ln.lastBy });
+        return;
+      }
+      const ideal = ln.due == null ? null : MJMPalms.diffDays(ln.start, ln.due);
+      // Inclusive of the day it started, which is how the nursery counts a
+      // day's work — the same convention the old table used.
+      const days = MJMPalms.diffDays(ln.start, MJMPalms.todayStr()) + 1;
+      statusByPlot.set(plot, {
+        stage_name: ln.status || '—',
+        since: ln.start,
+        days: Math.max(1, days),
+        ideal: ideal,
+        over: ln.state === 'overdue',
+        last: ln.lastDate,
+        reported_by: ln.lastBy,
+      });
     });
-  } catch (e) { /* table may not exist yet — map still shows plots in grey */ }
+  } catch (e) {
+    // PALMS tables may not exist yet — the map still shows the plots in grey.
+    console.warn('[plot life] PALMS status not read:', (e && e.message) || e);
+  }
 }
 
 function renderMapTabs() {
@@ -754,25 +802,38 @@ async function openPlotPopup(plotName) {
   $('ps-back').classList.remove('hidden');
   $('ps-modal').classList.remove('hidden');
   try {
-    const { data, error } = await _supabase
-      .from('nops_plot_status_entries')
-      .select('entry_date, stage_name, reported_by, remark')
-      .eq('plot_name', plotName)
-      .order('entry_date', { ascending: false })
-      .limit(180);
-    if (error) throw error;
-    if (!data || !data.length) {
-      $('ps-history').innerHTML = '<div class="text-slate-400 text-sm py-3">No daily entries yet.</div>';
+    /* The stage record from the PALMS log, newest first. The old table held
+       one row per DAY, so its history was a diary and the day a plot moved
+       stage had to be spotted by comparing neighbours. PALMS holds one row
+       per STAGE with a start and an end, so a move is a row — which is the
+       thing this list was always trying to show. */
+    const hist = MJMPalms.plotHistory(PALMS_LOGS, plotName);
+    const open = MJMPalms.currentEntries(PALMS_LOGS, plotName);
+    if (!hist.length && !open.length) {
+      $('ps-history').innerHTML = '<div class="text-slate-400 text-sm py-3">No stage record for this plot yet.</div>';
       return;
     }
-    $('ps-history').innerHTML = data.map((e, i) => {
-      // Bold the day the plot MOVED into this stage (stage differs from the older entry).
-      const changed = i === data.length - 1 || data[i + 1].stage_name !== e.stage_name;
+    const running = open.map((e) => {
+      const act = MJMPalms.actByN(e.actN);
       return `
         <div class="ps-hist-row">
-          <span class="text-[12px] font-bold text-slate-500 shrink-0 w-[92px]">${fmtDate(e.entry_date)}</span>
-          <span class="text-[13px] ${changed ? 'font-black text-teal-700' : 'font-semibold text-slate-700'}">${changed ? '➜ ' : ''}${esc(e.stage_name)}</span>
-          <span class="text-[11px] text-slate-400 ml-auto text-right">${e.reported_by ? esc(e.reported_by) : ''}${e.remark ? ` · ${esc(e.remark)}` : ''}</span>
+          <span class="text-[12px] font-bold text-slate-500 shrink-0 w-[92px]">${fmtDate(e.start)}</span>
+          <span class="text-[13px] font-black text-teal-700">➜ ${esc(act ? act.name : 'Stage ' + e.actN)}</span>
+          <span class="text-[11px] text-slate-400 ml-auto text-right">${e.by ? esc(e.by) : ''} · running now</span>
+        </div>`;
+    }).join('');
+    $('ps-history').innerHTML = running + hist.map((r) => {
+      let v = '';
+      if (r.variance > 0)      v = ` · <span class="text-rose-600 font-black">${r.variance}d over</span>`;
+      else if (r.variance < 0) v = ` · <span class="text-emerald-600 font-black">${-r.variance}d ahead</span>`;
+      else if (r.variance === 0) v = ' · on time';
+      return `
+        <div class="ps-hist-row">
+          <span class="text-[12px] font-bold text-slate-500 shrink-0 w-[92px]">${fmtDate(r.done)}</span>
+          <span class="text-[13px] font-semibold text-slate-700">${esc(r.name)}
+            <span class="text-[11px] text-slate-400">${r.actual}d${r.ideal != null ? ' of ' + r.ideal + 'd' : ''}${v}</span>
+          </span>
+          <span class="text-[11px] text-slate-400 ml-auto text-right">${r.by ? esc(r.by) : ''}</span>
         </div>`;
     }).join('');
   } catch (e) {
@@ -862,38 +923,22 @@ function wireMapZoom() {
   window.addEventListener('touchend', onUp);
 }
 
-// ── Current plot status (daily entries from the FC Portal) ───
-async function loadPlotStatus(plotName) {
+// ── Current plot status, from the PALMS log ─────────────────
+// No second read: loadAllStatuses has already reduced the whole log to one
+// line per plot, and asking the server again for one plot would be a slower
+// way to get an answer that is already in memory.
+function loadPlotStatus(plotName) {
   const el = $('pv-status');
   el.classList.add('hidden');
-  try {
-    const { data, error } = await _supabase
-      .from('nops_plot_status_entries').select('entry_date, stage_id, stage_name, reported_by')
-      .eq('plot_name', plotName)
-      .order('entry_date', { ascending: false })
-      .limit(120);
-    if (error || !data || !data.length) return;
-    const cur = data[0];
-    // Walk back through consecutive entries with the same stage to find
-    // when this stage started.
-    let since = cur.entry_date;
-    for (const e of data) {
-      if (e.stage_name !== cur.stage_name) break;
-      since = e.entry_date;
-    }
-    // Calendar days, inclusive — compare midnights so time of day never shifts it.
-    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-    const days = Math.max(1, Math.round((t0 - new Date(since + 'T00:00:00')) / 86400000) + 1);
-    const stage = statusStages.find(s => s.id === cur.stage_id) || statusStages.find(s => s.name === cur.stage_name);
-    const ideal = stage && stage.ideal_days != null ? Number(stage.ideal_days) : null;
-    const over = ideal != null && days > ideal;
-    el.innerHTML = `
-      <span class="chip ${over ? 'chip-over' : 'chip-done'}">🚦 ${esc(cur.stage_name)}</span>
-      <span class="text-[12px] font-bold ${over ? 'text-rose-600' : 'text-slate-500'} ml-1">
-        day ${days}${ideal != null ? ' of ideal ' + ideal : ''} · since ${fmtDate(since)} · last report ${fmtDate(cur.entry_date)}${cur.reported_by ? ' by ' + esc(cur.reported_by) : ''}
-      </span>`;
-    el.classList.remove('hidden');
-  } catch (e) { /* table may not exist yet — stay hidden */ }
+  const st = statusByPlot.get(plotName);
+  if (!st || !st.since) return;
+  const over = !!st.over;
+  el.innerHTML = `
+    <span class="chip ${over ? 'chip-over' : 'chip-done'}">🚦 ${esc(st.stage_name)}</span>
+    <span class="text-[12px] font-bold ${over ? 'text-rose-600' : 'text-slate-500'} ml-1">
+      day ${st.days}${st.ideal != null ? ' of ideal ' + st.ideal : ''} · since ${fmtDate(st.since)} · last report ${fmtDate(st.last)}${st.reported_by ? ' by ' + esc(st.reported_by) : ''}
+    </span>`;
+  el.classList.remove('hidden');
 }
 
 // ── Plot Status Stages settings ──────────────────────────────
@@ -1090,7 +1135,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
     if (!MJMAccess.canAccess('nursery_ops')) {
-      alert('You do not have access to Nursery Operation Management.');
+      alert('You do not have access to Nursery Operation Manage.');
       window.location.href = '../index.html';
       return;
     }
@@ -1131,5 +1176,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
   }
 })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

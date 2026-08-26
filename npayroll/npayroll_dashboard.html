@@ -11,7 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="npayroll_styles.css?v=6">
+<link rel="stylesheet" href="npayroll_styles.css?v=11">
 </head>
 <body>
 
@@ -19,22 +19,18 @@
 <div id="mjm-ribbon"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<!-- Page sub-header: keeps the module brand + month picker below the ribbon -->
+<!-- Page sub-header: the module's name, then the month it is showing, the
+     signed-in name and the module badge — the same strip, in the same
+     order, that Nursery Operation Manage carries under the ribbon. -->
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="brand">
-      <div class="brand-mark">NP</div>
-      <div>
-        <div class="brand-name">Nursery Payroll System</div>
-        <div class="brand-sub">mjmnpayroll_</div>
-      </div>
-    </div>
+    <span class="topbar-title">Nursery Payroll System</span>
     <div class="topbar-right">
       <label class="month-ctrl">
         <span>Month</span>
         <input type="month" id="global-month">
       </label>
-      <span id="who" class="who"></span>
+      <div class="topbar-badge">NP</div>
     </div>
   </div>
 </header>
@@ -144,6 +140,12 @@
           section below and the section is already filled in.</div>
       </div>
       <div class="bar-actions">
+        <!-- One register, two ways of reading it: the section-by-section list,
+             and the board that shows who stands where. -->
+        <div class="vtoggle">
+          <button class="vtoggle-btn is-on" id="wv-list"  onclick="setWorkerView('list')">List</button>
+          <button class="vtoggle-btn"       id="wv-board" onclick="setWorkerView('board')">Team Board</button>
+        </div>
         <label class="chk"><input type="checkbox" id="w-show-inactive" onchange="renderWorkers()"> Show inactive</label>
         <input type="text" id="w-search" class="sel" placeholder="Search name or role…" oninput="renderWorkers()">
       </div>
@@ -153,7 +155,13 @@
       Run <code>shared/fix_npayroll_maint_general.sql</code> in the Supabase SQL Editor, then reload.
       Until then who appears on the Work Maintenance tick sheets is guessed from the role and cannot be set per worker.
     </div>
+    <div id="pin-setup" class="warn hidden">
+      <b>⚠️ Worker PINs are not switched on yet.</b>
+      Run <code>shared/add_npayroll_worker_pin.sql</code> in the Supabase SQL Editor, then reload.
+      Until then the PIN boxes below are read-only.
+    </div>
     <div id="worker-sections"></div>
+    <div id="worker-board" class="hidden"></div>
   </section>
 
   <!-- ═══════════ PIECE RATE ═══════════ -->
@@ -201,6 +209,15 @@
           <select id="wf-role" onchange="onWorkerRoleChange()"></select></div>
         <div class="frow"><label>Status</label>
           <select id="wf-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+      </div>
+      <!-- What this worker will key into the worker portal to sign in.
+           Also settable straight from the register list. -->
+      <div class="frow"><label>Worker PIN</label>
+        <input type="text" id="wf-pin" autocomplete="off" autocapitalize="characters"
+               autocorrect="off" spellcheck="false" placeholder="Letters or numbers, any length">
+        <div style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:4px;">
+          For signing in to the worker portal. Letters, numbers or both, any length — letters are kept as capitals, so AB12 and ab12 are the same PIN. Leave blank if they have not been given one. No two workers share a PIN.
+        </div>
       </div>
       <!-- Decides whether this person gets a column on the Work Maintenance
            tick sheets. Guessed from the role until it is set here. -->
@@ -283,6 +300,10 @@
   </div>
 </div>
 
-<script src="npayroll_script.js?v=9"></script>
+<script src="npayroll_script.js?v=14"></script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

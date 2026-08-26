@@ -195,23 +195,55 @@ function refreshPayrollTab() {
 function closeModal(id) { $(id).classList.remove('open'); }
 
 /* ════════════ WORKER SYSTEM ════════════ */
-function renderWorkers() {
-  const box = $('worker-sections');
+
+/* Two ways of looking at one register — the section-by-section list it has
+   always been, and the team board. The Show inactive tick and the search box
+   belong to the register, not to either view, so both read them from here. */
+let workerView = 'list';
+try { if (localStorage.getItem('npayroll_worker_view') === 'board') workerView = 'board'; } catch (_) {}
+
+function workerShown(w) {
   const showInactive = $('w-show-inactive').checked;
+  const q = ($('w-search').value || '').trim().toLowerCase();
+  return (showInactive || w.active !== false) &&
+         (!q || `${w.full_name || ''} ${w.role || ''}`.toLowerCase().includes(q));
+}
+
+function setWorkerView(v) {
+  workerView = (v === 'board') ? 'board' : 'list';
+  try { localStorage.setItem('npayroll_worker_view', workerView); } catch (_) {}
+  renderWorkers();
+}
+
+function renderWorkers() {
+  const board = workerView === 'board';
+  $('wv-list').classList.toggle('is-on', !board);
+  $('wv-board').classList.toggle('is-on', board);
+  $('worker-sections').classList.toggle('hidden', board);
+  $('worker-board').classList.toggle('hidden', !board);
+  if (board) renderWorkerBoard(); else renderWorkerList();
+}
+
+function renderWorkerList() {
+  const box = $('worker-sections');
   const q = ($('w-search').value || '').trim().toLowerCase();
 
   box.innerHTML = SECTIONS.map(sec => {
-    const list = workers.filter(w =>
-      (w.section || '') === sec.code &&
-      (showInactive || w.active !== false) &&
-      (!q || `${w.full_name || ''} ${w.role || ''}`.toLowerCase().includes(q))
-    );
+    const list = workers.filter(w => (w.section || '') === sec.code && workerShown(w));
+    const canEdit = may('workers', 'manage');
     const rows = list.length ? list.map((w, i) => `
       <tr>
-        <td style="color:var(--text-faint);width:44px;">${i + 1}</td>
+        <td style="color:var(--text-faint);">${i + 1}</td>
         <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}</td>
         <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
           ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
+        <td><input class="pin-in" type="text" autocomplete="off"
+                   autocapitalize="characters" autocorrect="off" spellcheck="false"
+                   placeholder="––––" value="${esc(w.pin || '')}"
+                   ${(_pinCol && canEdit) ? '' : 'disabled'}
+                   title="${_pinCol ? 'PIN this worker signs in to the worker portal with — letters, numbers or both' : 'Run shared/add_npayroll_worker_pin.sql to switch PINs on'}"
+                   onchange="savePin(${w.id}, this)"
+                   onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
         <td class="r" style="white-space:nowrap;">
           <button class="btn btn-sm" onclick="openWorker(${w.id})">Edit</button>
@@ -221,8 +253,8 @@ function renderWorkers() {
       // While a search is running an empty section means "nothing matched",
       // not "nobody works here" — offering to add someone there would be wrong.
       : q
-        ? `<tr><td colspan="5" class="empty">No match in this section.</td></tr>`
-        : `<tr><td colspan="5" class="empty">No worker in this section yet.
+        ? `<tr><td colspan="6" class="empty">No match in this section.</td></tr>`
+        : `<tr><td colspan="6" class="empty">No worker in this section yet.
              <button class="btn btn-sm wsec-add-inline" onclick="openWorker(null,'${sec.code}')"
                      >+ Add to ${esc(sec.code)}</button></td></tr>`;
 
@@ -234,13 +266,272 @@ function renderWorkers() {
           <button class="btn btn-sm wsec-add" onclick="openWorker(null,'${sec.code}')"
                   title="Add a worker to ${esc(sec.name)}">+ Add Worker</button>
         </div>
-        <div class="wsec-body"><div class="tbl-wrap"><table>
-          <thead><tr><th style="width:44px;">No.</th><th class="l">Name</th><th class="l">Role</th>
-                     <th style="width:100px;">Status</th><th style="width:150px;"></th></tr></thead>
+        <div class="wsec-body"><div class="tbl-wrap"><table class="wsec-table">
+          <colgroup>
+            <col style="width:44px"><col><col style="width:210px">
+            <col style="width:120px"><col style="width:104px"><col style="width:150px">
+          </colgroup>
+          <thead><tr><th>No.</th><th class="l">Name</th><th class="l">Role</th>
+                     <th>PIN</th><th>Status</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div></div>
       </div>`;
   }).join('');
+}
+
+/* -- Team board ---------------------------------------------------------
+   The same register drawn the way the organisation actually stands: a
+   column per section, a row per role, and a name that can be picked up and
+   dropped somewhere else when somebody moves.
+
+   Nothing new is stored for this. A worker's place on the board IS their
+   section and their role - the two columns the register has always kept -
+   so the board and the list cannot drift apart, and dropping a name in a
+   new place is the same edit as changing it on the Edit Worker form.
+
+   A division is a heading over sections, not a third column: Main Nursery
+   is the three nurseries seen together, and nothing in the database has to
+   learn the word.
+   ---------------------------------------------------------------------- */
+const DIVISIONS = [
+  { name: 'Pre Nursery',  sections: ['PN'] },
+  { name: 'Main Nursery', sections: ['BNN', 'UNN1', 'UNN2'] },
+  { name: 'Estate',       sections: ['UNE'] },
+  { name: 'Driver',       sections: ['Driver'] }
+];
+
+/* A section nobody thought to file under a division would take its workers
+   off the board with it, and a board that quietly loses people is worse
+   than no board. Anything unplaced gets a division of its own. */
+function boardColumns() {
+  const known = new Set(SECTIONS.map(s => s.code));
+  const cols  = [];
+  DIVISIONS.forEach(d => {
+    const secs = d.sections.filter(c => known.has(c));
+    if (secs.length) cols.push({ name: d.name, sections: secs });
+  });
+  const placed = new Set(cols.flatMap(d => d.sections));
+  SECTIONS.filter(s => !placed.has(s.code))
+          .forEach(s => cols.push({ name: s.name, sections: [s.code] }));
+  return cols;
+}
+
+/* The rows, in the order the yard talks about them. */
+const BOARD_ROLES = [
+  { key: 'Field Conductor',           label: 'FC'                  },
+  { key: 'Assistant Field Conductor', label: 'Assistant FC'        },
+  { key: 'Water Pump Operator',       label: 'Water Pump Operator' },
+  { key: 'General Worker',            label: 'Workers'             }
+];
+/* Driver, Gardener, a role typed before the list existed, or none at all.
+   A row for them, because the alternative is a worker who is on the
+   register and nowhere on the board. */
+const BOARD_OTHER = '(other)';
+
+function boardRoleOf(w) {
+  const r = String(w.role || '').trim().toLowerCase();
+  const hit = BOARD_ROLES.find(b => b.key.toLowerCase() === r);
+  return hit ? hit.key : BOARD_OTHER;
+}
+
+function renderWorkerBoard() {
+  const box     = $('worker-board');
+  const cols    = boardColumns();
+  const canEdit = may('workers', 'manage');
+  const flat    = cols.flatMap(d => d.sections);
+  const rows    = BOARD_ROLES.concat([{ key: BOARD_OTHER, label: 'Other' }]);
+
+  const shown = workers.filter(workerShown);
+  const at = (sec, role) => shown.filter(w => (w.section || '') === sec && boardRoleOf(w) === role);
+
+  const head =
+    `<tr class="bd-divs"><th class="bd-corner"></th>` +
+    cols.map(d => `<th colspan="${d.sections.length}"><span class="bd-div">${esc(d.name)}</span></th>`).join('') +
+    `</tr><tr class="bd-secs"><th class="bd-corner"></th>` +
+    flat.map(c => `<th><span class="bd-sec">${esc(c)}</span></th>`).join('') +
+    `</tr>`;
+
+  const body = rows.map(r => {
+    const total = flat.reduce((n, c) => n + at(c, r.key).length, 0);
+    const cells = flat.map(c => {
+      const chips = at(c, r.key).map(w => `
+        <span class="wchip ${w.active === false ? 'wchip-off' : ''}"
+              ${canEdit ? 'draggable="true"' : ''}
+              ondragstart="boardDragStart(event, ${w.id})" ondragend="boardDragEnd(event)"
+              onclick="openWorker(${w.id})"
+              title="${esc(w.full_name)}${w.role ? ' - ' + esc(w.role) : ''}${w.active === false ? ' (inactive)' : ''}"
+              >${esc(w.full_name)}</span>`).join('');
+      // Adding from the Other row would have to invent a role for them, so
+      // that one row takes drops but does not offer to add.
+      const add = (canEdit && r.key !== BOARD_OTHER)
+        ? `<button class="wchip-add" onclick="openWorker(null, '${esc(c)}', '${esc(r.key)}')">+ Add person</button>`
+        : '';
+      return `<td class="bd-cell" ondragover="boardDragOver(event)" ondragleave="boardDragLeave(event)"
+                  ondrop="boardDrop(event, '${esc(c)}', '${esc(r.key)}')">
+                <div class="bd-cell-in">${chips}${add}</div></td>`;
+    }).join('');
+    return `<tr><th class="bd-role"><span class="bd-role-name">${esc(r.label)}</span>
+                  <span class="bd-role-count">${total}</span></th>${cells}</tr>`;
+  }).join('');
+
+  const hiddenNote = (workers.some(w => w.active === false) && !$('w-show-inactive').checked)
+    ? ' Inactive workers are hidden - tick Show inactive to see them.' : '';
+
+  box.innerHTML =
+    `<div class="card bd-wrap"><table class="bd"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+     <p class="foot-note">${canEdit
+       ? 'Drag a name into another box to move them. Dropped in a new row it changes their role; in a new column, their section. Click a name to open their record.'
+       : 'You can look, but moving a worker needs the Workers permission.'}${hiddenNote}</p>`;
+}
+
+/* -- Moving a name ------------------------------------------------------
+   The board writes the same two columns the Edit Worker form writes, and
+   keeps the original nursery/job_title pair in step exactly as saveWorker
+   does, so nothing still reading the old names disagrees with the board.
+
+   The move is drawn before the database has answered. A name that hangs in
+   its old box until the round trip finishes reads as a drag that did not
+   take, and it is the second attempt that causes the trouble. If the save
+   fails the name goes back and says why.
+   ---------------------------------------------------------------------- */
+let _dragId = null;
+
+function boardDragStart(ev, id) {
+  if (!may('workers', 'manage')) { ev.preventDefault(); return; }
+  _dragId = id;
+  ev.dataTransfer.effectAllowed = 'move';
+  // Firefox will not start a drag at all unless something is carried.
+  try { ev.dataTransfer.setData('text/plain', String(id)); } catch (_) {}
+  ev.currentTarget.classList.add('wchip-drag');
+}
+
+function boardDragEnd(ev) {
+  ev.currentTarget.classList.remove('wchip-drag');
+  _dragId = null;
+  document.querySelectorAll('.bd-cell-over').forEach(el => el.classList.remove('bd-cell-over'));
+}
+
+function boardDragOver(ev) {
+  if (_dragId == null) return;              // something dragged in from outside
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  ev.currentTarget.classList.add('bd-cell-over');
+}
+
+function boardDragLeave(ev) { ev.currentTarget.classList.remove('bd-cell-over'); }
+
+async function boardDrop(ev, section, roleKey) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('bd-cell-over');
+  const id = _dragId;
+  _dragId = null;
+  if (id == null) return;
+  const w = workers.find(x => x.id === id);
+  if (!w) return;
+  if (!mayDo('workers', 'manage',
+      'You do not have permission to move a worker. Ask an admin to grant it in User Access.')) return;
+
+  // Other is not a role anybody holds. Dropped there, a worker changes
+  // section and keeps whatever role they arrived with.
+  const role = (roleKey === BOARD_OTHER) ? (w.role || null) : roleKey;
+  if ((w.section || '') === section && (w.role || '') === (role || '')) return;   // nothing moved
+
+  const was = { section: w.section, role: w.role, nursery: w.nursery, job_title: w.job_title };
+  Object.assign(w, { section, role, nursery: section, job_title: role });
+  renderWorkers();
+  resolveMaintWorkers();          // a role or a section changes the tick sheets
+
+  const { error } = await _supabase.from('mjmnpayroll_workers')
+    .update({ section, role, nursery: section, job_title: role,
+              updated_at: new Date().toISOString(), updated_by: userEmail || null })
+    .eq('id', id);
+
+  if (error) {
+    Object.assign(w, was);
+    renderWorkers();
+    resolveMaintWorkers();
+    alert('Could not move ' + w.full_name + '.\n\n' + (error.message || error));
+  }
+}
+
+/* ── Worker PIN ─────────────────────────────────────────────────────────
+   What a worker will key into the worker portal to sign in. Kept on the
+   register beside them so whoever hands it out can see and change it.
+
+   Rules: letters and numbers, in any mix, as many as you like, or blank
+   for a worker who has not been given one; and no two workers share a
+   PIN, since a PIN is how the portal will tell them apart. Both are
+   checked here for a plain message, and again by the database (see
+   shared/add_npayroll_worker_pin.sql) so a second browser cannot slip a
+   duplicate past this one.
+
+   Letters are held as capitals. A PIN written down as AB12 and keyed back
+   as ab12 is the same PIN — which is the point of allowing letters at all,
+   and would otherwise be a locked-out worker nobody could explain.
+
+   There is no length limit. A short PIN is easier to guess than a long
+   one, so a two-character PIN is a decision rather than an accident — the
+   register takes whatever is keyed.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Everything that is not a letter or a number is dropped — a space or a
+   dash keyed for looks is not part of the PIN — and letters come back as
+   capitals, so what is stored is what pinProblem() checked. */
+const pinClean = v => (v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const PIN_CHARS_ONLY = 'A PIN is letters and numbers only.';
+
+function pinProblem(pin, id) {
+  if (!pin) return null;                                  // blank clears it
+  if (!/^[A-Z0-9]+$/.test(pin)) return PIN_CHARS_ONLY;
+  const clash = workers.find(x => x.id !== id && pinClean(x.pin) === pin);
+  return clash ? `That PIN is already ${clash.full_name}'s. Give each worker a different one.` : null;
+}
+
+/* Reads a PIN box: what would be stored, and the first thing wrong with it.
+   A box holding nothing but symbols cleans away to nothing, and taking that
+   for "clear this worker's PIN" would wipe one on a slip of the hand. An
+   empty box clears a PIN; a box that was not empty has to mean something. */
+function readPin(raw, id) {
+  const pin = pinClean(raw);
+  if (!pin && (raw || '').trim()) return { pin, problem: PIN_CHARS_ONLY };
+  return { pin, problem: pinProblem(pin, id) };
+}
+
+/* A database still carrying the old numbers-only rule refuses the first PIN
+   with a letter in it. Postgres names the constraint and little else, so
+   say which file switches letters on rather than passing that through. */
+function pinRuleHint(err) {
+  const msg = (err && err.message) || String(err || '');
+  return /pin_chars|pin_digits|pin_format/.test(msg)
+    ? 'This database still only takes number PINs.\n\n' +
+      'Run shared/allow_npayroll_worker_pin_letters.sql in the Supabase SQL Editor, then try again.'
+    : null;
+}
+
+async function savePin(id, el) {
+  const w = workers.find(x => x.id === id);
+  if (!w) return;
+  const prev = w.pin || '';
+  const { pin, problem } = readPin(el.value, id);
+  const back = () => { el.value = prev; };
+
+  if (!mayDo('workers', 'manage',
+      'You do not have permission to set a worker PIN. Ask an admin to grant it in User Access.')) return back();
+  if (problem) { alert(problem); back(); el.focus(); return; }
+  if (pin === prev) { el.value = pin; return; }
+
+  el.disabled = true;
+  const { error } = await _supabase.from('mjmnpayroll_workers')
+    .update({ pin: pin || null, updated_at: new Date().toISOString(), updated_by: userEmail || null })
+    .eq('id', id);
+  el.disabled = false;
+  if (error) { alert(pinRuleHint(error) || ('Could not save the PIN.\n\n' + (error.message || error))); back(); return; }
+
+  w.pin = pin || null;
+  el.value = pin;
+  el.classList.add('pin-saved');
+  setTimeout(() => el.classList.remove('pin-saved'), 900);
 }
 
 function fillSectionSelect(el, includeAll, selected) {
@@ -268,7 +559,7 @@ let editWorkerId = null;
    is no location to fill in, and no filing a Batu Niah sprayer under PN because
    the form happened to open on PN. Editing can still move somebody, but that is
    behind "Move…" rather than a field to answer every time. */
-function openWorker(id, section) {
+function openWorker(id, section, role) {
   if (!mayDo('workers', 'manage',
       'You do not have permission to add or edit workers. Ask an admin to grant it in User Access.')) return;
   if (!_tablesOk) { alert('Set the database up first — see the notice at the top.'); return; }
@@ -279,8 +570,10 @@ function openWorker(id, section) {
   $('wf-move-btn').classList.toggle('hidden', !w);   // only an existing worker moves
   onWorkerSectionChange();               // titles the modal with that section
   $('wf-name').value   = w?.full_name || '';
-  fillRoleSelect(w?.role || w?.job_title || '');
+  fillRoleSelect(w?.role || w?.job_title || role || '');
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
+  $('wf-pin').value    = pinClean(w?.pin);
+  $('wf-pin').disabled = !_pinCol;
   $('wf-remark').value = w?.remark || '';
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
   $('wf-maint').checked = w ? onMaintSheet(w) : true;
@@ -349,6 +642,11 @@ async function saveWorker() {
   };
   // Writing a column the table does not have fails the whole save.
   if (_maintGeneralCol && MAINT_NURSERIES.includes(row.section)) row.maint_general = $('wf-maint').checked;
+  if (_pinCol) {
+    const { pin, problem } = readPin($('wf-pin').value, editWorkerId);
+    if (problem) { alert(problem); $('wf-pin').focus(); return; }
+    row.pin = pin || null;
+  }
   $('wf-save').disabled = true;
   try {
     let error;
@@ -360,7 +658,7 @@ async function saveWorker() {
     resolveMaintWorkers();          // the maintenance sheets read this register
     renderWorkers();
   } catch (e) {
-    alert('Could not save the worker.\n\n' + (e.message || e));
+    alert(pinRuleHint(e) || ('Could not save the worker.\n\n' + (e.message || e)));
   } finally { $('wf-save').disabled = false; }
 }
 
@@ -1043,6 +1341,7 @@ function downloadMonthlyPDF() {
 
 /* ════════════ LOAD ════════════ */
 let _maintGeneralCol = true;
+let _pinCol = true;
 async function loadWorkers() {
   const { data, error } = await _supabase.from('mjmnpayroll_workers').select('*').order('full_name');
   if (error) { flagSetup(error.message); return; }
@@ -1052,6 +1351,11 @@ async function loadWorkers() {
   _maintGeneralCol = !probe.error;
   const w = $('worker-setup');
   if (w) w.classList.toggle('hidden', _maintGeneralCol);
+  // Same question for the PIN column, added later again.
+  const pinProbe = await _supabase.from('mjmnpayroll_workers').select('pin').limit(1);
+  _pinCol = !pinProbe.error;
+  const pw = $('pin-setup');
+  if (pw) pw.classList.toggle('hidden', _pinCol);
 }
 async function loadRates() {
   const { data, error } = await _supabase.from('mjmnpayroll_piece_rates')
@@ -1143,7 +1447,6 @@ $('global-month').addEventListener('change', async () => {
     isAdmin   = MJMAccess.isAdminOf('npayroll');
     // One missing helper must not take the whole module down with it.
     try { if (MJMAccess.canManageUsers()) $('user-access-tab').classList.remove('hidden'); } catch (_) {}
-    $('who').textContent = u.full_name || u.email || '';
 
     let savedMonth = null;
     try { savedMonth = localStorage.getItem('npayroll_month'); } catch (_) {}

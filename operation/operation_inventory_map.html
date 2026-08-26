@@ -125,7 +125,7 @@
                 const btn = document.createElement('button');
                 btn.className = `tab-btn flex-1 hover:bg-blue-50 hover:text-blue-600 transition-all ${activeNurseryName === n.name ? 'active-nursery' : ''}`;
                 btn.id = `tab-${n.name.replace(/\s+/g, '-')}`;
-                btn.innerHTML = `🏠 ${n.name}`;
+                btn.textContent = `🏠 ${n.name}`;      // a name is text, not markup
                 btn.onclick = () => switchNursery(n.name);
                 container.appendChild(btn);
             });
@@ -212,5 +212,9 @@
 
         _supabase.auth.getSession().then(({ data: { session } }) => { if (!session) window.location.href = 'operation_dashboard.html'; else init(); });
     </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>
