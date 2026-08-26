@@ -213,10 +213,11 @@ function renderWorkers() {
         <td class="l" style="font-weight:700;color:var(--text-head);">${esc(w.full_name)}</td>
         <td class="l">${esc(w.role || '—')}${onMaintSheet(w)
           ? '<div class="maint-chip" title="Has a column on the Work Maintenance tick sheets">🌱 maintenance</div>' : ''}</td>
-        <td><input class="pin-in" type="text" inputmode="numeric" autocomplete="off"
+        <td><input class="pin-in" type="text" autocomplete="off"
+                   autocapitalize="characters" autocorrect="off" spellcheck="false"
                    placeholder="––––" value="${esc(w.pin || '')}"
                    ${(_pinCol && canEdit) ? '' : 'disabled'}
-                   title="${_pinCol ? 'PIN this worker signs in to the worker portal with' : 'Run shared/add_npayroll_worker_pin.sql to switch PINs on'}"
+                   title="${_pinCol ? 'PIN this worker signs in to the worker portal with — letters, numbers or both' : 'Run shared/add_npayroll_worker_pin.sql to switch PINs on'}"
                    onchange="savePin(${w.id}, this)"
                    onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td><span class="pill ${w.active === false ? 'pill-off' : 'pill-on'}">${w.active === false ? 'Inactive' : 'Active'}</span></td>
@@ -255,37 +256,70 @@ function renderWorkers() {
 }
 
 /* ── Worker PIN ─────────────────────────────────────────────────────────
-   The number a worker will key into the worker portal to sign in. Kept on
-   the register beside them so whoever hands it out can see and change it.
+   What a worker will key into the worker portal to sign in. Kept on the
+   register beside them so whoever hands it out can see and change it.
 
-   Rules: digits, as many as you like, or blank for a worker who has not
-   been given one; and no two workers share a PIN, since a PIN is how the
-   portal will tell them apart. Both are checked here for a plain message,
-   and again by the database (see shared/add_npayroll_worker_pin.sql) so a
-   second browser cannot slip a duplicate past this one.
+   Rules: letters and numbers, in any mix, as many as you like, or blank
+   for a worker who has not been given one; and no two workers share a
+   PIN, since a PIN is how the portal will tell them apart. Both are
+   checked here for a plain message, and again by the database (see
+   shared/add_npayroll_worker_pin.sql) so a second browser cannot slip a
+   duplicate past this one.
+
+   Letters are held as capitals. A PIN written down as AB12 and keyed back
+   as ab12 is the same PIN — which is the point of allowing letters at all,
+   and would otherwise be a locked-out worker nobody could explain.
 
    There is no length limit. A short PIN is easier to guess than a long
-   one, so a two-digit PIN is a decision rather than an accident — the
+   one, so a two-character PIN is a decision rather than an accident — the
    register takes whatever is keyed.
    ─────────────────────────────────────────────────────────────────────── */
+
+/* Everything that is not a letter or a number is dropped — a space or a
+   dash keyed for looks is not part of the PIN — and letters come back as
+   capitals, so what is stored is what pinProblem() checked. */
+const pinClean = v => (v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const PIN_CHARS_ONLY = 'A PIN is letters and numbers only.';
+
 function pinProblem(pin, id) {
   if (!pin) return null;                                  // blank clears it
-  if (!/^\d+$/.test(pin)) return 'A PIN is numbers only.';
-  const clash = workers.find(x => x.id !== id && String(x.pin || '') === pin);
+  if (!/^[A-Z0-9]+$/.test(pin)) return PIN_CHARS_ONLY;
+  const clash = workers.find(x => x.id !== id && pinClean(x.pin) === pin);
   return clash ? `That PIN is already ${clash.full_name}'s. Give each worker a different one.` : null;
+}
+
+/* Reads a PIN box: what would be stored, and the first thing wrong with it.
+   A box holding nothing but symbols cleans away to nothing, and taking that
+   for "clear this worker's PIN" would wipe one on a slip of the hand. An
+   empty box clears a PIN; a box that was not empty has to mean something. */
+function readPin(raw, id) {
+  const pin = pinClean(raw);
+  if (!pin && (raw || '').trim()) return { pin, problem: PIN_CHARS_ONLY };
+  return { pin, problem: pinProblem(pin, id) };
+}
+
+/* A database still carrying the old numbers-only rule refuses the first PIN
+   with a letter in it. Postgres names the constraint and little else, so
+   say which file switches letters on rather than passing that through. */
+function pinRuleHint(err) {
+  const msg = (err && err.message) || String(err || '');
+  return /pin_chars|pin_digits|pin_format/.test(msg)
+    ? 'This database still only takes number PINs.\n\n' +
+      'Run shared/allow_npayroll_worker_pin_letters.sql in the Supabase SQL Editor, then try again.'
+    : null;
 }
 
 async function savePin(id, el) {
   const w = workers.find(x => x.id === id);
   if (!w) return;
   const prev = w.pin || '';
-  const pin  = (el.value || '').replace(/\D/g, '');
+  const { pin, problem } = readPin(el.value, id);
   const back = () => { el.value = prev; };
 
   if (!mayDo('workers', 'manage',
       'You do not have permission to set a worker PIN. Ask an admin to grant it in User Access.')) return back();
-  const bad = pinProblem(pin, id);
-  if (bad) { alert(bad); back(); el.focus(); return; }
+  if (problem) { alert(problem); back(); el.focus(); return; }
   if (pin === prev) { el.value = pin; return; }
 
   el.disabled = true;
@@ -293,7 +327,7 @@ async function savePin(id, el) {
     .update({ pin: pin || null, updated_at: new Date().toISOString(), updated_by: userEmail || null })
     .eq('id', id);
   el.disabled = false;
-  if (error) { alert('Could not save the PIN.\n\n' + (error.message || error)); back(); return; }
+  if (error) { alert(pinRuleHint(error) || ('Could not save the PIN.\n\n' + (error.message || error))); back(); return; }
 
   w.pin = pin || null;
   el.value = pin;
@@ -339,7 +373,7 @@ function openWorker(id, section) {
   $('wf-name').value   = w?.full_name || '';
   fillRoleSelect(w?.role || w?.job_title || '');
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
-  $('wf-pin').value    = w?.pin || '';
+  $('wf-pin').value    = pinClean(w?.pin);
   $('wf-pin').disabled = !_pinCol;
   $('wf-remark').value = w?.remark || '';
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
@@ -410,9 +444,8 @@ async function saveWorker() {
   // Writing a column the table does not have fails the whole save.
   if (_maintGeneralCol && MAINT_NURSERIES.includes(row.section)) row.maint_general = $('wf-maint').checked;
   if (_pinCol) {
-    const pin = ($('wf-pin').value || '').replace(/\D/g, '');
-    const bad = pinProblem(pin, editWorkerId);
-    if (bad) { alert(bad); $('wf-pin').focus(); return; }
+    const { pin, problem } = readPin($('wf-pin').value, editWorkerId);
+    if (problem) { alert(problem); $('wf-pin').focus(); return; }
     row.pin = pin || null;
   }
   $('wf-save').disabled = true;
@@ -426,7 +459,7 @@ async function saveWorker() {
     resolveMaintWorkers();          // the maintenance sheets read this register
     renderWorkers();
   } catch (e) {
-    alert('Could not save the worker.\n\n' + (e.message || e));
+    alert(pinRuleHint(e) || ('Could not save the worker.\n\n' + (e.message || e)));
   } finally { $('wf-save').disabled = false; }
 }
 
