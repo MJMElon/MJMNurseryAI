@@ -166,15 +166,39 @@
       </div>
     </div>
 
-    <!-- Not Required + Save -->
+    <!-- No Audit Needed — same two-option chooser as the per-batch
+         form (view-form) below, so a PN auditor closing out a whole
+         plot picks the same reason (Culling / Transplanting) that a
+         MN auditor picks when closing a single batch. Picking a
+         choice greys the samples + photos and flips
+         plotFormState.declined on. -->
+    <div class="form-card" id="mf-no-audit-card">
+      <div class="form-inner" style="padding-top:14px;padding-bottom:14px">
+        <div id="mf-no-audit-choices">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text3);text-transform:uppercase;margin-bottom:9px;text-align:center" data-t="no_audit_ask">No audit needed? Say which kind of plot</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+            <button type="button" class="no-audit-choice" onclick="markPlotNotRequired('Culling Plot')" data-t="culling_plot">CULLING PLOT</button>
+            <button type="button" class="no-audit-choice" onclick="markPlotNotRequired('Transplanting Plot')" data-t="transplanting_plot">TRANSPLANTING PLOT</button>
+          </div>
+        </div>
+        <div id="mf-no-audit-note" style="display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--g50);border:1px solid var(--g200);color:var(--g800);font-size:12px;font-weight:600;line-height:1.5">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--g600);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><polyline points="5 12 10 17 19 8"/></svg>
+              <strong>Marked <span id="mf-no-audit-reason">No Audit Required</span></strong>
+            </div>
+            <button type="button" id="mf-btn-undo-no-audit" onclick="undoPlotNotRequired()"
+                    style="flex-shrink:0;background:transparent;border:1px solid var(--g500);color:var(--g700);font-family:inherit;font-weight:800;font-size:10px;letter-spacing:.5px;padding:5px 11px;border-radius:999px;cursor:pointer;text-transform:uppercase;display:flex;align-items:center;gap:5px">
+              <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L3 7"/></svg>
+              <span>Undo</span>
+            </button>
+          </div>
+          <div style="color:var(--text3);font-weight:500;margin-top:6px">Fields above are disabled. Tap Save to close this plot out — no measurements or photos needed.</div>
+        </div>
+      </div>
+    </div>
+
     <div style="padding:0 12px 14px">
-      <button type="button" onclick="markPlotNotRequired()" id="mf-notreq-btn"
-              style="width:100%;background:transparent;border:1px dashed #cbd5e1;color:#64748b;
-                     font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.4px;
-                     text-transform:uppercase;padding:10px 12px;border-radius:12px;cursor:pointer;
-                     margin-bottom:12px">
-        Mark Plot as Not Required
-      </button>
       <button class="btn-primary" id="btn-save-plot" onclick="savePlotAudit()"
               style="width:100%;height:50px;border-radius:12px;background:#1a4d1a;color:#fff;
                      font-size:14px;font-weight:700;font-family:inherit;border:none;
@@ -408,11 +432,7 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<<<<<<< HEAD
-<script src="audit_height_script.js?v=20260826j"></script>
-=======
-<script src="audit_height_script.js?v=20260826h"></script>
->>>>>>> origin/main
+<script src="audit_height_script.js?v=20260826k"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
