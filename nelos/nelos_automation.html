@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NELOS — Automation Cases</title>
+<title>NELOS — Automate Cases</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%237c3aed%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3ENL%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,15 +23,49 @@
               box-shadow:0 3px 10px rgba(124,58,237,.10); }
   .backlink:hover { background:#ede9fe; }
 
-  .head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
-  .tool-btn { display:inline-flex; align-items:center; gap:8px; margin-left:auto; padding:9px 16px;
+  .head { display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:10px; }
+  .head h1 { font-size:22px; font-weight:900; color:#1e293b; letter-spacing:-.01em; margin:0;
+             text-align:center; }
+  .tool-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px;
               border-radius:999px; background:#7c3aed; border:1.5px solid #7c3aed; color:#fff;
               font-weight:900; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
               cursor:pointer; box-shadow:0 3px 10px rgba(124,58,237,.10); }
   .tool-btn:hover { background:#6d28d9; }
   .plus { font-size:17px; font-weight:900; line-height:0; margin-top:-1px; }
 
+  .sec-h { font-size:11px; font-weight:900; letter-spacing:.12em; text-transform:uppercase;
+           color:#94a3b8; margin:26px 0 6px; }
+  .sec-note { font-size:11.5px; font-weight:600; color:#94a3b8; line-height:1.6; margin:0 0 12px; }
+
+  /* One system, one card; one condition, one row. Two columns, because
+     there are two things to know: when it fires, and where it lands. */
+  .cond-sys { background:#fff; border:1.5px solid #ede9fe; border-radius:14px; margin-bottom:10px;
+              overflow:hidden; }
+  .cond-sys-h { display:flex; align-items:center; gap:9px; padding:11px 16px; background:#faf5ff;
+                border-bottom:1px solid #ede9fe; font-size:12px; font-weight:900; color:#5b21b6; }
+  .cond-sys-n { margin-left:auto; font-size:9.5px; font-weight:900; color:#a78bfa;
+                letter-spacing:.06em; text-transform:uppercase; }
+  .cond-head, .cond-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+                          gap:14px; padding:10px 16px; align-items:center; }
+  .cond-head { font-size:9px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
+               color:#a1a1aa; padding-top:9px; padding-bottom:5px; }
+  .cond-row { border-top:1px dashed #f1e9ff; }
+  .cond-work { font-size:12.5px; font-weight:900; color:#1e293b; }
+  .cond-when { font-size:11px; font-weight:600; color:#94a3b8; line-height:1.5; margin-top:2px; }
+  .cond-act { display:flex; flex-wrap:wrap; gap:7px; }
+  .cond-act select { flex:1 1 130px; min-width:0; font-size:11.5px; font-weight:700; color:#1e293b;
+                     background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:9px;
+                     padding:7px 9px; outline:none; }
+  .cond-act select:focus { border-color:#a78bfa; background:#fff; }
+  .cond-empty { padding:14px 16px; font-size:11.5px; font-weight:700; color:#cbd5e1; }
+  @media (max-width:640px) {
+    .cond-head { display:none; }
+    .cond-row { grid-template-columns:1fr; gap:8px; }
+  }
+
+  .lede-sec { text-align:left; margin-left:0; margin-right:0; max-width:none; }
   .lede { font-size:12px; font-weight:600; color:#6b7280; line-height:1.6; margin:0 0 18px;
+         text-align:center; max-width:640px; margin-left:auto; margin-right:auto;
           max-width:70ch; }
 
   .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:12px;
@@ -107,19 +141,36 @@
 
   <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Nelos Main Page</a>
 
+  <!-- The name centred on the page, with the one action it offers under
+       it rather than beside it — a heading pushed off centre by a button is
+       a heading arranged around the button. -->
   <div class="head">
-    <h1 class="text-[18px] font-black text-slate-800">Automation Cases</h1>
+    <h1>Automate Cases</h1>
     <button class="tool-btn" id="new-btn"><span class="plus">+</span> New Automation</button>
   </div>
 
-  <p class="lede">
+
+  <!-- What each system opens a case for on its own, and where that case
+       goes. The condition is the module's own code and is shown, not set,
+       here; the two dropdowns beside it ARE the setting. -->
+  <h2 class="sec-h">Cases each system opens by itself</h2>
+  <p class="sec-note">
+    The condition is written into the module that raises it, so it is read
+    here rather than edited. Where the case then goes is yours: pick the
+    system that should work it, and the person, if it should be one
+    person's.
+  </p>
+  <div id="conds"></div>
+
+  <h2 class="sec-h">Work that comes round</h2>
+
+  <p class="lede lede-sec">
     Work that comes round rather than goes wrong. Each line below is a standing
     instruction — what to do, where, who deals with it and how often — and Nelos
     raises the case itself when it is due. The case links straight through to the
     Auditor Portal module that records it, so the audit is done where audits are
     done and the case is what says it was.
   </p>
-
   <div id="list"></div>
 
 </div>
@@ -218,6 +269,9 @@ function toast(msg, ok) {
 
 const typeOf  = k => types.find(t => t.key === k) || {};
 const labelOf = k => (modules.find(m => m.key === k) || {}).label || k || '';
+/* True once nelos_categories.auto_condition and the route PIC columns
+   exist — i.e. once migration_nelos_auto_conditions.sql has run. */
+let hasConds = false;
 const handlerLabel = k => (modules.find(m => m.key === k) || {}).handler_label || labelOf(k);
 const handlersIn = k => handlers.filter(h => h.primary_module === k && k)
                                 .sort((a, b) => (a.seat_no || 99) - (b.seat_no || 99));
@@ -481,8 +535,121 @@ $('a-save').addEventListener('click', save);
 
 /* ── Loading ───────────────────────────────────────────────────── */
 
+/* ── Cases a system opens by itself ─────────────────────────────────
+   A condition is a nelos_categories row carrying auto_condition — plain
+   words for when the module raises it without being asked. The words are
+   the module code's and are read here, never set: changing them here would
+   change the label, not the behaviour, which is the worst kind of setting.
+
+   Where the case goes IS set here, and it is set where routing already
+   lives — the nelos_routes row for that (system, work). So this page and
+   the Case Routing tab on User Setting are two views of one table rather
+   than two tables that can disagree, and nelos_route_case() picks up either
+   without knowing which screen wrote it. */
+
+let conds = [];   // nelos_categories rows with auto_condition set
+let routes = [];  // nelos_routes rows
+
+const routeFor = (mod, work) =>
+  routes.find(r => r.source_module === mod && r.category === work) || null;
+
+/* The people who could be the PIC: those pinned to the system the case is
+   being sent to, by name. Same rule as the raise form — the pin decides who
+   is in the list, the name decides the order. */
+const picsFor = (mod) => handlers
+  .filter(h => h.primary_module === mod)
+  .map(h => ({ id: h.user_id, name: h.full_name || h.email || 'Unnamed' }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+function renderConds() {
+  if (!hasConds) {
+    $('conds').innerHTML = `<div class="cond-sys"><div class="cond-empty">
+      Run <strong>shared/migration_nelos_auto_conditions.sql</strong> in Supabase to
+      list and re-point the cases each system opens on its own.</div></div>`;
+    return;
+  }
+
+  /* Every system gets a card, including the ones with nothing — an absent
+     section reads as "not loaded", a section saying "none yet" reads as an
+     answer. */
+  $('conds').innerHTML = modules.map(m => {
+    const mine = conds.filter(c => c.module_key === m.key);
+    const rows = mine.length
+      ? `<div class="cond-head"><span>Condition</span><span>Open case action</span></div>` +
+        mine.map(c => {
+          const r = routeFor(m.key, c.name);
+          const to = r?.to_module || m.key;
+          const pics = picsFor(to);
+          return `
+          <div class="cond-row" data-mod="${esc(m.key)}" data-work="${esc(c.name)}">
+            <div>
+              <div class="cond-work">${esc(c.name)}</div>
+              <div class="cond-when">${esc(c.auto_condition)}</div>
+            </div>
+            <div class="cond-act">
+              <select data-to>
+                ${modules.map(x => `<option value="${esc(x.key)}"${x.key === to ? ' selected' : ''}
+                  >${esc(x.handler_label || x.label)}</option>`).join('')}
+              </select>
+              <select data-pic>
+                <option value="">Anyone in that system</option>
+                ${pics.map(pp => `<option value="${esc(pp.id)}"${
+                    r && r.to_user_id === pp.id ? ' selected' : ''}>${esc(pp.name)}</option>`).join('')}
+              </select>
+            </div>
+          </div>`;
+        }).join('')
+      : `<div class="cond-empty">Nothing here opens a case on its own yet.</div>`;
+
+    return `<div class="cond-sys">
+      <div class="cond-sys-h">${esc(m.handler_label || m.label)}
+        <span class="cond-sys-n">${mine.length || 'none'}</span></div>
+      ${rows}</div>`;
+  }).join('');
+
+  $('conds').querySelectorAll('.cond-row').forEach(row => {
+    row.querySelectorAll('select').forEach(sel =>
+      sel.addEventListener('change', () => saveCond(row, sel.hasAttribute('data-to'))));
+  });
+}
+
+/* One rule, written where routing lives. Changing the system clears the PIC
+   in the same breath: a person pinned to Auditor is not a PIC for a case
+   that now goes to Stock, and leaving them there would send it to somebody
+   who cannot see it. */
+async function saveCond(row, systemChanged) {
+  const mod  = row.dataset.mod;
+  const work = row.dataset.work;
+  const toSel  = row.querySelector('[data-to]');
+  const picSel = row.querySelector('[data-pic]');
+  if (systemChanged) picSel.value = '';
+
+  const toModule = toSel.value;
+  const picId    = picSel.value || null;
+  const picName  = picId ? picSel.options[picSel.selectedIndex].text : null;
+
+  const existing = routeFor(mod, work);
+  const patch = {
+    source_module: mod,
+    category:      work,
+    to_module:     toModule,
+    to_user_id:    picId,
+    to_user_name:  picName,
+    updated_at:    new Date().toISOString(),
+    updated_by:    me.name
+  };
+
+  const { error } = existing
+    ? await _supabase.from('nelos_routes').update(patch).eq('id', existing.id)
+    : await _supabase.from('nelos_routes').insert([patch]);
+
+  if (error) { toast('Could not save — ' + error.message, false); await load(); return; }
+  toast(`${work} now opens for ${labelOf(toModule)}${picName ? ' · ' + picName : ''}.`);
+  await load();
+}
+
 async function load() {
-  const [tRes, aRes, mRes, hRes, pRes] = await Promise.all([
+  const [tRes, aRes, mRes, hRes, pRes, cRes, rRes] = await Promise.all([
     _supabase.from('nelos_work_types').select('*').eq('active', true).order('sort_order')
       .then(r => r, e => ({ error: e })),
     _supabase.from('nelos_automations').select('*').order('id')
@@ -492,7 +659,17 @@ async function load() {
     _supabase.from('nelos_handlers').select('user_id,full_name,email,primary_module,seat_no')
       .then(r => r, () => ({ data: [] })),
     _supabase.from('shared_plots').select('plot_name,nursery_name')
-      .then(r => r, () => ({ data: [] }))
+      .then(r => r, () => ({ data: [] })),
+    /* auto_condition and the PIC columns arrive with
+       migration_nelos_auto_conditions.sql. On a database that has not run it
+       these come back as errors and the section says so, rather than the
+       page failing to load. */
+    _supabase.from('nelos_categories')
+      .select('name,module_key,auto_condition,sort_order')
+      .eq('active', true).not('auto_condition', 'is', null).order('sort_order')
+      .then(r => r, e => ({ error: e })),
+    _supabase.from('nelos_routes').select('id,source_module,category,to_module,to_user_id,to_user_name')
+      .then(r => r, e => ({ error: e }))
   ]);
 
   if (tRes.error || aRes.error) {
@@ -508,8 +685,12 @@ async function load() {
   modules  = mRes.data || [];
   handlers = hRes.data || [];
   plots    = pRes.data || [];
+  hasConds = !cRes.error && !rRes.error;
+  conds    = cRes.data || [];
+  routes   = rRes.data || [];
   fillTypes();
   render();
+  renderConds();
 }
 
 (async () => {
