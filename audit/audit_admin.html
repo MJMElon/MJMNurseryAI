@@ -547,6 +547,8 @@
 <!-- Which plots still owe work — the same helper the auditor to-do uses,
      so this page and that one count progress the same way. -->
 <script src="audit_pending.js?v=20260825a"></script>
+<!-- Rounds and windows, shared with the auditor's to-do list. -->
+<script src="audit_settings.js?v=2"></script>
 <!-- Welcome-name fill for the shared FC ribbon.
 
      audit_lang.js is deliberately NOT loaded here. This page had the
@@ -667,19 +669,18 @@ const WORK_GROUPS = [
   { key:'MN', name:'Main Nursery', tone:'#1558a8', nurseries:['BNN','UNN1','UNN2'] }
 ];
 
-/* Day-of-month windows. Mirrors PN_SET / MN_SET in audit_home.html. */
-const WORK_SCHEDULE = {
-  PN: [
-    { mod:'plot',   name:'Plot Condition',  windows:[[20,25]] },
-    { mod:'height', name:'Seedling Height', windows:[[20,25]] },
-    { mod:'papan',  name:'Papan Tanda',     windows:[[1,31]] }
-  ],
-  MN: [
-    { mod:'plot',   name:'Plot Condition',  windows:[[10,10],[20,20],[30,30]] },
-    { mod:'height', name:'Seedling Height', windows:[[1,5],[15,20]] },
-    { mod:'papan',  name:'Papan Tanda',     windows:[[1,31]] }
-  ]
-};
+/* Day-of-month windows, from Settings → System Setting — the same source
+   the auditor's own to-do list reads, so the two boards can never quote
+   different days for one audit. This used to be a second hardcoded copy of
+   PN_SET / MN_SET, which is exactly how it came to say the 10th while the
+   settings said the 9th.
+
+   A module with no rounds left drops out of the board, the same way it
+   drops off the to-do list. */
+const WORK_MOD_NAME = { plot:'Plot Condition', height:'Seedling Height', papan:'Papan Tanda' };
+const workSchedule = (scope) => Object.keys(WORK_MOD_NAME)
+  .map(mod => ({ mod, name: WORK_MOD_NAME[mod], windows: MJMAuditSettings.windows(scope, mod) }))
+  .filter(sc => sc.windows.length);
 
 const WORK_CHIP = {
   done:     { label:'Done',     bg:'#dcfce7', fg:'#15803d' },
@@ -692,6 +693,12 @@ const WORK_CHIP = {
 async function loadWorkDashboard(){
   const host = document.getElementById('work-dash');
   if (!host) return;
+
+  /* The rounds come from the database now, so read them before drawing.
+     A failure leaves MJMAuditSettings on its defaults, which is the
+     schedule this board carried before it was settable. */
+  try { await MJMAuditSettings.load(); }
+  catch (e) { console.warn('[work-dash] settings:', e); }
 
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth(), today = now.getDate();
@@ -709,7 +716,7 @@ async function loadWorkDashboard(){
   const cards = WORK_GROUPS.map(g => {
     let gTotal = 0, gDone = 0, anyBasis = false;
 
-    const rows = WORK_SCHEDULE[g.key].map(sc => {
+    const rows = workSchedule(g.key).map(sc => {
       return sc.windows.map((w, i) => {
         const start = Math.min(w[0], last), end = Math.min(w[1], last);
         let total = 0, owed = 0, basis = false;
