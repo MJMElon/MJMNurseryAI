@@ -113,12 +113,26 @@
     }
 
     /* ── the 555 logotype ── */
+    /* A centred, letter-spaced line is NOT centred: CSS puts the space
+       after the last letter too, so the ink sits half a letter-space left
+       of the box. An equal text-indent cancels it, and one --ls feeds both
+       so a breakpoint cannot change one and forget the other. */
+    .brand {
+      --ls: .26em;
+      text-align: center;
+      font-size: 19px; font-weight: 900;
+      letter-spacing: var(--ls); text-indent: var(--ls);
+      text-transform: uppercase;
+      color: var(--quiet);
+      margin-bottom: 2px;
+    }
     .logo-wrap { text-align: center; margin-bottom: 4px; }
     .logo555 {
       display: inline-block;
       font-family: 'DM Sans', sans-serif;
       font-weight: 900;
-      font-size: 74px; line-height: .9;
+      /* Grows with the phone, the way the Admin and FC covers do. */
+      font-size: clamp(74px, 24vw, 100px); line-height: .9;
       letter-spacing: -.02em;
       font-style: italic;
       color: var(--green);
@@ -130,37 +144,24 @@
         5px 5px 0 var(--green-3), 6px 6px 0 var(--green-3),
         7px 7px 0 var(--green-4), 8px 8px 0 var(--green-4),
         10px 12px 16px rgba(6,42,22,.4);
-      /* No sideways nudge on this cover, and that is measured, not an
-         oversight — the -7px that used to be here pushed it left.
-
-         Two things move the ink: the glyphs lean right (and their extrusion
-         further), while the cover's own -.4deg tilt swings anything ABOVE
-         its centre to the left. On the FC and Admin covers a house name sits
-         over the 555, pushing it down past the centre where that second
-         effect works the other way, so those two need a nudge. Here the 555
-         is the top thing on the cover and the two effects cancel: the face
-         of the middle 5 lands within half a pixel of centre on its own, at
-         both 64px and 74px. */
-      transform: rotate(-1.2deg);
+      /* The Admin cover's nudge, and it applies here for the same reason
+         it applies there: with a house name above it the 555 sits below the
+         cover's centre, where the -.4deg tilt swings ink right rather than
+         left, and the glyphs' own lean adds to it. This cover used to have
+         no nudge because the 555 was its top line and the two effects
+         cancelled — that stopped being true the moment MJM NURSERY went
+         above it. */
+      transform: translateX(calc(2.7px - .108em)) rotate(-1.2deg);
     }
     /* A centred, letter-spaced line is NOT centred: CSS puts the space
        after the last letter too, so the ink sits half a letter-space left
        of the box. An equal text-indent puts it back — indent and trailing
        space cancel. Both come off one --ls so the pair cannot drift. */
     .portal-name {
-      --ls: .34em;
-      margin-top: 12px;
+      --ls: .3em;
+      margin-top: 14px;
       text-align: center;
-      font-size: 12px; font-weight: 900;
-      letter-spacing: var(--ls); text-indent: var(--ls);
-      text-transform: uppercase;
-      color: var(--quiet);
-    }
-    .portal-sub {
-      margin-top: 5px;
-      text-align: center;
-      --ls: .2em;
-      font-size: 9.5px; font-weight: 700;
+      font-size: 14px; font-weight: 900;
       letter-spacing: var(--ls); text-indent: var(--ls);
       text-transform: uppercase;
       color: var(--quiet);
@@ -175,8 +176,6 @@
     .write {
       display: block; width: 100%; height: 54px;
       padding: 0 15px;
-      /* room for the eye, when there is one */
-      padding-right: 44px;
       background: rgba(255,255,255,.6);
       border: 1.5px solid rgba(35,48,63,.32);
       border-radius: 10px 7px 12px 6px / 7px 12px 6px 10px;
@@ -198,17 +197,6 @@
     /* the label is inside the box now, so the tag beside it is retired */
     .row-tag { display: none; }
 
-    .pw-toggle {
-      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; padding: 4px; cursor: pointer;
-    }
-    .pw-toggle svg {
-      width: 17px; height: 17px;
-      stroke: rgba(70,40,45,.45); fill: none; stroke-width: 1.7;
-      stroke-linecap: round; stroke-linejoin: round;
-      transition: stroke .15s;
-    }
-    .pw-toggle:hover svg { stroke: var(--ink); }
 
     /* ── marked in red pen ── */
     .error-msg {
@@ -385,8 +373,8 @@
 
     @media (max-width: 360px) {
       .cover { padding: 26px 20px 22px; }
-      .logo555 { font-size: 64px; }
-      .portal-name { --ls: .26em; font-size: 11px; }
+      .portal-name { --ls: .26em; font-size: 12px; }
+      .brand { --ls: .2em; font-size: 16px; }
     }
     @media (min-height: 800px) {
       .lines { margin-top: 48px; }
@@ -407,11 +395,15 @@
     <div class="cover">
       <div class="smudge" aria-hidden="true"></div>
 
+      <!-- The Admin Portal's order, line for line: whose book it is, the
+           book, then the portal it opens. The third line this cover used to
+           carry ("Sign in to the 555 Auditor Portal") said what the portal
+           name already says. -->
+      <div class="brand">MJM Nursery</div>
       <div class="logo-wrap">
         <div class="logo555">555</div>
       </div>
-      <div class="portal-name">Auditor Portal</div>
-      <div class="portal-sub" data-t="login_sub">Sign in to the 555 Auditor Portal</div>
+      <div class="portal-name" data-t="auditor_portal">Auditor Portal</div>
 
       <div class="lines">
 
@@ -442,27 +434,16 @@
             autocomplete="current-password"
             onkeydown="if(event.key==='Enter') doLogin()"
           />
-          <button class="pw-toggle" type="button" onclick="togglePw()" title="Show / hide password">
-            <svg id="pw-icon" viewBox="0 0 24 24">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
         </div>
 
         <button class="btn-login" id="btn-login" onclick="doLogin()">
           <div class="spinner"></div>
-          <svg class="btn-icon" viewBox="0 0 24 24">
-            <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          <span class="btn-text" data-t="login_btn">Sign In</span>
+          <span class="btn-text" data-t="login_btn">Login</span>
         </button>
 
         <div class="auth-links">
           <button class="auth-link" onclick="showForgotPassword()" data-t="forgot_password">Forgot Password?</button>
-          <button class="auth-link" onclick="showSignUp()" data-t="sign_up">Sign Up</button>
+          <button class="auth-link" onclick="showSignUp()" data-t="sign_up_btn">Create Account</button>
         </div>
 
       </div>
@@ -513,7 +494,7 @@
 
 </div>
 
-<script src="audit_lang.js?v=20260825a"></script>
+<script src="audit_lang.js?v=20260825b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
@@ -573,17 +554,6 @@
   window.addEventListener('online', updateOfflineBar);
   window.addEventListener('offline', updateOfflineBar);
 
-  function togglePw() {
-    const input = document.getElementById('password');
-    const icon  = document.getElementById('pw-icon');
-    if (input.type === 'password') {
-      input.type = 'text';
-      icon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
-    } else {
-      input.type = 'password';
-      icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
-    }
-  }
 
   async function doLogin() {
     const email    = document.getElementById('email').value.trim().toLowerCase();

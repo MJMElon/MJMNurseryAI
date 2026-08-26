@@ -31,7 +31,7 @@ const TRANSLATIONS = {
     login_sub:      'Sign in to the 555 Auditor Portal',
     login_email:    'EMAIL',
     login_password: 'PASSWORD',
-    login_btn:      'Sign In',
+    login_btn:      'Login',
     login_failed:   'Incorrect email or password. Please try again.',
     login_offline:  '📴 You are offline. Please connect to login for the first time.',
     login_no_connection: 'Login failed. Please check your connection and try again.',
