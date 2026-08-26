@@ -87,20 +87,9 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  if(activeView==='form'){
-    if(e)e.preventDefault();
-    /* PN uses the per-plot form (no batch-list step), so back from
-       it goes to the grid. MN uses the batch list — back from the
-       per-batch form returns to that list for the same plot. */
-    if(activeTab!=='PN' && window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot);
-    else setView('list');
-    return false;
-  }
-  if(activeView==='plot'||activeView==='detail'||activeView==='multi'){
-    if(e)e.preventDefault();
-    setView('list');
-    return false;
-  }
+  /* Same as Plot Condition: auditor came in from a To Do chip on
+     audit_home, so back returns straight to that list rather than
+     the module's own view stack. The anchor href does it. */
   return true;
 }
 window.goBack=goBack;
