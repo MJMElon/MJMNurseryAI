@@ -749,13 +749,25 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   }
 
   // Fill banner
-  document.getElementById('banner-nursery').textContent=b.nursery||'—';
-  document.getElementById('banner-plot').textContent=b.plot;
-  document.getElementById('banner-batch').textContent=b.batch||'—';
-  document.getElementById('banner-breed').textContent=b.breed||'—';
-  document.getElementById('banner-qty').textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
-  document.getElementById('banner-dt').textContent=fmtDate(b.dateTransplant);
-  document.getElementById('banner-dm').textContent=fmtDate(b.dateMature);
+  /* Batch info rewritten to match the physical papan tanda: Plot +
+     Batch on the top line, then Breed, Planted, Transplanted (MN
+     only), Quantity. Nursery and Mature rows retired. Every write is
+     guarded so a stale cache with the old markup does not throw. */
+  const _bp =document.getElementById('banner-plot');   if(_bp) _bp.textContent=b.plot;
+  const _bb =document.getElementById('banner-batch');  if(_bb) _bb.textContent=b.batch||'—';
+  const _br =document.getElementById('banner-breed');  if(_br) _br.textContent=b.breed||'—';
+  const _bdp=document.getElementById('banner-dp');     if(_bdp)_bdp.textContent=fmtDate(b.datePlanted);
+  const _bdt=document.getElementById('banner-dt');     if(_bdt)_bdt.textContent=fmtDate(b.dateTransplant);
+  const _bq =document.getElementById('banner-qty');    if(_bq) _bq.textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
+  /* PN is a seed bed — there is no transplant to record. Hide the
+     row entirely rather than showing "—" beside a label that does
+     not apply. */
+  const dtRow=document.getElementById('banner-dt-row');
+  if(dtRow)dtRow.style.display=(b.nursery==='PN')?'none':'';
+  /* Legacy elements the old layout carried, guarded so nothing throws
+     if this page is still hydrated from an old cache. */
+  const _bn=document.getElementById('banner-nursery'); if(_bn) _bn.textContent=b.nursery||'—';
+  const _bdm=document.getElementById('banner-dm');     if(_bdm)_bdm.textContent=fmtDate(b.dateMature);
   /* Title reads on the outer ribbon (#audit-form-title inside #ctx-form).
      Audit ID pill was retired at the auditor's request. */
   const _aft=document.getElementById('audit-form-title');
