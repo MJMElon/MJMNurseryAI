@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-<meta name="theme-color" content="#1a4d1a"/>
+<!-- Pinch-zoom is deliberately allowed here, unlike the field modules. This
+     is a page of eight-column tables; a phone reading one wants to zoom. -->
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#ffffff"/>
 <link rel="manifest" href="audit_manifest.json"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-touch-icon" href="audit_icon-192.png"/>
@@ -17,223 +19,451 @@
 <script src="audit_login_guard.js?v=20260824a"></script>
 <script>MJMAuditLogin.requireAdmin();</script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
+
+<!-- Shared FC-style top ribbon: 555 / MJM Nursery wordmark, welcome name,
+     way back, sign out. The same bar audit_admin.html carries, so the
+     report reads as part of the back office rather than as a phone screen
+     that happens to be reachable from it. -->
+<link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
 <style>
+/* ══════════════════════════════════════════════════════════════════
+   MONTHLY AUDIT REPORT
+   ══════════════════════════════════════════════════════════════════
+   Built to the audit_admin.html design system, not to the field
+   modules'. This page used to be a 520px phone column with the dark
+   green module top bar — which is what every auditor screen looks
+   like, and this is not one of them. It is opened from a desk, by an
+   admin, to read four tables of up to a few hundred rows each and
+   print them; squeezing that into a phone column meant every table
+   scrolled sideways inside a 520px box on a 1920px screen.
+
+   So: the admin palette (slate ground, white cards, 16px radii), the
+   shared ribbon, and a content column that runs to 1400px. The tables
+   get the width they were always asking for.
+
+   The phone is not given up in return. Below 720px each table row
+   folds into its own card, label on the left and value on the right,
+   so an eight-column plot-condition row is read down instead of
+   dragged sideways. Those rules are scoped to `screen` — print keeps
+   real tables at every width.
+   ══════════════════════════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --g900:#0d2b0d;--g800:#1a4d1a;--g700:#236023;--g600:#2d7a2d;--g400:#5aab5a;
-  --g200:#b5dfb5;--g100:#e0f2e0;--g50:#f2faf2;
-  --white:#fff;--surface:#f4f6f4;--border:#dde8dd;--border2:#c4d8c4;
-  --text1:#182018;--text2:#3d5c3d;--text3:#6b8a6b;--text4:#9db09d;
-  --r-md:10px;--r-lg:16px;
+  --bg:#f1f5f9; --card:#fff; --line:#e6ecf2;
+  --ink:#16323f; --ink2:#5b7280; --ink3:#94a7b4;
+  --green:#22a34a;
+  /* The module hues, unchanged — they are what the badges, the summary
+     figures and the two nursery headers are colour-coded by, and they
+     match the module cards on the manage page. */
+  --pn:#1a5c1a; --mn:#1565c0; --papan:#e65100; --maint:#880e4f;
+  --r-md:12px; --r-lg:16px;
 }
-html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:15px;background:var(--surface);color:var(--text1);-webkit-font-smoothing:antialiased}
-#app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--surface)}
+html,body{min-height:100%;font-family:'DM Sans',sans-serif;font-size:16px;
+          background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+#app{min-height:100vh;background:var(--bg)}
 
-/* TOP BAR */
-.top-bar{position:sticky;top:0;z-index:200;height:56px;background:var(--g800);display:flex;align-items:center;padding:0 14px;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
-.top-bar-back{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0}
-.top-bar-back svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.top-bar-icon{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.top-bar-icon svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.top-bar-title{font-size:15px;font-weight:700;color:#fff;flex:1}
-.top-bar-sub{font-size:10px;color:rgba(255,255,255,.55)}
-.top-bar-btn{width:36px;height:36px;border-radius:8px;background:transparent;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.top-bar-btn svg{width:18px;height:18px;stroke:rgba(255,255,255,.85);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* ── CONTENT ──
+   1400 rather than the manage page's 1100: that page is a grid of cards
+   and this one is tables, which have somewhere to put the extra width. */
+.content{max-width:1400px;margin:0 auto;padding:22px 32px 3rem}
+.section-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+              color:var(--ink3);padding-left:2px}
 
-/* FILTER */
-.filter-card{background:var(--white);border-bottom:1px solid var(--border);padding:16px}
-.filter-row{display:flex;gap:10px;margin-bottom:12px;align-items:flex-end}
-.filter-row:last-child{margin-bottom:0}
-.filter-field{flex:1}
-.filter-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+/* ── FILTERS ── */
+.filter-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+             padding:18px 18px 16px;box-shadow:0 1px 3px rgba(16,40,60,.05);margin-bottom:24px}
+/* auto-fit, so the three selects sit in a row on a desk and stack on a
+   phone without a breakpoint having to name either case. */
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.filter-label{font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;
+              letter-spacing:1px;margin-bottom:6px}
 .select-wrap{position:relative}
-.select-wrap::after{content:'';position:absolute;right:10px;top:50%;transform:translateY(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--text3);pointer-events:none}
-select.input{width:100%;height:40px;padding:0 30px 0 12px;font-size:13px;font-family:'DM Sans',sans-serif;border:1px solid var(--border2);border-radius:var(--r-md);background:var(--surface);color:var(--text1);outline:none;-webkit-appearance:none;appearance:none}
-select.input:focus{border-color:var(--g400);background:var(--white)}
+.select-wrap::after{content:'';position:absolute;right:12px;top:50%;transform:translateY(-50%);
+                    border-left:5px solid transparent;border-right:5px solid transparent;
+                    border-top:6px solid var(--ink3);pointer-events:none}
+select.input{width:100%;height:44px;padding:0 34px 0 13px;font-size:13.5px;font-weight:600;
+             font-family:inherit;border:1px solid var(--line);border-radius:var(--r-md);
+             background:#f8fafc;color:var(--ink);outline:none;cursor:pointer;
+             -webkit-appearance:none;appearance:none}
+select.input:hover{background:#eef3f8}
+select.input:focus{border-color:var(--green);background:var(--card);
+                   box-shadow:0 0 0 3px rgba(34,163,74,.12)}
+
 .mod-checks{display:flex;flex-wrap:wrap;gap:8px}
-.mod-check{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;background:var(--surface);border:1px solid var(--border2);padding:6px 12px;border-radius:20px;-webkit-tap-highlight-color:transparent;user-select:none}
-.mod-check.checked{background:var(--g800);color:#fff;border-color:var(--g800)}
-.btn-generate{width:100%;height:44px;background:var(--g800);color:#fff;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;border:none;border-radius:var(--r-md);cursor:pointer;margin-top:14px}
+.mod-check{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+           color:var(--ink2);cursor:pointer;background:#f8fafc;border:1px solid var(--line);
+           padding:8px 14px;border-radius:999px;transition:background .15s,color .15s,border-color .15s;
+           -webkit-tap-highlight-color:transparent;user-select:none}
+.mod-check:hover{background:#eef3f8}
+.mod-check.checked{background:var(--pn);color:#fff;border-color:var(--pn)}
 
-/* REPORT */
-.report-wrap{padding:14px 12px 100px}
+/* Same block as the manage page's "Visit 555 Auditor Portal" — this is the
+   one thing to press on the card, and it should look like it. */
+.btn-generate{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+              margin-top:18px;padding:15px 22px;border:none;border-radius:var(--r-lg);
+              background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;font-family:inherit;
+              font-weight:900;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+              cursor:pointer;box-shadow:0 10px 26px -8px rgba(27,107,50,.5);transition:all .15s}
+.btn-generate:hover{transform:translateY(-1px);box-shadow:0 14px 30px -8px rgba(27,107,50,.55)}
+.btn-generate:active{transform:translateY(1px)}
+.btn-generate svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;
+                  stroke-linecap:round;stroke-linejoin:round}
 
-/* HEADER */
-.report-header{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;margin-bottom:12px;text-align:center}
-.report-logo{font-size:22px;font-weight:800;color:var(--g800)}
-.report-logo span{color:var(--g400)}
-.report-company{font-size:11px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
-.report-title{font-size:16px;font-weight:700;color:var(--text1);margin-top:10px}
-.report-period{font-size:13px;color:var(--text3);margin-top:4px}
-.report-generated{font-size:11px;color:var(--text4);margin-top:6px}
+/* The filter card folds away once a report is on screen — on a phone it is
+   two thirds of the first screenful and the report is the thing wanted. */
+.collapse-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;
+              cursor:pointer;font-family:inherit;font-size:10px;font-weight:800;letter-spacing:.6px;
+              text-transform:uppercase;color:var(--ink3)}
+.collapse-btn:hover{color:var(--ink)}
+.collapse-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;
+                  stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.filter-card.collapsed{display:none}
+.is-collapsed .collapse-btn svg{transform:rotate(-90deg)}
 
-/* SUMMARY */
-.summary-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.sum-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;text-align:center;flex:1;min-width:80px}
-.sum-val{font-size:24px;font-weight:700;color:var(--g800);line-height:1}
-.sum-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
+/* ── TOOLBAR ──
+   Print and full screen. The old page kept Print in a bar pinned to the
+   bottom of the viewport at 520px wide, which on a desktop was a white
+   strip across the middle of the screen. It belongs with the report. */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tbtn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 16px;border-radius:999px;
+      background:var(--card);border:1px solid var(--line);color:var(--ink2);font-family:inherit;
+      font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+      text-decoration:none;box-shadow:0 1px 3px rgba(16,40,60,.05);
+      transition:background .15s,color .15s,border-color .15s}
+.tbtn:hover{background:#ecfdf5;color:#059669;border-color:#a7f3d0}
+.tbtn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+          stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.tbtn-primary{background:var(--pn);border-color:var(--pn);color:#fff}
+.tbtn-primary:hover{background:#144a14;border-color:#144a14;color:#fff}
 
-/* MODULE SECTION */
-.mod-section{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden}
-.mod-head{padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
-.mod-head-pn{background:var(--g800)}
-.mod-head-mn{background:#1565c0}
-.mod-head-title{font-size:14px;font-weight:700;color:#fff}
-.mod-head-sub{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px}
-.mod-head-badge{font-size:11px;font-weight:700;background:rgba(255,255,255,.2);color:#fff;padding:3px 10px;border-radius:20px;white-space:nowrap}
+/* ── REPORT HEADER (the letterhead) ── */
+.report-header{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+               padding:26px 20px;margin-bottom:14px;text-align:center;
+               box-shadow:0 1px 3px rgba(16,40,60,.05)}
+.report-logo{font-size:26px;font-weight:800;color:var(--pn);letter-spacing:-.4px}
+.report-logo span{color:var(--green)}
+.report-company{font-size:10px;font-weight:700;color:var(--ink3);margin-top:4px;
+                text-transform:uppercase;letter-spacing:1.2px}
+.report-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--ink);
+              margin-top:14px;line-height:1.2}
+.report-period{font-size:13px;font-weight:700;color:var(--ink2);margin-top:5px}
+.report-generated{font-size:10.5px;color:var(--ink3);margin-top:7px}
 
-/* TABLE */
-.rec-table{width:100%;border-collapse:collapse;font-size:12px}
-.rec-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);background:var(--g50);white-space:nowrap}
-.rec-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text1);vertical-align:middle}
-.rec-table tr:last-child td{border-bottom:none}
-.rec-table tr:hover td{background:var(--g50)}
-.rec-table .total-row td{background:var(--g50);font-weight:700;color:var(--g800);border-top:2px solid var(--border2)}
-.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
-.badge-plot{background:#e0f2e0;color:#1a4d1a}
-.badge-height{background:#e3f2fd;color:#1565c0}
-.badge-papan{background:#fff3e0;color:#e65100}
-.badge-maint{background:#fce4ec;color:#880e4f}
-.no-data{text-align:center;padding:20px;color:var(--text4);font-size:13px}
+/* ── SUMMARY ──
+   auto-fit again: five figures across on a desk, two across on a phone.
+   132 rather than a rounder 150 because five is the real count — at 150
+   the fifth card dropped onto a row of its own on a tablet, which reads
+   as a sixth figure that failed to load rather than as a wrap. */
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+             gap:12px;margin-bottom:14px}
+.sum-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+          padding:18px 14px;text-align:center;box-shadow:0 1px 3px rgba(16,40,60,.05)}
+.sum-val{font-size:32px;font-weight:900;color:var(--pn);line-height:1;font-variant-numeric:tabular-nums}
+.sum-label{font-size:9.5px;font-weight:800;color:var(--ink3);text-transform:uppercase;
+           letter-spacing:.9px;margin-top:7px}
 
-/* PRINT BAR */
-.print-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;padding:12px;background:var(--white);border-top:1px solid var(--border);z-index:100}
-.btn-print{width:100%;height:44px;background:var(--g800);color:#fff;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;border:none;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-print svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* ── NURSERY SECTION ── */
+.mod-section{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+             margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(16,40,60,.05)}
+.mod-head{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mod-head-pn{background:linear-gradient(135deg,#2f9c4f,#1b6b32)}
+.mod-head-mn{background:linear-gradient(135deg,#2f86d8,#12508f)}
+.mod-head-title{font-size:13px;font-weight:900;color:#fff;letter-spacing:.07em;text-transform:uppercase}
+.mod-head-sub{font-size:11px;color:rgba(255,255,255,.72);margin-top:3px;font-weight:600}
+.mod-head-badge{font-size:11px;font-weight:800;background:rgba(255,255,255,.22);color:#fff;
+                padding:5px 13px;border-radius:999px;white-space:nowrap;flex-shrink:0}
+.mod-block{border-top:1px solid var(--line)}
+.mod-block-head{padding:12px 20px;background:#f8fafc;display:flex;align-items:center;
+                justify-content:space-between;gap:10px}
+.mod-block-name{font-size:11.5px;font-weight:900;color:var(--ink);letter-spacing:.05em;
+                text-transform:uppercase}
 
-/* TOAST */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--g900);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;pointer-events:none;z-index:9999;transition:all .28s ease}
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto}
+.rec-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.rec-table th{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;
+              color:var(--ink3);padding:10px 14px;text-align:left;
+              border-bottom:1px solid var(--line);background:var(--card);white-space:nowrap}
+.rec-table td{padding:10px 14px;border-bottom:1px solid #f1f5f9;color:var(--ink);
+              vertical-align:middle;white-space:nowrap}
+.rec-table tbody tr:last-child td{border-bottom:none}
+.rec-table tbody tr:hover td{background:#f8fafc}
+.rec-table .num{font-variant-numeric:tabular-nums}
+.rec-table .total-row td{background:#f8fafc;font-weight:800;color:var(--pn);
+                         border-top:1px solid var(--line);font-size:11.5px;
+                         letter-spacing:.04em;text-transform:uppercase}
+.rec-table tbody tr.total-row:hover td{background:#f8fafc}
+.badge{display:inline-block;font-size:10px;font-weight:800;padding:4px 11px;border-radius:999px;
+       white-space:nowrap;flex-shrink:0}
+.badge-plot{background:#e8f5e9;color:var(--pn)}
+.badge-height{background:#e0f2fe;color:#0369a1}
+.badge-papan{background:#fff3e0;color:var(--papan)}
+.badge-maint{background:#fce4ec;color:var(--maint)}
+.no-data{text-align:center;padding:26px 16px;color:var(--ink3);font-size:12.5px;font-weight:600}
+
+/* ── STATES ── */
+.empty-report{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+              text-align:center;padding:3.5rem 1.5rem;color:var(--ink3);font-size:13px;
+              box-shadow:0 1px 3px rgba(16,40,60,.05)}
+.empty-report svg{width:46px;height:46px;stroke:#cbd9e2;fill:none;stroke-width:1.3;
+                  margin:0 auto 14px;display:block}
+.empty-report strong{color:var(--ink2)}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(8px);
+       background:#0f2f1a;color:#fff;padding:12px 22px;border-radius:999px;font-size:13px;
+       font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;z-index:9999;
+       transition:all .28s ease;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;display:flex;align-items:center;justify-content:center}
+#loading-overlay{position:fixed;inset:0;background:rgba(16,40,60,.45);z-index:9998;
+                 display:flex;align-items:center;justify-content:center}
 #loading-overlay.hidden{display:none!important}
-.loading-box{background:#fff;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px}
-.loading-spinner{width:32px;height:32px;border:3px solid var(--g100);border-top-color:var(--g800);border-radius:50%;animation:spin .7s linear infinite}
-.loading-text{font-size:13px;font-weight:600;color:var(--text2)}
+.loading-box{background:#fff;border-radius:var(--r-lg);padding:26px 34px;display:flex;
+             flex-direction:column;align-items:center;gap:13px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.loading-spinner{width:32px;height:32px;border:3px solid #e8f5e9;border-top-color:var(--pn);
+                 border-radius:50%;animation:spin .7s linear infinite}
+.loading-text{font-size:12.5px;font-weight:700;color:var(--ink2)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hidden{display:none!important}
-.empty-report{text-align:center;padding:3rem 1rem;color:var(--text4)}
-.empty-report svg{width:48px;height:48px;stroke:var(--g200);fill:none;stroke-width:1.2;margin:0 auto 12px;display:block}
 
-/* PRINT */
-@media print{
-  @page{margin:12mm;size:A4}
-  body{background:#fff;font-size:10pt}
-  #app{max-width:100%}
-  .top-bar,.filter-card,.print-bar,.toast,#loading-overlay{display:none!important}
-  .report-wrap{padding:0}
-  .mod-section{break-inside:avoid;page-break-inside:avoid;border:1px solid #ccc}
-  .mod-head-pn{background:#1a4d1a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .mod-head-mn{background:#1565c0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .rec-table th{background:#f2faf2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* ── FULL SCREEN ──
+   Two things at once, because the browser gives only one of them. The
+   Fullscreen API takes the report out to the edges of the display, which
+   is what somebody presenting a month's figures wants; and the same class
+   is applied whether or not the API answers, so a browser that refuses
+   (an iPhone does) still gets the report filling the tab with everything
+   else out of the way. Nothing here is the report itself, so nothing here
+   is worth a pixel in that mode. */
+body.is-full .fcr,
+body.is-full .filter-section,
+body.is-full .report-section-head,
+body.is-full #nelos-dock,
+body.is-full .nelos-dock{display:none!important}
+body.is-full .content{max-width:none;padding:14px 18px 40px}
+body.is-full{background:var(--card)}
+body.is-full #app{background:var(--card)}
+body.is-full .report-header{border:none;box-shadow:none;padding-top:8px}
+/* The way back out has to stay reachable, and in full screen the toolbar
+   has scrolled off long before anybody wants it. It replaces the
+   toolbar's own Full Screen button rather than joining it — two Exit
+   buttons on one screen is one too many. */
+.exit-full{display:none;position:fixed;top:14px;right:14px;z-index:300}
+body.is-full .exit-full{display:inline-flex}
+body.is-full #btn-full{display:none}
+
+/* ── PHONE: rows become cards ──
+   `screen` only. A phone printing this still prints tables. */
+@media screen and (max-width:720px){
+  .tbl-wrap{overflow-x:visible}
+  /* The header row is dropped from view but kept for screen readers —
+     each cell carries its own label in ::before instead. */
+  .rec-table thead{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;
+                   clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .rec-table,.rec-table tbody,.rec-table tr,.rec-table td{display:block;width:100%}
+  .rec-table tbody tr{border:1px solid var(--line);border-radius:var(--r-md);
+                      margin:0 0 8px;overflow:hidden;background:var(--card)}
+  .rec-table tbody tr:last-child{margin-bottom:0}
+  .rec-table td{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+                padding:9px 13px;border-bottom:1px solid #f1f5f9;text-align:right;
+                white-space:normal}
+  .rec-table tbody tr td:last-child{border-bottom:none}
+  .rec-table td::before{content:attr(data-label);flex-shrink:0;font-size:9.5px;font-weight:800;
+                        letter-spacing:.7px;text-transform:uppercase;color:var(--ink3);
+                        text-align:left}
+  .rec-table tbody tr:hover td{background:transparent}
+  /* The first cell becomes the card's header rather than just another
+     row: without it a card of eight identical grey-label rows gives no
+     answer to "where does one record stop and the next begin". */
+  .rec-table tbody tr td:first-child{background:#f8fafc;font-weight:800;
+                                     border-bottom:1px solid var(--line)}
+  .rec-table tbody tr.total-row{border-color:var(--line);background:#f8fafc}
+  .rec-table .total-row td{justify-content:center;border:none;text-align:center;padding:11px 13px}
+  .rec-table .total-row td::before{display:none}
+  .mod-block-body{padding:10px}
+  .mod-block-body .no-data{padding:16px}
 }
 
-    /* ── DESKTOP RESPONSIVE ── */
-    @media (min-width: 768px) {
-      #app {
-        max-width: 860px !important;
-        margin: 0 auto !important;
-        box-shadow: 0 2px 20px rgba(0,0,0,.08);
-        min-height: 100vh;
-      }
-    }
-    
+@media (max-width:640px){
+  .content{padding:16px 14px 3rem}
+  .report-title{font-size:22px}
+  .sum-val{font-size:26px}
+  .mod-head{padding:14px 15px}
+  .filter-card{padding:15px}
+  .tbtn{flex:1;justify-content:center;padding:0 12px}
+}
+
+/* ── PRINT ──
+   Everything that is chrome comes off; the tables come back to being
+   tables at any width, and the two nursery headers keep their colour so a
+   printed report is still readable as two nurseries. */
+@media print{
+  @page{margin:12mm;size:A4}
+  html,body{background:#fff;font-size:10pt}
+  #app{background:#fff}
+  .fcr,.filter-section,.toolbar,.report-section-head,.toast,#loading-overlay,
+  .exit-full,#nelos-dock,.nelos-dock{display:none!important}
+  .content{max-width:100%;padding:0}
+  .report-header,.sum-card,.mod-section{box-shadow:none;border:1px solid #d7e0e8}
+  .mod-section{break-inside:avoid;page-break-inside:avoid}
+  .summary-row{grid-template-columns:repeat(5,1fr)}
+  .tbl-wrap{overflow:visible}
+  .rec-table,.rec-table tbody,.rec-table tr,.rec-table td{display:revert;width:auto}
+  .rec-table{display:table;width:100%}
+  .rec-table thead{display:table-header-group;position:static;width:auto;height:auto;clip:auto}
+  .rec-table tr{display:table-row;border:none;margin:0}
+  .rec-table td{display:table-cell;text-align:left;border-bottom:1px solid #eef2f4}
+  .rec-table td::before{display:none}
+  .rec-table tr{break-inside:avoid;page-break-inside:avoid}
+  .mod-head-pn{background:#1b6b32!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mod-head-mn{background:#12508f!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mod-block-head,.rec-table .total-row td{background:#f5f8fa!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
 <div id="app">
 
-  <nav class="top-bar">
-    <!-- Back to where this page is opened from. Both admin modules hang off
-         the back end, so returning to the auditor view dropped an admin
-         somewhere they did not come from and had to navigate out of. -->
-    <a href="audit_admin.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
-    <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-    <div style="flex:1">
-      <div class="top-bar-title">Monthly Report</div>
-      <div class="top-bar-sub" id="nav-today"></div>
+  <!-- The shared FC ribbon, as on audit_admin.html. "Manage" rather than
+       "Portal" in the right-hand cluster: both admin modules hang off the
+       back end, and returning an admin to the auditor view dropped them
+       somewhere they did not come from. -->
+  <nav class="fcr" role="navigation" aria-label="Auditor Portal">
+    <span class="fcr-spacer" aria-hidden="true"></span>
+    <div class="fcr-brand">
+      <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub">Monthly Audit Report</div>
     </div>
-    <button class="top-bar-btn" onclick="generateReport()">
-      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-    </button>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Admin</span>
+      <a class="fcr-portal" href="audit_admin.html" aria-label="Back to manage" title="Back to manage">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span class="fcr-portal-label">Manage</span>
+      </a>
+      <button class="fcr-signout" onclick="signOut()" aria-label="Sign out" title="Sign out">
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
+        <span class="fcr-signout-label">Sign Out</span>
+      </button>
+    </div>
   </nav>
 
-  <!-- FILTERS -->
-  <div class="filter-card">
-    <div class="filter-row">
-      <div class="filter-field">
-        <div class="filter-label">Month</div>
-        <div class="select-wrap">
-          <select class="input" id="f-month">
-            <option value="1">January</option><option value="2">February</option>
-            <option value="3">March</option><option value="4">April</option>
-            <option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option>
-            <option value="9">September</option><option value="10">October</option>
-            <option value="11">November</option><option value="12">December</option>
-          </select>
-        </div>
+  <div class="content">
+
+    <!-- FILTERS -->
+    <div class="filter-section">
+      <div class="section-row">
+        <div class="section-head">Report Filters</div>
+        <button type="button" class="collapse-btn" id="filter-toggle" onclick="toggleFilters()"
+                aria-expanded="true" aria-controls="filter-card">
+          <span id="filter-toggle-label">Hide</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
       </div>
-      <div class="filter-field">
-        <div class="filter-label">Year</div>
-        <div class="select-wrap">
-          <select class="input" id="f-year"></select>
+
+      <div class="filter-card" id="filter-card">
+        <div class="filter-grid">
+          <div>
+            <div class="filter-label">Month</div>
+            <div class="select-wrap">
+              <select class="input" id="f-month" aria-label="Month">
+                <option value="1">January</option><option value="2">February</option>
+                <option value="3">March</option><option value="4">April</option>
+                <option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option>
+                <option value="9">September</option><option value="10">October</option>
+                <option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="filter-label">Year</div>
+            <div class="select-wrap">
+              <select class="input" id="f-year" aria-label="Year"></select>
+            </div>
+          </div>
+          <div>
+            <div class="filter-label">Nursery</div>
+            <div class="select-wrap">
+              <select class="input" id="f-nursery" aria-label="Nursery">
+                <option value="both">Pre Nursery + Main Nursery (All)</option>
+                <option value="pn">Pre Nursery only</option>
+                <option value="mn">Main Nursery only</option>
+              </select>
+            </div>
+          </div>
         </div>
+
+        <div class="filter-label" style="margin:16px 0 8px">Modules to Include</div>
+        <div class="mod-checks">
+          <label class="mod-check checked" onclick="toggleMod(this,'plot')">📋 Plot Condition</label>
+          <label class="mod-check checked" onclick="toggleMod(this,'height')">📏 Seedling Height</label>
+          <label class="mod-check checked" onclick="toggleMod(this,'papan')">🪧 Papan Tanda</label>
+          <label class="mod-check checked" onclick="toggleMod(this,'maint')">🔧 Maintenance</label>
+        </div>
+
+        <button class="btn-generate" onclick="generateReport()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Generate Report</span>
+        </button>
       </div>
     </div>
-    <div class="filter-row">
-      <div class="filter-field">
-        <div class="filter-label">Nursery</div>
-        <div class="select-wrap">
-          <select class="input" id="f-nursery">
-            <option value="both">Pre Nursery + Main Nursery (All)</option>
-            <option value="pn">Pre Nursery only</option>
-            <option value="mn">Main Nursery only</option>
-          </select>
-        </div>
+
+    <!-- TOOLBAR — revealed with the first report -->
+    <div class="toolbar hidden" id="print-bar">
+      <button class="tbtn tbtn-primary" onclick="window.print()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span>Print / Save PDF</span>
+      </button>
+      <button class="tbtn" onclick="toggleFullScreen()" id="btn-full">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        <span>Full Screen</span>
+      </button>
+      <button class="tbtn" onclick="generateReport()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        <span>Refresh</span>
+      </button>
+    </div>
+
+    <!-- OUTPUT -->
+    <div id="report-output">
+      <div class="empty-report">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>Choose a month and press <strong>Generate Report</strong>.</p>
       </div>
     </div>
-    <div class="filter-label" style="margin-bottom:8px">Modules to Include</div>
-    <div class="mod-checks">
-      <label class="mod-check checked" onclick="toggleMod(this,'plot')">📋 Plot Condition</label>
-      <label class="mod-check checked" onclick="toggleMod(this,'height')">📏 Seedling Height</label>
-      <label class="mod-check checked" onclick="toggleMod(this,'papan')">🪧 Papan Tanda</label>
-      <label class="mod-check checked" onclick="toggleMod(this,'maint')">🔧 Maintenance</label>
-    </div>
-    <button class="btn-generate" onclick="generateReport()">Generate Report</button>
   </div>
 
-  <!-- OUTPUT -->
-  <div class="report-wrap" id="report-output">
-    <div class="empty-report">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <p>Select filters and tap <strong>Generate Report</strong></p>
-    </div>
-  </div>
-
-  <!-- PRINT BAR -->
-  <div class="print-bar hidden" id="print-bar">
-    <button class="btn-print" onclick="window.print()">
-      <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      Print / Save PDF
-    </button>
-  </div>
+  <button class="tbtn exit-full" onclick="toggleFullScreen()" aria-label="Exit full screen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    <span>Exit Full Screen</span>
+  </button>
 
   <div class="toast" id="toast"></div>
   <div id="loading-overlay" class="hidden">
-    <div class="loading-box"><div class="loading-spinner"></div><span class="loading-text">Generating report...</span></div>
+    <div class="loading-box"><div class="loading-spinner"></div><span class="loading-text">Generating report…</span></div>
   </div>
 
 </div>
 <script src="audit_lang.js?v=20260825b"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
+<!-- Welcome-name fill for the shared FC ribbon. -->
+<script src="audit_ribbon.js?v=20260824b"></script>
 <script>
 'use strict';
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const PN_NURSERIES=['PN'];
 const MN_NURSERIES=['BNN','UNN1','UNN2'];
+
+function signOut(){
+  if(!confirm('Sign out of the audit system?')) return;
+  MJMAuditLogin.signOut();
+}
 
 let toastTimer=null;
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2800);}
@@ -245,13 +475,62 @@ function toggleMod(el,mod){
   else{selectedMods.add(mod);el.classList.add('checked');}
 }
 
+/* ── FILTERS FOLD AWAY ──
+   On a phone the filter card is most of the first screenful, and once a
+   report is on screen it is not what is being read. Collapsed
+   automatically after the first successful generate on a narrow screen
+   only — on a desk there is room for both. */
+function setFilters(open){
+  const card=document.getElementById('filter-card');
+  const btn=document.getElementById('filter-toggle');
+  card.classList.toggle('collapsed',!open);
+  document.body.classList.toggle('is-collapsed',!open);
+  btn.setAttribute('aria-expanded',String(open));
+  document.getElementById('filter-toggle-label').textContent=open?'Hide':'Show';
+}
+function toggleFilters(){
+  setFilters(document.getElementById('filter-card').classList.contains('collapsed'));
+}
+
+/* ── FULL SCREEN ──
+   The class is what actually clears the page; the Fullscreen API is asked
+   on top of it and is allowed to fail. Safari on iOS has no element
+   fullscreen at all, and a report that only expands on Chrome would be a
+   button that does nothing on half the devices this is opened on. */
+function toggleFullScreen(){
+  const on=!document.body.classList.contains('is-full');
+  document.body.classList.toggle('is-full',on);
+  const lbl=document.querySelector('#btn-full span');
+  if(lbl) lbl.textContent=on?'Exit Full Screen':'Full Screen';
+  try{
+    if(on){ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }
+    else{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }
+  }catch(e){}
+}
+/* Leaving fullscreen by Esc or the browser's own control has to put the
+   page back too, or the chrome stays hidden with no way to bring it back. */
+document.addEventListener('fullscreenchange',()=>{
+  if(!document.fullscreenElement && document.body.classList.contains('is-full')){
+    document.body.classList.remove('is-full');
+    const lbl=document.querySelector('#btn-full span');
+    if(lbl) lbl.textContent='Full Screen';
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && document.body.classList.contains('is-full') && !document.fullscreenElement)
+    toggleFullScreen();
+});
+
 function initFilters(){
   const now=new Date();
   document.getElementById('f-month').value=now.getMonth()+1;
   const ySel=document.getElementById('f-year');
   const cy=now.getFullYear();
   for(let y=cy;y>=cy-3;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ySel.appendChild(o);}
-  document.getElementById('nav-today').textContent=now.toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+
+function esc(v){
+  return String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
 function fmtDate(iso){
@@ -283,29 +562,70 @@ function filterByNursery(rows,nurseries){
   return(rows||[]).filter(r=>nurseries.includes(r.nursery));
 }
 
-/* Build records table for a module */
+/* ── COLUMNS ──
+   The four table shapes as data rather than as four hand-written blocks
+   of HTML. Each column knows its own heading, and that heading is what
+   goes into the cell's data-label — which is the whole of how a row
+   folds into a readable card on a phone. Written out once, they cannot
+   drift apart from the headings above them. */
+const MOD_COLS={
+  plot:[
+    {h:'#',       v:(r,i)=>i+1, label:'Record', num:true},
+    {h:'Date',    v:r=>fmtDate(r.date)},
+    {h:'Plot',    v:r=>`<b>${esc(r.plot)}</b>`,    raw:true},
+    {h:'Batch',   v:r=>r.batch||'—'},
+    {h:'Pest',    v:r=>r.pest||'—'},
+    {h:'Animal',  v:r=>r.tikus||'—'},
+    {h:'Disease', v:r=>r.disease||'—'},
+    {h:'Leaf',    v:r=>r.warna_daun||'—'}
+  ],
+  height:[
+    {h:'#',        v:(r,i)=>i+1, label:'Record', num:true},
+    {h:'Date',     v:r=>fmtDate(r.date)},
+    {h:'Plot',     v:r=>`<b>${esc(r.plot)}</b>`,   raw:true},
+    {h:'Batch',    v:r=>r.batch||'—'},
+    {h:'S1 (cm)',  v:r=>r.sample_1||'—',           num:true},
+    {h:'S2 (cm)',  v:r=>r.sample_2||'—',           num:true},
+    {h:'S3 (cm)',  v:r=>r.sample_3||'—',           num:true},
+    {h:'Avg (cm)', v:r=>`<b>${esc(r.avg_height||'—')}</b>`, raw:true, num:true}
+  ],
+  papan:[
+    {h:'#',        v:(r,i)=>i+1, label:'Record', num:true},
+    {h:'Date',     v:r=>fmtDate(r.date)},
+    {h:'Plot',     v:r=>`<b>${esc(r.plot)}</b>`,   raw:true},
+    {h:'Batch',    v:r=>r.batch_no||'—'},
+    {h:'Presence', v:r=>r.presence||'—'},
+    {h:'Info',     v:r=>r.info_correct||'—'},
+    {h:'Height',   v:r=>r.condition||'—'}
+  ],
+  maint:[
+    {h:'#',      v:(r,i)=>i+1, label:'Record', num:true},
+    {h:'Date',   v:r=>fmtDate(r.date)},
+    {h:'Plot',   v:r=>`<b>${esc(r.plot)}</b>`,     raw:true},
+    {h:'Task',   v:r=>r.task_type||'—'},
+    {h:'Result', v:r=>r.result||'—'}
+  ]
+};
+
 function buildModTable(mod, rows){
   if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
-  let cols='',head='',body='';
+  const cols=MOD_COLS[mod];
+  if(!cols) return '<div class="no-data">No records found.</div>';
 
-  if(mod==='plot'){
-    head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Pest</th><th>Animal</th><th>Disease</th><th>Leaf</th></tr>`;
-    rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.pest||'—'}</td><td>${r.tikus||'—'}</td><td>${r.disease||'—'}</td><td>${r.warna_daun||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="8">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
-  } else if(mod==='height'){
-    head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>S1 (cm)</th><th>S2 (cm)</th><th>S3 (cm)</th><th>Avg (cm)</th></tr>`;
-    rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch||'—'}</td><td>${r.sample_1||'—'}</td><td>${r.sample_2||'—'}</td><td>${r.sample_3||'—'}</td><td><b>${r.avg_height||'—'}</b></td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="8">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
-  } else if(mod==='papan'){
-    head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Batch</th><th>Presence</th><th>Info</th><th>Height</th></tr>`;
-    rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.batch_no||'—'}</td><td>${r.presence||'—'}</td><td>${r.info_correct||'—'}</td><td>${r.condition||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="7">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
-  } else if(mod==='maint'){
-    head=`<tr><th>#</th><th>Date</th><th>Plot</th><th>Task</th><th>Result</th></tr>`;
-    rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><b>${r.plot}</b></td><td>${r.task_type||'—'}</td><td>${r.result||'—'}</td></tr>`;});
-    body+=`<tr class="total-row"><td colspan="5">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
-  }
-  return`<div style="overflow-x:auto"><table class="rec-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  const head='<tr>'+cols.map(c=>`<th>${esc(c.h)}</th>`).join('')+'</tr>';
+  let body='';
+  rows.forEach((r,i)=>{
+    body+='<tr>'+cols.map(c=>{
+      const val=c.v(r,i);
+      /* c.label is what the cell announces itself as on a phone, where
+         it is a card row rather than a column: "#" is a column heading
+         and says nothing on its own once the heading row is gone. */
+      return `<td data-label="${esc(c.label||c.h)}"${c.num?' class="num"':''}>${c.raw?val:esc(val)}</td>`;
+    }).join('')+'</tr>';
+  });
+  body+=`<tr class="total-row"><td colspan="${cols.length}" data-label="">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
+
+  return`<div class="tbl-wrap"><table class="rec-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
 function buildNurserySection(label, sub, headClass, data, nurseries){
@@ -318,19 +638,19 @@ function buildNurserySection(label, sub, headClass, data, nurseries){
     const rows=filterByNursery(data[mod],nurseries);
     total+=rows.length;
     modSections+=`
-      <div style="border-top:1px solid var(--border)">
-        <div style="padding:10px 14px;background:var(--g50);display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:12px;font-weight:700;color:var(--g800)">${modLabels[mod]}</span>
+      <div class="mod-block">
+        <div class="mod-block-head">
+          <span class="mod-block-name">${modLabels[mod]}</span>
           <span class="badge ${modBadge[mod]}">${fmtNum(rows.length)} records</span>
         </div>
-        ${buildModTable(mod,rows)}
+        <div class="mod-block-body">${buildModTable(mod,rows)}</div>
       </div>`;
   });
   return`
   <div class="mod-section">
     <div class="mod-head ${headClass}">
       <div><div class="mod-head-title">${label}</div><div class="mod-head-sub">${sub}</div></div>
-      <span class="mod-head-badge">${total} total</span>
+      <span class="mod-head-badge">${fmtNum(total)} total</span>
     </div>
     ${modSections}
   </div>`;
@@ -361,10 +681,10 @@ async function generateReport(){
     const maintTotal  = filterByNursery(data.maint||[],  selectedNurseries).length;
 
     let summaryCards=`<div class="sum-card"><div class="sum-val">${fmtNum(grandTotal)}</div><div class="sum-label">Total Audits</div></div>`;
-    if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1a4d1a">${fmtNum(plotTotal)}</div><div class="sum-label">Plot Condition</div></div>`;
-    if(selectedMods.has('height')) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#1565c0">${fmtNum(heightTotal)}</div><div class="sum-label">Seedling Height</div></div>`;
-    if(selectedMods.has('papan'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#e65100">${fmtNum(papanTotal)}</div><div class="sum-label">Papan Tanda</div></div>`;
-    if(selectedMods.has('maint'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:#880e4f">${fmtNum(maintTotal)}</div><div class="sum-label">Maintenance</div></div>`;
+    if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--pn)">${fmtNum(plotTotal)}</div><div class="sum-label">Plot Condition</div></div>`;
+    if(selectedMods.has('height')) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--mn)">${fmtNum(heightTotal)}</div><div class="sum-label">Seedling Height</div></div>`;
+    if(selectedMods.has('papan'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--papan)">${fmtNum(papanTotal)}</div><div class="sum-label">Papan Tanda</div></div>`;
+    if(selectedMods.has('maint'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--maint)">${fmtNum(maintTotal)}</div><div class="sum-label">Maintenance</div></div>`;
 
     let sections='';
     if(showPN) sections+=buildNurserySection('Pre Nursery (PN)','Plots P01 – P52','mod-head-pn',data,PN_NURSERIES);
@@ -378,9 +698,11 @@ async function generateReport(){
         <div class="report-period">${periodStr} · ${nurseryLabel}</div>
         <div class="report-generated">Generated: ${now.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${summaryCards}</div>
+      <div class="summary-row">${summaryCards}</div>
       ${sections}`;
     document.getElementById('print-bar').classList.remove('hidden');
+    /* Only on a phone: on a desk the filters and the report both fit. */
+    if(window.matchMedia('(max-width:720px)').matches) setFilters(false);
     showToast('✓ Report generated');
   }catch(e){
     console.error(e);

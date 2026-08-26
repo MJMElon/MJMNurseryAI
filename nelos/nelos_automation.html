@@ -45,6 +45,13 @@
                 border-bottom:1px solid #ede9fe; font-size:12px; font-weight:900; color:#5b21b6; }
   .cond-sys-n { margin-left:auto; font-size:9.5px; font-weight:900; color:#a78bfa;
                 letter-spacing:.06em; text-transform:uppercase; }
+  .cond-add { width:24px; height:24px; border-radius:8px; border:1.5px solid #ddd6fe;
+              background:#fff; color:#7c3aed; font-size:15px; font-weight:900; line-height:0;
+              cursor:pointer; flex-shrink:0; }
+  .cond-add:hover { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+  .sec-bar { display:flex; align-items:center; gap:12px; }
+  .sec-bar .sec-h { margin-bottom:0; }
+  .sec-bar .tool-btn { margin-left:auto; }
   .cond-head, .cond-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
                           gap:14px; padding:10px 16px; align-items:center; }
   .cond-head { font-size:9px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
@@ -146,7 +153,6 @@
        a heading arranged around the button. -->
   <div class="head">
     <h1>Automate Cases</h1>
-    <button class="tool-btn" id="new-btn"><span class="plus">+</span> New Automation</button>
   </div>
 
 
@@ -154,23 +160,16 @@
        goes. The condition is the module's own code and is shown, not set,
        here; the two dropdowns beside it ARE the setting. -->
   <h2 class="sec-h">Cases each system opens by itself</h2>
-  <p class="sec-note">
-    The condition is written into the module that raises it, so it is read
-    here rather than edited. Where the case then goes is yours: pick the
-    system that should work it, and the person, if it should be one
-    person's.
-  </p>
   <div id="conds"></div>
 
-  <h2 class="sec-h">Work that comes round</h2>
+  <!-- The button belongs to the list it adds to, at the right-hand end of
+       that list's own heading — not under the page title, where it read as
+       the page's one purpose. -->
+  <div class="sec-bar">
+    <h2 class="sec-h">Work that comes round</h2>
+    <button class="tool-btn" id="new-btn"><span class="plus">+</span> New Automation</button>
+  </div>
 
-  <p class="lede lede-sec">
-    Work that comes round rather than goes wrong. Each line below is a standing
-    instruction — what to do, where, who deals with it and how often — and Nelos
-    raises the case itself when it is due. The case links straight through to the
-    Auditor Portal module that records it, so the audit is done where audits are
-    done and the case is what says it was.
-  </p>
   <div id="list"></div>
 
 </div>
@@ -601,16 +600,34 @@ function renderConds() {
         }).join('')
       : `<div class="cond-empty">Nothing here opens a case on its own yet.</div>`;
 
+    /* A "+" per system rather than one for the page: a condition belongs
+       to the system that raises it, and the corner of that system's card is
+       where you would reach for it. Writing one is not built yet — see
+       addCond() — so it says so rather than opening something empty. */
     return `<div class="cond-sys">
       <div class="cond-sys-h">${esc(m.handler_label || m.label)}
-        <span class="cond-sys-n">${mine.length || 'none'}</span></div>
+        <span class="cond-sys-n">${mine.length || 'none'}</span>
+        <button class="cond-add" data-add="${esc(m.key)}" title="Add a condition to ${esc(m.handler_label || m.label)}"
+                aria-label="Add a condition to ${esc(m.handler_label || m.label)}">+</button></div>
       ${rows}</div>`;
   }).join('');
+
+  $('conds').querySelectorAll('[data-add]').forEach(b =>
+    b.addEventListener('click', () => addCond(b.dataset.add)));
 
   $('conds').querySelectorAll('.cond-row').forEach(row => {
     row.querySelectorAll('select').forEach(sel =>
       sel.addEventListener('change', () => saveCond(row, sel.hasAttribute('data-to'))));
   });
+}
+
+/* Adding a condition is not a row on a screen: the WHEN lives in the
+   module that raises it, so a new one is a line of that module's code plus
+   a line here. Until that flow exists this says what it would take, rather
+   than opening a form whose Save could not mean anything. */
+function addCond(modKey) {
+  toast(`Adding a condition to ${labelOf(modKey)} is not built yet — ` +
+        `the module has to raise it before this page can point it.`, false);
 }
 
 /* One rule, written where routing lives. Changing the system clears the PIC
