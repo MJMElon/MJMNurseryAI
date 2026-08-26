@@ -42,49 +42,20 @@
   <!-- LIST VIEW -->
   <div id="view-list" class="view page-scroll">
 
-    <!-- Nursery filter moved to the bottom bar (see .nursery-bottom-tabs).
-         The summary strip stays inside the dark header so the counts still
-         read as belonging to the selected nursery — the label at the top
-         of the page (Maintenance Audit — <PN>) also confirms it. -->
-    <div class="summary-strip">
-      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total</div></div>
-      <div class="stat-card highlight"><div class="stat-value" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-done">0</div><div class="stat-label">Audited</div></div>
-    </div>
-
-    <!-- Filter by task type — 5 icon tiles in a single row (All +
-         Manuring, Weeding, Interrow, Others). P&D Spraying is
-         intentionally NOT audited here: those records are reviewed on
-         another surface, and 'pd' rows from the field ledger are
-         dropped in loadAll(). "All" is the default active tile. -->
-    <div class="filter-icons" id="filter-chips">
-      <button class="filter-icon active" data-f="All" onclick="setFilter('All',this)" title="All work types" aria-label="Show all task types">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/></svg>
-        <span>All</span>
-      </button>
-      <button class="filter-icon" data-f="Manuring" onclick="setFilter('Manuring',this)" title="Manuring" aria-label="Filter by Manuring">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h8l1 4v10a2 2 0 01-2 2H9a2 2 0 01-2-2V10l1-4z"/><path d="M10 4h4v2h-4z"/><circle cx="11" cy="14" r=".8"/><circle cx="14" cy="16" r=".8"/><circle cx="12" cy="18" r=".8"/></svg>
-        <span>Manuring</span>
-      </button>
-      <button class="filter-icon" data-f="Weeding" onclick="setFilter('Weeding',this)" title="Weeding" aria-label="Filter by Weeding">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22V10"/><path d="M12 10c-3 0-5-2-5-5 3 0 5 2 5 5z"/><path d="M12 10c3 0 5-2 5-5-3 0-5 2-5 5z"/><path d="M5 22h14"/></svg>
-        <span>Weeding</span>
-      </button>
-      <button class="filter-icon" data-f="Interrow Spray" onclick="setFilter('Interrow Spray',this)" title="Interrow Spraying" aria-label="Filter by Interrow Spraying">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h6l3-9h6"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="16.5" cy="18.5" r="2.5"/><path d="M13 8l1-3h3"/><path d="M17 11l1 1M20 10l1 1M17 14l1 1"/></svg>
-        <span>Interrow</span>
-      </button>
-      <button class="filter-icon" data-f="Others" onclick="setFilter('Others',this)" title="Others" aria-label="Filter by Others">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>
-        <span>Others</span>
-      </button>
-    </div>
+    <!-- Total / Pending / Audited dashboard and the work-type filter
+         row were both cancelled at the auditor's request. The "To
+         Audit" section below already carries the progress in its own
+         header (audited / total tasks), and the auditor walks every
+         work type in one pass rather than filtering to one at a time. -->
 
     <!-- To audit -->
     <div id="pending-wrap">
       <div class="list-header">
         <span class="list-heading" data-t="to_audit">To Audit</span>
-        <span class="list-count" id="pending-count">0 tasks</span>
+        <!-- Progress: "audited / total tasks" — replaces the old
+             three-tile dashboard above with a single line the eye
+             lands on when opening the page. -->
+        <span class="list-count" id="pending-count">0 / 0 tasks</span>
       </div>
       <div class="record-list" id="pending-list"></div>
     </div>
@@ -268,7 +239,7 @@
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_maintenance_script.js?v=20260826b"></script>
+<script src="audit_maintenance_script.js?v=20260826c"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
