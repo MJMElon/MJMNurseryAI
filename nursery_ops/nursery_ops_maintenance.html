@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=41">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=42">
 </head>
 <body>
 
@@ -331,13 +331,11 @@
         <div class="cap-tabs" id="cap-tabs"></div>
 
         <div style="padding:18px;">
+          <!-- The title is centred over the block, so Edit is taken out of
+               the flow rather than sharing a row and pushing it off centre. -->
           <div class="cap-top">
-            <div>
-              <div class="set-h" style="margin-bottom:2px;">Plot Capacity</div>
-              <div class="set-sub" id="cap-sub" style="margin-bottom:0;"></div>
-            </div>
-            <button class="btn" id="cap-edit-btn" style="font-size:12px;flex-shrink:0;"
-                    onclick="startCapEdit()">&#9998; Edit</button>
+            <div class="set-h">Plot Capacity</div>
+            <button class="btn cap-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
           </div>
 
           <!-- Pre nursery only: one tray size for the whole nursery. -->
@@ -353,12 +351,9 @@
           <div id="cap-grid" class="cap-grid"></div>
           <div id="cap-empty" class="set-empty" style="display:none;"></div>
 
-          <div class="cap-foot">
-            <div id="cap-total"></div>
-            <div id="cap-actions" style="display:none;">
-              <button class="btn" style="font-size:12px;" onclick="cancelCapEdit()">Cancel</button>
-              <button class="btn btn-primary" style="font-size:12px;" onclick="saveCapEdit()">Save</button>
-            </div>
+          <div class="cap-foot" id="cap-actions" style="display:none;">
+            <button class="btn" onclick="cancelCapEdit()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveCapEdit()">Save</button>
           </div>
         </div>
       </div>
@@ -369,11 +364,7 @@
            obviously two halves of one list rather than two lists that
            happen to look alike. -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div class="set-h" style="text-align:center;">Chemical List</div>
-        <div class="set-sub" style="text-align:center;">
-          Dosage is per pump. Usage per seedling is worked out from it —
-          one pump covers <b id="chem-cover">800</b> seedlings — and that is
-          the figure a plot&rsquo;s capacity is multiplied by.</div>
+        <div class="set-h set-h-c">Chemical List</div>
 
         <div class="two-col">
           <div class="col-block">
@@ -400,10 +391,7 @@
            Same block, same columns, one dose and two ticks: a fertiliser is
            used at transplanting, at monthly manuring, or at both. -->
       <div class="card" style="padding:18px;">
-        <div class="set-h" style="text-align:center;">Fertiliser List</div>
-        <div class="set-sub" style="text-align:center;">
-          Tick what each fertiliser is used for. Only the ticked work offers
-          it when the dosage is worked out.</div>
+        <div class="set-h set-h-c">Fertiliser List</div>
 
         <div class="col-block" style="max-width:760px;margin:0 auto;">
           <div class="lst-head fert-head">
@@ -513,7 +501,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=57"></script>
+<script src="plot_maintenance_script.js?v=58"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

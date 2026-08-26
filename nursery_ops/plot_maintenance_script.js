@@ -4179,12 +4179,6 @@ function renderCapacity() {
   const pre   = isPreNursery(n);
   const plots = capPlots(n);
 
-  const sub = document.getElementById('cap-sub');
-  if (sub) sub.innerHTML = pre
-    ? 'Trays per plot. Seedlings come from trays &times; the tray size, and that ' +
-      'is the figure every dosage is worked out from.'
-    : 'Seedlings per plot — the figure every dosage is worked out from.';
-
   const editBtn = document.getElementById('cap-edit-btn');
   if (editBtn) editBtn.style.display = capEditing ? 'none' : '';
   const acts = document.getElementById('cap-actions');
@@ -4204,7 +4198,6 @@ function renderCapacity() {
   }
 
   const empty = document.getElementById('cap-empty');
-  const tot   = document.getElementById('cap-total');
   if (!plots.length) {
     grid.innerHTML = '';
     if (empty) {
@@ -4212,7 +4205,6 @@ function renderCapacity() {
       empty.innerHTML = 'No plots for this nursery yet. They come from Seedling ' +
         'Stock — add them there and they appear here.';
     }
-    if (tot) tot.textContent = '';
     return;
   }
   if (empty) empty.style.display = 'none';
@@ -4242,7 +4234,6 @@ function renderCapacity() {
       '</div>';
   }).join('');
 
-  updateCapTotal();
 }
 
 /* What a pre nursery plot's trays come to, from whichever numbers are live —
@@ -4279,7 +4270,6 @@ function onDraftInput(plot, val) {
   if (!capEditing) return;
   capDraft.plots[plot] = val === '' ? '' : Math.max(0, +val || 0);
   refreshDerived(plot);
-  updateCapTotal();
 }
 
 function onDraftTraySize(val) {
@@ -4288,7 +4278,6 @@ function onDraftTraySize(val) {
   // Every plot's seedling figure just changed and none of the boxes did, so
   // the derived lines redraw and the inputs are left alone.
   capPlots(capTab).forEach(refreshDerived);
-  updateCapTotal();
 }
 
 /* Only the line beside the box being typed in — repainting the grid would
@@ -4351,22 +4340,6 @@ async function saveCapEdit() {
   renderCapacity();
 }
 
-function updateCapTotal() {
-  const n = capTab, pre = isPreNursery(n);
-  const plots = capPlots(n);
-  const tot = document.getElementById('cap-total');
-  if (!tot) return;
-  const total = plots.reduce((t, p) => {
-    if (!capEditing) return t + capacityOf(n, p);
-    const v = +capDraft.plots[p] || 0;
-    return t + (pre ? v * (+capDraft.perTray || 0) : v);
-  }, 0);
-  tot.textContent = plots.length + ' plot' + (plots.length === 1 ? '' : 's') +
-    ' \u00b7 ' + total.toLocaleString() + ' seedlings in total' +
-    (capEditing ? ' (unsaved)' : '');
-}
-
-
 /* ── Chemicals, pest and disease ───────────────────────────────────────
    One table, one `kind`, shown as two columns of one list.
 
@@ -4391,9 +4364,6 @@ function perSeedling(dose) {
 function renderChemicals(kind) {
   const box = document.getElementById('chem-' + kind + '-list');
   if (!box) return;
-  const cover = document.getElementById('chem-cover');
-  if (cover) cover.textContent = COVERAGE_PER_PUMP.toLocaleString();
-
   const rows = chemicals.filter(c => c.kind === kind);
   if (!rows.length) {
     box.innerHTML = '<div class="lst-empty">No ' + CHEM_LABEL[kind] +
