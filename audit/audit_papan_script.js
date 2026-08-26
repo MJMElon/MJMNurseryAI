@@ -629,10 +629,38 @@ function renderAuditList(){
     </div>`;
   }
 
-  // Plots to audit (pending only)
+  /* Plots to audit — round chips only, one per plot with pending
+     work. The full card ate three screenfuls when a nursery had a
+     dozen plots outstanding, most of it repeating the breed / qty
+     info already on the physical papan. Tap a chip and land on the
+     audit form directly; the batch info card inside the form still
+     spells everything out for the auditor mid-audit.
+
+     A tap always opens the latest pending batch on that plot; the
+     roster returned by getLatestBatchPerPlot() is already one row
+     per plot, so this holds even when several batches were sown on
+     the same plot in one month. */
   if(pending.length){
-    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot))
-      .map(b=>makeCard(b,{canView:true,canAudit:true})).join('');
+    listEl.innerHTML =
+      '<div class="plot-chip-list" style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 12px">' +
+      pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b => {
+        const plotLabel = String(b.plot||'').replace(/[^A-Za-z0-9]/g,'') || '—';
+        return '<button type="button" class="plot-chip" '
+          + 'onclick="openAuditForm(\''+b.uid+'\',false,null)" '
+          + 'aria-label="Audit plot '+plotLabel+' — batch '+(b.batch||'')+'" '
+          + 'title="'+plotLabel+' · Batch '+(b.batch||'')+'" '
+          + 'style="min-width:58px;height:58px;padding:0 14px;border-radius:999px;'
+          + 'background:#fff;border:2px solid #e65100;color:#c2410c;'
+          + 'font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.3px;'
+          + 'cursor:pointer;display:inline-flex;align-items:center;justify-content:center;'
+          + 'transition:transform .12s,background .12s,color .12s;'
+          + '-webkit-tap-highlight-color:transparent" '
+          + 'onmouseover="this.style.background=\'#e65100\';this.style.color=\'#fff\'" '
+          + 'onmouseout="this.style.background=\'#fff\';this.style.color=\'#c2410c\'">'
+          + plotLabel
+          + '</button>';
+      }).join('') +
+      '</div>';
   } else {
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
