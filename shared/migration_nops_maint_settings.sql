@@ -75,10 +75,12 @@ CREATE TABLE IF NOT EXISTS public.nops_maint_tray_size (
 -- shapes: they are the same thing used against two different problems, and
 -- a screen that shows them as two lists can ask for one kind at a time.
 --
--- The dose is per seedling. That is what the calculator multiplies by a
--- plot's capacity, and it is the figure that stays true whatever size the
--- plot is. `unit` is the unit that dose is IN — gm or mL — so a 0.5 gm
--- product and a 0.5 mL product are not silently added together.
+-- The dose is PER PUMP, which is how it is written on the drum and how
+-- anybody mixing it actually measures. Per seedling is worked out from it —
+-- dose / COVERAGE_PER_PUMP, 800 seedlings to a pump — rather than asked
+-- for, because nobody measures a chemical per seedling. `unit` is the unit
+-- the dose is IN — gm or mL — so a 0.5 gm product and a 0.5 mL product are
+-- not silently added together.
 CREATE TABLE IF NOT EXISTS public.nops_maint_chemicals (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kind       TEXT NOT NULL CHECK (kind IN ('pest', 'disease')),
@@ -93,7 +95,9 @@ CREATE TABLE IF NOT EXISTS public.nops_maint_chemicals (
 );
 
 COMMENT ON COLUMN public.nops_maint_chemicals.dose IS
-  'Per seedling, in `unit`. A plot needs capacity x dose.';
+  'Per pump, in `unit`, as written on the drum. Per seedling is dose / 800 '
+  '(COVERAGE_PER_PUMP in plot_maintenance_script.js); a plot needs its '
+  'capacity x that.';
 
 -- The same product can be listed for pest and for disease at different
 -- rates, so the name is unique only within its kind.
@@ -124,6 +128,9 @@ CREATE TABLE IF NOT EXISTS public.nops_maint_fertilisers (
   updated_at     TIMESTAMPTZ DEFAULT now()
 );
 
+-- NULL is the tick being off, which is why it is not 0: "not used for this
+-- work" and "used at nothing per seedling" are different answers, and only
+-- one of them should keep the fertiliser out of that calculation.
 COMMENT ON COLUMN public.nops_maint_fertilisers.dose_transplant IS
   'Per seedling, in `unit`, when transplanting. NULL = not used for that work.';
 COMMENT ON COLUMN public.nops_maint_fertilisers.dose_monthly IS
