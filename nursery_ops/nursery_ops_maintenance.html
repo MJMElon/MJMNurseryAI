@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=38">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=39">
 </head>
 <body>
 
@@ -310,35 +310,93 @@
       <div id="payroll-hint" style="font-size:11px;color:var(--text-faint);margin-top:8px;"></div>
     </div>
 
-    <!-- SETTING -->
+    <!-- SETTING —————————————————————————————————————————————
+         Four things the schedules and the calculator read from, and
+         nothing that belongs to another module. Piece rates and workers
+         used to live here; they have gone to their own module and to the
+         FC Portal, and the plot list has gone to shared_plots, which every
+         other module already reads. -->
     <div id="tab-setting" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="setting-nursery-line"></div></div>
+
+      <!-- PLOT CAPACITY ————————————————————————————————————
+           The plots come from shared data. There is no "add plot" here on
+           purpose: a plot keyed in twice is a plot that can disagree with
+           itself, and Seedling Stock already owns that list. -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Plots in this nursery</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rows added from a schedule's “Add Row” button appear here. Removing one takes its row out of all four schedules.</div>
-        <div id="setting-plot-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-          <input type="text" id="setting-new-plot" placeholder="New plot name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:200px;">
-          <button class="btn btn-primary" style="font-size:12px;" onclick="addPlotFromSetting()">➕ Add Plot</button>
+        <div class="set-h">Plot Capacity</div>
+        <div class="set-sub" id="cap-sub"></div>
+
+        <!-- Pre nursery only: one tray size for the whole nursery. -->
+        <div id="cap-tray-size" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
+             background:var(--gold-bg,#fffbeb);border:1.5px solid var(--gold-border,#fcd34d);
+             border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;">
+          <span style="font-size:12px;font-weight:800;color:#78350f;">Seedlings per tray</span>
+          <input type="number" min="0" step="1" id="cap-per-tray" class="set-in" style="width:110px;"
+                 oninput="onTraySizeInput(this.value)">
+          <span style="font-size:11.5px;font-weight:600;color:#92400e;" id="cap-tray-note">
+            Every tray in this nursery holds the same number, so it is set once here.</span>
+        </div>
+
+        <div id="cap-grid" class="set-grid"></div>
+        <div id="cap-empty" class="set-empty" style="display:none;"></div>
+        <div id="cap-total" style="font-size:12px;font-weight:800;color:var(--green-text);
+             margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
+      </div>
+
+      <!-- PEST CHEMICALS ————————————————————————————————— -->
+      <div class="card" style="padding:18px;margin-bottom:16px;">
+        <div class="set-h">Pest Chemical List</div>
+        <div class="set-sub">What is sprayed against insects. The dose is
+          <b>per seedling</b>, so a plot needs its capacity &times; this dose —
+          which is what the Dosage Calculator works out for you.</div>
+        <div id="chem-pest-list" class="set-rows"></div>
+        <div class="set-add">
+          <input type="text" id="pest-name" class="set-in" placeholder="Chemical name…" style="flex:2;min-width:150px;">
+          <input type="number" id="pest-dose" class="set-in" min="0" step="0.0001"
+                 placeholder="Dose / seedling" style="flex:1;min-width:120px;">
+          <select id="pest-unit" class="set-in" style="width:82px;flex:0 0 82px;">
+            <option value="gm">gm</option><option value="mL">mL</option></select>
+          <button class="btn btn-primary" style="font-size:12px;" onclick="addChemical('pest')">&#10133; Add</button>
         </div>
       </div>
 
-      <!-- PIECE RATE -->
+      <!-- DISEASE CHEMICALS ——————————————————————————————— -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Piece Rate</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rate paid per unit of work <b>for this nursery</b>. Applies to every month from now on until you change it, and feeds Monthly Payroll.</div>
-        <div id="setting-rate-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;"></div>
-        <div id="setting-rate-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);"></div>
+        <div class="set-h">Disease Chemical List</div>
+        <div class="set-sub">What is sprayed against fungus and disease. Same
+          dose basis — per seedling.</div>
+        <div id="chem-disease-list" class="set-rows"></div>
+        <div class="set-add">
+          <input type="text" id="disease-name" class="set-in" placeholder="Chemical name…" style="flex:2;min-width:150px;">
+          <input type="number" id="disease-dose" class="set-in" min="0" step="0.0001"
+                 placeholder="Dose / seedling" style="flex:1;min-width:120px;">
+          <select id="disease-unit" class="set-in" style="width:82px;flex:0 0 82px;">
+            <option value="gm">gm</option><option value="mL">mL</option></select>
+          <button class="btn btn-primary" style="font-size:12px;" onclick="addChemical('disease')">&#10133; Add</button>
+        </div>
       </div>
 
-      <!-- WORKERS -->
+      <!-- FERTILISERS ——————————————————————————————————————
+           One row per fertiliser with two doses, not two rows. The same
+           product is used at both, at different rates, and printing its
+           name twice invites the two halves to drift apart. -->
       <div class="card" style="padding:18px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Workers</div>
-        <div id="setting-worker-note" style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;"></div>
-        <div id="setting-worker-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;"></div>
-        <div id="setting-worker-add" style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-          <input type="text" id="setting-new-worker" placeholder="Worker name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:220px;">
-          <button class="btn btn-primary" style="font-size:12px;" onclick="addWorkerFromSetting()">➕ Add Worker</button>
+        <div class="set-h">Fertiliser List</div>
+        <div class="set-sub">Each fertiliser carries a dose for
+          <b>transplanting</b> and a dose for <b>monthly manuring</b>, both per
+          seedling. Leave one blank if the fertiliser is not used for that work
+          — it will not be offered there.</div>
+        <div id="fert-list" class="set-rows"></div>
+        <div class="set-add">
+          <input type="text" id="fert-name" class="set-in" placeholder="Fertiliser type…" style="flex:2;min-width:150px;">
+          <input type="number" id="fert-tp" class="set-in" min="0" step="0.0001"
+                 placeholder="Transplanting" style="flex:1;min-width:118px;">
+          <input type="number" id="fert-mm" class="set-in" min="0" step="0.0001"
+                 placeholder="Monthly manuring" style="flex:1;min-width:130px;">
+          <select id="fert-unit" class="set-in" style="width:82px;flex:0 0 82px;">
+            <option value="gm">gm</option><option value="mL">mL</option></select>
+          <button class="btn btn-primary" style="font-size:12px;" onclick="addFertiliser()">&#10133; Add</button>
         </div>
       </div>
     </div>
@@ -440,7 +498,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=54"></script>
+<script src="plot_maintenance_script.js?v=55"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

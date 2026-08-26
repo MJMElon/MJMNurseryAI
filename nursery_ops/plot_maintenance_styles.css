@@ -381,3 +381,51 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 /* Quantity derived from the batch report's movement data rather than keyed by
    hand — marked so a linked number is never mistaken for an entered one. */
 .qty-linked{color:var(--green-text);border-bottom:1px dotted var(--green-mid);cursor:help;}
+
+/* ── Setting tab ──────────────────────────────────────────────────────────
+   Four lists that are keyed in rarely and read from constantly, so they are
+   built for reading: a heading that says what the list is FOR, then rows
+   wide enough to see the numbers without opening anything. */
+.set-h   { font-size:13px; font-weight:700; color:var(--green-text); margin-bottom:4px;
+           text-transform:uppercase; letter-spacing:.5px; }
+.set-sub { font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.6; }
+.set-sub b { color:var(--green-text); font-weight:800; }
+.set-in  { height:36px; padding:0 11px; font-size:12px; font-family:inherit;
+           border:1.5px solid var(--border); border-radius:var(--r-sm); background:#fff;
+           color:var(--text); box-sizing:border-box; }
+.set-in:focus { outline:none; border-color:var(--green-mid); }
+.set-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:14px;
+           padding-top:13px; border-top:1px solid var(--border); }
+.set-empty { font-size:12px; color:var(--text-faint); padding:14px 0; line-height:1.7; }
+
+/* Plot capacity: a tile per plot, the plot's own name on it. */
+.set-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; }
+.set-cap  { background:#fff; border:1.5px solid var(--border); border-radius:var(--r-sm);
+            padding:9px 11px; }
+.set-cap-n{ font-size:12.5px; font-weight:800; color:var(--green-text); margin-bottom:6px; }
+.set-cap input { width:100%; height:32px; padding:0 9px; font-size:12px; font-family:inherit;
+                 border:1.5px solid var(--border); border-radius:var(--r-sm); box-sizing:border-box; }
+.set-cap input:focus { outline:none; border-color:var(--green-mid); }
+.set-cap-u{ font-size:10px; font-weight:700; color:var(--text-faint); margin-top:4px;
+            text-transform:uppercase; letter-spacing:.05em; }
+/* A tray plot shows what its trays come to, because that is the number the
+   dosage is worked out from and it is not the number being typed. */
+.set-cap-d{ font-size:10.5px; font-weight:800; color:var(--green-mid); margin-top:4px; }
+
+/* Chemical and fertiliser rows. */
+.set-rows { display:flex; flex-direction:column; gap:7px; }
+.set-row  { display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+            background:#fff; border:1.5px solid var(--border); border-radius:var(--r-sm);
+            padding:9px 12px; }
+.set-row-n{ font-size:13px; font-weight:800; color:var(--green-text); flex:1; min-width:110px; }
+.set-row-d{ display:flex; align-items:center; gap:5px; }
+.set-row-l{ font-size:9.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+            color:var(--text-faint); }
+.set-row-d input { width:84px; height:30px; padding:0 8px; font-size:12px; font-family:inherit;
+                   border:1.5px solid var(--border); border-radius:var(--r-sm); box-sizing:border-box; }
+.set-row-d input:focus { outline:none; border-color:var(--green-mid); }
+.set-row-u{ font-size:10.5px; font-weight:800; color:var(--text-muted); min-width:22px; }
+@media (max-width:560px) {
+  .set-row   { align-items:flex-start; }
+  .set-row-n { flex:1 0 100%; }
+}
