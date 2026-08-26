@@ -40,13 +40,13 @@
      not one of PALMS's own three. A page that is not listed can still mount
      the strip to get out of — an unknown data-page marks nothing current. */
   var PAGES = [
-    { key: 'board',    label: 'Plot Status Map',  icon: '🪴', href: 'nursery_ops_palms_board.html' },
-    { key: 'motion',   label: 'Plot Motion Study', icon: '⏱️', href: 'nursery_ops_palms_motion.html' },
+    { key: 'board',    label: 'Plot Status Map',  href: 'nursery_ops_palms_board.html' },
+    { key: 'motion',   label: 'Plot Motion Study', href: 'nursery_ops_palms_motion.html' },
     /* nursery_ops_settings.html is the MAINTENANCE module's work types
        (P&D, Manuring, Weeding, Interrow) and is read by the monthly
        schedule — it is not PALMS and must not be reached from this strip.
        PALMS's own setting is the stage list a plot moves through. */
-    { key: 'settings', label: 'Settings',         icon: '⚙️', href: 'nursery_ops_palms_stages.html' },
+    { key: 'settings', label: 'Settings',         href: 'nursery_ops_palms_stages.html' },
   ];
 
   /* The two-column frame lives here, not in the host page's Tailwind.
@@ -78,7 +78,6 @@
     '#palms-nav .pn-tab:hover{background:#ccfbf1;}' +
     '#palms-nav .pn-tab.is-on{background:#0f766e;color:#fff;}' +
     '#palms-nav .pn-tab.is-on:hover{background:#115e59;}' +
-    '#palms-nav .pn-ico{font-size:14px;line-height:1;flex:0 0 auto;}' +
     /* Desktop: a real column that stays put while a long board scrolls
        past it. 84px clears the ribbon, which is sticky. */
     '@media(min-width:768px){#palms-nav{position:sticky;top:84px;align-self:start;}}' +
@@ -106,7 +105,6 @@
       var on = p.key === current;
       return '<a class="pn-tab' + (on ? ' is-on' : '') + '" href="' + esc(p.href) + '"' +
              (on ? ' aria-current="page"' : '') + '>' +
-               '<span class="pn-ico" aria-hidden="true">' + p.icon + '</span>' +
                '<span>' + esc(p.label) + '</span>' +
              '</a>';
     }).join('');

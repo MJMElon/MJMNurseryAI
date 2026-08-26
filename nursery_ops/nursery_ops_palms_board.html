@@ -30,17 +30,34 @@
   .s-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
   .s-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .s-idle { background:#f8fafc; border-color:#e2e8f0; color:#475569; }
+  /* width:100% here, not Tailwind's w-full: table-layout:fixed only means
+     anything once the table has a width, and a layout that exists only if a
+     CDN answered is a layout that cannot be checked. */
+  table { table-layout:fixed; width:100%; }
   th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
        padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
   td { padding:11px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; vertical-align:top; }
+  /* The action square is fixed, Plot is as wide as a plot name ever gets,
+     Current Status takes the slack because it carries the longest text —
+     two activity names joined by " + " — and the last three are equal so
+     the eye can run down them. */
+  .c-act    { width:56px; }
+  .c-plot   { width:88px; }
+  .c-status { width:auto; min-width:190px; }
+  /* Narrower than the header text, so the header wraps to two lines and the
+     width the column actually needs is the DATA's, not the label's. That is
+     what frees the room Current Status wants. */
+  .c-eq     { width:16%; white-space:normal; }
+  td.wrap   { white-space:normal; }
   .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
           border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
   .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
   .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
   .up-btn { width:30px; height:30px; border-radius:9px; border:1.5px solid #99f6e4; background:white;
-            color:#0f766e; font-size:13px; font-weight:900; cursor:pointer; line-height:1;
+            color:#0f766e; cursor:pointer; padding:0; line-height:1;
             display:inline-flex; align-items:center; justify-content:center; transition:all .15s; }
+  .up-btn svg { width:14px; height:14px; display:block; }
   .up-btn:hover { background:#ccfbf1; }
   .up-btn[disabled] { opacity:.4; cursor:default; }
   .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60;
@@ -83,22 +100,6 @@
 
   <div class="palms-body">
 
-  <div class="card p-5 mb-5">
-    <div class="flex items-baseline justify-between gap-3 flex-wrap mb-1">
-      <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">What every plot is on today</h1>
-      <span id="asof" class="text-[11px] font-bold text-slate-400"></span>
-    </div>
-    <p class="text-[12px] text-slate-500 leading-relaxed">
-      Recorded in the field on the <strong>555 FC Portal</strong> and read here — the office does not key plot status in.
-      A plot is <strong>late</strong> once it has been on an activity longer than that activity is meant to take.
-    </p>
-    <div class="grid grid-cols-3 gap-3 mt-4">
-      <div class="stat s-late"><div class="stat-n" id="n-late">—</div><div class="stat-l">Late</div></div>
-      <div class="stat s-ok"><div class="stat-n" id="n-ok">—</div><div class="stat-l">On schedule</div></div>
-      <div class="stat s-idle"><div class="stat-n" id="n-idle">—</div><div class="stat-l">Nothing running</div></div>
-    </div>
-  </div>
-
   <!-- The map, and the same plots as a table under it — the Life of Plot
        layout, because that is how the office already reads a nursery. -->
   <div id="plot-map" class="card overflow-hidden mb-5"></div>
@@ -106,22 +107,25 @@
   <div class="card overflow-hidden">
     <div class="p-4 border-b border-slate-100 flex flex-wrap items-baseline justify-between gap-2">
       <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
-        🪴 Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
+        Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
       </h2>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th style="width:52px"></th><th>Plot</th><th>Current Status</th><th>Expected Completion</th>
-            <th class="text-right">Days Left / Over</th><th>Last Update</th>
+            <th class="c-act"></th>
+            <th class="c-plot">Plot</th>
+            <th class="c-status">Current Status</th>
+            <th class="c-eq">Expected Completion</th>
+            <th class="c-eq text-right">Days Left / Over</th>
+            <th class="c-eq">Last Update</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
     <div id="empty" class="hidden px-6 py-14 text-center">
-      <div class="text-3xl mb-3">🪴</div>
       <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plots registered for this nursery</p>
       <p class="text-[12px] text-slate-500 mt-2 max-w-[440px] mx-auto leading-relaxed">
         Plots are kept in Seedling Stock Management → System Settings, and their status is
@@ -267,12 +271,6 @@ function renderTable() {
      already sorts on the number, so this order is simply the map's. */
   const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }));
 
-  const late = rows.filter((r) => r.ln && r.ln.state === 'overdue').length;
-  const idle = rows.filter((r) => !r.ln || r.ln.state === 'none').length;
-  $('n-late').textContent = late;
-  $('n-ok').textContent = rows.length - late - idle;
-  $('n-idle').textContent = idle;
-
   $('rows').innerHTML = rows.map((r) => {
     const ln = r.ln;
     if (!ln || ln.state === 'none') {
@@ -290,7 +288,7 @@ function renderTable() {
     return '<tr>' +
       upCell(MJMPalms.plotOf(ln.key)) +
       '<td class="font-black text-slate-800">' + esc(ln.label) + '</td>' +
-      '<td>' + esc(ln.status || '—') + '</td>' +
+      '<td class="wrap">' + esc(ln.status || '—') + '</td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
       '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
@@ -310,7 +308,12 @@ function renderTable() {
    is the one who knows. Whoever saves here has their own name recorded, so
    the log says where the entry came from. */
 const upCell = (plot) =>
-  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status">🚦</button></td>';
+  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status" aria-label="Update status">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 20h9"></path>' +
+      '<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>' +
+    '</svg></td>';
 
 let UP_PLOT = null;    // the plot the modal is open for
 let UP_SEL = [];       // act numbers ticked in the modal
@@ -489,7 +492,7 @@ function render() {
     PAL = buildPhases();
     MAP = MJMPlotMap.create({
       mount: $('plot-map'),
-      title: '🗺️ Plot Status Map',
+      title: 'Plot Status Map',
       legend: PAL.legend,
       legendTitle: 'Current stage',
       statusOf: mapStatusOf,
@@ -497,8 +500,6 @@ function render() {
     });
     await MAP.load(_supabase, allowed ? { nurseries: visible } : {});
 
-    $('asof').textContent = 'as at ' + new Date().toLocaleString('en-MY',
-      { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     render();
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');

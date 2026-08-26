@@ -188,7 +188,7 @@
 
     mount.innerHTML = `
       <div class="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">${esc(o.title || '🗺️ Plot Status Map')}</h2>
+        <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">${esc(o.title || 'Plot Status Map')}</h2>
         <div class="pm-tabs flex gap-2 overflow-x-auto"></div>
       </div>
       <div class="pm-body" style="height:${height}; min-height:380px;">
@@ -261,7 +261,7 @@
     function renderTabs() {
       elTabs.innerHTML = nurseries.length
         ? nurseries.map((n) =>
-            `<button class="pm-tab ${active === n.name ? 'active' : ''}" data-pm-tab="${esc(n.name)}">🏠 ${esc(n.name)}</button>`
+            `<button class="pm-tab ${active === n.name ? 'active' : ''}" data-pm-tab="${esc(n.name)}">${esc(n.name)}</button>`
           ).join('')
         : '<span class="text-[11px] text-slate-400 font-bold">No nurseries configured</span>';
     }
