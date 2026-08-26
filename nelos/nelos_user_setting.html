@@ -146,6 +146,24 @@
   .right-name { display:block; font-size:12.5px; font-weight:800; color:#1e293b; }
   .right-note { display:block; font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:1px; line-height:1.45; }
 
+  /* The systems a person may use. A wrapping row of name-and-tick rather
+     than a column of cards: five systems used four hundred pixels of
+     height to say five words. Its own classes, not .right-row — the
+     rights below still earn their notes and are left alone. */
+  .acc-sys { display:flex; flex-wrap:wrap; gap:6px; }
+  .acc-chip { display:inline-flex; align-items:center; gap:7px; padding:7px 12px 7px 10px;
+              border-radius:999px; border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
+              font-size:12px; font-weight:800; color:#1e293b; white-space:nowrap; }
+  .acc-chip:hover { border-color:#c4b5fd; }
+  .acc-chip input { width:15px; height:15px; accent-color:#7c3aed; flex-shrink:0; margin:0; }
+  .acc-chip:has(input:checked) { background:#f5f3ff; border-color:#c4b5fd; }
+  /* The home queue is Case Handlers' to set, so it is shown, ticked, and
+     not editable here. */
+  .acc-chip-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
+  .acc-chip-home:hover { border-color:#ddd6fe; }
+  .acc-chip-all { border-style:dashed; }
+  .acc-chip-all:has(input:checked) { border-style:solid; }
+
   .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 17px; border-radius:10px;
          border:none; cursor:pointer; font-size:10px;
          font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
@@ -556,20 +574,27 @@ function panelHtml(p) {
         </p>` : ''}
 
       <label class="lbl">Systems they may use Nelos in</label>
-      <div class="rights">
+      <!-- Names and tick boxes, nothing else. Every row used to carry an
+           emoji and a line explaining what a tick does — five times over,
+           saying the same thing five times, which turned a five-item choice
+           into a screenful of scrolling. The name is the choice; "All" is
+           the one that needed saying, and it is now a box rather than five
+           taps. The home system's box is still ticked and disabled, and
+           says why on hover rather than in a permanent subtitle. -->
+      <div class="acc-sys">
+        <label class="acc-chip acc-chip-all" title="Tick every system at once">
+          <input type="checkbox" data-sys-all>
+          <span>All</span>
+        </label>
         ${modules.map(m => {
           const home = p.primary_module === m.key;
           return `
-          <label class="right-row ${home ? 'right-home' : ''}">
+          <label class="acc-chip ${home ? 'acc-chip-home' : ''}"${home
+            ? ' title="The queue they handle — theirs whatever is ticked. Change it on Case Handlers."'
+            : ''}>
             <input type="checkbox" data-sys="${esc(m.key)}" ${on.has(m.key) || home ? 'checked' : ''}
                    ${home ? 'disabled' : ''}>
-            <span class="right-ico">${esc(m.icon || '📦')}</span>
-            <span class="min-w-0">
-              <span class="right-name">${esc(m.label)}${m.sees_all_cases ? ' · HQ' : ''}</span>
-              <span class="right-note">${home
-                ? 'The queue they handle — theirs whatever is ticked. Change it on Case Handlers.'
-                : 'Lets them see and work the cases in this system.'}</span>
-            </span>
+            <span>${esc(m.label)}</span>
           </label>`;
         }).join('')}
       </div>
@@ -641,7 +666,24 @@ function wireAccess() {
     }));
 
   const panel = $('access').querySelector('.panel');
-  if (panel) panel.addEventListener('click', e => e.stopPropagation());
+  if (panel) {
+    panel.addEventListener('click', e => e.stopPropagation());
+
+    /* "All" is a shortcut, not a stored value: it ticks and unticks the
+       systems, and nothing reads it on save — savePerson() collects
+       [data-sys], and this box has none. It also follows them, so a person
+       who already has every system open opens the panel with All ticked
+       rather than looking un-set.
+
+       The home system is deliberately outside both: it is ticked and
+       disabled, Case Handlers owns it, and "All" cannot turn it off. */
+    const all = panel.querySelector('input[data-sys-all]');
+    const boxes = [...panel.querySelectorAll('input[data-sys]')].filter(b => !b.disabled);
+    const sync = () => { if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked); };
+    if (all) all.addEventListener('change', () => boxes.forEach(b => { b.checked = all.checked; }));
+    boxes.forEach(b => b.addEventListener('change', sync));
+    sync();
+  }
 
   wireFind();
 }
