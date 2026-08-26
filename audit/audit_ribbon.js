@@ -29,9 +29,29 @@
     var short = name.split(' ').slice(0, 2).join(' ');
     el.textContent = 'Welcome, ' + short;
   }
+  /* Where the ribbon's back arrow goes depends on who is looking. An
+     admin came in through the Auditor Portal Manage page and expects to
+     land back on it; everyone else came from the Nursery sector of the
+     MJM AI hub and expects that. Set at run time rather than in the
+     markup, because the same page serves both. */
+  function aimBack(){
+    var a = document.querySelector('.fcr-back');
+    if (!a) return;
+    var admin = false;
+    try {
+      admin = !!(window.MJMAuditLogin && MJMAuditLogin.isAdmin && MJMAuditLogin.isAdmin());
+    } catch (e) {}
+    var href  = admin ? 'audit_admin.html' : '../index.html#sector-nursery';
+    var label = admin ? 'Back to Auditor Portal Manage' : 'Back to the Nursery sector';
+    a.setAttribute('href', href);
+    a.setAttribute('title', label);
+    a.setAttribute('aria-label', label);
+  }
+
+  function start(){ fill(); aimBack(); }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', fill);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    fill();
+    start();
   }
 })();
