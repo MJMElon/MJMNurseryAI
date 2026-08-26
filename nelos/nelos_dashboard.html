@@ -51,7 +51,7 @@
   /* Five columns now. Status went with the tabs — a row in the Solved tab
      saying "Solved" was answering a question the tab had already answered —
      and the width it held went to the four that were tightest. */
-  .th, .tr { display:grid; grid-template-columns:84px 104px 190px 1fr 150px; gap:17px; }
+  .th, .tr { display:grid; grid-template-columns:108px 104px 214px 1fr 150px; gap:17px; }
   /* align-items:center, or the two headings carrying a funnel sit a few
      pixels below the four that do not. */
   .th { padding:10px 18px; background:#fdfcff; border-bottom:1.5px solid #ede9fe;
@@ -65,7 +65,10 @@
   .td-stack { display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
 
   /* Created date, leftmost. */
-  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15; }
+  /* One line — "12 Aug 2026". The year sat on a second row only because the
+     column was 74px wide; it is not, any more. */
+  .when-d { font-size:13px; font-weight:900; color:#1e293b; line-height:1.15;
+            white-space:nowrap; }
   .when-y { font-size:10.5px; font-weight:700; color:#94a3b8; }
 
   /* ── Content is black ──
@@ -75,6 +78,11 @@
      by" is not less true than the name beside it. Size and weight
      carry the hierarchy instead. Status keeps its colour, because
      there the colour IS the information. */
+  /* System and person on one line — "Auditor · Auditor Two" — each keeping
+     its own weight so the queue still leads. Two rows for two words was the
+     158px column talking. */
+  .pic-top { display:flex; align-items:baseline; flex-wrap:wrap; gap:5px; line-height:1.25; }
+  .pic-dot { color:#aab3c0; font-weight:800; }
   .sys-line { font-size:13px; font-weight:900; color:#0f172a; line-height:1.25; }
   .pic-line { font-size:11.5px; font-weight:700; color:#0f172a; }
   .pic-none { font-style:italic; color:#0f172a; }
@@ -206,7 +214,10 @@
      the front of the panel below rather than a button above it. */
   .stabs { display:flex; gap:5px; padding:11px 14px 0; flex-wrap:wrap;
            background:#faf5ff; border-bottom:1.5px solid #ede9fe; }
-  .stab { position:relative; margin-bottom:-1.5px; padding:9px 16px 10px; cursor:pointer;
+  /* One third each, so the three read as one bar rather than three labels
+     of whatever length their words happened to be. */
+  .stab { flex:1 1 0; min-width:0; justify-content:center;
+          position:relative; margin-bottom:-1.5px; padding:9px 16px 10px; cursor:pointer;
           border:1.5px solid #e4dbfa; border-radius:11px 11px 0 0; background:#f2ecfd;
           font-family:inherit; font-size:11px; font-weight:900; letter-spacing:.06em;
           text-transform:uppercase; color:#8b83a6; display:inline-flex; align-items:center; gap:7px; }
@@ -214,6 +225,7 @@
   /* Same fill as the heading strip below, so the two share one surface. */
   .stab.on { background:#fdfcff; border-color:#ede9fe; border-bottom-color:#fdfcff;
              color:#4c1d95; }
+  .stab-short { display:none; }
   .stab-n { font-size:9.5px; font-weight:900; letter-spacing:.03em; padding:2px 7px;
             border-radius:999px; background:#e4dbfa; color:#7c6aa8; }
   .stab.on .stab-n { background:#ede9fe; color:#6d28d9; }
@@ -288,6 +300,8 @@
   @media (max-width:520px) {
     .stabs { padding:8px 6px 0; gap:3px; }
     .stab { padding:8px 9px 9px; font-size:10px; gap:5px; letter-spacing:.03em; }
+    .stab-long { display:none; }
+    .stab-short { display:inline; }
     .stab-n { padding:2px 6px; }
   }
 
@@ -450,7 +464,12 @@
     </div>
 
     <div class="stabs" id="stabs" role="tablist">
-      <button class="stab on" data-tab="pending"  role="tab">Pending to solve
+      <!-- Equal thirds are narrow on a phone, and "Pending to solve" is the
+           only label that does not fit one. The tab it names is the one you
+           are looking at, so the two words it drops are the two you already
+           know. -->
+      <button class="stab on" data-tab="pending"  role="tab"><span
+        class="stab-long">Pending to solve</span><span class="stab-short">Pending</span>
         <span class="stab-n" data-n="pending">0</span></button>
       <button class="stab"    data-tab="resolved" role="tab">Solved
         <span class="stab-n" data-n="resolved">0</span></button>
@@ -826,8 +845,8 @@ function rowHtml(c) {
 
       <div class="td-stack td-when">
         <span class="cell-cap">Created</span>
-        <span class="when-d">${esc(when.toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}</span>
-        <span class="when-y">${when.getFullYear()}</span>
+        <span class="when-d">${esc(when.toLocaleDateString('en-MY', { day:'numeric', month:'short' }))}
+          <span class="when-y">${when.getFullYear()}</span></span>
       </div>
 
       <div class="td-stack">
@@ -839,10 +858,13 @@ function rowHtml(c) {
            Portal and routed to the auditors is the auditors' work. -->
       <div class="td-stack">
         <span class="cell-cap">PIC</span>
-        <span class="sys-line">${esc(queueIn)}</span>
-        <span class="pic-line">${c.assignee_name
-          ? esc(c.assignee_name)
-          : '<span class="pic-none">no PIC yet</span>'}</span>
+        <span class="pic-top">
+          <span class="sys-line">${esc(queueIn)}</span>
+          <span class="pic-dot">·</span>
+          <span class="pic-line">${c.assignee_name
+            ? esc(c.assignee_name)
+            : '<span class="pic-none">no PIC yet</span>'}</span>
+        </span>
         <span class="by-line">Created by
           <b>${c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b></span>
       </div>
