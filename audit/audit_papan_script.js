@@ -52,6 +52,15 @@ function fmtDate(iso){
   const s=iso.split('T')[0].split('-');
   return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
 }
+/* Month + year only (e.g. "June 2026") for the PN papan's
+   D. Transplanting row, which is planted month + 3 months. Full
+   month name matches the physical sign. */
+function _fmtMonthYear(iso){
+  if(!iso||iso==='—')return'—';
+  const s=iso.split('T')[0].split('-');
+  const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return names[+s[1]-1]+' '+s[0];
+}
 /* First day of this calendar month as YYYY-MM-01 — the window for
    auto-detecting new transplant/planted events from the operation
    ledger. Papan tanda gets checked on newly-placed plants, so
@@ -759,11 +768,23 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   const _bdp=document.getElementById('banner-dp');     if(_bdp)_bdp.textContent=fmtDate(b.datePlanted);
   const _bdt=document.getElementById('banner-dt');     if(_bdt)_bdt.textContent=fmtDate(b.dateTransplant);
   const _bq =document.getElementById('banner-qty');    if(_bq) _bq.textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
-  /* PN is a seed bed — there is no transplant to record. Hide the
-     row entirely rather than showing "—" beside a label that does
-     not apply. */
+  /* PN is a seed bed — no keyed transplant to record. Hide the
+     Transplanted Date row entirely, and instead compute a
+     "D. Transplanting" row from planted month + 3 months, shown as
+     Month YYYY only (matching the physical PN papan). */
+  const isPN = (b.nursery==='PN');
   const dtRow=document.getElementById('banner-dt-row');
-  if(dtRow)dtRow.style.display=(b.nursery==='PN')?'none':'';
+  if(dtRow)dtRow.style.display=isPN?'none':'';
+  const dp3Row=document.getElementById('banner-dp3-row');
+  const dp3El =document.getElementById('banner-dp3');
+  if(dp3Row && dp3El){
+    if(isPN && b.datePlanted){
+      dp3Row.style.display='';
+      dp3El.textContent=_fmtMonthYear(_addMonthsISO(b.datePlanted, 3));
+    } else {
+      dp3Row.style.display='none';
+    }
+  }
   /* Legacy elements the old layout carried, guarded so nothing throws
      if this page is still hydrated from an old cache. */
   const _bn=document.getElementById('banner-nursery'); if(_bn) _bn.textContent=b.nursery||'—';

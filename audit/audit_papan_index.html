@@ -208,6 +208,11 @@
           <div class="bbg-row"><span class="bbg-label" data-t="planted_lbl">Planted Date:</span><span class="bbg-val" id="banner-dp"></span></div>
           <div class="bbg-row" id="banner-dt-row"><span class="bbg-label" data-t="transplanted_lbl">Transplanted Date:</span><span class="bbg-val" id="banner-dt"></span></div>
           <div class="bbg-row"><span class="bbg-label" data-t="quantity_lbl">Quantity:</span><span class="bbg-val" id="banner-qty"></span></div>
+          <!-- D. Transplanting — Pre Nursery only. Not a keyed field; the
+               physical PN papan reads "D. TRANSPLANTING: JUNE 2026",
+               computed as the seed's planted month + 3 months. Only
+               the month and year are shown here to match the sign. -->
+          <div class="bbg-row" id="banner-dp3-row" style="display:none"><span class="bbg-label" data-t="d_transplanting_lbl">D. Transplanting:</span><span class="bbg-val" id="banner-dp3"></span></div>
         </div>
       </div>
     </div>
@@ -346,13 +351,13 @@
 </div><!-- /#app -->
 <script src="audit_login_guard.js?v=20260824a"></script>
 <script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
-<script src="audit_lang.js?v=20260826c"></script>
+<script src="audit_lang.js?v=20260826d"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_papan_script.js?v=20260826c"></script>
+<script src="audit_papan_script.js?v=20260826d"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
