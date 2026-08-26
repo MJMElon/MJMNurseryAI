@@ -537,7 +537,7 @@
   #nelos-dock-panel.nd-in { animation:nd-in .18s ease-out; }
   @keyframes nd-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 
-  .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px;
+  .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px 17px;
              background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; flex-shrink:0; }
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
@@ -617,8 +617,6 @@
                 border:none; background:rgba(15,23,42,.72); color:#fff; font-size:11px;
                 font-weight:900; cursor:pointer; line-height:1; }
   .nd-in:disabled { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
-  .nd-from { font-size:9.5px; font-weight:700; color:#94a3b8; line-height:1.5; padding:2px 2px 10px; }
-  .nd-from b { color:#64748b; font-weight:900; }
   .nd-err { font-size:10.5px; font-weight:800; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca;
             border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.5; }
   .nd-err[hidden] { display:none; }
@@ -838,10 +836,20 @@
         '<div class="nd-form" hidden>' +
           '<div class="nd-err" hidden></div>' +
           '<div class="nd-today"></div>' +
-          '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-to">Assign to</label>' +
-            '<select class="nd-in" id="nd-f-to">' +
-              '<option value="">— choose a system —</option></select>' +
+          /* Who it goes to, on one row: the system, then the person in it.
+             They are one decision asked in two parts, and the PIC list is
+             filled from whatever the system beside it says. */
+          '<div class="nd-fld nd-2">' +
+            '<div>' +
+              '<label class="nd-lbl" for="nd-f-to">Assign to</label>' +
+              '<select class="nd-in" id="nd-f-to">' +
+                '<option value="">— choose —</option></select>' +
+            '</div>' +
+            '<div>' +
+              '<label class="nd-lbl" for="nd-f-pic">PIC</label>' +
+              '<select class="nd-in" id="nd-f-pic" disabled>' +
+                '<option value="">Anyone</option></select>' +
+            '</div>' +
           '</div>' +
           '<div class="nd-fld">' +
             '<label class="nd-lbl" for="nd-f-work">Work</label>' +
@@ -849,11 +857,6 @@
               '<option value="">— choose the work —</option></select>' +
             '<input class="nd-in" id="nd-f-title" maxlength="300" autocomplete="off" ' +
                    'placeholder="Choose a system first" disabled>' +
-          '</div>' +
-          '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-pic">PIC</label>' +
-            '<select class="nd-in" id="nd-f-pic" disabled>' +
-              '<option value="">Anyone in that system</option></select>' +
           '</div>' +
           '<div class="nd-fld nd-2">' +
             '<div>' +
@@ -878,11 +881,9 @@
                  'class="nd-photo-x" aria-label="Remove photo">&#10005;</button></div>' +
           '</div>' +
           '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-desc">Remarks <span style="text-transform:none;letter-spacing:0">(optional)</span></label>' +
-            '<textarea class="nd-in" id="nd-f-desc" rows="3" ' +
-                      'placeholder="What you saw"></textarea>' +
+            '<label class="nd-lbl" for="nd-f-desc">New Case Remark</label>' +
+            '<textarea class="nd-in" id="nd-f-desc" rows="3"></textarea>' +
           '</div>' +
-          '<div class="nd-from"></div>' +
         '</div>' +
         /* Raising a case is what this panel is for; leaving for the full
            Nelos page is the exception. The split says so — roughly 70/30
@@ -1205,12 +1206,6 @@
     var d = pageDir();
     var file = (location.pathname || '').split('/').pop() || 'index.html';
     return '../' + (MODULE_DIRS.indexOf(d) !== -1 ? d + '/' : '') + file + (location.search || '');
-  }
-
-  function pageName() {
-    var t = (document.title || '').trim();
-    if (t) return t.length > 46 ? t.slice(0, 45) + '…' : t;
-    return (location.pathname || '').split('/').pop() || 'this page';
   }
 
   /* The four nurseries and the plots each one has, copied from
@@ -1603,8 +1598,6 @@
     formEl.querySelector('.nd-today').textContent =
       new Date().toLocaleDateString('en-MY',
         { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    formEl.querySelector('.nd-from').innerHTML =
-      'Raised from <b>' + esc(pageName()) + '</b> — the case links back here.';
     formEl.scrollTop = 0;
 
     var nurs = formEl.querySelector('#nd-f-nursery');
@@ -1620,7 +1613,7 @@
     var all = await Promise.all([loadModules(), loadCategories(), loadPeople()]);
     var to = formEl.querySelector('#nd-f-to');
     if (to.options.length <= 1) {
-      to.innerHTML = opt('', '— choose a system —') +
+      to.innerHTML = opt('', '— choose —') +
         all[0].map(function (m) { return opt(m.key, m.label); }).join('');
     }
     setTimeout(function () { to.focus(); }, 60);
@@ -1653,8 +1646,8 @@
 
     var pic = formEl.querySelector('#nd-f-pic');
     pic.disabled = !key;
-    pic.innerHTML = opt('', key && !pics.length ? 'Nobody pinned to this system yet'
-                                                : 'Anyone in that system') +
+    pic.innerHTML = opt('', key && !pics.length ? 'Nobody pinned yet'
+                                                : 'Anyone') +
       pics.map(function (p) { return opt(p.id, p.name); }).join('');
   }
 
