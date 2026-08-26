@@ -221,9 +221,15 @@ BEGIN
     RAISE EXCEPTION 'too many tries — wait a minute' USING ERRCODE = '28000';
   END IF;
 
+  -- A PIN may carry letters, and the register stores them as capitals (see
+  -- shared/allow_npayroll_worker_pin_letters.sql). A worker keying ab12 on a
+  -- phone means the AB12 on their slip, so match the two the same way rather
+  -- than turning a phone keyboard's idea of case into a PIN not recognised.
+  -- upper() on the keyed side only: what is stored is already capitals, so
+  -- the unique index still does the finding.
   SELECT * INTO w
     FROM mjmnpayroll_workers
-   WHERE pin = btrim(p_pin)
+   WHERE pin = upper(btrim(p_pin))
      AND active
    LIMIT 1;
 
