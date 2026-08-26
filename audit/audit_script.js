@@ -997,6 +997,18 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Same treatment as Papan Tanda: opening the module page without a
+     specific plot lands on a redundant plot-grid. The pending plot
+     chips on audit_home already send the auditor here with ?plot=;
+     land on Home instead when no plot is named. ?admin=1 keeps the
+     escape hatch for admins who want the grid. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot = !!qs.get('plot');
+    const isAdm   = qs.get('admin') === '1';
+    if (!hasPlot && !isAdm) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
   // FAB was removed from the page but a stub is kept so this binding
   // still succeeds without a null-check. If a future refactor drops
