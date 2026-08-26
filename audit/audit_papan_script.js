@@ -406,6 +406,50 @@ async function loadAll(){
       });
     });
 
+    /* Backfill datePlanted for MN batches. Main-nursery cards come from
+       Transplanted* events in the current month, so their datePlanted
+       is empty — the seeds were sown months earlier as Planted events
+       and that record still lives in shared_inventory_logs. Read all
+       Planted events for the batch_names we have, take the earliest
+       transaction_date per batch, and fill it in.
+
+       Same source the Batch Record → Seeds Planting & Damage Report
+       page writes to, so what the auditor reads on the papan matches
+       what the office keyed. */
+    try {
+      const needsPlanted = batches
+        .filter(b => !b.datePlanted && b.batch)
+        .map(b => b.batch);
+      if (needsPlanted.length) {
+        const uniqBatches = Array.from(new Set(needsPlanted));
+        /* .in. filter — one round-trip covers every batch. Order by
+           transaction_date ascending so the first row we see per
+           batch is the earliest sowing (chunked planting stays
+           anchored to the first tray). */
+        const inList = uniqBatches.map(x => '"' + String(x).replace(/"/g,'\\"') + '"').join(',');
+        const q = 'select=batch_name,transaction_date,created_at'
+                + '&transaction_type=eq.Planted'
+                + '&batch_name=in.(' + inList + ')'
+                + '&order=transaction_date.asc.nullslast,created_at.asc';
+        const pRows = await sb.select('shared_inventory_logs', q).catch(e => {
+          console.warn('[papan] Planted lookup for MN batches failed:', e);
+          return [];
+        });
+        const firstPlanted = new Map();
+        (pRows||[]).forEach(r => {
+          const d = r.transaction_date || (r.created_at ? String(r.created_at).split('T')[0] : '');
+          if (!d || !r.batch_name) return;
+          if (!firstPlanted.has(r.batch_name)) firstPlanted.set(r.batch_name, d);
+        });
+        batches.forEach(b => {
+          if (!b.datePlanted && firstPlanted.has(b.batch))
+            b.datePlanted = firstPlanted.get(b.batch);
+        });
+      }
+    } catch (e) {
+      console.warn('[papan] datePlanted backfill error:', e);
+    }
+
     // Fill in the maturity date for every MN batch that doesn't already
     // carry one from the office. Both the manual + log-derived batches
     // pass through the same helper so the auditor sees the same "Mature:
