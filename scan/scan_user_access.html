@@ -130,7 +130,19 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
 const PAGES = [
   { key:'barcode',     label:'Scan Barcode Counter' },
   { key:'do',          label:'Issue Collection DO' },
-  { key:'maintenance', label:'Schedule Maintenance Work' },
+  { key:'maintenance', label:'Schedule Maintenance Work',
+    /* Extra ticks under the nursery list. Workers record their own mornings
+       from the 555 Worker Portal, so signing one off is a separate act from
+       opening the page — a Field Conductor and his assistant do it, and
+       nobody else should. */
+    actions:[
+      { key:'record', label:'Record work',
+        desc:'Key in a job from the work sheet — what a Field Conductor does himself' },
+      { key:'verify', label:'Verify work done',
+        desc:'Sign off a record a worker made, so the office can see it was checked' },
+      { key:'export', label:'Download the month',
+        desc:'Take the nursery\u2019s records away as a spreadsheet' }
+    ] },
   { key:'palms',       label:'PALMS (Plot Status Update)' },
   { key:'culling',     label:'Culling Calculator' },
 ];
@@ -160,6 +172,23 @@ function flash(msg) {
 function pageOn(perms, key) {
   const acts = (perms.scan_actions || {})[key];
   return acts ? !!acts.view : true;
+}
+
+/* Exactly what canScan() on the phone concludes, and it has to be exactly
+   that or this screen lies.
+ 
+   A page nobody has configured fails OPEN there — somebody who has never been
+   through this screen keeps the access they had. So the ticks must show ON
+   for that person, because that is what they actually have. Showing them off
+   and then saving would quietly take away the Record Work button from every
+   Field Conductor whose access was opened only to grant them the new Verify
+   tick, which is a trap laid for whoever opens this screen next.
+ 
+   Once a page HAS been configured, an absent action is off. */
+function actionOn(perms, page, action) {
+  const acts = (perms.scan_actions || {})[page];
+  if (!acts) return true;
+  return !!acts[action];
 }
 
 // null means every nursery. The pre-per-page list still answers for a person
@@ -212,6 +241,22 @@ function pageBlockHtml(pg) {
         <span class="block text-[13px] font-black text-slate-800 min-w-0">${esc(pg.label)}</span>
       </label>
 
+      ${(pg.actions && pg.actions.length) ? `
+      <div class="mt-2.5 ${on ? '' : 'hidden'}">
+        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">What they may do</div>
+        <div class="space-y-1.5">
+          ${pg.actions.map((ac) => `
+            <label class="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" class="chk mt-0.5" data-act="${pg.key}" data-actkey="${ac.key}"
+                     ${actionOn(draft, pg.key, ac.key) ? 'checked' : ''}>
+              <span class="min-w-0">
+                <span class="block text-[12.5px] font-black text-slate-700">${esc(ac.label)}</span>
+                <span class="block text-[11px] text-slate-400 leading-snug">${esc(ac.desc || '')}</span>
+              </span>
+            </label>`).join('')}
+        </div>
+      </div>` : ''}
+
       <div class="mt-2.5 ${on ? '' : 'hidden'}" data-nur-for="${pg.key}">
         <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nurseries</div>
         <div class="flex flex-wrap gap-2">
@@ -256,7 +301,15 @@ function openRow(uid) {
      displayed value in first is what makes the panel honest. */
   PAGES.forEach((pg) => {
     const acts = draft.scan_actions[pg.key];
-    draft.scan_actions[pg.key] = { ...(acts || {}), view: acts ? !!acts.view : true };
+    /* Seed from what this person effectively has, not from an empty object:
+       actionOn() reads an unconfigured page as every action on, so the ticks
+       start where their access already is and saving changes only what was
+       actually touched. */
+    const seeded = { ...(acts || {}), view: acts ? !!acts.view : true };
+    (pg.actions || []).forEach((ac) => {
+      if (seeded[ac.key] === undefined) seeded[ac.key] = actionOn(draft, pg.key, ac.key);
+    });
+    draft.scan_actions[pg.key] = seeded;
   });
 
   /* Settle the pre-per-page list into the five pages too, and drop it.
@@ -294,6 +347,12 @@ document.addEventListener('change', (e) => {
     const acts = draft.scan_actions[t.dataset.page] || {};
     acts.view = t.checked;
     draft.scan_actions[t.dataset.page] = acts;
+    return render();
+  }
+  if (t.dataset.act) {
+    const acts = draft.scan_actions[t.dataset.act] || {};
+    acts[t.dataset.actkey] = t.checked;
+    draft.scan_actions[t.dataset.act] = acts;
     return render();
   }
   if (t.dataset.nall) {

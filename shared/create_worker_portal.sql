@@ -456,6 +456,14 @@ END;
 $$;
 
 
+-- The verify columns this reads. Normally added by
+-- shared/add_maint_field_verify.sql; repeated here so running the files in
+-- either order leaves a working portal.
+ALTER TABLE nops_maint_field_records
+  ADD COLUMN IF NOT EXISTS verified_by TEXT,
+  ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+
+
 -- ── 8b. What the maintenance board needs ────────────────────────────────
 --
 -- The worker portal shows the same Maintenance board as the FC Portal: this
@@ -467,11 +475,16 @@ $$;
 -- So this returns every record inside the boundary, whoever recorded it,
 -- while worker_my_records stays what it is: the worker's own list. Neither
 -- reaches past the boundary.
+-- The return type gained verified_by/verified_at, and Postgres will not
+-- REPLACE a function whose OUT columns changed. Dropped first so re-running
+-- this file over an earlier install upgrades rather than erroring.
+DROP FUNCTION IF EXISTS public.worker_maint_records(UUID, INT);
 CREATE OR REPLACE FUNCTION public.worker_maint_records(p_token UUID, p_limit INT DEFAULT 500)
 RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
                work_type TEXT, jenis TEXT, chemical TEXT, qty NUMERIC,
                remark TEXT, reported_by TEXT, batch_name TEXT,
-               week_no INT, schedule_month TEXT)
+               week_no INT, schedule_month TEXT,
+               verified_by TEXT, verified_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -482,7 +495,11 @@ BEGIN
   RETURN QUERY
     SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
            r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
-           r.batch_name, r.week_no, r.schedule_month
+           r.batch_name, r.week_no, r.schedule_month,
+           -- So a worker can see their morning has been checked off. Read
+           -- only: verifying is the conductor's signature, and nobody signs
+           -- for their own work.
+           r.verified_by, r.verified_at
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
