@@ -203,7 +203,7 @@
   /* ── New-case drawer ────────────────────────────────────────── */
   /* ── Solve sheet ── */
   .s-case { border:1.5px solid #ede9fe; background:#faf8ff; border-radius:13px;
-            padding:12px 13px; margin-bottom:15px; }
+            padding:12px 13px; }
   .s-case-no { font-size:11px; font-weight:900; letter-spacing:.05em; color:#0f172a;
                font-variant-numeric:tabular-nums; }
   .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; margin-top:2px; }
@@ -214,47 +214,69 @@
   .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
             display:block; border:1.5px solid #ede9fe; }
   .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
-           padding:9px 11px; font-size:12px; font-weight:700; margin-top:12px; }
-  .s-foot { display:flex; gap:8px; margin-top:18px; }
-  .s-btn { flex:1; padding:11px 12px; border-radius:11px; border:none; cursor:pointer;
-           font-family:inherit; font-size:12.5px; font-weight:900; letter-spacing:.03em; }
-  .s-btn:disabled { opacity:.6; cursor:progress; }
-  .s-btn-a { background:#7c3aed; color:#fff; }  .s-btn-a:hover:not(:disabled) { background:#6d28d9; }
-  .s-btn-c { background:#f8fafc; color:#64748b; border:1.5px solid #e2e8f0; flex:0 0 96px; }
-  .s-btn-c:hover:not(:disabled) { background:#f1f5f9; }
-  .s-btn-x { background:#065f46; color:#fff; }  .s-btn-x:hover:not(:disabled) { background:#047857; }
+           padding:9px 11px; font-size:12px; font-weight:700; }
 
-  .scrim { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:60; display:flex;
-           align-items:flex-end; justify-content:center; }
-  @media (min-width:768px) { .scrim { align-items:center; } }
-  .sheet { background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:560px; max-height:92vh;
-           overflow-y:auto; padding:22px; box-shadow:0 -10px 40px rgba(0,0,0,.25); }
-  @media (min-width:768px) { .sheet { border-radius:20px; } }
-  .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
+  /* ── Modals ─────────────────────────────────────────────────── */
+  /* The Admin Portal's dialog, in Nelos violet: a centred card with a
+     gradient head, labelled fields, and a footer that separates leaving
+     from doing. The same shape on a phone and on a desktop — it used to
+     slide up from the bottom on a phone and sit in the middle otherwise,
+     which is two dialogs to think about for no gain. */
+  @keyframes popIn { from { opacity:0; transform:scale(.95) translateY(12px); }
+                     to   { opacity:1; transform:scale(1) translateY(0); } }
+  .scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
+           display:flex; align-items:center; justify-content:center; padding:16px; }
+  .sheet { background:#fff; border-radius:24px; width:100%; max-width:560px; max-height:93vh;
+           overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,.35);
+           animation:popIn .25s ease both; }
+
+  .m-head { background:linear-gradient(135deg,#4c1d95,#6d28d9); padding:22px 24px;
+            border-radius:24px 24px 0 0; display:flex; align-items:flex-start;
+            justify-content:space-between; gap:16px; }
+  .m-title { font-size:15px; font-weight:900; color:#ddd6fe;
+             text-transform:uppercase; letter-spacing:.13em; line-height:1.35; }
+  .m-sub { display:block; margin-top:5px; font-size:11px; font-weight:600;
+           letter-spacing:.02em; text-transform:none; color:rgba(255,255,255,.62); }
+  .m-x { width:36px; height:36px; border-radius:12px; background:rgba(255,255,255,.12); color:#fff;
+         border:none; cursor:pointer; font-size:19px; font-weight:900; line-height:1; flex-shrink:0;
+         display:flex; align-items:center; justify-content:center; }
+  .m-x:hover { background:rgba(255,255,255,.24); }
+
+  .m-body { padding:20px; display:flex; flex-direction:column; gap:17px; }
+  @media (min-width:640px) { .m-body { padding:24px; } }
+  /* A section is only a grouping — the spacing between them is the body's
+     gap. It carries a class so a step can be hidden by the field inside it
+     (.closest('.m-sec')) without every step needing its own id. */
+  .m-sec { min-width:0; }
+  .m-sec-h { font-size:11px; font-weight:900; color:#7c3aed; text-transform:uppercase;
+             letter-spacing:.13em; margin-bottom:9px; }
+  .m-row  { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .m-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media (max-width:520px) { .m-row, .m-row3 { grid-template-columns:1fr; } }
+  .m-note { font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:7px; line-height:1.5; }
+  .m-note.warn { color:#b45309; font-weight:800; }
+
+  .m-foot { padding:18px 20px 22px; display:flex; gap:12px; justify-content:flex-end;
+            flex-wrap:wrap; border-top:1px solid #f1f5f9; }
+  @media (min-width:640px) { .m-foot { padding:20px 24px 24px; } }
+  .m-cancel { padding:12px 26px; border-radius:999px; border:1px solid #e2e8f0; background:#f8fafc;
+              color:#64748b; font-size:10px; font-weight:900; letter-spacing:.13em;
+              text-transform:uppercase; cursor:pointer; }
+  .m-cancel:hover { color:#1e293b; background:#f1f5f9; }
+  .m-go { padding:12px 32px; border-radius:14px; border:none; background:#7c3aed; color:#fff;
+          font-size:11px; font-weight:900; letter-spacing:.13em; text-transform:uppercase;
+          cursor:pointer; }
+  .m-go:hover:not(:disabled) { background:#6d28d9; }
+  .m-go:disabled { opacity:.4; cursor:not-allowed; }
+  .m-go-x { background:#065f46; } .m-go-x:hover:not(:disabled) { background:#047857; }
+  .lbl { font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:#94a3b8;
          display:block; margin-bottom:5px; }
-  .inp { width:100%; font-size:13.5px; font-weight:600; color:#1e293b; background:#f8fafc;
-         border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; outline:none; box-sizing:border-box; }
-  .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
+  .inp { width:100%; font-size:14px; font-weight:600; color:#1e293b; background:#fff;
+         border:2px solid #e2e8f0; border-radius:14px; padding:10px 14px; outline:none;
+         box-sizing:border-box; transition:all .2s; font-family:'Outfit', sans-serif; }
+  .inp:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.10); }
+  .inp::placeholder { color:#94a3b8; }
   textarea.inp { min-height:88px; resize:vertical; }
-  /* ── The six steps ──────────────────────────────────────────── */
-  /* Numbered blocks rather than a flat stack of fields, so the order the
-     drawer wants to be filled in is the order it reads in. */
-  .step { border:1.5px solid #ede9fe; border-radius:13px; padding:13px 15px; margin-bottom:11px;
-          background:#fdfcff; }
-  .step-h { display:flex; align-items:center; gap:9px; margin-bottom:9px;
-            font-size:12.5px; font-weight:900; color:#4c1d95; }
-  .step-n { width:21px; height:21px; border-radius:7px; background:#7c3aed; color:#fff; flex-shrink:0;
-            display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; }
-  .step-row  { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
-  .step-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; }
-  @media (max-width:520px) { .step-row3 { grid-template-columns:1fr; } }
-  .step-note { font-size:10.5px; font-weight:600; color:#a78bfa; margin-top:7px; line-height:1.5; }
-  .step-note.warn { color:#b45309; font-weight:800; }
-
-  .save-btn { width:100%; padding:13px; border-radius:12px; background:#7c3aed; color:#fff; border:none;
-              font-size:12px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; cursor:pointer; }
-  .save-btn:hover { background:#6d28d9; }
-  .save-btn:disabled { opacity:.55; cursor:not-allowed; }
 
   #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80;
            padding:11px 20px; border-radius:11px; font-size:12px; font-weight:800; color:#fff;
@@ -347,35 +369,40 @@
      the field can add: a photo of the fix and a line about it. -->
 <div id="solve-scrim" class="scrim hidden">
   <div class="sheet">
-    <div class="flex items-center justify-between mb-4">
-      <span class="font-black text-slate-800 uppercase tracking-widest text-xs"
-            id="s-heading">Solve Case</span>
-      <button id="solve-close"
-              class="text-slate-400 hover:text-slate-700 text-2xl leading-none font-bold">&times;</button>
+    <div class="m-head">
+      <!-- The heading and its line of explanation are separate elements
+           because the heading is rewritten per case, and setting
+           textContent on a parent would take the subtitle with it. -->
+      <div class="m-title"><span id="s-heading">Solve Case</span>
+        <span class="m-sub" id="s-sub">Say what was done, and show it</span></div>
+      <button id="solve-close" class="m-x" aria-label="Close">&times;</button>
     </div>
 
-    <div id="s-case" class="s-case"></div>
+    <div class="m-body">
+      <div id="s-case" class="s-case"></div>
 
-    <div class="step">
-      <div class="step-h"><span class="step-n">1</span>Photo of the fix</div>
-      <input id="s-photo" class="inp" type="file" accept="image/*" capture="environment">
-      <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
+      <div class="m-sec">
+        <div class="m-sec-h">Photo of the fix</div>
+        <input id="s-photo" class="inp" type="file" accept="image/*" capture="environment"
+               style="padding:8px 12px;font-size:12px;">
+        <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
+      </div>
+
+      <div class="m-sec">
+        <div class="m-sec-h">What was done?</div>
+        <textarea id="s-remark" class="inp" rows="3"
+                  placeholder="Enough that the person closing it can tell it was done properly."></textarea>
+      </div>
+
+      <div id="s-err" class="s-err hidden"></div>
     </div>
 
-    <div class="step">
-      <div class="step-h"><span class="step-n">2</span>What was done?</div>
-      <textarea id="s-remark" class="inp" rows="3"
-                placeholder="Enough that the person closing it can tell it was done properly."></textarea>
-    </div>
-
-    <div id="s-err" class="s-err hidden"></div>
-
-    <div class="s-foot">
-      <button id="s-cancel" class="s-btn s-btn-c">Cancel</button>
-      <button id="s-save" class="s-btn s-btn-a">Save &amp; Solve</button>
+    <div class="m-foot">
+      <button id="s-cancel" class="m-cancel">Cancel</button>
+      <button id="s-save" class="m-go">Save &amp; Solve</button>
       <!-- Only for somebody whose ticks include closing. Solving says the
            work is done; closing accepts it — usually a different person. -->
-      <button id="s-close-case" class="s-btn s-btn-x hidden">Close Case</button>
+      <button id="s-close-case" class="m-go m-go-x hidden">Close Case</button>
     </div>
   </div>
 </div>
@@ -383,83 +410,93 @@
 <!-- ── New case drawer ─────────────────────────────────────────── -->
 <div id="new-scrim" class="scrim hidden">
   <div class="sheet">
-    <div class="flex items-center justify-between mb-4">
-      <span class="font-black text-slate-800 uppercase tracking-widest text-xs" id="c-heading">New Case</span>
-      <button id="new-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none font-bold">&times;</button>
+    <div class="m-head">
+      <div class="m-title"><span id="c-heading">New Case</span>
+        <span class="m-sub" id="c-sub">Where it is, what it is, and who takes it</span></div>
+      <button id="new-close" class="m-x" aria-label="Close">&times;</button>
     </div>
 
     <!-- The flow, in the order somebody actually thinks in: which system,
-         what went wrong, where, who deals with it, then the evidence. -->
+         what went wrong, where, who deals with it, then the evidence. The
+         numbering is gone with the Admin Portal styling; the order is what
+         carries it, and a form nobody can skip through does not need to
+         count itself out loud. -->
+    <div class="m-body">
 
-    <div class="step" id="step-system">
-      <div class="step-h"><span class="step-n">1</span>Which system is this under?</div>
-      <!-- Filled from nelos_modules, so the systems here and the ones on the
-           User Setting page stay the same list. -->
-      <select id="c-system" class="inp"><option value="nelos">Nelos</option></select>
-    </div>
-
-    <div class="step" id="step-problem">
-      <div class="step-h"><span class="step-n">2</span>What is the problem?</div>
-      <!-- That system's own case categories, set on User Setting → Case
-           Routing. "Other" is always last, for something not listed yet. -->
-      <select id="c-problem" class="inp"></select>
-      <input id="c-problem-other" class="inp hidden" maxlength="120"
-             placeholder="Name the problem in a few words" style="margin-top:8px;">
-      <div class="step-row" style="margin-top:9px;">
-        <div><label class="lbl" for="c-priority">Priority</label>
-          <select id="c-priority" class="inp">
-            <option value="low">Low</option><option value="normal" selected>Normal</option>
-            <option value="high">High</option><option value="urgent">Urgent</option>
-          </select></div>
-        <div><label class="lbl" for="c-due">Due date</label>
-          <input id="c-due" type="date" class="inp"></div>
+      <div class="m-sec" id="step-system">
+        <div class="m-sec-h">Which system is this under?</div>
+        <!-- Filled from nelos_modules, so the systems here and the ones on the
+             User Setting page stay the same list. -->
+        <select id="c-system" class="inp"><option value="nelos">Nelos</option></select>
       </div>
-      <p class="step-note">Both are filled in from the problem's usual settings, and stay editable.</p>
-    </div>
 
-    <div class="step" id="step-where">
-      <div class="step-h"><span class="step-n">3</span>Where is it?</div>
-      <div class="step-row3">
-        <div><label class="lbl" for="c-nursery">Nursery *</label>
-          <select id="c-nursery" class="inp"></select></div>
-        <div><label class="lbl" for="c-plot">Plot</label>
-          <select id="c-plot" class="inp"><option value="">— any —</option></select></div>
-        <div><label class="lbl" for="c-batch">Batch</label>
-          <select id="c-batch" class="inp"><option value="">— any —</option></select></div>
+      <div class="m-sec" id="step-problem">
+        <div class="m-sec-h">What is the problem?</div>
+        <!-- That system's own case categories, set on User Setting → Case
+             Routing. "Other" is always last, for something not listed yet. -->
+        <select id="c-problem" class="inp"></select>
+        <input id="c-problem-other" class="inp hidden" maxlength="120"
+               placeholder="Name the problem in a few words" style="margin-top:8px;">
+        <div class="m-row" style="margin-top:12px;">
+          <div><label class="lbl" for="c-priority">Priority</label>
+            <select id="c-priority" class="inp">
+              <option value="low">Low</option><option value="normal" selected>Normal</option>
+              <option value="high">High</option><option value="urgent">Urgent</option>
+            </select></div>
+          <div><label class="lbl" for="c-due">Due date</label>
+            <input id="c-due" type="date" class="inp"></div>
+        </div>
+        <p class="m-note">Both are filled in from the problem's usual settings, and stay editable.</p>
       </div>
-      <p class="step-note">A nursery is needed. Plot and batch narrow it down if you know them.</p>
-    </div>
 
-    <div class="step" id="step-who">
-      <div class="step-h"><span class="step-n">4</span>Who deals with it?</div>
-      <div class="step-row">
-        <div><label class="lbl" for="c-dest">System</label>
-          <select id="c-dest" class="inp"></select></div>
-        <div><label class="lbl" for="c-pic">Person in charge</label>
-          <select id="c-pic" class="inp"></select></div>
+      <div class="m-sec" id="step-where">
+        <div class="m-sec-h">Where is it?</div>
+        <div class="m-row3">
+          <div><label class="lbl" for="c-nursery">Nursery *</label>
+            <select id="c-nursery" class="inp"></select></div>
+          <div><label class="lbl" for="c-plot">Plot</label>
+            <select id="c-plot" class="inp"><option value="">— any —</option></select></div>
+          <div><label class="lbl" for="c-batch">Batch</label>
+            <select id="c-batch" class="inp"><option value="">— any —</option></select></div>
+        </div>
+        <p class="m-note">A nursery is needed. Plot and batch narrow it down if you know them.</p>
       </div>
-      <p class="step-note" id="c-who-note"></p>
-    </div>
 
-    <div class="step" id="step-photo">
-      <div class="step-h"><span class="step-n">5</span>Photo</div>
-      <input id="c-photo" type="file" accept="image/*" class="inp" style="padding:8px 10px;font-size:12px;">
-      <div id="c-photo-now" class="hidden" style="margin-top:8px;display:flex;align-items:center;gap:9px;">
-        <img id="c-photo-thumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1.5px solid #ede9fe;">
-        <button type="button" id="c-photo-drop"
-                style="font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#b91c1c;background:none;border:none;cursor:pointer;">
-          Remove photo</button>
+      <div class="m-sec" id="step-who">
+        <div class="m-sec-h">Who deals with it?</div>
+        <div class="m-row">
+          <div><label class="lbl" for="c-dest">System</label>
+            <select id="c-dest" class="inp"></select></div>
+          <div><label class="lbl" for="c-pic">Person in charge</label>
+            <select id="c-pic" class="inp"></select></div>
+        </div>
+        <p class="m-note" id="c-who-note"></p>
       </div>
-      <p class="step-note">One picture of the thing itself. Optional, but it usually saves a paragraph.</p>
+
+      <div class="m-sec" id="step-photo">
+        <div class="m-sec-h">Photo</div>
+        <input id="c-photo" type="file" accept="image/*" class="inp" style="padding:8px 12px;font-size:12px;">
+        <div id="c-photo-now" class="hidden" style="margin-top:10px;display:flex;align-items:center;gap:9px;">
+          <img id="c-photo-thumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:10px;border:1.5px solid #ede9fe;">
+          <button type="button" id="c-photo-drop"
+                  style="font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#b91c1c;background:none;border:none;cursor:pointer;">
+            Remove photo</button>
+        </div>
+        <p class="m-note">One picture of the thing itself. Optional, but it usually saves a paragraph.</p>
+      </div>
+
+      <div class="m-sec" id="step-desc">
+        <div class="m-sec-h">Describe it</div>
+        <textarea id="c-desc" class="inp"
+                  placeholder="What happened, what needs doing, anything the person in charge needs to know."></textarea>
+      </div>
+
     </div>
 
-    <div class="step" id="step-desc">
-      <div class="step-h"><span class="step-n">6</span>Describe it</div>
-      <textarea id="c-desc" class="inp"
-                placeholder="What happened, what needs doing, anything the person in charge needs to know."></textarea>
+    <div class="m-foot">
+      <button id="c-cancel" class="m-cancel">Cancel</button>
+      <button id="c-save" class="m-go">Create Case</button>
     </div>
-
-    <button id="c-save" class="save-btn">Create Case</button>
   </div>
 </div>
 
@@ -883,9 +920,11 @@ function openSolve(c) {
      it, for somebody whose ticks allow that. */
   const done = c.status === 'resolved';
   $('s-heading').textContent = (done ? 'Close ' : 'Solve ') + (c.case_no || 'Case');
+  $('s-sub').textContent = done ? 'The work is done — accept it and close the case'
+                                : 'Say what was done, and show it';
   $('s-save').classList.toggle('hidden', done);
-  $('s-remark').closest('.step').classList.toggle('hidden', done);
-  $('s-photo').closest('.step').classList.toggle('hidden', done);
+  $('s-remark').closest('.m-sec').classList.toggle('hidden', done);
+  $('s-photo').closest('.m-sec').classList.toggle('hidden', done);
   $('s-close-case').classList.toggle('hidden', !(rights.may_close && done));
 
   $('solve-scrim').classList.remove('hidden');
@@ -1172,7 +1211,7 @@ function fillPics() {
   if (staff.some(h => h.user_id === keep)) $('c-pic').value = keep;
 
   const chosen = pickedPic();
-  $('c-who-note').className = 'step-note' + (chosen ? '' : ' warn');
+  $('c-who-note').className = 'm-note' + (chosen ? '' : ' warn');
   $('c-who-note').textContent = chosen
     ? `${chosen.full_name || chosen.email} will find this in their Nelos to-do list as soon as it is created.`
     : 'Nobody is tagged to that system yet, so this case will sit unassigned. ' +
@@ -1248,6 +1287,7 @@ async function openNew(prefill) {
   editingId = null;
   clearDrawer();
   $('c-heading').textContent = 'New Case';
+  $('c-sub').textContent = 'Where it is, what it is, and who takes it';
   $('c-save').textContent = 'Create Case';
   $('step-system').classList.remove('hidden');
   // Shown before the batch list is fetched — a drawer that waits on a round
@@ -1287,6 +1327,7 @@ async function openEdit(c) {
   editingId = c.id;
   clearDrawer();
   $('c-heading').textContent = 'Edit ' + (c.case_no || 'Case');
+  $('c-sub').textContent = 'The system it came from stays as it is';
   $('c-save').textContent = 'Save Changes';
   $('step-system').classList.add('hidden');
   $('new-scrim').classList.remove('hidden');
@@ -1474,6 +1515,7 @@ $('c-save').addEventListener('click', async () => {
 
 $('new-case-btn').addEventListener('click', () => openNew());
 $('new-close').addEventListener('click', closeNew);
+$('c-cancel').addEventListener('click', closeNew);
 
 /* ── Solve sheet ── */
 $('solve-close').addEventListener('click', closeSolve);
