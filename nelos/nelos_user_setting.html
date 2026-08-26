@@ -24,10 +24,18 @@
               box-shadow:0 3px 10px rgba(124,58,237,.10); }
   .backlink:hover { background:#ede9fe; }
 
-  .tabs { display:flex; gap:7px; margin-bottom:18px; flex-wrap:wrap; }
-  .tab { padding:9px 17px; border-radius:999px; border:1.5px solid #ddd6fe; background:#fff; color:#6d28d9;
-         font-size:10.5px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
-  .tab.on { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+  .page-title { font-size:18px; font-weight:900; color:#1e293b; text-align:center; margin:0 0 14px; }
+
+  /* Tabs, not buttons: one strip, the live one underlined. Three pills in a
+     row read as three things to press; a tab strip reads as one thing with
+     three faces, which is what this is. */
+  .tabs { display:flex; gap:26px; margin-bottom:18px; flex-wrap:wrap;
+          border-bottom:1.5px solid #ede9fe; justify-content:center; }
+  .tab { padding:0 2px 10px; border:none; background:none; cursor:pointer;
+         color:#94a3b8; font-size:12.5px; font-weight:800; letter-spacing:.01em;
+         border-bottom:2.5px solid transparent; margin-bottom:-1.5px; }
+  .tab:hover { color:#6d28d9; }
+  .tab.on { color:#4c1d95; font-weight:900; border-bottom-color:#7c3aed; }
 
   .card { background:#fff; border:1.5px solid #ede9fe; border-radius:16px; margin-bottom:12px;
           box-shadow:0 4px 16px rgba(124,58,237,.06); overflow:hidden; }
@@ -59,11 +67,8 @@
   /* Always on the page and always open, whether or not anybody is waiting —
      it is where somebody is brought into Nelos, not a leftovers pile. */
   .pend-block { border-color:#fde68a; background:#fffbeb; }
-  .pend-head { display:flex; align-items:center; gap:10px; padding:15px 18px 10px; }
-  .pend-ico { font-size:17px; }
+  .pend-head { padding:14px 18px 8px; }
   .pend-name { font-size:14px; font-weight:900; color:#92400e; }
-  .pend-n { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.07em;
-            text-transform:uppercase; color:#b45309; }
   .find { padding:0 18px 16px; }
   .find .inp { border-color:#fde68a; background:#fff; }
   .find .inp:focus { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.18); }
@@ -90,6 +95,37 @@
 
   .panel { padding:2px 16px 16px 63px; border-top:1px dashed #ede9fe; background:#fdfcff; }
 
+  /* The person being edited, ringed. The row and its panel are one block
+     so the ring closes round both, and the row keeps its own tint so the
+     name stays attached to the settings under it. */
+  .editing { border:1.5px solid #a78bfa; border-radius:14px; overflow:hidden; margin:6px 0;
+             box-shadow:0 6px 20px -8px rgba(124,58,237,.35); }
+  .person-editing { background:#f5f3ff; }
+  .editing-tag { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                 color:#6d28d9; background:#ede9fe; padding:3px 9px; border-radius:999px;
+                 flex-shrink:0; }
+  .editing .panel { border-top:1px solid #ddd6fe; background:#fff; }
+
+  /* One thing, one row: a tick box and a name. Used by both lists in the
+     panel — the systems and what may be done to a case — because they ask
+     the same kind of question and should not look like two designs. */
+  .acc-list { display:flex; flex-direction:column; gap:4px; }
+  .acc-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px;
+             border:1.5px solid #e9e3fb; background:#fff; cursor:pointer;
+             font-size:12.5px; font-weight:800; color:#1e293b; }
+  .acc-row:hover { border-color:#c4b5fd; }
+  .acc-row input { width:16px; height:16px; accent-color:#7c3aed; flex-shrink:0; margin:0; }
+  .acc-row:has(input:checked) { background:#f5f3ff; border-color:#c4b5fd; }
+  /* The home queue is Case Handlers' to set, so it is shown, ticked, and
+     not editable here. */
+  .acc-row-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
+  .acc-row-home:hover { border-color:#ddd6fe; }
+  .acc-row-all { border-style:dashed; }
+  .acc-row-all:has(input:checked) { border-style:solid; }
+
+  /* The end of the form, at its end: Cancel then Save, hard right. */
+  .panel-acts { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
   .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
          display:block; margin:12px 0 6px; }
   .inp { width:100%; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc;
@@ -112,12 +148,41 @@
   /* A plain plus at the button's own weight — the full-width one drew thin
      and pale, and these are the buttons people are looking for. */
   .plus { font-size:15px; font-weight:900; line-height:0; }
-  .seat-add { align-self:flex-start; display:inline-flex; align-items:center; gap:6px;
-              margin-top:3px; padding:8px 14px; border-radius:999px; border:1.5px solid #7c3aed;
-              background:#7c3aed; color:#fff; font-size:10.5px; font-weight:900; letter-spacing:.06em;
-              text-transform:uppercase; cursor:pointer; }
-  .seat-add:hover { background:#6d28d9; }
+  /* Plain text under the names rather than a solid button. It is the least
+     used control on the card and was the loudest thing on it. */
+  .seat-add { display:inline-flex; align-items:center; gap:5px; margin:7px 0 0 13px;
+              padding:0; border:none; background:none; cursor:pointer;
+              color:#8b5cf6; font-size:11.5px; font-weight:800; }
+  .seat-add:hover { color:#6d28d9; text-decoration:underline; }
   .seat-hint { font-size:12px; font-weight:700; color:#cbd5e1; padding:4px 0; }
+
+  /* ── One card per system, side by side ──────────────────────── */
+  /* auto-fill rather than a fixed count: two systems should not leave three
+     empty columns, and five should wrap rather than squeeze. */
+  /* Narrow enough for four across a 980px page, and auto-fill so two
+     systems do not leave two empty columns. */
+  .sys-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(216px, 1fr)); gap:10px; }
+  .sys-card { background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+              box-shadow:0 3px 12px rgba(124,58,237,.05); padding-bottom:11px; }
+  .sys-head { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;
+              padding:12px 13px 9px; border-bottom:1px solid #f3f0fd; }
+  .sys-head .sys-name { font-size:13px; font-weight:900; color:#4c1d95; }
+  .sys-head .sys-count { margin-left:auto; font-size:9.5px; font-weight:800; color:#c4b5fd; }
+
+  /* ── A system's numbered slots ──────────────────────────────── */
+  /* One row per number, holding a name or empty. Filling one is choosing
+     from a list, and choosing somebody who sits elsewhere moves them. */
+  /* A number, then who holds it. No badge and no boxed label — "#1" said
+     plainly is the whole of what the badge was saying. */
+  .slots { display:flex; flex-direction:column; gap:6px; padding:11px 13px 2px; }
+  .slot { display:flex; align-items:center; gap:8px; }
+  .slot-no { flex-shrink:0; width:22px; font-size:12px; font-weight:900; color:#7c3aed;
+             font-variant-numeric:tabular-nums; }
+  .slot-pick { padding:6px 9px; font-size:12.5px; }
+
+  /* The home system on User Access: ticked, and not this screen's to change. */
+  .right-home { background:#f5f3ff; border-color:#ddd6fe; cursor:default; }
+  .right-home:hover { border-color:#ddd6fe; }
 
   /* ── What they may do to a case ─────────────────────────────── */
   .rights { display:flex; flex-direction:column; gap:5px; }
@@ -128,6 +193,7 @@
   .right-ico { font-size:14px; flex-shrink:0; }
   .right-name { display:block; font-size:12.5px; font-weight:800; color:#1e293b; }
   .right-note { display:block; font-size:10.5px; font-weight:600; color:#94a3b8; margin-top:1px; line-height:1.45; }
+
 
   .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 17px; border-radius:10px;
          border:none; cursor:pointer; font-size:10px;
@@ -210,23 +276,29 @@
 <div id="mjm-ribbon" data-brand="MJM Nursery AI System" data-center="NELOS" data-sub="Nursery Case Log" data-logo="off"></div>
 <script src="../shared/shared_ribbon.js"></script>
 
-<div id="loading" class="max-w-[880px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+<div id="loading" class="max-w-[1040px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
-<div id="main" class="max-w-[880px] mx-auto px-4 md:px-6 py-7 hidden">
+<div id="main" class="max-w-[1040px] mx-auto px-4 md:px-6 py-7 hidden">
 
   <!-- The way back leads, above the title. -->
   <a class="backlink" href="nelos_dashboard.html">&lsaquo; Back to Nelos Main Page</a>
 
-  <h1 class="text-[18px] font-black text-slate-800 mb-4">User Setting</h1>
+  <h1 class="page-title">User Setting</h1>
 
   <div class="tabs">
-    <button class="tab on" data-tab="people">👤 Case Handlers</button>
-    <button class="tab"    data-tab="routing">🔀 Case Routing</button>
+    <button class="tab on" data-tab="people">Case Handlers</button>
+    <button class="tab"    data-tab="access">User Access</button>
+    <button class="tab"    data-tab="routing">Case Routing</button>
   </div>
 
-  <!-- ── People ──────────────────────────────────────────────── -->
+  <!-- ── Case Handlers: the roster, system by system ─────────── -->
   <div id="tab-people">
     <div id="people"></div>
+  </div>
+
+  <!-- ── User Access: who may use Nelos where ─────────────────── -->
+  <div id="tab-access" class="hidden">
+    <div id="access"></div>
   </div>
 
   <!-- ── Routing ─────────────────────────────────────────────── -->
@@ -250,13 +322,18 @@ let modules = [];      // nelos_modules rows
 let categories = [];   // active nelos_categories rows: { name, module_key }
 let routes = [];       // nelos_routes rows
 let open = null;       // user_id whose panel is expanded
-let extraSeats = 0;    // how many extra numbers the + button is offering
-let openGrp = null;    // which system's handler block is open
+/* True once nelos_people() carries access_modules — i.e. once
+   migration_nelos_access.sql has run. Until then the system ticks are not
+   drawn and the column is not saved, rather than saved as empty. */
+let hasAccessCol = false;
 let openRoute = null;  // which system's routing block is open
 let me = { name: '' };
 
-/* Pending Allocation's search. The directory is everybody in the company —
-   fetched once, then filtered here, so typing does not hit the network. */
+/* The search on User Access. nelos_directory() is the staff list — every
+   account that is not a Salesweb customer, the same population the main
+   portal's own User Access screen shows (migration_nelos_directory_staff
+   .sql). Fetched once, then filtered here, so typing does not hit the
+   network. */
 let directory = null;  // null until the first search asks for it
 let findQ = '';
 
@@ -271,24 +348,23 @@ function toast(msg, ok) {
 
 /* What a person may do with a case, and so which buttons they are shown.
    Drawn in the order a case actually moves through them: raised, edited,
-   solved, closed — and delete last, apart, because it is the only one
-   that destroys rather than advances.
+   solved, closed — and delete last, because it is the only one that
+   destroys rather than advances.
+
+   Names only. Each of these used to carry an emoji and a sentence
+   explaining it, which is a paragraph of screen to say five things a
+   reader of this page already knows.
 
    may_create and may_close arrive with shared/migration_nelos_close_right
    .sql. Closing is deliberately its own tick rather than part of solving:
    solving says "I did the work", closing says "and it was done properly",
    and the second is somebody else's judgement of the first. */
 const RIGHTS = [
-  { key:'may_create', icon:'➕', name:'Add a new case',
-    note:'Raise a case from any module, or from the floating to-do window.' },
-  { key:'may_edit',   icon:'✏️', name:'Edit a case',
-    note:'Change the title, detail, photo, PIC or due date after it was raised.' },
-  { key:'may_solve',  icon:'✅', name:'Solve a case',
-    note:'Attach a photo of the fix, say what was done, and send it to be closed.' },
-  { key:'may_close',  icon:'🔒', name:'Close a case',
-    note:'Accept somebody else\'s solved case as finished. This ends the case.' },
-  { key:'may_delete', icon:'🗑', name:'Delete a case',
-    note:'Remove it for good. Solving keeps the record; this does not.' }
+  { key:'may_create', name:'Add New Case' },
+  { key:'may_edit',   name:'Edit Case' },
+  { key:'may_solve',  name:'Solve Case' },
+  { key:'may_close',  name:'Close Case' },
+  { key:'may_delete', name:'Delete Case' }
 ];
 
 /* Only the ticks this database actually has a column for. may_create and
@@ -313,10 +389,6 @@ const categoriesIn = key => categories.filter(c => c.module_key === key).map(c =
 const pickLabel = m => m.label + (m.sees_all_cases ? '  (HQ)' : '');
 const handlerLabel = key => (modules.find(m => m.key === key) || {}).handler_label || labelOf(key);
 const seatName = (key, n) => n ? `${handlerLabel(key)} ${n}` : '';
-/* The numbers already taken in a system, so the picker never offers a clash. */
-const seatsUsed = (key, exceptUserId) => new Set(
-  people.filter(p => p.primary_module === key && p.seat_no && p.id !== exceptUserId)
-        .map(p => p.seat_no));
 /* Everyone tagged to a system, in number order — the shape the list uses. */
 const peopleIn = key => people
   .filter(p => p.primary_module === key)
@@ -327,291 +399,336 @@ const routeFor = (mod, cat) =>
   routes.find(r => r.source_module === mod && r.category === cat) ||
   routes.find(r => r.source_module === mod && r.category === null) || null;
 
-/* ── People ────────────────────────────────────────────────────── */
+/* ── Case Handlers ─────────────────────────────────────────────────
+   System first, not person first.
 
-function personHtml(p) {
-  const admin = p.nelos_level === 'admin';
-  const tagged = !!p.primary_module;
+   The old screen asked the question backwards: you opened a PERSON and
+   told them which system and number they were. But a system's numbers are
+   a fixed little set — #1, #2, and one more when it grows — and what an
+   admin actually wants to know is "who is Audit's #1", which that shape
+   could only answer by opening people one at a time until you found them.
 
-  const sub = tagged
-    ? `<span class="p-pin pin-set">${esc(seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module))}</span>`
-    : admin
-      ? '<span class="p-pin pin-set">Nelos admin</span>'
-      : '<span class="p-pin pin-unset">Not allocated</span>';
+   So a system is a list of numbered slots, each holding a name or empty,
+   and filling one is choosing from a list. Moving somebody is the same
+   act: picking them into a slot takes them out of wherever they were,
+   because a person handles one queue.
+
+   Everything else about a person — which systems they may use, what they
+   may do to a case — is on User Access. This tab is only the roster. */
+
+let moreSeats = {};   // module key → extra empty slots the + button opened
+
+/* The slots a system shows: every number somebody holds, one spare past
+   the highest so it can always grow, plus whatever + has asked for. */
+function seatCount(key) {
+  const held = peopleIn(key).map(p => p.seat_no || 0);
+  const highest = Math.max(0, ...held);
+  return Math.max(highest + 1, moreSeats[key] || 0, 1);
+}
+
+function seatSlot(key, n) {
+  const holder = peopleIn(key).find(p => p.seat_no === n) || null;
+  // Whoever could go here: everybody holding Nelos. Somebody already in
+  // another system is offered too — choosing them moves them, which is
+  // the only way to move anybody.
+  const options = people
+    .map(p => {
+      const where = p.primary_module && p.primary_module !== key
+        ? ` — now ${seatName(p.primary_module, p.seat_no) || labelOf(p.primary_module)}`
+        : '';
+      const sel = holder && holder.id === p.id ? 'selected' : '';
+      return `<option value="${esc(p.id)}" ${sel}>${esc(p.full_name || p.email)}${esc(where)}</option>`;
+    })
+    .join('');
 
   return `
-    <div>
-      <div class="person" data-person="${esc(p.id)}">
-        ${tagged && p.seat_no
-          ? `<div class="seat-no">${p.seat_no}</div>`
-          : `<div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>`}
-        <div class="min-w-0 flex-1">
-          <div class="p-name">${esc(p.full_name || p.email.split('@')[0])}
-            <span class="lvl ${admin ? 'lvl-admin' : ''}">${esc(p.nelos_level)}</span></div>
-          <div class="p-mail">${esc(p.email)}</div>
-          ${sub}
-        </div>
-        <span class="chev">${open === p.id ? '▾' : '›'}</span>
-      </div>
-      ${open === p.id ? panelHtml(p) : ''}
+    <div class="slot">
+      <span class="slot-no">#${n}</span>
+      <select class="inp slot-pick min-w-0 flex-1" data-mod="${esc(key)}" data-seat="${n}"
+              aria-label="${esc(handlerLabel(key))} ${n}">
+        <option value="">— empty —</option>
+        ${options}
+      </select>
     </div>`;
 }
 
-/* The numbers on offer in a system. Each row shows who holds it, so it is
-   obvious that 1 is taken before somebody ticks 2, and "+" offers one more
-   when a system needs another handler. There is no separate list of numbers
-   kept anywhere — a number exists because somebody holds it, plus the next
-   one up. */
-function seatRows(p, moduleKey) {
-  const key = moduleKey !== undefined ? moduleKey : p.primary_module;
-  if (!key) return '<div class="seat-hint">Choose a system first.</div>';
-
-  const held = {};                       // number → who holds it
-  people.filter(x => x.primary_module === key && x.seat_no)
-        .forEach(x => { held[x.seat_no] = x; });
-
-  const highest = Math.max(0, ...Object.keys(held).map(Number));
-  // Always offer one past the highest so a system can grow; extraSeats is
-  // however many more the + button has asked for on top of that.
-  const upto = Math.max(highest + 1, p.seat_no || 0, extraSeats);
-
-  let rows = '';
-  for (let n = 1; n <= upto; n++) {
-    const holder = held[n];
-    const mine = p.seat_no === n;
-    const takenByOther = holder && holder.id !== p.id;
-    rows += `
-      <label class="seat-row ${mine ? 'on' : ''} ${takenByOther ? 'taken' : ''}">
-        <input type="radio" name="seat" value="${n}" ${mine ? 'checked' : ''} ${takenByOther ? 'disabled' : ''}>
-        <span class="seat-badge">${n}</span>
-        <span class="seat-who">${
-          holder ? esc(holder.full_name || holder.email)
-          : mine ? esc(p.full_name || p.email || '')
-          : '<em>free</em>'}</span>
-      </label>`;
+function renderPeople() {
+  if (!modules.length) {
+    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         No systems yet — run <strong>shared/migration_nelos_all.sql</strong>.
+       </div>`;
+    return;
   }
-  return rows +
-    '<button type="button" class="seat-add" data-act="add-seat">' +
-    '<span class="plus">+</span> add another number</button>';
+
+  // Blocks side by side rather than a stack of full-width rows, and every
+  // one of them open. A system holds two or three people; hiding that
+  // behind a chevron was hiding nothing, and made "who is Audit's #1" a
+  // click away on a page whose whole job is answering it.
+  $('people').innerHTML = '<div class="sys-grid">' + modules.map(m => {
+    const rows = peopleIn(m.key);
+    const n = seatCount(m.key);
+    const slots = [];
+    for (let i = 1; i <= n; i++) slots.push(seatSlot(m.key, i));
+
+    return `
+      <div class="sys-card">
+        <div class="sys-head">
+          <span class="sys-name">${esc(m.label)}</span>
+          ${m.sees_all_cases ? '<span class="hq-tag">HQ</span>' : ''}
+          <span class="sys-count">${rows.length
+            ? rows.length + (rows.length === 1 ? ' person' : ' people')
+            : 'nobody'}</span>
+        </div>
+        <div class="slots">${slots.join('')}</div>
+        <button type="button" class="seat-add" data-more="${esc(m.key)}">+ add another person</button>
+      </div>`;
+  }).join('') + '</div>';
+
+  $('people').querySelectorAll('[data-more]').forEach(b =>
+    b.addEventListener('click', () => {
+      const k = b.dataset.more;
+      moreSeats[k] = seatCount(k) + 1;
+      renderPeople();
+    }));
+
+  $('people').querySelectorAll('.slot-pick').forEach(sel =>
+    sel.addEventListener('change', () => setSeat(sel.dataset.mod, Number(sel.dataset.seat), sel.value)));
+}
+
+/* Put somebody in a system's numbered slot, or empty it.
+
+   Whoever was there leaves first, and so does whatever the incoming person
+   was holding — both are the same single row per person, so this is two
+   writes at most and never leaves two people on one number. */
+async function setSeat(moduleKey, seatNo, userId) {
+  const sitting = peopleIn(moduleKey).find(p => p.seat_no === seatNo) || null;
+  if (sitting && sitting.id === userId) return;          // nothing changed
+
+  const rows = [];
+  const rowFor = (p, mod, seat) => ({
+    user_id: p.id,
+    email: p.email,
+    full_name: p.full_name,
+    primary_module: mod,
+    seat_no: seat,
+    updated_at: new Date().toISOString(),
+    updated_by: me.name
+  });
+
+  if (sitting) rows.push(rowFor(sitting, null, null));   // they step out
+
+  const incoming = userId ? people.find(p => p.id === userId) : null;
+  if (incoming) rows.push(rowFor(incoming, moduleKey, seatNo));
+
+  if (!rows.length) return;
+
+  const { error } = await _supabase.from('nelos_handlers').upsert(rows, { onConflict: 'user_id' });
+  if (error) { toast('Could not save — ' + error.message, false); return; }
+
+  toast(incoming
+    ? `${incoming.full_name || incoming.email} is now ${seatName(moduleKey, seatNo)}.`
+    : `${seatName(moduleKey, seatNo)} is empty.`);
+  moreSeats = {};
+  await load();
+}
+
+/* ── User Access ───────────────────────────────────────────────────
+   Person first, and the other half of the split: which systems somebody
+   may USE Nelos in, and what they may do to a case once they are in it.
+
+   Everything starts off. Somebody added here can open Nelos and see
+   nothing until a system is ticked for them, which is what makes the tick
+   worth anything — a default of "everything" is not access control, it is
+   a list. */
+
+/* Name and email, and nothing else. What somebody's access adds up to is
+   several lines to say and is right there the moment the row is opened —
+   summarising it on every closed row made a list of people read as a wall
+   of settings. */
+function personHtml(p) {
+  const admin = p.nelos_level === 'admin';
+  const editing = open === p.id;
+  /* The open person is drawn as one bounded block — their row and their
+     panel inside a single ring — so on a list of twenty it is never a
+     question whose access is being changed. Closed, they are a plain row
+     as before. */
+  return `
+    <div class="${editing ? 'editing' : ''}">
+      <div class="person ${editing ? 'person-editing' : ''}" data-person="${esc(p.id)}">
+        <div class="av ${admin ? 'av-admin' : ''}">${esc(initials(p.full_name || p.email))}</div>
+        <div class="min-w-0 flex-1">
+          <div class="p-name">${esc(p.full_name || p.email.split('@')[0])}</div>
+          <div class="p-mail">${esc(p.email)}</div>
+        </div>
+        ${editing ? '<span class="editing-tag">Editing</span>' : ''}
+        <span class="chev">${editing ? '▾' : '›'}</span>
+      </div>
+      ${editing ? panelHtml(p) : ''}
+    </div>`;
 }
 
 function panelHtml(p) {
   const admin = p.nelos_level === 'admin';
+  const on = new Set(Array.isArray(p.access_modules) ? p.access_modules : []);
+
   return `
     <div class="panel" data-panel="${esc(p.id)}">
       ${admin ? `
         <p class="text-[11.5px] font-bold text-violet-700 mt-3">
-          A Nelos admin sees every case whatever is set here.
+          A Nelos admin uses every system and may do everything, whatever is ticked here.
         </p>` : ''}
 
-      <label class="lbl" for="pm-${esc(p.id)}">System</label>
-      <select class="inp" id="pm-${esc(p.id)}">
-        <option value="">— none —</option>
-        ${modules.map(m => `<option value="${esc(m.key)}" ${p.primary_module === m.key ? 'selected' : ''}>${esc(pickLabel(m))}</option>`).join('')}
-      </select>
-
-      <label class="lbl">Person in charge #</label>
-      <div class="seat-list" id="rl-${esc(p.id)}">${seatRows(p)}</div>
+      <label class="lbl">Systems they may use Nelos in</label>
+      <!-- One system, one row, "All" at the top of them. A tick box and a
+           name: the name is the choice, and everything else that used to be
+           on these rows — an emoji, and a sentence repeated five times —
+           was screen spent saying nothing. The home system's row is ticked
+           and not editable, and says why on hover rather than in a
+           permanent subtitle. -->
+      <div class="acc-list">
+        <label class="acc-row acc-row-all" title="Tick every system at once">
+          <input type="checkbox" data-sys-all>
+          <span>All</span>
+        </label>
+        ${modules.map(m => {
+          const home = p.primary_module === m.key;
+          return `
+          <label class="acc-row ${home ? 'acc-row-home' : ''}"${home
+            ? ' title="The queue they handle — theirs whatever is ticked. Change it on Case Handlers."'
+            : ''}>
+            <input type="checkbox" data-sys="${esc(m.key)}" ${on.has(m.key) || home ? 'checked' : ''}
+                   ${home ? 'disabled' : ''}>
+            <span>${esc(m.label)}</span>
+          </label>`;
+        }).join('')}
+      </div>
 
       ${!hasRights ? '' : `
       <label class="lbl">What they may do to a case</label>
       ${admin
         ? '<p class="text-[11.5px] font-bold text-violet-700">An admin may do all of these whatever is ticked here.</p>'
         : ''}
-      <div class="rights">
+      <div class="acc-list">
         ${liveRights().map(r => `
-          <label class="right-row">
+          <label class="acc-row">
             <input type="checkbox" data-right="${r.key}" ${p[r.key] ? 'checked' : ''}>
-            <span class="right-ico">${r.icon}</span>
-            <span class="min-w-0">
-              <span class="right-name">${esc(r.name)}</span>
-              <span class="right-note">${esc(r.note)}</span>
-            </span>
+            <span>${esc(r.name)}</span>
           </label>`).join('')}
       </div>`}
 
-      <div class="flex gap-2 mt-4">
-        <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
+      <!-- Cancel then Save, and both at the foot on the right, where the
+           end of a form is. -->
+      <div class="panel-acts">
         <button class="btn btn-ghost" data-act="close-person">Cancel</button>
+        <button class="btn btn-save" data-act="save-person" data-person="${esc(p.id)}">Save</button>
       </div>
     </div>`;
 }
 
-/* One closed block per system, opened only when somebody in it needs
-   editing — the same shape as Case Routing, so the two tabs read alike.
-   Pending Allocation sits below them all, always open. */
-function renderPeople() {
-  // Whatever "+ add another number" conjured belongs to the panel that was
-  // open. With none open it must not survive — otherwise setting somebody
-  // to #2 leaves a phantom #3 waiting for whoever is opened next.
-  if (!open) extraSeats = 0;
-
-  const blocks = modules.map(m => {
-    const rows = peopleIn(m.key);
-    const openHere = openGrp === m.key;
-    return `
-      <div class="card">
-        <div class="sys-block">
-          <button class="sys-row" data-grp="${esc(m.key)}">
-            <span class="sys-chev">${openHere ? '▾' : '▸'}</span>
-            <span class="sys-ico">${esc(m.icon || '📦')}</span>
-            <span class="sys-name">${esc(m.label)}</span>
-            ${m.sees_all_cases ? '<span class="hq-tag">HQ · sees every case</span>' : ''}
-            <span class="sys-count">${rows.length ? rows.length + (rows.length === 1 ? ' person' : ' people') : 'nobody'}</span>
-          </button>
-          ${openHere
-            ? `<div class="grp-body">${rows.length
-                 ? rows.map(personHtml).join('')
-                 : '<div class="grp-empty">— nobody tagged to this system yet —</div>'}</div>`
-            : ''}
-        </div>
-      </div>`;
-  }).join('');
-
-  // Pending Allocation leads: it is where somebody is brought into Nelos,
-  // which comes before deciding which system they sit in.
-  $('people').innerHTML = pendingHtml() + blocks;
-  wirePeople();
-}
-
-/* User Pending Allocation — the way somebody joins Nelos. It is a fixed part
-   of the page rather than a group that appears when the list is non-empty,
-   because it holds the search that puts people INTO the list. */
-function pendingHtml() {
-  const waiting = people.filter(p => !p.primary_module);
-  return `
+/* The search that brings somebody in leads the tab: adding a person is the
+   first thing done here, and it is the only way into the list. */
+function renderAccess() {
+  const finder = `
     <div class="card pend-block">
       <div class="pend-head">
-        <span class="pend-ico">⏳</span>
-        <span class="pend-name">User Pending Allocation</span>
-        <span class="pend-n">${waiting.length ? waiting.length + ' waiting' : 'nobody waiting'}</span>
+        <span class="pend-name">Add Nelos user</span>
       </div>
       <div class="find">
         <input class="inp" id="find" type="search" autocomplete="off"
-               placeholder="Search name or email…" value="${esc(findQ)}">
+               placeholder="Search staff by name or email…" value="${esc(findQ)}">
         <div id="find-res"></div>
       </div>
-      ${waiting.length
-        ? `<div class="grp-body">${waiting.map(personHtml).join('')}</div>`
-        : '<div class="grp-empty">— nobody is waiting to be tagged —</div>'}
     </div>`;
+
+  const list = people.length
+    ? `<div class="card">${people.map(personHtml).join('')}</div>`
+    : `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+         Nobody has Nelos yet.<br>
+         <span class="text-[11px] font-semibold">Search above to add the first person.</span>
+       </div>`;
+
+  $('access').innerHTML = finder + list;
+  wireAccess();
 }
 
-function wirePeople() {
-  $('people').querySelectorAll('.sys-row').forEach(b =>
-    b.addEventListener('click', () => {
-      // Collapsing a system takes any panel open inside it with it.
-      openGrp = openGrp === b.dataset.grp ? null : b.dataset.grp;
-      open = null;
-      extraSeats = 0;
-      renderPeople();
-    }));
-
-  $('people').querySelectorAll('.person').forEach(row =>
+function wireAccess() {
+  $('access').querySelectorAll('.person').forEach(row =>
     row.addEventListener('click', () => {
       open = open === row.dataset.person ? null : row.dataset.person;
-      extraSeats = 0;
-      renderPeople();
+      renderAccess();
     }));
 
-  $('people').querySelectorAll('[data-act]').forEach(b =>
+  $('access').querySelectorAll('[data-act]').forEach(b =>
     b.addEventListener('click', e => {
       e.stopPropagation();
       if (b.dataset.act === 'save-person')  return savePerson(b.dataset.person);
-      if (b.dataset.act === 'close-person') { open = null; renderPeople(); }
+      if (b.dataset.act === 'close-person') { open = null; renderAccess(); }
     }));
+
+  const panel = $('access').querySelector('.panel');
+  if (panel) {
+    panel.addEventListener('click', e => e.stopPropagation());
+
+    /* "All" is a shortcut, not a stored value: it ticks and unticks the
+       systems, and nothing reads it on save — savePerson() collects
+       [data-sys], and this box has none. It also follows them, so a person
+       who already has every system open opens the panel with All ticked
+       rather than looking un-set.
+
+       The home system is deliberately outside both: it is ticked and
+       disabled, Case Handlers owns it, and "All" cannot turn it off. */
+    const all = panel.querySelector('input[data-sys-all]');
+    const boxes = [...panel.querySelectorAll('input[data-sys]')].filter(b => !b.disabled);
+    const sync = () => { if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked); };
+    if (all) all.addEventListener('change', () => boxes.forEach(b => { b.checked = all.checked; }));
+    boxes.forEach(b => b.addEventListener('change', sync));
+    sync();
+  }
 
   wireFind();
-
-  // Keep clicks inside the open panel from collapsing it.
-  const panel = $('people').querySelector('.panel');
-  if (!panel) return;
-  panel.addEventListener('click', e => e.stopPropagation());
-
-  // Changing the system re-offers that system's numbers — a number belongs
-  // to one system, so the one they held elsewhere does not carry over.
-  const pm = panel.parentElement.querySelector('select[id^="pm-"]');
-  const rl = panel.parentElement.querySelector('.seat-list');
-  const person = pm ? (people.find(x => x.id === pm.id.slice(3)) || {}) : {};
-
-  if (pm && rl) {
-    pm.addEventListener('change', () => {
-      // A number belongs to one system, so moving somebody starts them
-      // unnumbered in the system they are moving to.
-      extraSeats = 0;
-      rl.innerHTML = seatRows(Object.assign({}, person, { seat_no: null }), pm.value || null);
-      wireSeats(rl, pm, person);
-    });
-    wireSeats(rl, pm, person);
-  }
-}
-
-/* The number list is redrawn on every interaction, so both handlers have to
-   put it back together and re-wire it.
-
-   `+` offers exactly one more number than is showing. Picking a number
-   TRIMS back to it — otherwise pressing + and then choosing a lower number
-   left the spare row sitting there, which is what made choosing #2 leave a
-   #3 behind. Nothing is written until Save either way. */
-function wireSeats(rl, pm, person) {
-  const redraw = seat => {
-    // Carry the whole person through: seatRows names whoever holds a row,
-    // so an object missing full_name/email would render a blank one.
-    rl.innerHTML = seatRows(Object.assign({}, person, { seat_no: seat }), pm.value || null);
-    wireSeats(rl, pm, person);
-  };
-
-  rl.querySelectorAll('input[name="seat"]').forEach(r =>
-    r.addEventListener('change', () => {
-      extraSeats = 0;                       // drop any spare row the + left
-      redraw(Number(r.value));
-    }));
-
-  const add = rl.querySelector('[data-act="add-seat"]');
-  if (!add) return;
-  add.addEventListener('click', e => {
-    e.preventDefault();
-    const picked = rl.querySelector('input[name="seat"]:checked');
-    extraSeats = rl.querySelectorAll('.seat-row').length + 1;
-    redraw(picked ? Number(picked.value) : (person.seat_no || null));
-  });
 }
 
 async function savePerson(userId) {
   const p = people.find(x => x.id === userId);
-  const panel = $('people').querySelector(`.panel[data-panel="${userId}"]`);
+  const panel = $('access').querySelector(`.panel[data-panel="${userId}"]`);
   if (!p || !panel) return;
 
-  const primary = $(`pm-${userId}`).value || null;
-  const ticked = panel.querySelector('input[name="seat"]:checked');
-  const seatNo = primary && ticked ? Number(ticked.value) : null;
+  // The home system is ticked and disabled — it belongs to Case Handlers —
+  // so a disabled box is read as "not part of what this screen sets" and
+  // left out of the array rather than written into it twice.
+  const sys = [...panel.querySelectorAll('input[data-sys]')]
+    .filter(b => b.checked && !b.disabled)
+    .map(b => b.dataset.sys);
 
-  // upsert on user_id: one handler row per person, so re-saving edits it
-  // rather than stacking a second.
   const row = {
     user_id: userId,
     email: p.email,
     full_name: p.full_name,
-    primary_module: primary,
-    seat_no: seatNo,
     updated_at: new Date().toISOString(),
     updated_by: me.name
   };
+  // access_modules arrives with migration_nelos_access.sql. Where the
+  // column is missing the boxes are not drawn either (see hasAccessCol), so
+  // nothing is sent and the save still goes through.
+  if (hasAccessCol) row.access_modules = sys;
+
   // The rights arrive with migration_nelos_case_tools.sql and
   // migration_nelos_close_right.sql. On a database missing either, those
-  // boxes are not drawn (see liveRights) and their columns are not sent —
-  // so the save still goes through.
+  // boxes are not drawn (see liveRights) and their columns are not sent.
   RIGHTS.forEach(r => {
     const box = panel.querySelector(`input[data-right="${r.key}"]`);
     if (box) row[r.key] = box.checked;
   });
 
+  // Deliberately NOT sending primary_module or seat_no: this screen does
+  // not set them, and an upsert naming them would blank whatever Case
+  // Handlers had put there.
   const { error } = await _supabase.from('nelos_handlers').upsert([row], { onConflict: 'user_id' });
-
   if (error) { toast('Could not save — ' + error.message, false); return; }
-  toast(primary
-    ? `Tagged ${seatNo ? seatName(primary, seatNo) : labelOf(primary)}.`
-    : 'Tag removed — sees every case.');
+
+  toast(sys.length
+    ? `${p.full_name || p.email} can use Nelos in ${sys.length} system${sys.length === 1 ? '' : 's'}.`
+    : `${p.full_name || p.email} has no system open yet.`);
   open = null;
   await load();
 }
@@ -922,7 +1039,7 @@ async function saveRule(mod, cat, toModule, toSeatNo) {
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
-  ['people', 'routing'].forEach(name =>
+  ['people', 'access', 'routing'].forEach(name =>
     $('tab-' + name).classList.toggle('hidden', t.dataset.tab !== name));
 }));
 
@@ -941,9 +1058,11 @@ async function load() {
   ]);
 
   if (modRes.error) {
-    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+    const msg = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
       Could not load sections — ${esc(modRes.error.message)}<br>
       <span class="text-[11px] font-semibold">Run the Nelos migrations in Supabase first.</span></div>`;
+    $('people').innerHTML = msg;
+    $('access').innerHTML = msg;
     return;
   }
 
@@ -953,17 +1072,21 @@ async function load() {
 
   if (pplRes.error || !pplRes.data) {
     people = [];
-    $('people').innerHTML = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
+    const msg = `<div class="text-center text-[12.5px] font-bold text-slate-400 py-10">
       Could not load the people list.<br>
       <span class="text-[11px] font-semibold">
         Run <strong>shared/migration_nelos_routing.sql</strong> in Supabase — it adds nelos_people().</span></div>`;
+    $('people').innerHTML = msg;
+    $('access').innerHTML = msg;
     renderRouting();
     return;
   }
 
   people = pplRes.data;
   hasRights = people.some(p => p.may_solve !== undefined);
+  hasAccessCol = people.some(p => p.access_modules !== undefined);
   renderPeople();
+  renderAccess();
   renderRouting();
 }
 

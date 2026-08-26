@@ -334,14 +334,23 @@
       if (!row) return (_scope = open);
       if (row.is_admin) return (_scope = open);
       if (row.sees_all) return (_scope = open);            // HQ system
-      if (!row.primary_module) return (_scope = open);     // not tagged yet
+
+      // Kept in step with shared_nelos.js: never set up at all still sees
+      // everything, but once there IS a handler row it governs, empty or
+      // not. row.has_row arrives with migration_nelos_access.sql.
+      if (row.has_row === false || (row.has_row === undefined && !row.primary_module)) {
+        return (_scope = open);
+      }
 
       var list = Array.isArray(row.categories) ? row.categories.filter(Boolean) : [];
       var cats = null;
       if (list.length) { cats = {}; list.forEach(function (c) { cats[c] = true; }); }
+      // access_modules is deliberately NOT read here. A ticked system says
+      // somebody may WORK in that queue; it does not hand them its cases.
+      // The dock is one person's to-do list — see isMine() below.
       return (_scope = {
         unrestricted: false,
-        home: row.primary_module,
+        home: row.primary_module || null,
         seatNo: (row.seat_no === undefined ? null : row.seat_no),
         cats: cats,
         userId: u.id
@@ -374,7 +383,7 @@
     var uid = sc && sc.userId;
     if (c.assignee_id) return !!uid && String(c.assignee_id) === String(uid);
     if (!sc || sc.unrestricted) return false;
-    if (queueOf(c) !== sc.home) return false;
+    if (!sc.home || queueOf(c) !== sc.home) return false;
     if (c.assigned_seat_no != null && c.assigned_seat_no !== sc.seatNo) return false;
     if (!sc.cats) return true;
     return !!c.category && !!sc.cats[c.category];
@@ -568,16 +577,6 @@
                 border:none; background:rgba(15,23,42,.72); color:#fff; font-size:11px;
                 font-weight:900; cursor:pointer; line-height:1; }
   .nd-in:disabled { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
-  .nd-pri { display:flex; gap:5px; }
-  .nd-pri button { flex:1; padding:8px 2px; border-radius:9px; border:1.5px solid #e2e8f0; background:#fff;
-                   font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.05em; text-transform:uppercase;
-                   color:#64748b; cursor:pointer; }
-  .nd-pri button:hover { border-color:#cbd5e1; }
-  .nd-pri button.on { color:#fff; border-color:transparent; }
-  .nd-pri button.on[data-p="low"]    { background:#94a3b8; }
-  .nd-pri button.on[data-p="normal"] { background:#0ea5e9; }
-  .nd-pri button.on[data-p="high"]   { background:#f97316; }
-  .nd-pri button.on[data-p="urgent"] { background:#dc2626; }
   .nd-from { font-size:9.5px; font-weight:700; color:#94a3b8; line-height:1.5; padding:2px 2px 10px; }
   .nd-from b { color:#64748b; font-weight:900; }
   .nd-err { font-size:10.5px; font-weight:800; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca;
@@ -822,15 +821,6 @@
               '<label class="nd-lbl" for="nd-f-plot">Plot</label>' +
               '<select class="nd-in" id="nd-f-plot" disabled>' +
                 '<option value="">Nursery first</option></select>' +
-            '</div>' +
-          '</div>' +
-          '<div class="nd-fld">' +
-            '<span class="nd-lbl">Priority</span>' +
-            '<div class="nd-pri">' +
-              '<button type="button" data-p="low">Low</button>' +
-              '<button type="button" data-p="normal" class="on">Normal</button>' +
-              '<button type="button" data-p="high">High</button>' +
-              '<button type="button" data-p="urgent">Urgent</button>' +
             '</div>' +
           '</div>' +
           '<div class="nd-fld">' +
@@ -1195,13 +1185,14 @@
   }
 
   /* Shown only when nelos_modules cannot be read — the five systems as
-     they stand, in the order that table seeds them. */
+     they stand, in the order that table seeds them, under the short names
+     nelos_modules.handler_label already carries. */
   var FALLBACK_MODULES = [
-    { key: 'operation',   label: 'Seedling Stock System' },
-    { key: 'nursery_ops', label: 'Nursery Operation (HQ)' },
-    { key: 'scan',        label: 'FC Portal' },
-    { key: 'mobile',      label: 'Admin Portal' },
-    { key: 'audit',       label: 'Audit Portal' }
+    { key: 'operation',   label: 'Seedling Stock' },
+    { key: 'nursery_ops', label: 'HQ Operation' },
+    { key: 'scan',        label: 'FC' },
+    { key: 'mobile',      label: 'Admin' },
+    { key: 'audit',       label: 'Auditor' }
   ];
 
   var _mods = null;          // [{key, label}]
@@ -1229,12 +1220,21 @@
     var token = await accessToken();
     if (!token) return (_mods = FALLBACK_MODULES);
     try {
+      /* handler_label is the short name — Seedling Stock, HQ Operation, FC,
+         Admin, Auditor — and it already exists: migration_nelos_seats.sql seeded it as the
+         half of "Admin 1" that is not the number. "Assign to" wants the
+         same five words, so it reads them rather than inventing a second
+         set that could drift. `label` is the fallback for a system added
+         later that has not been given one. */
       var res = await fetch(CFG.url + '/rest/v1/nelos_modules' +
-                            '?select=key,label&active=is.true&order=sort_order.asc',
+                            '?select=key,label,handler_label&active=is.true&order=sort_order.asc',
                             { headers: authHeaders(token) });
       if (!res.ok) return (_mods = FALLBACK_MODULES);
       var rows = await res.json();
-      return (_mods = (Array.isArray(rows) && rows.length) ? rows : FALLBACK_MODULES);
+      if (!Array.isArray(rows) || !rows.length) return (_mods = FALLBACK_MODULES);
+      return (_mods = rows.map(function (m) {
+        return { key: m.key, label: m.handler_label || m.label };
+      }));
     } catch (_) { return (_mods = FALLBACK_MODULES); }
   }
 
@@ -1275,15 +1275,17 @@
       .sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
 
+  /* Priority is no longer asked for. It is a property of the KIND of case,
+     not a judgement the person raising it should have to make at the
+     moment they are raising it — nelos_categories.default_priority already
+     says what each kind is normally raised at, and it was only ever
+     pre-filled from there anyway. No default_priority, or no set titles
+     for that system at all, means normal. */
   function priority() {
-    var on = formEl.querySelector('.nd-pri button.on');
-    return (on && on.getAttribute('data-p')) || 'normal';
-  }
-
-  function setPriority(p) {
-    Array.prototype.forEach.call(formEl.querySelectorAll('.nd-pri button'), function (b) {
-      b.classList.toggle('on', b.getAttribute('data-p') === p);
-    });
+    var key  = formEl.querySelector('#nd-f-to').value;
+    var name = formEl.querySelector('#nd-f-work').value;
+    var c = worksFor(key).filter(function (x) { return x.name === name; })[0];
+    return (c && c.default_priority) || 'normal';
   }
 
   function formError(msg) {
@@ -1793,23 +1795,13 @@
 
   /* Field-level wiring, re-run whenever the form markup is rebuilt. */
   function wireFormFields() {
-    formEl.querySelector('.nd-pri').addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-p]');
-      if (b) setPriority(b.getAttribute('data-p'));
-    });
-
     formEl.querySelector('#nd-f-to').addEventListener('change', function () {
       onAssignTo();
       formError('');
     });
     formEl.querySelector('#nd-f-nursery').addEventListener('change', onNursery);
 
-    // The chosen work carries the priority that kind of case is usually
-    // raised at. It stays editable; this only saves a tap.
     formEl.querySelector('#nd-f-work').addEventListener('change', function () {
-      var key = formEl.querySelector('#nd-f-to').value;
-      var c = worksFor(key).filter(function (x) { return x.name === this.value; }, this)[0];
-      if (c && c.default_priority) setPriority(c.default_priority);
       if (this.value) formError('');
     });
 

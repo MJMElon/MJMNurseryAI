@@ -47,6 +47,16 @@
   let supa  = null;
 
   const html = `
+<div id="ss-offline" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-4">
+  <div class="text-[12px] font-black text-rose-800 uppercase tracking-widest">The portal is not reading these settings</div>
+  <p class="text-[12px] text-rose-800 mt-1.5 leading-relaxed">
+    What is on this screen saves, but the auditor portal cannot read it back, so auditors
+    still see the built-in schedule. Run <code class="font-bold">shared/create_audit_settings.sql</code>
+    in the Supabase SQL Editor and reload this page.
+  </p>
+  <p id="ss-offline-why" class="text-[11px] text-rose-700 mt-2 font-mono break-all"></p>
+</div>
+
 <div class="card p-6 space-y-5">
   <div class="flex items-start justify-between gap-4 flex-wrap">
     <div>
@@ -282,12 +292,23 @@
     $('ss-schedule').innerHTML = scheduleHtml();
     mountApp();
 
+    supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+    await MJMAuditSettings.load(supa);
+
+    /* This screen reads through supabase-js; the portal reads through
+       audit_supabase.js, which orders every request by created_at. A table
+       missing that column answers this screen and refuses the portal — the
+       two then disagree with nothing on screen to say so. Ask the portal's
+       own question here, and say plainly when it comes back empty. */
     try {
-      supa = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
-      await MJMAuditSettings.load(supa);
+      const probe = await supa.from('audit_settings')
+        .select('data').eq('id', 1).order('created_at', { ascending: false });
+      if (probe.error) throw probe.error;
     } catch (e) {
-      console.warn('[system-setting] load failed, showing defaults:', e);
-      status('Could not read the saved settings — showing the defaults.', 'err');
+      const box = $('ss-offline'), why = $('ss-offline-why');
+      if (box) box.classList.remove('hidden');
+      if (why) why.textContent = e.message || String(e);
+      console.warn('[system-setting] the portal cannot read this table:', e);
     }
     draft = MJMAuditSettings.normalise(MJMAuditSettings.current());
     draw();

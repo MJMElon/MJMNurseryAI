@@ -31,9 +31,21 @@ CREATE TABLE IF NOT EXISTS public.audit_settings (
   data        JSONB       NOT NULL DEFAULT '{}'::jsonb,
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_by  TEXT,
+  -- Every audit_* table carries created_at, and not for its own sake: the
+  -- portal's reader (audit_supabase.js) appends "order=created_at.desc" to
+  -- every request. A table without it makes PostgREST reject the whole read,
+  -- and the auditor portal falls back to the built-in schedule while the
+  -- Settings screen — which reads through supabase-js instead — shows the
+  -- saved one. The two then disagree and nothing says why.
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   -- One row, enforced by the table rather than by hope.
   CONSTRAINT audit_settings_single_row CHECK (id = 1)
 );
+
+-- For a database that already has the table from the first version of this
+-- script, without that column.
+ALTER TABLE public.audit_settings
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 INSERT INTO public.audit_settings (id, data)
 VALUES (1, '{}'::jsonb)
