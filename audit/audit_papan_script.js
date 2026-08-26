@@ -159,13 +159,24 @@ function setView(v){
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
   const fab=document.getElementById('fab');
   if(fab)fab.classList.toggle('hidden',!(v==='list'&&activeTab==='batch'));
-  /* One back arrow at a time. Sub-views carry their own back button in
-     the sub-header, so the outer top-bar back steps aside; on the list
-     view it returns as the only way back to audit_home. */
-  const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  /* Outer top-bar carries the context now — the sub-header rows inside
+     each view were removed. Show the form title only when a form view
+     is active; hide it back on the list. */
+  const ctxForm=document.getElementById('ctx-form');
+  const navToday=document.getElementById('nav-today');
+  const inForm=(v==='batch-form'||v==='audit-form');
+  if(ctxForm)ctxForm.style.display=inForm?'':'none';
+  if(navToday)navToday.style.display=inForm?'none':'';
   window.scrollTo(0,0);
 }
+/* Outer top-bar back is context-aware: from a form → list; from list
+   → audit_home (the anchor's own href takes over when we return true). */
+function goBack(e){
+  if(activeView==='batch-form'){ if(e)e.preventDefault(); setView('list');selectTab('batch'); return false; }
+  if(activeView==='audit-form'){ if(e)e.preventDefault(); setView('list');selectTab('audit'); return false; }
+  return true;
+}
+window.goBack=goBack;
 /* Audit/Batch view toggle — now the segmented control at the top of the
    list view, not a bottom bar. `el` is the seg-btn that was clicked (or
    omitted when called programmatically); we mark it and its twin
@@ -661,8 +672,14 @@ function openAddBatch(){
   document.getElementById('bf-date-planted').value='';
   document.getElementById('bf-date-transplant').value='';
   document.getElementById('bf-date-mature').value='';
-  document.getElementById('batch-form-title').textContent='New Batch';
-  document.getElementById('batch-form-id').textContent='';
+  /* form-view-header retired — the outer ribbon carries context now.
+     Guarded so stale calls don't throw against the removed elements. */
+  const _bftN=document.getElementById('batch-form-title');
+  if(_bftN)_bftN.textContent='New Batch';
+  const _bfiN=document.getElementById('batch-form-id');
+  if(_bfiN)_bfiN.textContent='';
+  const _aftN=document.getElementById('audit-form-title');
+  if(_aftN)_aftN.textContent='New Batch';
   setView('batch-form');
 }
 function openEditBatch(uid){
@@ -678,8 +695,12 @@ function openEditBatch(uid){
   document.getElementById('bf-date-planted').value=b.datePlanted||'';
   document.getElementById('bf-date-transplant').value=b.dateTransplant||'';
   document.getElementById('bf-date-mature').value=b.dateMature||'';
-  document.getElementById('batch-form-title').textContent='Edit Batch';
-  document.getElementById('batch-form-id').textContent=b.id;
+  const _bftE=document.getElementById('batch-form-title');
+  if(_bftE)_bftE.textContent='Edit Batch';
+  const _bfiE=document.getElementById('batch-form-id');
+  if(_bfiE)_bfiE.textContent=b.id;
+  const _aftE=document.getElementById('audit-form-title');
+  if(_aftE)_aftE.textContent='Edit Batch';
   setView('batch-form');
 }
 async function saveBatch(){
@@ -735,8 +756,12 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   document.getElementById('banner-qty').textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
   document.getElementById('banner-dt').textContent=fmtDate(b.dateTransplant);
   document.getElementById('banner-dm').textContent=fmtDate(b.dateMature);
-  document.getElementById('audit-form-title').textContent='Audit — '+b.plot;
-  document.getElementById('audit-form-id').textContent=editMode?editId:nextAuditID();
+  /* Title reads on the outer ribbon (#audit-form-title inside #ctx-form).
+     Audit ID pill was retired at the auditor's request. */
+  const _aft=document.getElementById('audit-form-title');
+  if(_aft)_aft.textContent='Audit — '+b.plot;
+  const _afi=document.getElementById('audit-form-id');
+  if(_afi)_afi.textContent='';
 
   // Reset tri buttons
   ['presence','info','cond'].forEach(f=>{

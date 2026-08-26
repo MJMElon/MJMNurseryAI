@@ -75,11 +75,10 @@
        one batch card per pending batch, one Save All at the bottom.
        Used for PN. Fed by openMultiBatchForm(plot). -->
   <div id="view-multi" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title" id="multi-title">Plot P01 — PN</span>
-      <span class="form-view-id" id="multi-count">0 batches</span>
-    </div>
+    <!-- Sub-header removed. The plot label reads on the outer ribbon
+         via #ctx-plot (populated by openMultiBatchForm), and the
+         back button up there returns to the plot grid. Batch count
+         pill was retired at the auditor's request. -->
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="record_info">Record Information</span></div>
@@ -330,7 +329,7 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<script src="audit_height_script.js?v=20260826d"></script>
+<script src="audit_height_script.js?v=20260826e"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

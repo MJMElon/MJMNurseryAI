@@ -23,11 +23,14 @@
 
   <nav class="top-bar">
     <div class="top-bar-logo">
-      <a href="audit_home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <a href="audit_home.html" class="top-bar-back" onclick="return goBack(event)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
       <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
       <div>
         <div class="top-bar-title">Maintenance Audit &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
+        <!-- Form context carried up from the old .form-view-header row
+             so the outer ribbon is the one ribbon. -->
+        <div class="top-bar-sub" id="ctx-form" style="display:none"><span id="form-title">Audit Task</span></div>
       </div>
     </div>
     <div class="top-bar-actions">
@@ -96,13 +99,11 @@
     </div>
   </div>
 
-  <!-- AUDIT FORM VIEW -->
+  <!-- AUDIT FORM VIEW —
+       Sub-header removed. Task title now reads on the outer ribbon
+       (#form-title inside #ctx-form) and the back button up there
+       returns via goBack(). Audit ID pill retired. -->
   <div id="view-form" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title" id="form-title">Audit Task</span>
-      <span class="form-view-id" id="form-id"></span>
-    </div>
 
     <!-- Task info banner -->
     <div style="padding:14px 12px 0">
@@ -267,7 +268,7 @@
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_maintenance_script.js?v=20260824d"></script>
+<script src="audit_maintenance_script.js?v=20260826b"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

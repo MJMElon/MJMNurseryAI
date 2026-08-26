@@ -75,9 +75,12 @@ function setView(v){
   const ctxP=document.getElementById('ctx-plot');
   const ctxF=document.getElementById('ctx-form');
   const today=document.getElementById('nav-today');
-  if(ctxP)ctxP.style.display=(v==='plot')?'':'none';
+  /* view-multi (PN) shows the plot name too — same #ctx-plot slot
+     as view-plot (MN). openMultiBatchForm writes into
+     #plot-detail-plot / #plot-detail-count for consistency. */
+  if(ctxP)ctxP.style.display=(v==='plot'||v==='multi')?'':'none';
   if(ctxF)ctxF.style.display=(v==='form')?'':'none';
-  if(today)today.style.display=(v==='plot'||v==='form')?'none':'';
+  if(today)today.style.display=(v==='plot'||v==='form'||v==='multi')?'none':'';
   window.scrollTo(0,0);
 }
 /* The ribbon arrow: out of the form to the plot it belongs to, out of
@@ -553,6 +556,15 @@ function openMultiBatchForm(plot){
     return String(a.batch).localeCompare(String(b.batch));
   });
 
+  /* Plot label reads on the outer ribbon's #ctx-plot slot — same
+     slot MN's view-plot uses. #multi-title / #multi-count were
+     removed with the sub-header; writes here are guarded so an old
+     cached page does not throw. */
+  const ttlOuter=document.getElementById('plot-detail-plot');
+  if(ttlOuter)ttlOuter.textContent='Plot '+plot+' — '+NURSERY_LABELS[activeTab];
+  const cntOuter=document.getElementById('plot-detail-count');
+  if(cntOuter)cntOuter.textContent=pending.length
+    ? pending.length+' batch'+(pending.length>1?'es':'') : 'no batches';
   const title=document.getElementById('multi-title');
   if(title)title.textContent='Plot '+plot+' — '+NURSERY_LABELS[activeTab];
   const count=document.getElementById('multi-count');
