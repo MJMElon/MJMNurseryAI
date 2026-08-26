@@ -36,7 +36,24 @@
 
   .lbl { font-size:9.5px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#94a3b8;
          display:block; margin-bottom:5px; }
-  .val { font-size:13.5px; font-weight:700; color:#1e293b; }
+  .val { font-size:13.5px; font-weight:700; color:#1e293b; word-break:break-word; }
+  /* The heading over each block, and the photo picker. Mirrors the dock's
+     .nd-d-sec / .nd-shot — shared/shared_nelos_dock.js. Keep them in step. */
+  .sec { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
+         color:#6d28d9; margin-bottom:7px; }
+  .shot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+          min-height:70px; cursor:pointer; border:1.5px dashed #ddd6fe; border-radius:12px;
+          background:#faf8ff; color:#7c3aed; font-size:11.5px; font-weight:800; }
+  .shot:hover { background:#f5f3ff; border-color:#c4b5fd; }
+  .shot-prev { position:relative; border-radius:12px; overflow:hidden; background:#f1f5f9; }
+  .shot-prev img { width:100%; max-height:240px; object-fit:cover; display:block; }
+  .shot-prev button { position:absolute; top:6px; right:6px; width:24px; height:24px; border:none;
+                      border-radius:50%; background:rgba(15,23,42,.62); color:#fff; cursor:pointer;
+                      font-size:12px; line-height:1; }
+  /* Three facts as one row, two where three names in that width would be a
+     column of single words. */
+  @media (max-width:420px) { #c-where, #c-queue, #c-pic { }
+    .grid.grid-cols-3 { grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .inp { width:100%; font-size:13.5px; font-weight:600; color:#1e293b; background:#f8fafc;
          border:1.5px solid #e2e8f0; border-radius:10px; padding:9px 12px; outline:none; box-sizing:border-box; }
   .inp:focus { border-color:#a78bfa; background:#fff; box-shadow:0 0 0 3px rgba(167,139,250,.18); }
@@ -82,14 +99,16 @@
 
   <!-- ── The case ─────────────────────────────────────────────── -->
   <div class="card">
+    <!-- The dock's case pane, move for move
+         (shared/shared_nelos_dock.js -> detailHtml). The pills that were
+         here read "Nelos - Normal - Open" on very nearly every case: three
+         words of nothing between the case number and the case. -->
     <div class="flex items-center gap-2 flex-wrap mb-2">
       <span id="c-no" class="text-[11px] font-black tracking-wider text-violet-700"></span>
-      <span id="c-priority" class="pill"></span>
-      <span id="c-status" class="pill"></span>
-      <span id="c-source" class="pill src"></span>
     </div>
+    <div id="c-sec" class="sec"></div>
     <h1 id="c-title" class="text-[19px] font-black text-slate-800 leading-snug"></h1>
-    <div id="c-subject" class="text-[12px] font-bold text-slate-500 mt-1.5"></div>
+    <div id="c-meta" class="text-[11.5px] font-bold text-slate-400 mt-1"></div>
     <a id="c-back-link" class="hidden inline-block mt-2.5 text-[10.5px] font-black uppercase tracking-widest text-violet-600 hover:underline"></a>
 
     <!-- The photo the case was raised with, full width — the list shows a
@@ -100,12 +119,17 @@
            style="width:100%;max-height:340px;object-fit:cover;border-radius:12px;border:1.5px solid #ede9fe;">
     </a>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-4 border-t border-dashed border-violet-100">
-      <div><span class="lbl">Raised by</span><span class="val" id="c-raised"></span></div>
-      <div><span class="lbl">Raised on</span><span class="val" id="c-created"></span></div>
-      <div><span class="lbl">Category</span><span class="val" id="c-category"></span></div>
-      <div><span class="lbl">Due</span><span class="val" id="c-due"></span></div>
+    <div class="grid grid-cols-3 gap-3 mt-4 p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+      <div class="min-w-0"><span class="lbl">Nursery (Plot)</span><span class="val" id="c-where"></span></div>
+      <div class="min-w-0"><span class="lbl">Assigned to</span><span class="val" id="c-queue"></span></div>
+      <div class="min-w-0"><span class="lbl">PIC</span><span class="val" id="c-pic"></span></div>
     </div>
+
+    <!-- What was written about it. Every raise path also puts this in the
+         thread as the first comment, and the thread below drops that copy
+         so it is not the same words twice on one page. -->
+    <div id="c-desc" class="text-[13px] leading-relaxed text-slate-700 mt-4"
+         style="white-space:pre-wrap;word-break:break-word;"></div>
   </div>
 
   <!-- ── Ownership ────────────────────────────────────────────── -->
@@ -125,9 +149,22 @@
   <div class="card" id="action-card">
     <span class="lbl">Move this case on</span>
     <div id="c-actions" class="flex flex-wrap gap-2"></div>
-    <div id="resolve-box" class="hidden mt-3">
-      <label class="lbl" for="c-resolution">What was done?</label>
-      <textarea id="c-resolution" class="inp" placeholder="The fix, in enough detail that somebody reading this in six months understands it."></textarea>
+    <div id="resolve-box" class="hidden mt-4 pt-3.5 border-t border-violet-100">
+      <div class="sec">Solve Case</div>
+      <label id="c-shot-pick" class="shot">
+        <span aria-hidden="true">&#128247;</span>
+        <span>Take or attach a photo</span>
+        <input id="c-shot" type="file" accept="image/*" capture="environment" hidden>
+      </label>
+      <div id="c-shot-prev" class="shot-prev hidden">
+        <img id="c-shot-img" alt="Photo of the fix">
+        <button type="button" id="c-shot-x" aria-label="Remove photo">&#10005;</button>
+      </div>
+      <!-- Labelled rather than prompted from inside the box: a placeholder is
+           gone the moment anybody types, so the one thing saying what the box
+           is for disappears as they start filling it in. -->
+      <label class="lbl mt-3" for="c-resolution">Solve Case Remark</label>
+      <textarea id="c-resolution" class="inp"></textarea>
       <button id="confirm-resolve" class="act act-resolve mt-2.5">Confirm Resolved</button>
     </div>
   </div>
@@ -197,18 +234,25 @@ function renderCase() {
     $('c-photo-link').classList.add('hidden');
   }
 
-  $('c-priority').textContent = MJMNelos.PRIORITY_LABEL[c.priority] || c.priority || '';
-  $('c-priority').className = 'pill pi-' + (c.priority || 'normal');
-  $('c-status').textContent = MJMNelos.STATUS_LABEL[c.status] || c.status;
-  $('c-status').className = 'pill st-' + c.status;
-  $('c-source').textContent = MJMNelos.SOURCE_LABEL[c.source_module] || c.source_module || '';
+  const pending = c.status === 'open' || c.status === 'in_progress';
+  $('c-sec').textContent = pending ? 'Pending Case Details' : 'Case Details';
+  $('c-meta').textContent = 'Created ' + fmtDate((c.created_at || '').slice(0, 10)) +
+                            (c.raised_by ? ' · by ' + c.raised_by : '');
 
-  const subject = [
-    c.batch_name && 'Batch ' + c.batch_name,
-    c.plot_name  && 'Plot '  + c.plot_name,
-    c.nursery_name
-  ].filter(Boolean).join('  ·  ');
-  $('c-subject').textContent = subject ? '📍 ' + subject : '';
+  /* Where the work is: the nursery with its plot in brackets, and the batch
+     only when there is one — a batch case that did not say so would be
+     missing the thing that identifies it. */
+  let where = c.nursery_name ? c.nursery_name + (c.plot_name ? ' (' + c.plot_name + ')' : '')
+                             : (c.plot_name || '');
+  if (c.batch_name) where = (where ? where + ' · ' : '') + 'Batch ' + c.batch_name;
+  $('c-where').textContent = where || '—';
+  $('c-queue').textContent = MJMNelos.SOURCE_LABEL[c.assigned_module || c.source_module] ||
+                             c.assigned_module || c.source_module || '—';
+  $('c-pic').textContent = c.assignee_name || 'Unassigned';
+
+  $('c-desc').textContent = c.description || 'No further detail was written.';
+  $('c-desc').style.color = c.description ? '' : '#94a3b8';
+  $('c-desc').style.fontStyle = c.description ? '' : 'italic';
 
   // The link back to whatever raised this. source_ref is stored as seen from
   // a module folder (it starts '../'), and this page is in one.
@@ -218,15 +262,6 @@ function renderCase() {
     a.textContent = '↗ Open in ' + (MJMNelos.SOURCE_LABEL[c.source_module] || 'the source module');
     a.classList.remove('hidden');
   }
-
-  $('c-raised').textContent   = c.raised_by || '—';
-  $('c-created').textContent  = fmtStamp(c.created_at);
-  $('c-category').textContent = c.category || '—';
-
-  const overdue = c.due_date && c.due_date < new Date().toISOString().slice(0,10)
-                  && (c.status === 'open' || c.status === 'in_progress');
-  $('c-due').textContent = fmtDate(c.due_date);
-  $('c-due').style.color = overdue ? '#b91c1c' : '';
 
   $('c-assignee').value = c.assignee_id || '';
   $('c-due-edit').value = c.due_date || '';
@@ -272,6 +307,22 @@ function renderActions() {
 }
 
 function renderThread(rows) {
+  /* The opening detail is shown at the top of the case now, and every raise
+     path also writes it into the thread as the first comment
+     (shared_nelos.js raiseCase, and the dock's own insert) so this page read
+     as one conversation. Shown in both places it is the same words twice on
+     one screen, so the thread drops its copy — the one at the top is the one
+     in the right place.
+
+     Only the FIRST match: a later comment repeating the description word for
+     word is somebody actually saying it again, and dropping that would be
+     editing the conversation. */
+  const desc = theCase && theCase.description;
+  if (desc) {
+    const i = rows.findIndex(r => r.kind === 'comment' && r.body === desc);
+    if (i !== -1) rows = rows.slice(0, i).concat(rows.slice(i + 1));
+  }
+
   $('thread').innerHTML = rows.length
     ? rows.map(r => {
         const sys = r.kind !== 'comment';
@@ -333,14 +384,58 @@ async function onAction(act) {
   }
 }
 
+/* ── The photo of the fix ───────────────────────────────────────
+   Into the same bucket and path shape the dock uses
+   (shared/shared_nelos_dock.js -> uploadShot), so one case's picture is in
+   the same place whichever surface solved it. */
+let _shot = null;
+
+$('c-shot').addEventListener('change', (e) => {
+  _shot = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+  if (!_shot) return;
+  $('c-shot-img').src = URL.createObjectURL(_shot);
+  $('c-shot-pick').classList.add('hidden');
+  $('c-shot-prev').classList.remove('hidden');
+});
+
+$('c-shot-x').addEventListener('click', () => {
+  _shot = null;
+  $('c-shot').value = '';
+  $('c-shot-prev').classList.add('hidden');
+  $('c-shot-pick').classList.remove('hidden');
+});
+
+async function uploadShot(caseId, file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `solve/${caseId}-${Date.now()}.${ext || 'jpg'}`;
+  const { error } = await _supabase.storage.from('nelos-photos')
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' });
+  if (error) return null;
+  return _supabase.storage.from('nelos-photos').getPublicUrl(path).data?.publicUrl || null;
+}
+
 $('confirm-resolve').addEventListener('click', async () => {
   const text = $('c-resolution').value.trim();
   if (!text) { toast('Say what was done before resolving.', false); $('c-resolution').focus(); return; }
-  const ok = await patch({
+
+  /* Upload BEFORE the patch: a failed upload leaves the case as it was,
+     whereas patching first would mark work solved and then lose the picture
+     of it. The column is written only when there IS a photo, so a database
+     without migration_nelos_solve_photo.sql still resolves cases. */
+  const url = _shot ? await uploadShot(theCase.id, _shot) : null;
+  const fields = {
     status: 'resolved', resolution: text,
     resolved_by: me.name, resolved_at: new Date().toISOString()
-  }, `Resolved — ${me.name}`);
-  if (ok) { $('resolve-box').classList.add('hidden'); $('c-resolution').value = ''; toast('Case resolved.'); }
+  };
+  if (url) fields.resolution_photo_url = url;
+
+  const ok = await patch(fields, `Resolved — ${me.name}`);
+  if (ok) {
+    $('resolve-box').classList.add('hidden');
+    $('c-resolution').value = '';
+    $('c-shot-x').click();
+    toast('Case resolved.');
+  }
 });
 
 $('save-owner').addEventListener('click', async () => {

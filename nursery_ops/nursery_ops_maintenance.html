@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=42">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=44">
 </head>
 <body>
 
@@ -328,15 +328,17 @@
            tabs and their plots come from Seedling Stock — operation_nurseries
            and shared_plots — so there is nothing to key in twice. -->
       <div class="card" style="padding:0;margin-bottom:16px;overflow:hidden;">
+        <!-- The title names the whole block, so it sits above the nursery
+             tabs rather than inside whichever one happens to be open. Edit is
+             taken out of the flow so the heading centres over the block and
+             not over what is left beside a button. -->
+        <div class="cap-top">
+          <div class="set-h">Plot Capacity</div>
+          <button class="btn cap-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
+        </div>
         <div class="cap-tabs" id="cap-tabs"></div>
 
         <div style="padding:18px;">
-          <!-- The title is centred over the block, so Edit is taken out of
-               the flow rather than sharing a row and pushing it off centre. -->
-          <div class="cap-top">
-            <div class="set-h">Plot Capacity</div>
-            <button class="btn cap-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
-          </div>
 
           <!-- Pre nursery only: one tray size for the whole nursery. -->
           <div id="cap-tray-size" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
@@ -364,26 +366,59 @@
            obviously two halves of one list rather than two lists that
            happen to look alike. -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div class="set-h set-h-c">Chemical List</div>
+        <div class="lst-top">
+          <div class="set-h">Chemical List</div>
+          <button class="btn lst-edit" id="chem-edit-btn" onclick="startChemEdit()">&#9998; Edit</button>
+        </div>
 
-        <div class="two-col">
+        <!-- One pump covers this many seedlings, unless a chemical says
+             otherwise in its own Covers box. Editable with the list, because
+             it is the same kind of fact and the same person changes it. -->
+        <div class="preset-row">
+          <span class="preset-l">One pump covers</span>
+          <input type="number" min="1" step="1" id="pump-coverage" class="set-in"
+                 style="width:104px;text-align:right;" disabled
+                 oninput="onPresetInput(this.value)">
+          <span class="preset-l">seedlings</span>
+        </div>
+
+        <div class="three-col">
           <div class="col-block">
             <div class="col-h col-h-pest">&#128027; Pest</div>
             <div class="lst-head">
-              <span>Chemical</span><span>Dosage / pump</span><span>Per seedling</span><span></span>
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span><span></span>
             </div>
             <div id="chem-pest-list"></div>
-            <button type="button" class="row-add" onclick="addChemRow('pest')">&#65291; Add chemical</button>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('pest')"
+                    style="display:none;">&#65291; Add chemical</button>
           </div>
 
           <div class="col-block">
             <div class="col-h col-h-disease">&#127810; Disease</div>
             <div class="lst-head">
-              <span>Chemical</span><span>Dosage / pump</span><span>Per seedling</span><span></span>
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span><span></span>
             </div>
             <div id="chem-disease-list"></div>
-            <button type="button" class="row-add" onclick="addChemRow('disease')">&#65291; Add chemical</button>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('disease')"
+                    style="display:none;">&#65291; Add chemical</button>
           </div>
+
+          <!-- Weedicides, stickers, and anything dosed its own way — Asir is
+               measured per seedling, which is not how the Pest list works. -->
+          <div class="col-block">
+            <div class="col-h col-h-other">&#127807; Other</div>
+            <div class="lst-head">
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span><span></span>
+            </div>
+            <div id="chem-other-list"></div>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('other')"
+                    style="display:none;">&#65291; Add chemical</button>
+          </div>
+        </div>
+
+        <div class="lst-foot" id="chem-actions" style="display:none;">
+          <button class="btn" onclick="cancelChemEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveChemEdit()">Save</button>
         </div>
       </div>
 
@@ -391,7 +426,10 @@
            Same block, same columns, one dose and two ticks: a fertiliser is
            used at transplanting, at monthly manuring, or at both. -->
       <div class="card" style="padding:18px;">
-        <div class="set-h set-h-c">Fertiliser List</div>
+        <div class="lst-top">
+          <div class="set-h">Fertiliser List</div>
+          <button class="btn lst-edit" id="fert-edit-btn" onclick="startFertEdit()">&#9998; Edit</button>
+        </div>
 
         <div class="col-block" style="max-width:760px;margin:0 auto;">
           <div class="lst-head fert-head">
@@ -399,7 +437,13 @@
             <span>Transplant</span><span>Monthly</span><span></span>
           </div>
           <div id="fert-list"></div>
-          <button type="button" class="row-add" onclick="addFertRow()">&#65291; Add fertiliser</button>
+          <button type="button" class="row-add" id="fert-add" onclick="addFertRow()"
+                  style="display:none;">&#65291; Add fertiliser</button>
+        </div>
+
+        <div class="lst-foot" id="fert-actions" style="display:none;">
+          <button class="btn" onclick="cancelFertEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveFertEdit()">Save</button>
         </div>
       </div>
     </div>
@@ -501,7 +545,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=58"></script>
+<script src="plot_maintenance_script.js?v=60"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
