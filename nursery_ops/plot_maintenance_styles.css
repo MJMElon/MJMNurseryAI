@@ -522,6 +522,16 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .lst-head, .lst-row { display:grid; grid-template-columns:1fr 112px 66px 88px 30px; gap:7px;
                       align-items:center; }
 .lst-head.fert-head, .fert-row { grid-template-columns:1fr 152px 94px 84px 34px; }
+/* The Other list carries one more column: which schedule dropdown may offer
+   the chemical. Pest and disease have a dropdown each already. */
+.lst-head.other-row, .other-row { grid-template-columns:1fr 104px 60px 82px 84px 30px; }
+.lst-tagsel { height:37px; padding:0 4px; font-family:inherit; font-size:12px; font-weight:700;
+              color:var(--text-head); background:#fff; border:1.5px solid var(--border);
+              border-radius:var(--r-sm); min-width:0; }
+.lst-tagsel:focus { outline:none; border-color:var(--green-mid); }
+@media (max-width:560px) {
+  .lst-head.other-row, .other-row { grid-template-columns:1fr 84px 34px; }
+}
 .lst-head  { padding:10px; background:#f7f9f8; border:1.5px solid var(--border);
              font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase;
              color:var(--text-muted); }
