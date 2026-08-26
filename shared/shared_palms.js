@@ -154,9 +154,24 @@
      read here: the office has no per-device settings, and a warning
      threshold the office cannot see the value of would be a number nobody
      could check. Overdue or on schedule, and the days left say the rest. */
+  /* Only ever called on OPEN entries — computeStatus maps it over
+     currentEntries — and that is what decides which ideal to use.
+
+     A running stage is judged by the standard as it stands TODAY, not by
+     whatever was stored on the row when the Field Conductor keyed it in.
+     Raise Culling from 2 days to 6 because 2 was never realistic, and the
+     plot that is on Culling right now has to stop being called late; a board
+     still calling it late against a number nobody believes any more is a
+     board people learn to ignore.
+
+     A FINISHED stage is the opposite and keeps its stored ideal — see
+     plotHistory. History should not change its verdict because the target
+     moved afterwards. The stored value is the fallback here too, for a stage
+     that has since been deleted from the office list. */
   function statusOfEntry(key, e) {
     const act = actByN(e.actN);
-    const due = addDays(e.start, e.ideal == null ? 0 : e.ideal);
+    const ideal = act && act.days != null ? act.days : e.ideal;
+    const due = addDays(e.start, ideal == null ? 0 : ideal);
     const left = diffDays(todayStr(), due);
     return { state: left < 0 ? 'overdue' : 'ontrack', act, due, left, start: e.start, key };
   }

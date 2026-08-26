@@ -65,8 +65,11 @@
   .iw-btn-dark:hover { background:#1e293b; }
   .iw-btn-ghost { background:white; color:#475569; border-color:#e2e8f0; }
   .iw-btn-ghost:hover { background:#f8fafc; }
-  .iw-btn-edit { background:white; color:#0f766e; border-color:#99f6e4; }
-  .iw-btn-edit:hover { background:#ccfbf1; }
+  .iw-icon { width:34px; height:34px; border-radius:11px; background:white; border:1.5px solid #99f6e4;
+             color:#0f766e; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+             padding:0; transition:all .15s; }
+  .iw-icon:hover { background:#ccfbf1; }
+  .iw-icon svg { width:16px; height:16px; display:block; }
   .fast { color:#047857; }
   .slow { color:#b91c1c; }
   .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
@@ -100,12 +103,14 @@
   <div class="card p-5 mb-5">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
       <h1 class="text-base font-black text-slate-800 uppercase tracking-widest">⏱️ Ideal Work — the standard days</h1>
-      <div class="flex items-center gap-2">
-        <span id="iw-msg" class="text-[11px] font-bold text-slate-400"></span>
-        <button id="iw-edit" class="iw-btn iw-btn-edit hidden">✏️ Edit</button>
-        <button id="iw-cancel" class="iw-btn iw-btn-ghost hidden">Cancel</button>
-        <button id="iw-save" class="iw-btn iw-btn-dark hidden">Save</button>
-      </div>
+      <span id="iw-rest-msg" class="text-[11px] font-bold text-slate-400 ml-auto mr-2"></span>
+      <button id="iw-edit" class="iw-icon hidden" title="Edit the standard days" aria-label="Edit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+        </svg>
+      </button>
     </div>
 
     <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
@@ -115,6 +120,12 @@
     </div>
     <div id="iw-list"></div>
     <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
+
+    <div id="iw-actions" class="hidden items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+      <span id="iw-msg" class="text-[11px] font-bold text-slate-400 mr-auto"></span>
+      <button id="iw-cancel" class="iw-btn iw-btn-ghost">Cancel</button>
+      <button id="iw-save" class="iw-btn iw-btn-dark">Save</button>
+    </div>
   </div>
 
   <!-- ── One plot's record of stage changes ──
@@ -366,9 +377,12 @@ function renderIdealWork() {
   }
 
   $('iw-edit').classList.toggle('hidden', IW_EDIT || !iwEditable());
-  $('iw-cancel').classList.toggle('hidden', !IW_EDIT);
-  $('iw-save').classList.toggle('hidden', !IW_EDIT);
   $('iw-add').classList.toggle('hidden', !IW_EDIT);
+  // The action bar is display:flex when shown; toggling `hidden` alone would
+  // leave a flex container that is still laid out.
+  const bar = $('iw-actions');
+  bar.classList.toggle('hidden', !IW_EDIT);
+  bar.classList.toggle('flex', IW_EDIT);
 
   const list = IW_EDIT ? IW_WORK : IW_ROWS;
   $('iw-list').innerHTML = list.map((r, i) => {
@@ -381,18 +395,19 @@ function renderIdealWork() {
         '</div>';
     }
     const was = r.id != null ? IW_ROWS.find((x) => String(x.id) === String(r.id)) : null;
-    const dirty = !was || String(r.days) !== String(was.days);
-    // A row added in this session has no name yet, so it gets a name box.
-    // An existing stage's name is not editable here — renaming belongs on
-    // the Settings page, where the warning about what it does to history is.
-    const nameCell = r.isNew
-      ? '<input class="iw-in name" data-iw-name="' + esc(r.key) + '" placeholder="Work status name" value="' + esc(r.name || '') + '">'
-      : '<div class="iw-name">' + esc(r.name) + '</div>';
+    const dDays = !was || String(r.days) !== String(was.days);
+    const dName = !was || String(r.name || '') !== String(was.name || '');
+    /* Renaming is allowed here. It does NOT rewrite history: a plot log
+       stores the stage NUMBER, not its name, so past records simply start
+       reading under the new one. Moving a stage is the operation that
+       changes what a stored number means — which is why the drag handle,
+       not this box, is the one worth pausing over. */
     return '<div class="iw-row edit" draggable="false" data-key="' + esc(r.key) + '">' +
       '<div class="iw-handle" data-iw-drag="' + esc(r.key) + '" title="Drag to reorder">⠿</div>' +
       '<div class="iw-n">' + (i + 1) + '</div>' +
-      nameCell +
-      '<input class="iw-in' + (dirty ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
+      '<input class="iw-in name' + (dName ? ' dirty' : '') + '" data-iw-name="' + esc(r.key) + '" ' +
+        'placeholder="Work status name" value="' + esc(r.name || '') + '">' +
+      '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
         'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
       '</div>';
   }).join('');
@@ -406,6 +421,7 @@ function iwEnter() {
   IW_WORK = IW_ROWS.map((r) => ({ id: r.id, key: 'k' + r.id, name: r.name, days: r.days, isNew: false }));
   IW_EDIT = true;
   $('iw-msg').textContent = '';
+  $('iw-rest-msg').textContent = '';
   renderIdealWork();
 }
 
@@ -437,6 +453,8 @@ $('iw-list').addEventListener('input', (e) => {
   if (n) {
     const row = IW_WORK.find((r) => r.key === n.dataset.iwName);
     if (row) row.name = n.value;
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    n.classList.toggle('dirty', !was || (row && String(row.name || '') !== String(was.name || '')));
   }
   $('iw-msg').textContent = '';
 });
@@ -503,7 +521,16 @@ $('iw-save').addEventListener('click', async () => {
   const msg = $('iw-msg');
   msg.className = 'text-[11px] font-bold text-slate-400';
 
+  // A blank Add-new row the user never filled in is a mind changed, so it is
+  // dropped. An EXISTING stage emptied of its name is a mistake, and saying
+  // so beats silently keeping the old name or writing an unnamed stage.
   const named = IW_WORK.filter((r) => !r.isNew || String(r.name || '').trim());
+  const blank = named.find((r) => !String(r.name || '').trim());
+  if (blank) {
+    msg.className = 'text-[11px] font-bold text-rose-600';
+    msg.textContent = 'A work status needs a name.';
+    return;
+  }
   const bad = named.find((r) => r.days == null || !(r.days >= 0));
   if (bad) {
     msg.className = 'text-[11px] font-bold text-rose-600';
@@ -522,13 +549,14 @@ $('iw-save').addEventListener('click', async () => {
     const pos = drafts.indexOf(r) + 1;
     const patch = {};
     if (!was || String(was.days) !== String(r.days)) patch.ideal_days = r.days;
+    if (!was || String(was.name || '') !== String(r.name || '')) patch.name = String(r.name).trim();
     // sort_order is rewritten for every row whose position moved, not just
     // the dragged one — everything after it shifts up or down by one.
     if (IW_ROWS.findIndex((x) => String(x.id) === String(r.id)) !== pos - 1) patch.sort_order = pos;
     return Object.keys(patch).length ? { id: r.id, patch: patch } : null;
   }).filter(Boolean);
 
-  if (!inserts.length && !updates.length) { msg.textContent = 'Nothing changed.'; iwLeave(); return; }
+  if (!inserts.length && !updates.length) { iwLeave(); return; }
 
   $('iw-save').disabled = true;
   msg.textContent = 'Saving…';
@@ -549,8 +577,11 @@ $('iw-save').addEventListener('click', async () => {
     iwLeave();
     fillMonths();
     renderAll();
-    msg.className = 'text-[11px] font-bold text-emerald-600';
-    msg.textContent = 'Saved.';
+    msg.textContent = '';
+    const rest = $('iw-rest-msg');
+    rest.className = 'text-[11px] font-bold text-emerald-600 ml-auto mr-2';
+    rest.textContent = 'Saved.';
+    setTimeout(() => { rest.textContent = ''; }, 4000);
   } catch (err) {
     console.warn(err);
     msg.className = 'text-[11px] font-bold text-rose-600';
