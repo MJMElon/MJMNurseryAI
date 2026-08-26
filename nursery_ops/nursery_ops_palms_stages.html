@@ -30,13 +30,13 @@
   .lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
          color:#64748b; margin-bottom:5px; }
 
-  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 106px; gap:10px 14px;
+  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
             align-items:center; padding:5px 6px; border-radius:12px; border:1.5px solid transparent; }
   .iw-row + .iw-row { margin-top:2px; }
   .iw-row.edit { border-color:#f1f5f9; }
   .iw-row.dragging { background:#f0fdfa; border-color:#5eead4; opacity:.85; }
   .iw-row.over { border-color:#14b8a6; }
-  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 106px; gap:10px 14px;
+  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
              padding:0 6px 6px; font-size:10px; font-weight:900; letter-spacing:.1em;
              text-transform:uppercase; color:#94a3b8; }
   .iw-handle { cursor:grab; touch-action:none; user-select:none; color:#cbd5e1; font-size:15px;
@@ -52,6 +52,16 @@
   .iw-in:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
   .iw-in.dirty { border-color:#f59e0b; background:#fffbeb; }
   .iw-ro { font-weight:900; color:#0f766e; font-size:14px; text-align:right; }
+  /* A swatch, not a colour box with chrome: the point is to see the colour
+     the map will paint, so the control IS the colour. */
+  .iw-sw { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; padding:0;
+           background:none; cursor:pointer; display:block; }
+  .iw-sw::-webkit-color-swatch-wrapper { padding:2px; }
+  .iw-sw::-webkit-color-swatch { border:none; border-radius:6px; }
+  .iw-sw::-moz-color-swatch { border:none; border-radius:6px; }
+  .iw-sw[disabled] { cursor:default; }
+  .iw-sw.dirty { border-color:#f59e0b; box-shadow:0 0 0 2px #fef3c7; }
+  .iw-dot { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; display:block; }
   .iw-add { display:flex; align-items:center; gap:8px; width:100%; margin-top:6px; padding:9px 12px;
             border-radius:12px; border:1.5px dashed #99f6e4; background:#f0fdfa; color:#0f766e;
             font-weight:900; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
@@ -102,7 +112,7 @@
     <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
 
     <div class="iw-head">
-      <div></div><div>#</div><div>Work status</div><div class="text-right">Ideal days</div>
+      <div></div><div>#</div><div>Work status</div><div>Map</div><div class="text-right">Ideal days</div>
     </div>
     <div id="iw-list"></div>
     <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
@@ -152,7 +162,7 @@ function iwEditable() {
 }
 
 function renderIdealWork() {
-  IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, name: a.name, days: a.days }));
+  IW_ROWS = MJMPalms.ACTIVITIES.map((a) => ({ id: a.stageId, name: a.name, days: a.days, color: a.color }));
 
   /* No stageId means shared_palms fell back to its built-in eleven, because
      nops_plot_status_stages is empty or could not be read. There would be
@@ -183,12 +193,14 @@ function renderIdealWork() {
         '<div></div>' +
         '<div class="iw-n">' + (i + 1) + '</div>' +
         '<div class="iw-name">' + esc(r.name) + '</div>' +
+        '<span class="iw-dot" style="background:' + esc(r.color || '#94a3b8') + '"></span>' +
         '<div class="iw-ro">' + (r.days == null ? '—' : esc(r.days) + 'd') + '</div>' +
         '</div>';
     }
     const was = r.id != null ? IW_ROWS.find((x) => String(x.id) === String(r.id)) : null;
     const dDays = !was || String(r.days) !== String(was.days);
     const dName = !was || String(r.name || '') !== String(was.name || '');
+    const dColor = !was || String(r.color || '') !== String(was.color || '');
     /* Renaming is allowed here. It does NOT rewrite history: a plot log
        stores the stage NUMBER, not its name, so past records simply start
        reading under the new one. Moving a stage is the operation that
@@ -199,6 +211,9 @@ function renderIdealWork() {
       '<div class="iw-n">' + (i + 1) + '</div>' +
       '<input class="iw-in name' + (dName ? ' dirty' : '') + '" data-iw-name="' + esc(r.key) + '" ' +
         'placeholder="Work status name" value="' + esc(r.name || '') + '">' +
+      '<input class="iw-sw' + (dColor ? ' dirty' : '') + '" type="color" ' +
+        'data-iw-color="' + esc(r.key) + '" value="' + esc(r.color || '#94a3b8') + '" ' +
+        'title="Colour on the Plot Status Map">' +
       '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
         'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
       '</div>';
@@ -210,7 +225,8 @@ function iwEnter() {
   // stage, a made-up one for a new row. Drag and the boxes are addressed by
   // it, so a row keeps its identity through reordering, when its INDEX does
   // not and its id may not exist yet.
-  IW_WORK = IW_ROWS.map((r) => ({ id: r.id, key: 'k' + r.id, name: r.name, days: r.days, isNew: false }));
+  IW_WORK = IW_ROWS.map((r) => ({ id: r.id, key: 'k' + r.id, name: r.name, days: r.days,
+                                  color: r.color, isNew: false }));
   IW_EDIT = true;
   $('iw-msg').textContent = '';
   $('iw-rest-msg').textContent = '';
@@ -227,7 +243,10 @@ $('iw-edit').addEventListener('click', iwEnter);
 $('iw-cancel').addEventListener('click', () => { $('iw-msg').textContent = ''; iwLeave(); });
 
 $('iw-add').addEventListener('click', () => {
-  IW_WORK.push({ id: null, key: 'new' + (++IW_SEQ), name: '', days: null, isNew: true });
+  // A new work starts grey rather than borrowing a colour already in use —
+  // two stages the same colour is a decision, not a default.
+  IW_WORK.push({ id: null, key: 'new' + (++IW_SEQ), name: '', days: null,
+                 color: '#94a3b8', isNew: true });
   renderIdealWork();
   const boxes = $('iw-list').querySelectorAll('[data-iw-name]');
   if (boxes.length) boxes[boxes.length - 1].focus();
@@ -240,6 +259,13 @@ $('iw-list').addEventListener('input', (e) => {
     if (row) row.days = d.value === '' ? null : Number(d.value);
     const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
     d.classList.toggle('dirty', !was || (row && String(row.days) !== String(was.days)));
+  }
+  const c = e.target.closest('[data-iw-color]');
+  if (c) {
+    const row = IW_WORK.find((r) => r.key === c.dataset.iwColor);
+    if (row) row.color = c.value;
+    const was = row && row.id != null ? IW_ROWS.find((x) => String(x.id) === String(row.id)) : null;
+    c.classList.toggle('dirty', !was || (row && String(row.color || '') !== String(was.color || '')));
   }
   const n = e.target.closest('[data-iw-name]');
   if (n) {
@@ -334,7 +360,8 @@ $('iw-save').addEventListener('click', async () => {
   const drafts = named;
 
   const inserts = drafts.filter((r) => r.isNew).map((r) => ({
-    name: String(r.name).trim(), ideal_days: r.days, sort_order: drafts.indexOf(r) + 1,
+    name: String(r.name).trim(), ideal_days: r.days, color: r.color || null,
+    sort_order: drafts.indexOf(r) + 1,
   }));
   const updates = drafts.filter((r) => !r.isNew).map((r, _i) => {
     const was = IW_ROWS.find((x) => String(x.id) === String(r.id));
@@ -342,6 +369,7 @@ $('iw-save').addEventListener('click', async () => {
     const patch = {};
     if (!was || String(was.days) !== String(r.days)) patch.ideal_days = r.days;
     if (!was || String(was.name || '') !== String(r.name || '')) patch.name = String(r.name).trim();
+    if (!was || String(was.color || '') !== String(r.color || '')) patch.color = r.color || null;
     // sort_order is rewritten for every row whose position moved, not just
     // the dragged one — everything after it shifts up or down by one.
     if (IW_ROWS.findIndex((x) => String(x.id) === String(r.id)) !== pos - 1) patch.sort_order = pos;

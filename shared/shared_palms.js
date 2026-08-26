@@ -68,6 +68,9 @@
       n: r.sort_order || i + 1,
       name: String(r.name).trim(),
       days: r.ideal_days == null ? 1 : Number(r.ideal_days),
+      // What the Plot Status Map paints this stage. Null until the office
+      // sets one — the map falls back to grey rather than inventing a hue.
+      color: r.color || null,
       stageId: r.id,
     }));
     FIRST_ACT = ACTIVITIES[0].n;
@@ -89,7 +92,7 @@
   async function loadStages(supa) {
     try {
       const res = await supa.from('nops_plot_status_stages')
-        .select('id, name, sort_order, ideal_days')
+        .select('id, name, sort_order, ideal_days, color')
         .order('sort_order');
       if (res.error) throw res.error;
       return applyStages(res.data);

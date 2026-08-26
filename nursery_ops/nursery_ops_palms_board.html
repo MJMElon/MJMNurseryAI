@@ -209,30 +209,25 @@ function lineForPlot(plot) {
    legal only with a second encoding — every plot carries its name, the key
    spells its stages out and the table under the map gives the exact stage,
    so it holds. Do not add a sixth colour without re-running that check. */
-const PHASE_DEF = [
-  { n: [1, 2, 3],  color: '#e34948' },   // Saringan · Tunggu buat culling · Culling
-  { n: [4, 5, 6],  color: '#2a78d6' },   // Membersih · Meracun secara selingan · Angkat tanah
-  { n: [7, 8, 9],  color: '#4a3aa7' },   // Isi polibeg · Lining · Transplanting
-  { n: [10],       color: '#eda100' },   // Membesar
-  { n: [11],       color: '#008300' },   // Pengambilan
-];
+/* The colours come from the office now — one per work status, set on
+   PALMS → Settings → Ideal Work (nops_plot_status_stages.color).
 
-/* A stage the office has added and no group claims is given its own grey
-   row rather than quietly taking someone else's colour — a wrong colour on
-   a map is worse than an obviously unassigned one. */
+   Stages that share a colour merge into ONE key entry, which is the useful
+   property: give three stages the same colour and they read as one phase on
+   the map and one line in the key, without anybody defining a "phase". Give
+   the one stage you care about its own colour and it stands out.
+
+   A stage with no colour set is grey. That is deliberate and visible — a
+   wrong colour on a map is worse than an obviously unassigned one. */
 function buildPhases() {
   const acts = MJMPalms.ACTIVITIES || [];
-  const nameOf = (n) => { const a = MJMPalms.actByN(n); return a ? a.name : null; };
-  const groups = PHASE_DEF.map((g) => ({
-    color: g.color,
-    stages: g.n.map(nameOf).filter(Boolean),
-  })).filter((g) => g.stages.length);
-
-  const claimed = {};
-  PHASE_DEF.forEach((g) => g.n.forEach((n) => { claimed[n] = true; }));
-  const rest = acts.filter((a) => !claimed[a.n]).map((a) => a.name);
-  if (rest.length) groups.push({ stages: rest, color: '#94a3b8' });
-
+  const groups = [];
+  acts.forEach((a) => {
+    const c = String(a.color || '#94a3b8').toLowerCase();
+    let g = groups.find((x) => x.color === c);
+    if (!g) { g = { color: c, stages: [] }; groups.push(g); }
+    g.stages.push(a.name);
+  });
   return MJMPlotMap.phases(groups);
 }
 
