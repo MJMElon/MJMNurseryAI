@@ -262,14 +262,18 @@ function selectNursery(n, el){
   setView('list');
 }
 
-/* --- STATS --- */
+/* --- STATS ---
+   The Total / Pending / Audited dashboard was cancelled — the
+   pending-count header ("N / M tasks") on the To Audit list is the
+   progress indicator now. The three stat-cards' DOM ids no longer
+   exist; writes are guarded so a stale cached page does not throw. */
 function updateStats(){
   const filtered=filterTasks(tasks);
   const pending=filtered.filter(t=>!getAuditForTask(t.id));
   const done=filtered.filter(t=>!!getAuditForTask(t.id));
-  document.getElementById('stat-total').textContent=fmtNum(filtered.length);
-  document.getElementById('stat-pending').textContent=fmtNum(pending.length);
-  document.getElementById('stat-done').textContent=fmtNum(done.length);
+  const _st=document.getElementById('stat-total');   if(_st)_st.textContent=fmtNum(filtered.length);
+  const _sp=document.getElementById('stat-pending'); if(_sp)_sp.textContent=fmtNum(pending.length);
+  const _sd=document.getElementById('stat-done');    if(_sd)_sd.textContent=fmtNum(done.length);
   // Pending count per nursery on the bottom tab bar — a green badge on
   // BNN says work exists there while you're standing on PN, so nobody
   // has to click through four tabs to find it. Same shape as the plot
@@ -488,8 +492,14 @@ function renderLists(){
   const pending  = filtered.filter(t=>!getAuditForTask(t.id));
   const done     = filtered.filter(t=>!!getAuditForTask(t.id));
 
-  document.getElementById('pending-count').textContent = fmtNum(pending.length) + ' task' + (pending.length!==1?'s':'');
-  document.getElementById('done-count').textContent    = fmtNum(done.length)    + ' task' + (done.length!==1?'s':'');
+  /* Progress on the To Audit header replaces the old Total / Pending
+     / Audited dashboard: "audited / total tasks", like the other
+     audit modules read. */
+  const _pc=document.getElementById('pending-count');
+  if(_pc)_pc.textContent = fmtNum(done.length) + ' / ' + fmtNum(filtered.length) +
+    ' task' + (filtered.length!==1?'s':'');
+  const _dc=document.getElementById('done-count');
+  if(_dc)_dc.textContent = fmtNum(done.length) + ' task' + (done.length!==1?'s':'');
 
   const pendingEl = document.getElementById('pending-list');
   if(!pending.length){
