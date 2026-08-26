@@ -422,7 +422,7 @@ function openPlotDetail(plot){
       ? (isNoAuditRequired(audit)
           ? `<div class="record-chips">
                <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0;padding:3px 10px">
-                 ✕ No Audit Required · by ${audit.auditor_name || 'Auditor'}
+                 ✕ ${noAuditReason(audit) || 'No Audit Required'} · by ${audit.auditor_name || 'Auditor'}
                </span>
              </div>`
           : `<div class="record-chips">
@@ -544,7 +544,7 @@ function _unlockPlotBatchInputs(){
    the previous decline still greyed-out or its confirmation panel
    still showing. Called at the top of openAddForm / openEdit. */
 function _resetDeclineUI(){
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = '';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
   document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
     b.disabled = false;
@@ -575,8 +575,9 @@ function openEdit(uid){
   // If this record was closed with "No Audit Required", replay the same
   // greyed-out state so the auditor can see (or re-decline / re-open).
   if (isNoAuditRequired(r)) {
-    const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+    const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = 'none';
     const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+    const nr   = document.getElementById('no-audit-reason');if (nr)   nr.textContent = noAuditReason(r) || NO_AUDIT_SENTINEL;
     const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = r.auditor_name || 'Auditor';
     const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = fmtDT(r.createdAt);
     document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
@@ -599,10 +600,7 @@ function openEdit(uid){
   document.getElementById('form-view-title').textContent='Edit — '+r.id;
 }
 function populateForm(r){
-  const id=editMode?r.id:nextID(formState.nursery);
-  document.getElementById('f-id').value=id;
   document.getElementById('f-date').value=editMode?r.date:todayISO();
-  document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
@@ -688,30 +686,45 @@ function cancelForm(){setView('list');}
    required — by X · date" pill. Kept as a distinctive constant string
    rather than a Boolean column so nothing has to change in the DB. */
 const NO_AUDIT_SENTINEL = 'No Audit Required';
+/* The auditor now says WHY a batch needs no audit — it is a culling plot
+   or a transplanting plot. The reason rides in the same field, appended
+   to the sentinel ('No Audit Required — Culling Plot'), so no column has
+   to be added and every record written before this still reads as
+   declined. Records from then carry no reason and simply show none. */
+const NO_AUDIT_REASONS = ['Culling Plot','Transplanting Plot'];
 function isNoAuditRequired(r){
-  return !!r && r.ulat === NO_AUDIT_SENTINEL && r.warna === NO_AUDIT_SENTINEL;
+  return !!r && String(r.ulat||'').indexOf(NO_AUDIT_SENTINEL) === 0
+             && String(r.warna||'').indexOf(NO_AUDIT_SENTINEL) === 0;
+}
+function noAuditReason(r){
+  const m = String((r&&r.ulat)||'').split('—')[1];
+  return m ? m.trim() : '';
 }
 window.isNoAuditRequired = isNoAuditRequired;
+window.noAuditReason = noAuditReason;
 
 /* Decline flow — one tap on the form's NO AUDIT REQUIRED button:
    fills formState with the sentinel values, shows the "who + when"
    confirmation panel, disables every other field, and lets the auditor
    press Save to write the record. The user's own name is captured from
    localStorage.mjm_user (the same field auditor_name uses elsewhere). */
-function declineAudit(){
+function declineAudit(reason){
   const u = (function(){ try { return JSON.parse(localStorage.getItem('mjm_user')||'{}'); } catch(e){ return {}; } })();
   const who = u.name || u.email || 'Auditor';
-  formState.ulat   = NO_AUDIT_SENTINEL;
-  formState.tikus  = NO_AUDIT_SENTINEL;
-  formState.bintik = NO_AUDIT_SENTINEL;
-  formState.warna  = NO_AUDIT_SENTINEL;
+  const why = NO_AUDIT_REASONS.indexOf(reason) !== -1 ? reason : '';
+  const stamp = why ? NO_AUDIT_SENTINEL + ' — ' + why : NO_AUDIT_SENTINEL;
+  formState.ulat   = stamp;
+  formState.tikus  = stamp;
+  formState.bintik = stamp;
+  formState.warna  = stamp;
   formState.photo1 = null;
   formState.photo2 = null;
 
   // Reveal the confirmation panel + hide the decline button so it can't
   // be tapped again. Stamp the "by <name> · <when>" line at the same time.
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = 'none';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = 'none';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = '';
+  const nr   = document.getElementById('no-audit-reason');if (nr)   nr.textContent = why || NO_AUDIT_SENTINEL;
   const nb   = document.getElementById('no-audit-by');    if (nb)   nb.textContent = who;
   const nw   = document.getElementById('no-audit-when');  if (nw)   nw.textContent = new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
@@ -730,9 +743,9 @@ function declineAudit(){
     s.style.pointerEvents = 'none';
   });
   const photoReq = document.getElementById('photo-req-note');
-  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch is being closed with No Audit Required.'; }
+  if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = 'Not required — this batch is being closed as a ' + (why || 'no-audit') + '.'; }
 
-  showToast('Marked "No Audit Required". Tap Save to close this batch.');
+  showToast('Marked "' + (why || NO_AUDIT_SENTINEL) + '". Tap Save to close this batch.');
 }
 window.declineAudit = declineAudit;
 
@@ -748,7 +761,7 @@ function undoDeclineAudit(){
   formState.tikus  = null;
   formState.bintik = null;
   formState.warna  = null;
-  const btn  = document.getElementById('btn-no-audit');   if (btn)  btn.style.display  = '';
+  const btn  = document.getElementById('no-audit-choices'); if (btn) btn.style.display = '';
   const note = document.getElementById('no-audit-note');  if (note) note.style.display = 'none';
   document.querySelectorAll('.tri-btn, .warna-btn').forEach(b => {
     b.disabled = false;
@@ -762,7 +775,7 @@ function undoDeclineAudit(){
   });
   const photoReq = document.getElementById('photo-req-note');
   if (photoReq){ photoReq.classList.remove('error'); photoReq.textContent = t('photo_req'); }
-  showToast('Undone. Fill in the audit or tap No Audit Required again.');
+  showToast('Undone. Fill in the audit, or name the plot type again.');
 }
 window.undoDeclineAudit = undoDeclineAudit;
 
@@ -776,8 +789,7 @@ async function saveRecord(){
   // a batch without checking it. All four fields carry NO_AUDIT_SENTINEL,
   // set by declineAudit(). Everything else on the payload (audit_id,
   // date, auditor_name) is captured the same way as a normal save.
-  const declined = formState.ulat === NO_AUDIT_SENTINEL
-                && formState.warna === NO_AUDIT_SENTINEL;
+  const declined = isNoAuditRequired({ulat:formState.ulat, warna:formState.warna});
   if (!declined) {
     if(!formState.ulat) {showToast(t('err_pest'));return;}
     if(!formState.tikus){showToast(t('err_animal'));return;}

@@ -118,6 +118,9 @@ const TRANSLATIONS = {
     all_audited:             'all audited',
     pending_word:            'pending',
     no_audit_required_a11y:  'no audit required',
+    no_audit_ask:            'No audit needed? Say which kind of plot',
+    culling_plot:            'CULLING PLOT',
+    transplanting_plot:      'TRANSPLANTING PLOT',
     /* Caption under the 555 wordmark on the shared top ribbon. The
        markup has carried data-t="auditor_portal" since the ribbon
        was written, but the key was never added here — so the bar
@@ -511,6 +514,9 @@ const TRANSLATIONS = {
     all_audited:             'semua diaudit',
     pending_word:            'belum audit',
     no_audit_required_a11y:  'audit tidak diperlukan',
+    no_audit_ask:            'Tiada audit perlu? Nyatakan jenis plot',
+    culling_plot:            'PLOT CULLING',
+    transplanting_plot:      'PLOT PINDAH',
     due_word:                'tarikh akhir',
     due_today:               'tarikh akhir hari ini',
     days_left:               'hari lagi',

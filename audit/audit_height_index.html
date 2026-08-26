@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#1a4d1a"/>
 <title>Seedling Height — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="audit_height_styles.css?v=20260822g"/>
+<link rel="stylesheet" href="audit_height_styles.css?v=20260826a"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
@@ -71,14 +71,12 @@
     <div class="form-view-header">
       <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="form-view-title">New Record</span>
-      <span class="form-view-id" id="form-view-id"></span>
     </div>
 
     <div class="form-card">
       <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="record_info">Record Information</span></div>
       <div class="form-inner">
         <div class="form-row">
-          <div class="form-field"><div class="field-label" data-t="record_id">Record ID</div><input id="f-id" class="input" type="text" readonly/></div>
           <div class="form-field"><div class="field-label" data-t="date">Date</div><input id="f-date" class="input" type="date" readonly/></div>
         </div>
         <div class="form-row">
@@ -99,16 +97,18 @@
          moved, plot empty). Mirrors the plot-condition decline flow. -->
     <div class="form-card" id="no-audit-card">
       <div class="form-inner" style="padding-top:14px;padding-bottom:14px">
-        <button type="button" id="btn-no-audit" onclick="declineAudit()"
-                style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px dashed var(--g500);background:var(--g50);color:var(--g800);font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s">
-          <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          <span>NO AUDIT REQUIRED</span>
-        </button>
+        <div id="no-audit-choices">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text3);text-transform:uppercase;margin-bottom:9px;text-align:center" data-t="no_audit_ask">No audit needed? Say which kind of plot</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+            <button type="button" class="no-audit-choice" onclick="declineAudit('Culling Plot')" data-t="culling_plot">CULLING PLOT</button>
+            <button type="button" class="no-audit-choice" onclick="declineAudit('Transplanting Plot')" data-t="transplanting_plot">TRANSPLANTING PLOT</button>
+          </div>
+        </div>
         <div id="no-audit-note" style="display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--g50);border:1px solid var(--g200);color:var(--g800);font-size:12px;font-weight:600;line-height:1.5">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:8px;min-width:0">
               <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--g600);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><polyline points="5 12 10 17 19 8"/></svg>
-              <strong>Marked "No Audit Required"</strong>
+              <strong>Marked <span id="no-audit-reason">No Audit Required</span></strong>
             </div>
             <button type="button" id="btn-undo-no-audit" onclick="undoDeclineAudit()"
                     style="flex-shrink:0;background:transparent;border:1px solid var(--g500);color:var(--g700);font-family:inherit;font-weight:800;font-size:10px;letter-spacing:.5px;padding:5px 11px;border-radius:999px;cursor:pointer;text-transform:uppercase;display:flex;align-items:center;gap:5px">
@@ -280,7 +280,7 @@
 
 <script src="audit_login_guard.js?v=20260824a"></script>
 <script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
-<script src="audit_lang.js?v=20260825b"></script>
+<script src="audit_lang.js?v=20260826a"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
@@ -288,7 +288,7 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<script src="audit_height_script.js?v=20260824d"></script>
+<script src="audit_height_script.js?v=20260826a"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

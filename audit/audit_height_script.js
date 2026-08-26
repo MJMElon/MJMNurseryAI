@@ -389,7 +389,7 @@ function openPlotDetail(plot){
       ? (isNoAuditRequired(audit)
           ? `<div class="record-chips" style="margin-top:6px">
                <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0">
-                 ✕ No Audit Required · by ${audit.auditor_name||'Auditor'}
+                 ✕ ${noAuditReason(audit)||'No Audit Required'} · by ${audit.auditor_name||'Auditor'}
                </span>
              </div>`
           : `<div class="record-chips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
@@ -482,7 +482,7 @@ function _unlockPlotBatchInputs(){
 /* Reset the "No Audit Required" UI so a new form doesn't start with the
    previous decline still greyed-out or its confirmation panel showing. */
 function _resetDeclineUI(){
-  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='';
+  const btn =document.getElementById('no-audit-choices'); if(btn) btn.style.display='';
   const note=document.getElementById('no-audit-note'); if(note)note.style.display='none';
   document.querySelectorAll('.height-input, .photo-slot').forEach(el=>{
     el.style.opacity='';
@@ -498,10 +498,21 @@ function _resetDeclineUI(){
    photo_1_url + photo_2_url both carrying the sentinel — a real photo
    would be a base64/https URL, never plain 'NO_AUDIT_REQUIRED'. */
 const NO_AUDIT_SENTINEL='NO_AUDIT_REQUIRED';
+/* The auditor says WHY no audit is needed — a culling plot or a
+   transplanting plot. The reason rides on the sentinel itself
+   ('NO_AUDIT_REQUIRED — Culling Plot') so no column has to be added and
+   records written before this still read as declined, just unexplained. */
+const NO_AUDIT_REASONS=['Culling Plot','Transplanting Plot'];
+function isSentinel(v){ return String(v||'').indexOf(NO_AUDIT_SENTINEL)===0; }
 function isNoAuditRequired(r){
-  return !!r && r.p1===NO_AUDIT_SENTINEL && r.p2===NO_AUDIT_SENTINEL;
+  return !!r && isSentinel(r.p1) && isSentinel(r.p2);
+}
+function noAuditReason(r){
+  const m=String((r&&r.p1)||'').split('—')[1];
+  return m?m.trim():'';
 }
 window.isNoAuditRequired=isNoAuditRequired;
+window.noAuditReason=noAuditReason;
 
 /* --- FORM --- */
 function openAddForm(){
@@ -521,8 +532,9 @@ function openEdit(uid){
   // Replay the declined state if this record was closed with No Audit
   // Required — the auditor can still Undo and fill in real numbers.
   if(isNoAuditRequired(r)){
-    const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='none';
+    const btn =document.getElementById('no-audit-choices'); if(btn) btn.style.display='none';
     const note=document.getElementById('no-audit-note'); if(note)note.style.display='';
+    const nr  =document.getElementById('no-audit-reason');if(nr)  nr.textContent=noAuditReason(r)||'No Audit Required';
     const nb  =document.getElementById('no-audit-by');   if(nb)  nb.textContent=r.auditor_name||'Auditor';
     const nw  =document.getElementById('no-audit-when'); if(nw)  nw.textContent=fmtDT(r.createdAt);
     document.querySelectorAll('.height-input').forEach(el=>{
@@ -550,16 +562,19 @@ function openEdit(uid){
 /* Decline: fill formState with the sentinel, grey out the fields, show
    the "who + when" confirmation panel. The auditor still has to press
    Save to persist. */
-function declineAudit(){
+function declineAudit(reason){
   const u=(function(){try{return JSON.parse(localStorage.getItem('mjm_user')||'{}');}catch(e){return{};}})();
   const who=u.name||u.email||'Auditor';
+  const why=NO_AUDIT_REASONS.indexOf(reason)!==-1?reason:'';
+  const stamp=why?NO_AUDIT_SENTINEL+' — '+why:NO_AUDIT_SENTINEL;
   formState.s1=''; formState.s2=''; formState.s3='';
-  formState.p1=NO_AUDIT_SENTINEL;
-  formState.p2=NO_AUDIT_SENTINEL;
-  formState.p3=NO_AUDIT_SENTINEL;
+  formState.p1=stamp;
+  formState.p2=stamp;
+  formState.p3=stamp;
 
-  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='none';
+  const btn =document.getElementById('no-audit-choices'); if(btn) btn.style.display='none';
   const note=document.getElementById('no-audit-note'); if(note)note.style.display='';
+  const nr  =document.getElementById('no-audit-reason');if(nr)  nr.textContent=why||'No Audit Required';
   const nb  =document.getElementById('no-audit-by');   if(nb)  nb.textContent=who;
   const nw  =document.getElementById('no-audit-when'); if(nw)  nw.textContent=new Date().toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 
@@ -573,8 +588,8 @@ function declineAudit(){
     s.style.pointerEvents='none';
   });
   const photoReq=document.getElementById('photo-req-note');
-  if(photoReq){photoReq.classList.remove('error'); photoReq.textContent='Not required — this batch is being closed with No Audit Required.';}
-  showToast('Marked "No Audit Required". Tap Save to close this batch.');
+  if(photoReq){photoReq.classList.remove('error'); photoReq.textContent='Not required — this batch is being closed as a '+(why||'no-audit')+'.';}
+  showToast('Marked "'+(why||'No Audit Required')+'". Tap Save to close this batch.');
 }
 window.declineAudit=declineAudit;
 
@@ -583,10 +598,10 @@ window.declineAudit=declineAudit;
    slots keep whatever was in them before the mistap so a two-tap
    mistake doesn't wipe half-filled real work. */
 function undoDeclineAudit(){
-  if(formState.p1===NO_AUDIT_SENTINEL) formState.p1=null;
-  if(formState.p2===NO_AUDIT_SENTINEL) formState.p2=null;
-  if(formState.p3===NO_AUDIT_SENTINEL) formState.p3=null;
-  const btn =document.getElementById('btn-no-audit');  if(btn) btn.style.display='';
+  if(isSentinel(formState.p1)) formState.p1=null;
+  if(isSentinel(formState.p2)) formState.p2=null;
+  if(isSentinel(formState.p3)) formState.p3=null;
+  const btn =document.getElementById('no-audit-choices'); if(btn) btn.style.display='';
   const note=document.getElementById('no-audit-note'); if(note)note.style.display='none';
   document.querySelectorAll('.height-input').forEach(el=>{
     el.disabled=false;
@@ -599,14 +614,11 @@ function undoDeclineAudit(){
   });
   const photoReq=document.getElementById('photo-req-note');
   if(photoReq){photoReq.classList.remove('error'); photoReq.textContent=t('photo_3_req');}
-  showToast('Undone. Fill in the audit or tap No Audit Required again.');
+  showToast('Undone. Fill in the audit, or name the plot type again.');
 }
 window.undoDeclineAudit=undoDeclineAudit;
 function populateForm(r){
-  const id=editMode?r.id:nextID(formState.nursery);
-  document.getElementById('f-id').value=id;
   document.getElementById('f-date').value=editMode?r.date:todayISO();
-  document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
   ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
@@ -636,7 +648,7 @@ function renderSlot(n,src){
   while(slot.firstChild)slot.removeChild(slot.firstChild);
   // Guard: the "No Audit Required" sentinel lives in the same field, but
   // is not a URL — render the empty placeholder instead of a broken image.
-  if(src && src!==NO_AUDIT_SENTINEL){
+  if(src && !isSentinel(src)){
     slot.classList.add('has-photo');
     const img=document.createElement('img');img.src=src;img.alt='S'+n;slot.appendChild(img);
     const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;slot.appendChild(lbl);
@@ -700,7 +712,7 @@ async function saveRecord(){
   if(!plot){showToast(t('err_select_plot'));return;}
   // "No Audit Required" bypasses samples + 3 photo checks — the whole
   // point is that the auditor is closing out a batch without measuring.
-  const declined = formState.p1===NO_AUDIT_SENTINEL && formState.p2===NO_AUDIT_SENTINEL;
+  const declined = isSentinel(formState.p1) && isSentinel(formState.p2);
   if(!declined){
     if(!formState.s1&&!formState.s2&&!formState.s3){showToast(t('err_height'));return;}
     if(!formState.p1||!formState.p2||!formState.p3){
@@ -721,9 +733,9 @@ async function saveRecord(){
       sample_2: declined ? null : (formState.s2?parseFloat(formState.s2):null),
       sample_3: declined ? null : (formState.s3?parseFloat(formState.s3):null),
       avg_height: avg?parseFloat(avg):null,
-      photo_1_url: declined ? NO_AUDIT_SENTINEL : (formState.p1||null),
-      photo_2_url: declined ? NO_AUDIT_SENTINEL : (formState.p2||null),
-      photo_3_url: declined ? NO_AUDIT_SENTINEL : (formState.p3||null),
+      photo_1_url: declined ? formState.p1 : (formState.p1||null),
+      photo_2_url: declined ? formState.p2 : (formState.p2||null),
+      photo_3_url: declined ? formState.p3 : (formState.p3||null),
       date:todayISO(),
       auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
@@ -743,7 +755,7 @@ function openDetail(uid){
   [1,2,3].forEach(n=>{
     const el=document.getElementById('detail-p'+n);if(!el)return;el.innerHTML='';
     const src=r['p'+n];
-    if(src && src!==NO_AUDIT_SENTINEL){
+    if(src && !isSentinel(src)){
       const img=document.createElement('img');img.src=src;img.alt='S'+n;
       img.onclick=()=>openLightbox(src);el.appendChild(img);
       const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;el.appendChild(lbl);
