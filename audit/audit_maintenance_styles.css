@@ -234,10 +234,14 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 .deadline-note{
   font-size:10px;color:var(--text3);margin-left:6px;
 }
-.task-card.status-pending{border-left:3px solid #f59e0b}
-.task-card.status-satisfactory{border-left:3px solid var(--g500)}
-.task-card.status-unsatisfactory{border-left:3px solid #dc2626}
-.task-card.status-not_done{border-left:3px solid #94a3b8}
+/* Border widths are the same; the colour is now set inline per card
+   based on the work type (see _taskTypeColour in the script). The
+   status-* colours below are the fallback for a card that landed
+   without a task type — the inline colour wins when it is present. */
+.task-card.status-pending{border-left:5px solid #f59e0b}
+.task-card.status-satisfactory{border-left:5px solid var(--g500)}
+.task-card.status-unsatisfactory{border-left:5px solid #dc2626}
+.task-card.status-not_done{border-left:5px solid #94a3b8}
 .task-card-top{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
 .task-nursery-tag{font-size:10px;font-weight:700;background:var(--g800);color:#fff;padding:2px 8px;border-radius:var(--r-full)}
 .task-type-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);background:var(--teal50);color:var(--teal600)}
