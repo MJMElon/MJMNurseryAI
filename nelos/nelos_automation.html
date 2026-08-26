@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
-  body { background:#faf5ff; margin:0; }
+  body { background:#f1f5f9; margin:0; }
   .hidden { display:none !important; }
 
   .backlink { display:inline-flex; align-items:center; gap:7px; margin-bottom:14px;
@@ -39,16 +39,26 @@
 
   /* One system, one card; one condition, one row. Two columns, because
      there are two things to know: when it fires, and where it lands. */
-  .cond-sys { background:#fff; border:1.5px solid #ede9fe; border-radius:14px; margin-bottom:10px;
-              overflow:hidden; }
-  .cond-sys-h { display:flex; align-items:center; gap:9px; padding:11px 16px; background:#faf5ff;
-                border-bottom:1px solid #ede9fe; font-size:12px; font-weight:900; color:#5b21b6; }
+  /* Each system reads as its own block. It was a 1.5px line in almost the
+     page's own colour against a header tinted three shades off the page —
+     six cards ran together as one long list, which is the opposite of what
+     a card is for. So: the page goes grey, the cards stay white, the header
+     takes the full violet, and each card carries a real shadow and a rule
+     under its heading. */
+  .cond-sys { background:#fff; border:1px solid #e2e8f0; border-radius:14px; margin-bottom:16px;
+              overflow:hidden; box-shadow:0 4px 16px -6px rgba(15,23,42,.16); }
+  .cond-sys-h { display:flex; align-items:center; gap:9px; padding:13px 16px;
+                background:linear-gradient(180deg,#7c3aed,#6d28d9);
+                font-size:12.5px; font-weight:900; color:#fff;
+                letter-spacing:.06em; text-transform:uppercase; }
   .cond-sys-n { margin-left:auto; font-size:9.5px; font-weight:900; color:#a78bfa;
                 letter-spacing:.06em; text-transform:uppercase; }
-  .cond-add { width:24px; height:24px; border-radius:8px; border:1.5px solid #ddd6fe;
-              background:#fff; color:#7c3aed; font-size:15px; font-weight:900; line-height:0;
+  /* On the violet header now, so it inverts: a pale outline that fills in. */
+  .cond-add { margin-left:auto; width:24px; height:24px; border-radius:8px;
+              border:1.5px solid rgba(255,255,255,.45); background:rgba(255,255,255,.12);
+              color:#fff; font-size:15px; font-weight:900; line-height:0;
               cursor:pointer; flex-shrink:0; }
-  .cond-add:hover { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+  .cond-add:hover { background:#fff; border-color:#fff; color:#6d28d9; }
   .sec-bar { display:flex; align-items:center; gap:12px; }
   .sec-bar .sec-h { margin-bottom:0; }
   .sec-bar .tool-btn { margin-left:auto; }
@@ -57,7 +67,7 @@
   .cond-head { font-size:9px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
                color:#a1a1aa; padding-top:9px; padding-bottom:5px; }
   .cond-row { border-top:1px dashed #f1e9ff; }
-  .cond-work { font-size:12.5px; font-weight:900; color:#1e293b; }
+  .cond-work { font-size:13px; font-weight:800; color:#1e293b; line-height:1.4; }
   .cond-when { font-size:11px; font-weight:600; color:#94a3b8; line-height:1.5; margin-top:2px; }
   .cond-act { display:flex; flex-wrap:wrap; gap:7px; }
   .cond-act select { flex:1 1 130px; min-width:0; font-size:11.5px; font-weight:700; color:#1e293b;
@@ -159,18 +169,8 @@
   <!-- What each system opens a case for on its own, and where that case
        goes. The condition is the module's own code and is shown, not set,
        here; the two dropdowns beside it ARE the setting. -->
-  <h2 class="sec-h">Cases each system opens by itself</h2>
   <div id="conds"></div>
 
-  <!-- The button belongs to the list it adds to, at the right-hand end of
-       that list's own heading — not under the page title, where it read as
-       the page's one purpose. -->
-  <div class="sec-bar">
-    <h2 class="sec-h">Work that comes round</h2>
-    <button class="tool-btn" id="new-btn"><span class="plus">+</span> New Automation</button>
-  </div>
-
-  <div id="list"></div>
 
 </div>
 
@@ -286,7 +286,21 @@ const everyText = a => a.repeat_every === 'weekly'
 
 /* ── The list ──────────────────────────────────────────────────── */
 
+/* PARKED, NOT DELETED.
+   The "Work that comes round" half of this page — the schedule list and its
+   New Automation drawer — was taken off screen on request. Everything below
+   still works and nothing in the database changed: nelos_automations still
+   holds the schedules and nelos_run_automations() still raises them, with or
+   without a screen. Putting it back is putting two elements back:
+
+     <div class="sec-bar"><h2 class="sec-h">Work that comes round</h2>
+       <button class="tool-btn" id="new-btn"><span class="plus">+</span> New Automation</button></div>
+     <div id="list"></div>
+
+   Until then these render into nothing, so they check for it rather than
+   throwing on a null. */
 function render() {
+  if (!$('list')) return;
   if (!autos.length) {
     $('list').innerHTML = `<div class="empty">Nothing repeats yet.<br>
       <span class="text-[11px] font-semibold text-slate-400">
@@ -519,7 +533,8 @@ async function remove(a) {
 
 /* ── Wiring ────────────────────────────────────────────────────── */
 
-$('new-btn').addEventListener('click', () => openDrawer(null));
+// Parked with the section above — see render().
+if ($('new-btn')) $('new-btn').addEventListener('click', () => openDrawer(null));
 $('a-close').addEventListener('click', closeDrawer);
 $('scrim').addEventListener('click', e => { if (e.target === $('scrim')) closeDrawer(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
@@ -581,10 +596,7 @@ function renderConds() {
           const pics = picsFor(to);
           return `
           <div class="cond-row" data-mod="${esc(m.key)}" data-work="${esc(c.name)}">
-            <div>
-              <div class="cond-work">${esc(c.name)}</div>
-              <div class="cond-when">${esc(c.auto_condition)}</div>
-            </div>
+            <div class="cond-work">${esc(c.name)}</div>
             <div class="cond-act">
               <select data-to>
                 ${modules.map(x => `<option value="${esc(x.key)}"${x.key === to ? ' selected' : ''}
@@ -606,7 +618,6 @@ function renderConds() {
        addCond() — so it says so rather than opening something empty. */
     return `<div class="cond-sys">
       <div class="cond-sys-h">${esc(m.handler_label || m.label)}
-        <span class="cond-sys-n">${mine.length || 'none'}</span>
         <button class="cond-add" data-add="${esc(m.key)}" title="Add a condition to ${esc(m.handler_label || m.label)}"
                 aria-label="Add a condition to ${esc(m.handler_label || m.label)}">+</button></div>
       ${rows}</div>`;
