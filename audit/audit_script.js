@@ -250,7 +250,12 @@ async function loadRecords(){
    form (or to the record, once there is one), and the batch box is not
    on the form at all. The batches are still read behind the scenes —
    they are how we know whether anything is standing on the plot. */
-function byPlot(){ return activeTab === 'PN'; }
+/* Both PN and MN audit by plot now — batch-by-batch was cancelled at
+   the auditor's request. The batches sitting on the plot are still
+   read from the roster (see plotHasWork) so the tile can flag empty
+   plots, and they render as read-only chips inside the form's
+   Audit Information card. */
+function byPlot(){ return true; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
 }
@@ -262,8 +267,32 @@ function openPlotAudit(plot){
   const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
   if (rec) { openDetail(rec.uid); return; }
   _openFormForPlot(plot, null);
+  /* Fill the read-only batches chips inside the form so the auditor
+     sees which batches sit on this plot. Sorted by batch number. */
+  _paintBatchesChips(plot);
 }
 window.openPlotAudit = openPlotAudit;
+
+function _paintBatchesChips(plot){
+  const chips = document.getElementById('f-batches-chips');
+  if (!chips) return;
+  const bs = batchesOnPlot(plot).slice().sort((a,b)=>{
+    const na=Number(a.batch)||0, nb=Number(b.batch)||0;
+    if(na!==nb)return na-nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
+  if (!bs.length){
+    chips.innerHTML='<span style="font-size:12px;color:#94a3b8">No batches on file</span>';
+    return;
+  }
+  chips.innerHTML=bs.map(b=>{
+    const breed=b.breed ? ' · '+b.breed : '';
+    return '<span class="batch-chip" style="display:inline-flex;align-items:center;padding:5px 11px;'
+      +'border-radius:999px;background:#e0f2e0;border:1px solid #a7d5b0;color:#0f5527;'
+      +'font-size:11.5px;font-weight:700;letter-spacing:.2px">Batch '+b.batch+breed+'</span>';
+  }).join('');
+}
+window._paintBatchesChips = _paintBatchesChips;
 /* The batch box belongs to a batch-by-batch audit. Hide it where the
    audit is the plot, and hide the row it sits in so nothing gaps. */
 function syncBatchField(){

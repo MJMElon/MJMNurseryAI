@@ -300,7 +300,10 @@ function isBatchAudited(plot, batch){
    form (or to the record, once there is one), and the batch box is not
    on the form at all. The batches are still read behind the scenes —
    they are how we know whether anything is standing on the plot. */
-function byPlot(){ return activeTab === 'PN'; }
+/* Both PN and MN count and audit by plot now — the multi-batch flow
+   was cancelled at the auditor's request; one record covers a plot,
+   and the batches on it are shown as chips only. */
+function byPlot(){ return true; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
 }
@@ -398,12 +401,12 @@ function renderList(){
    Row ordering: pending on top, audited middle, Not-Required at the
    bottom; ascending batch number within each band. Whole row is the
    tap target (opens the form pre-linked to that batch). */
-/* PN skips the batch-list step: tapping a plot opens the multi-batch
-   form directly. MN keeps the existing list-then-form flow. The
-   forkless helper below just dispatches on scope. */
+/* Every plot — PN and MN — opens the per-plot form directly now. The
+   old batch-list step (view-plot) is cancelled: an auditor keys one
+   set of samples + photos for the whole plot, and the batches roster
+   sitting on it is shown as read-only chips inside Record Information. */
 function openPlot(plot){
-  if(activeTab==='PN') openMultiBatchForm(plot);
-  else                 openPlotDetail(plot);
+  openMultiBatchForm(plot);
 }
 window.openPlot=openPlot;
 
@@ -528,76 +531,266 @@ window.openPlotDetail=openPlotDetail;
    number, so a switch between plots wipes it cleanly (a fresh call
    to openMultiBatchForm rebuilds the Map from scratch).
    ══════════════════════════════════════════════════════════════════ */
-const multiState = new Map();      // batch → {s1,s2,s3,p1,p2,p3,declined}
+/* Per-plot form state — one set of samples + photos for the whole
+   plot. The batches roster is still detected and shown as read-only
+   chips inside Record Information, but the auditor only fills the
+   plot's numbers in once. */
+let plotFormState = null;
 let multiPlot = null;
 
-function _mfGet(batch){
-  if(!multiState.has(batch))
-    multiState.set(batch, {s1:'', s2:'', s3:'', p1:null, p2:null, p3:null, declined:null});
-  return multiState.get(batch);
+function _resetPlotForm(){
+  plotFormState = { s1:'', s2:'', s3:'', p1:null, p2:null, p3:null, declined:null };
 }
+_resetPlotForm();
+
+/* Retained no-op so any stale caller of the old multi-batch helper
+   does not blow up. Returns the plot-form state unchanged. */
+function _mfGet(_batch){ return plotFormState; }
 
 function openMultiBatchForm(plot){
   window._lastOpenedPlot=plot;
   multiPlot=plot;
-  multiState.clear();
+  _resetPlotForm();
 
-  const all=batchesOnPlot(plot);
-  /* Only pending batches. Already-audited and not-required drop off:
-     the point of this screen is what still needs work. Sort by batch
-     number so the auditor walks them in the same order every time. */
-  const pending=all.filter(b=>{
-    const done=records.some(r=>r.nursery===activeTab && r.plot===plot &&
-                             String(r.batch||'').trim()===b.batch);
-    return !done && !isBatchNotRequired(plot,b.batch);
-  }).sort((a,b)=>{
+  const all=batchesOnPlot(plot).slice().sort((a,b)=>{
     const na=Number(a.batch)||0, nb=Number(b.batch)||0;
     if(na!==nb)return na-nb;
     return String(a.batch).localeCompare(String(b.batch));
   });
 
-  /* Plot label reads on the outer ribbon's #ctx-plot slot — same
-     slot MN's view-plot uses. #multi-title / #multi-count were
-     removed with the sub-header; writes here are guarded so an old
-     cached page does not throw. */
+  /* Plot label reads on the outer ribbon's #ctx-plot slot. */
   const ttlOuter=document.getElementById('plot-detail-plot');
   if(ttlOuter)ttlOuter.textContent='Plot '+plot+' — '+NURSERY_LABELS[activeTab];
   const cntOuter=document.getElementById('plot-detail-count');
-  if(cntOuter)cntOuter.textContent=pending.length
-    ? pending.length+' batch'+(pending.length>1?'es':'') : 'no batches';
-  const title=document.getElementById('multi-title');
-  if(title)title.textContent='Plot '+plot+' — '+NURSERY_LABELS[activeTab];
-  const count=document.getElementById('multi-count');
-  if(count)count.textContent=pending.length ? pending.length+' batch'+(pending.length>1?'es':'') : 'no batches';
+  if(cntOuter)cntOuter.textContent=all.length
+    ? all.length+' batch'+(all.length>1?'es':'') : 'no batches';
   const dateEl=document.getElementById('mf-date');
   if(dateEl)dateEl.value=todayISO();
   const plotEl=document.getElementById('mf-plot');
   if(plotEl)plotEl.value=plot+' — '+NURSERY_LABELS[activeTab];
 
-  const list=document.getElementById('multi-batches');
-  if(list){
-    if(!pending.length){
-      /* Every batch on the plot is either audited or not required —
-         still open the screen so the auditor can see that, rather
-         than bouncing them back to the grid without explanation. */
-      list.innerHTML='<div class="empty-state" style="margin:24px 12px">'+
-        '<div class="empty-state-icon"><svg viewBox="0 0 24 24"><polyline points="5 12 10 17 19 8"/></svg></div>'+
-        '<h3>Nothing pending on this plot</h3>'+
-        '<p>Every batch has been audited or is not required. Nothing to fill in.</p></div>';
+  /* Batches on this plot, read-only chips inside Record Information.
+     Auto-detected from the batches roster; the auditor no longer
+     records per batch, just sees which ones the plot carries. */
+  const chips=document.getElementById('mf-batches-chips');
+  if(chips){
+    if(!all.length){
+      chips.innerHTML='<span style="font-size:12px;color:#94a3b8">No batches on file</span>';
     } else {
-      list.innerHTML=pending.map(b=>_mfCardHtml(b)).join('');
+      chips.innerHTML=all.map(b=>{
+        const breed=b.breed ? ' · '+b.breed : '';
+        return '<span class="batch-chip" style="display:inline-flex;align-items:center;padding:5px 11px;'
+          +'border-radius:999px;background:#e0f2e0;border:1px solid #a7d5b0;color:#0f5527;'
+          +'font-size:11.5px;font-weight:700;letter-spacing:.2px">Batch '+b.batch+breed+'</span>';
+      }).join('');
     }
+  }
+
+  /* Clear all sample + photo inputs to a fresh state. */
+  ['1','2','3'].forEach(n=>{
+    const s=document.getElementById('mf-s'+n); if(s)s.value='';
+    const fb=document.getElementById('mf-s'+n+'-fb'); if(fb)fb.textContent='';
+    _renderPlotSlot(n, null);
+  });
+  const avg=document.getElementById('mf-avg'); if(avg)avg.textContent='—';
+
+  /* Pre-fill from an existing record for the plot on the same day, so
+     the auditor can amend without keying twice. batch column is now
+     empty for plot-level records; the pre-fill matches on nursery+
+     plot only. */
+  const existing=records.find(r=>r.nursery===activeTab && r.plot===plot);
+  if(existing){
+    plotFormState.s1=existing.s1||'';
+    plotFormState.s2=existing.s2||'';
+    plotFormState.s3=existing.s3||'';
+    plotFormState.p1=isSentinel(existing.p1)?null:(existing.p1||null);
+    plotFormState.p2=isSentinel(existing.p2)?null:(existing.p2||null);
+    plotFormState.p3=isSentinel(existing.p3)?null:(existing.p3||null);
+    const s1=document.getElementById('mf-s1'); if(s1)s1.value=plotFormState.s1;
+    const s2=document.getElementById('mf-s2'); if(s2)s2.value=plotFormState.s2;
+    const s3=document.getElementById('mf-s3'); if(s3)s3.value=plotFormState.s3;
+    ['1','2','3'].forEach(n=>{
+      const fb=document.getElementById('mf-s'+n+'-fb');
+      if(fb)fb.textContent=(plotFormState['s'+n]&&parseFloat(plotFormState['s'+n])>0)?'✓':'';
+      _renderPlotSlot(n, plotFormState['p'+n]);
+    });
+    if(avg)avg.textContent=calcAvg(plotFormState.s1,plotFormState.s2,plotFormState.s3)||'—';
+    window._plotEditId = existing.uid;
+  } else {
+    window._plotEditId = null;
   }
 
   setView('multi');
 }
-window.openMultiBatchForm=openMultiBatchForm;
+window.openMultiBatchForm=openMultiBatchForm;   // legacy alias
+window.openPlotForm=openMultiBatchForm;
 
-/* Card for one batch inside the multi-batch view. Same visual grammar
-   as the single-batch form (three sample columns, three photo slots)
-   so an auditor moving between the two does not have to re-learn
-   anything. Element ids are namespaced by batch to keep the state
-   split cleanly. */
+/* Sample entry handler for the per-plot form. */
+function onPlotHeightInput(n, el){
+  plotFormState['s'+n]=el.value.trim();
+  const fb=document.getElementById('mf-s'+n+'-fb');
+  if(fb)fb.textContent=(el.value && parseFloat(el.value)>0)?'✓':'';
+  const avg=document.getElementById('mf-avg');
+  if(avg)avg.textContent=calcAvg(plotFormState.s1,plotFormState.s2,plotFormState.s3)||'—';
+}
+window.onPlotHeightInput=onPlotHeightInput;
+
+/* Not-Required toggle for the whole plot. */
+function markPlotNotRequired(){
+  plotFormState.declined = plotFormState.declined ? null : 'Not Required';
+  const btn=document.getElementById('mf-notreq-btn');
+  if(btn)btn.textContent = plotFormState.declined ? '↺ Undo Not Required' : 'Mark Plot as Not Required';
+  ['mf-s1','mf-s2','mf-s3'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=!!plotFormState.declined; el.style.opacity=plotFormState.declined?'.55':''; }
+  });
+  ['1','2','3'].forEach(n=>{
+    const slot=document.getElementById('mf-photo-'+n);
+    if(slot){ slot.style.opacity=plotFormState.declined?'.55':''; slot.style.pointerEvents=plotFormState.declined?'none':''; }
+  });
+}
+window.markPlotNotRequired=markPlotNotRequired;
+
+/* Photo capture for the per-plot form — one target slot. */
+let _plotPhotoTarget=null;
+function triggerPlotPhoto(n){
+  _plotPhotoTarget=n;
+  const existing=document.getElementById('mf-photo-sheet');
+  if(existing)existing.remove();
+  const sheet=document.createElement('div');
+  sheet.id='mf-photo-sheet';
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;'
+    +'display:flex;align-items:flex-end;justify-content:center';
+  sheet.innerHTML=
+    '<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;'
+      +'width:100%;max-width:480px">'
+      +'<div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:6px;'
+        +'text-align:center">Sample '+n+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 12px">'
+        +'<button onclick="_plotOpenCamera()" style="height:64px;border-radius:12px;'
+          +'background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;'
+          +'font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>'
+        +'<button onclick="_plotOpenGallery()" style="height:64px;border-radius:12px;'
+          +'background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;'
+          +'border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br>'
+          +'<span style="font-size:11px">Gallery</span></button>'
+      +'</div>'
+      +'<button onclick="document.getElementById(\'mf-photo-sheet\').remove()" '
+        +'style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;'
+        +'border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;'
+        +'font-family:inherit;cursor:pointer">Cancel</button>'
+    +'</div>';
+  sheet.addEventListener('click', e=>{ if(e.target===sheet) sheet.remove(); });
+  document.body.appendChild(sheet);
+}
+window.triggerPlotPhoto=triggerPlotPhoto;
+function _plotOpenCamera(){
+  document.getElementById('mf-photo-sheet')?.remove();
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+  inp.style.display='none';
+  inp.onchange=function(){ _plotHandlePhoto(this); };
+  document.body.appendChild(inp);
+  inp.click();
+}
+window._plotOpenCamera=_plotOpenCamera;
+function _plotOpenGallery(){
+  document.getElementById('mf-photo-sheet')?.remove();
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.style.display='none';
+  inp.onchange=function(){ _plotHandlePhoto(this); };
+  document.body.appendChild(inp);
+  inp.click();
+}
+window._plotOpenGallery=_plotOpenGallery;
+async function _plotHandlePhoto(input){
+  if(_plotPhotoTarget==null || !input.files || !input.files[0]) return;
+  const n=_plotPhotoTarget;
+  const compressed=await compressPhoto(input.files[0]);
+  plotFormState['p'+n]=compressed;
+  _renderPlotSlot(n, compressed);
+  input.value='';
+}
+function _renderPlotSlot(n, src){
+  const slot=document.getElementById('mf-photo-'+n);
+  if(!slot)return;
+  while(slot.firstChild)slot.removeChild(slot.firstChild);
+  if(src){
+    slot.classList.add('has-photo');
+    const img=document.createElement('img'); img.src=src; img.alt='S'+n; slot.appendChild(img);
+    const lbl=document.createElement('span'); lbl.className='detail-photo-num'; lbl.textContent='S'+n; slot.appendChild(lbl);
+    const btn=document.createElement('button'); btn.className='photo-slot-clear'; btn.textContent='×';
+    btn.onclick=e=>{ e.stopPropagation(); plotFormState['p'+n]=null; _renderPlotSlot(n,null); };
+    slot.appendChild(btn);
+  } else {
+    slot.classList.remove('has-photo');
+    const num=document.createElement('div'); num.className='photo-slot-num'; num.textContent=n;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 24 24');
+    svg.innerHTML='<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/>';
+    const lbl=document.createElement('span'); lbl.className='photo-slot-label'; lbl.textContent='Sample '+n;
+    slot.appendChild(num); slot.appendChild(svg); slot.appendChild(lbl);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SAVE — one record per plot per day. batch column is left null; the
+   batches roster sitting on the plot is shown as chips on the form
+   for context but is not part of the write.
+   ══════════════════════════════════════════════════════════════════ */
+async function savePlotAudit(){
+  if(!multiPlot){ showToast('No plot selected'); return; }
+  const declined=!!plotFormState.declined;
+  if(!declined){
+    if(!plotFormState.s1 && !plotFormState.s2 && !plotFormState.s3){
+      showToast(t('err_height')||'⚠ Enter at least one height');
+      return;
+    }
+    if(!(plotFormState.p1 && plotFormState.p2 && plotFormState.p3)){
+      const note=document.getElementById('mf-photo-req-note');
+      if(note){ note.style.color='#b91c1c'; note.textContent='⚠ All 3 photos are required'; }
+      showToast(t('err_3_photos')||'⚠ Three photos are required');
+      return;
+    }
+  }
+  const authorName=(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'');
+  const dateISO=todayISO();
+  const avg=declined ? null : calcAvg(plotFormState.s1,plotFormState.s2,plotFormState.s3);
+  const payload={
+    nursery: activeTab,
+    plot: multiPlot,
+    batch: null,                    // per-plot record — no batch key any more
+    sample_1: declined ? null : (plotFormState.s1?parseFloat(plotFormState.s1):null),
+    sample_2: declined ? null : (plotFormState.s2?parseFloat(plotFormState.s2):null),
+    sample_3: declined ? null : (plotFormState.s3?parseFloat(plotFormState.s3):null),
+    avg_height: avg?parseFloat(avg):null,
+    photo_1_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p1||null),
+    photo_2_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p2||null),
+    photo_3_url: declined ? 'NO_AUDIT_REQUIRED' : (plotFormState.p3||null),
+    date: dateISO,
+    auditor_name: authorName
+  };
+  setLoading(true);
+  try {
+    const editing = !!window._plotEditId;
+    const result = editing
+      ? await smartSave('audit_height_records','update', payload, window._plotEditId)
+      : await smartSave('audit_height_records','insert',
+          {...payload, record_id: nextID(activeTab)}, null);
+    await loadRecords();
+    setLoading(false);
+    showToast(result?.offline ? (t('offline_saved')||'Saved offline') : '✓ Plot saved');
+    setView('list');
+  } catch(e){
+    console.error('[Save plot]', e);
+    showToast('⚠ '+(e.message||'Save failed'));
+    setLoading(false);
+  }
+}
+window.savePlotAudit=savePlotAudit;
+
+/* Legacy per-batch card renderer kept only to satisfy any stale caller
+   during the transition; the per-plot form does not use it. */
 function _mfCardHtml(b){
   const breed=b.breed ? '<span style="font-size:11px;color:var(--text3);font-weight:500;margin-left:6px">· '+b.breed+'</span>' : '';
   const bId=String(b.batch).replace(/[^A-Za-z0-9_-]/g,'_');
