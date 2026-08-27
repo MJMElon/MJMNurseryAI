@@ -1637,7 +1637,21 @@ function loadAuditTodo(){
          what's there. Deadline windowing / plot mapping can fail
          for a stray task without hiding the whole module from the
          home page. */
-      if (!MAINT_OCCURRENCES.length) {
+      /* Fires when nothing lands in the month on screen — not merely when
+         there are no buckets at all.
+
+         That distinction is the whole bug. One maintenance deadline in
+         any other month made MAINT_OCCURRENCES non-empty, so this never
+         ran; and occurrences() then filtered that bucket out for being
+         the wrong month, leaving the To Do list with no maintenance row
+         and nothing to say about it. Work that the module page lists as
+         overdue simply did not appear here.
+
+         The month is today's, not the one being browsed: this runs once
+         at load, and the answer it is standing in for is "what do I owe
+         now". */
+      const _thisMonth = MAINT_OCCURRENCES.some(mo => mo.y === year && mo.m === month);
+      if (!_thisMonth) {
         /* The buckets came out empty, but that is not the same as "no
            work pending": push() also drops a record whose deadline could
            not be worked out. So the same rows are walked again with only
@@ -1661,13 +1675,19 @@ function loadAuditTodo(){
            not otherwise. */
         const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
         const loose = [];
+        /* Pending work that resolves to NO nursery at all. It is not this
+           auditor's or anyone else's until something can place it, and it
+           is the one case where staying silent is wrong: the row vanishes
+           and nothing anywhere says a dozen records were dropped. Counted
+           so the row can say so. */
+        let unplaceable = 0;
         const pushLoose = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
           if (SKIP_FALLBACK_TYPES.has(String(workType||'').toLowerCase())) return;
           if (auditedIds.has(String(id)))  return;
           if (!workDateISO)                return;
           const plot = _canonPlot(plotRaw);
           const n = _nurseryFor(plot, nurseryNameRaw);
-          if (!n) return;                              // cannot say which nursery
+          if (!n) { unplaceable++; return; }            // cannot say which nursery
           if (SCOPE_NURSERIES.indexOf(n) === -1) return;
           loose.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
         };
@@ -1680,7 +1700,12 @@ function loadAuditTodo(){
                     JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
         });
 
-        if (loose.length) {
+        /* Placed work raises a normal row. Work that could not be placed
+           at all raises one too, empty but explaining itself — never
+           nothing. Work that placed fine and simply belongs to another
+           nursery raises nothing here, which is the whole point of the
+           scope test and is not a failure. */
+        if (loose.length || unplaceable) {
           const now = new Date();
           const plots = new Map();
           const nurseries = new Set();
@@ -1689,15 +1714,24 @@ function loadAuditTodo(){
             if (!plots.has(it.nursery)) plots.set(it.nursery, new Set());
             plots.get(it.nursery).add(it.plot);
           });
-          MAINT_OCCURRENCES = [{
+          /* Appended, not assigned. Buckets in other months are what
+             carriedOverdue() reads to bring an older deadline forward;
+             replacing the list would throw them away to fix this month. */
+          MAINT_OCCURRENCES = MAINT_OCCURRENCES.concat([{
             y: now.getFullYear(),
             m: now.getMonth(),
             d: now.getDate(),
-            nurseries: nurseries,
+            nurseries: nurseries.size ? nurseries : new Set(SCOPE_NURSERIES),
             plots: plots,
-            items: loose
-          }];
+            items: loose,
+            _why: loose.length ? null
+                : (unplaceable + ' pending record' + (unplaceable === 1 ? '' : 's') +
+                   ' could not be matched to a nursery. Their plot names are not in ' +
+                   'the standard ranges and are not listed under a nursery in ' +
+                   'Nursery Operation \u2192 Work Maintenance \u2192 plot list.')
+          }]);
           diag.fallback = true;
+          diag.unplaceable = unplaceable;
           diag.fallbackItems = loose.length;
         }
       }
@@ -1790,7 +1824,8 @@ function loadAuditTodo(){
         end:   mo.d,
         _maintNurseries: mo.nurseries,
         _maintPlots: mo.plots,
-        _maintItems: mo.items
+        _maintItems: mo.items,
+        _maintWhy:   mo._why || null
       });
     });
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
@@ -2138,9 +2173,14 @@ function loadAuditTodo(){
     }
 
     if (!mine.length) {
-      return `<div class="tl-wts"><div class="tl-wt-none">` +
-             `No pending plot came through for this deadline. Reload; if it stays, ` +
-             `the maintenance records behind this row could not be read.</div></div>`;
+      /* The row used to guess here — "reload; if it stays, the records
+         could not be read" — which was wrong every time the real answer
+         was a plot nobody had filed under a nursery. When the walk knows
+         why it placed nothing, say that instead. */
+      const why = o._maintWhy ||
+        'No pending plot came through for this deadline. Reload; if it stays, ' +
+        'the maintenance records behind this row could not be read.';
+      return `<div class="tl-wts"><div class="tl-wt-none">${why}</div></div>`;
     }
 
     /* Canonicalised again here rather than trusted. The items are written
