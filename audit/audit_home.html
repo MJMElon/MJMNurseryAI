@@ -1744,16 +1744,49 @@ function loadAuditTodo(){
            nothing. Work that placed fine and simply belongs to another
            nursery raises nothing here, which is the whole point of the
            scope test and is not a failure. */
-        /* What the strict walk already placed, so the same job is not
-           listed twice under two different dates. */
+        /* What the strict walk already placed AND is going to render, so
+           the same job is not listed twice under two different dates.
+
+           Deadlines that land in a month before START_M never render:
+           beforeStart() excludes them from both occurrences() and
+           carriedOverdue(). An item placed in one of those buckets is
+           silently gone. The auditor sees no row, the module page still
+           lists it as overdue, and the invariant (if the module can see
+           it, this list can too) is broken.
+
+           So a strict-walk bucket only counts as "placed" if its month
+           will actually appear somewhere in this view — current month,
+           or one of the past LOOKBACK_MONTHS that is not beforeStart. An
+           item in an out-of-view bucket stays "missing" and gets
+           surfaced on today by the fallback below.
+
+           The set of renderable months matches carriedOverdue() +
+           current — anything past the lookback stays out (it belongs to
+           the auditor scrolling forward, not to today). */
+        const renderableMonths = new Set();
+        for (let back = 0; back <= LOOKBACK_MONTHS; back++) {
+          const d = new Date(year, month - back, 1);
+          const y = d.getFullYear(), m = d.getMonth();
+          if (beforeStart(y, m)) continue;
+          renderableMonths.add(y + '-' + m);
+        }
         const placedKeys = new Set();
-        MAINT_OCCURRENCES.forEach(mo => (mo.items || []).forEach(it =>
-          placedKeys.add(it.nursery + '|' + it.plot + '|' + it.wt)));
+        MAINT_OCCURRENCES.forEach(mo => {
+          if (!renderableMonths.has(mo.y + '-' + mo.m)) return;
+          (mo.items || []).forEach(it =>
+            placedKeys.add(it.nursery + '|' + it.plot + '|' + it.wt));
+        });
         const missing = loose.filter(it =>
           !placedKeys.has(it.nursery + '|' + it.plot + '|' + it.wt));
         diag.filledGaps = missing.length;
+        diag.renderableMonths = [...renderableMonths];
 
-        if (missing.length || (unplaceable && !MAINT_OCCURRENCES.length)) {
+        /* Same trigger widening as `missing`: strict-walk buckets that
+           will never render must not veto the fallback. Otherwise an
+           unplaceable count is silenced by an invisible July bucket. */
+        const renderableStrictCount = MAINT_OCCURRENCES.filter(
+          mo => renderableMonths.has(mo.y + '-' + mo.m)).length;
+        if (missing.length || (unplaceable && !renderableStrictCount)) {
           const now = new Date();
           const plots = new Map();
           const nurseries = new Set();
@@ -1783,6 +1816,11 @@ function loadAuditTodo(){
           diag.fallbackItems = loose.length;
         }
       }
+      diag.startMonth = START_Y + '-' + String(START_M + 1).padStart(2, '0');
+      diag.today      = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      diag.strictBucketsByMonth =
+        MAINT_OCCURRENCES.map(mo => mo.y + '-' + String(mo.m + 1).padStart(2, '0')
+                                  + '-' + String(mo.d).padStart(2, '0'));
       console.log('[audit-home] maintenance timeline:', diag,
                   'SCOPE_NURSERIES=', SCOPE_NURSERIES);
     } catch (e) {
