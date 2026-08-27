@@ -158,14 +158,25 @@ const PAGES = [
        now, System Setting → Portal View & Function, and this screen no longer
        asks the same question a second time in a way that could disagree.
 
-       Signing off is different, and stays here. Verifying, approving and
-       taking the month away are things one person may do and the next may
-       not, which is exactly what a per-person screen is for. */
+       Signing off is different, and stays here. Verifying, correcting,
+       removing and taking the month away are things one person may do and
+       the next may not, which is exactly what a per-person screen is for. */
     actions:[
       { key:'verify', label:'Verify work done',
         desc:'Sign off a record a worker made, so the office can see it was checked' },
-      { key:'approve', label:'Approve work done',
-        desc:'The second signature, after verifying — the office agreeing the work stands' },
+      /* dflt:false on both, and it does two jobs. It renders the box unticked
+         until somebody ticks it, matching canMaintCorrect exactly — the tick
+         is the only thing that says yes. And it keeps them out of the seeding
+         below, so merely OPENING somebody's row does not write an answer into
+         it. */
+      { key:'edit', label:'Edit work done', dflt:false,
+        desc:'Correct a record already saved — the plot, the batch, the quantity, the remark' },
+      /* Its own tick, not a corner of Edit. Correcting a figure and removing
+         the morning it was recorded for are different acts with different
+         consequences, and somebody trusted to fix a typo is not automatically
+         somebody trusted to make a record disappear. */
+      { key:'delete', label:'Delete work done', dflt:false,
+        desc:'Remove a record from the books altogether. It does not come back' },
       { key:'export', label:'Download the month',
         desc:'Take the nursery\u2019s records away as a spreadsheet' }
     ] },
