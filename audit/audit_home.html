@@ -2028,17 +2028,32 @@ function loadAuditTodo(){
      empty too, say which of the two is missing. A silent gap is what made
      this hard to diagnose the first time. */
   function _maintTypesHtml(o, oy, om, pending){
-    const items = o._maintItems || [];
-    const fallback = (why) => {
-      const flat = _plotsHtml(o, oy, om, pending);
-      return flat || `<div class="tl-wts"><div class="tl-wt-none">${why}</div></div>`;
-    };
-    if (!items.length)
-      return fallback('The plots are pending but the job each is waiting on did not come through. Reload; if it stays, the maintenance records are missing their work type.');
-    const inScope = new Set(pending.map(x => x.nursery));
-    const mine = items.filter(it => inScope.has(it.nursery));
-    if (!mine.length)
-      return fallback('Nothing pending in the nurseries on screen.');
+    /* `pending` is the nurseries a separate check thinks are unfinished.
+       Where it has an answer, use it. Where it does not, fall back to the
+       whole scope rather than to nothing: everything in this row was put
+       there by a walk that already dropped anything out of scope, so the
+       scope is the honest wider net. */
+    const scope = pending.length ? pending.map(x => x.nursery) : SCOPE_NURSERIES;
+    const inScope = new Set(scope);
+
+    let mine = (o._maintItems || []).filter(it => inScope.has(it.nursery));
+
+    /* Two lists come off the same walk: which plots are pending, and which
+       job each is waiting on. If the second is missing — an older cached
+       page, a record with no work type — the first is still worth drawing.
+       Better one group headed "Others" than a row with nothing under it. */
+    if (!mine.length && o._maintPlots) {
+      o._maintPlots.forEach((set, nur) => {
+        if (!inScope.has(nur)) return;
+        [...set].forEach(plot => mine.push({ nursery: nur, plot: plot, wt: 'other', on: '' }));
+      });
+    }
+
+    if (!mine.length) {
+      return `<div class="tl-wts"><div class="tl-wt-none">` +
+             `No pending plot came through for this deadline. Reload; if it stays, ` +
+             `the maintenance records behind this row could not be read.</div></div>`;
+    }
 
     /* Canonicalised again here rather than trusted. The items are written
        that way, but a group is not the place to find out otherwise: a
@@ -2181,10 +2196,18 @@ function loadAuditTodo(){
       /* Only live rows get circles. A row whose window has not opened
          renders greyed and does not navigate, so plot shortcuts into
          it would be links to a screen with nothing to record. */
-      const plotsHtml = live
-        ? (o.mod === 'maint' ? _maintTypesHtml(o, oy, om, pending)
-                             : _plotsHtml(o, oy, om, pending))
-        : '';
+      /* Maintenance is not gated on `live`. Every other row has to work out
+         whether its window is open and whether anything in it is still
+         owed. A maintenance row does not: it EXISTS because a deadline has
+         pending work on it — that is the only reason one is created — and
+         it arrives carrying the very plots that are pending. Asking a
+         second, separately-derived question ("is any nursery still not
+         done?") could only ever subtract from that, and when it came back
+         empty the row drew with nothing underneath: not "no work", which
+         it never means, but a silent gap. */
+      const plotsHtml = (o.mod === 'maint')
+        ? _maintTypesHtml(o, oy, om, pending)
+        : (live ? _plotsHtml(o, oy, om, pending) : '');
       const due = dueInfo(o, oy, om);
 
       return `<div class="tl-item ${k==='overdue'?'overdue':''}${
