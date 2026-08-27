@@ -70,6 +70,16 @@
      it. */
   .act-kids { margin:8px 0 2px 28px; padding-left:12px; border-left:2px solid #ede9fe;
               display:flex; flex-direction:column; gap:8px; }
+
+  /* One of the five doors. A heavier box than the pages inside it, so the
+     hierarchy is visible at a glance rather than being a matter of reading
+     every label: five doors, and the FC Portal has rooms. */
+  .area-block { border:1.5px solid #e2e8f0; border-radius:18px; padding:15px 17px; }
+  .area-block.on { border-color:#c4b5fd; background:#faf5ff; }
+  .area-pages { margin-top:14px; padding-top:13px; border-top:1px dashed #ddd6fe; }
+  /* The pages sit on white inside a tinted door, or two shades of the same
+     violet have to be told apart. */
+  .area-block.on .page-block { background:white; }
   .nur input { accent-color:#7c3aed; cursor:pointer; }
   .hidden { display:none !important; }
 </style>
@@ -190,6 +200,37 @@ const PAGES = [
   { key:'culling',     label:'Culling Calculator' },
 ];
 
+/* The five places a person can be sent, and the nursery each is confined to.
+ *
+ * The scan module used to be one thing you either had or did not, with the FC
+ * Portal's five pages hanging directly off it. It is really five doors, and
+ * they are not the same job — the back office, the two phone apps, the worker
+ * register and this screen.
+ *
+ * Stored as permissions.scan_areas.<key>.view, with the nursery list under
+ * scan_area_nurseries.<key>. Read by MJMAccess.canScanArea() in
+ * shared/shared_access.js, which is also where the fallback lives: an absent
+ * answer means nobody has been asked about this person yet, and the rule that
+ * governed the door before this screen existed answers instead. Nobody loses
+ * anything on the day this ships.
+ *
+ * The FC Portal carries its five pages inside it. Nothing else does — a
+ * nursery and a tick is the whole of what the others need.
+ */
+const AREAS = [
+  { key:'manage',  label:'Worker Portal Manage',
+    desc:'The back office on this site — the two portal doors, Worker System and Setting. Without it, opening this site sends them straight to whichever portal they hold below' },
+  { key:'fc',      label:'555 FC Portal',
+    desc:'The Field Conductor’s phone app at scan.mjmnursery.com, signed in with this e-mail account',
+    pages: PAGES },
+  { key:'worker',  label:'555 Worker Portal',
+    desc:'The worker’s phone app, entered with the PIN on their row of the payroll register' },
+  { key:'workers', label:'Worker System',
+    desc:'The register of workers — who is on the books, their section and their PIN' },
+  { key:'setting', label:'Setting',
+    desc:'This screen. Who may open what, for everybody' },
+];
+
 let profiles = [];        // everyone who holds the scan module
 let nurseries = [];       // distinct nursery names from shared_plots
 let openUid = null;       // the row expanded right now
@@ -252,14 +293,65 @@ function flatActions(pg) {
     (all, ac) => all.concat([ac], ac.children || []), []);
 }
 
-// null means every nursery. The pre-per-page list still answers for a person
-// whose access has not been re-saved since, or turning this on would silently
-// reopen every nursery for everyone who had been narrowed down.
+/* Is this door open to them?
+ *
+ * Has to conclude exactly what MJMAccess.canScanArea() concludes, or this
+ * screen lies about what it is showing. An absent answer is not "no" — it is
+ * "nobody has been asked", and the rule that governed the door before this
+ * screen existed answers instead. Kept as its own copy rather than calling
+ * MJMAccess: that reads the SIGNED-IN user's permissions, and this screen is
+ * looking at somebody else's. */
+function areaOn(perms, key) {
+  const entry = (perms.scan_areas || {})[key];
+  if (entry && entry.view !== undefined) return !!entry.view;
+
+  const mods = perms.modules || {};
+  const lvl = String(mods.scan || '').toLowerCase();
+  switch (key) {
+    case 'manage':  return lvl === 'admin' || !!perms.manage_users;
+    case 'fc':      return !!lvl && lvl !== 'none';
+    case 'worker':  return false;
+    case 'workers': {
+      if (perms.manage_users) return true;
+      const np = String(mods.npayroll || '').toLowerCase();
+      if (!np || np === 'none') return false;
+      const acts = (perms.npayroll_actions || {}).workers;
+      return acts ? !!acts.view : true;
+    }
+    case 'setting': return !!perms.manage_users;
+    default:        return false;
+  }
+}
+
+/** null means every nursery. */
+function areaNurseries(perms, key) {
+  const per = perms.scan_area_nurseries || {};
+  return Array.isArray(per[key]) ? per[key] : null;
+}
+
+/* A page's nurseries, inside the FC Portal.
+ *
+ * ABSENT MEANS "the same as the portal", not "all". That is the hierarchy the
+ * five sections are for: the FC Portal says which nurseries this person works
+ * in, and a page may narrow it further but never widen it.
+ *
+ * Backwards compatible on purpose. Nobody has an area list yet, so an absent
+ * page list falls through to an absent area list, which means every nursery —
+ * exactly what it meant before this existed. The legacy single list still
+ * answers ahead of that for anyone never re-saved.
+ */
 function pageNurseries(perms, key) {
   const per = perms.scan_nurseries || {};
   if (Array.isArray(per[key])) return per[key];
+  const area = areaNurseries(perms, 'fc');
+  if (area) return area;
   if (Array.isArray(perms.plot_status_nurseries)) return perms.plot_status_nurseries;
   return null;
+}
+
+/** True when the page has no list of its own and is simply following the portal. */
+function pageFollowsPortal(perms, key) {
+  return !Array.isArray((perms.scan_nurseries || {})[key]);
 }
 
 /* ---- the list ---- */
@@ -282,12 +374,54 @@ function rowHtml(p) {
 
 function panelHtml() {
   return '<div class="panel space-y-2.5">' +
-    PAGES.map(pageBlockHtml).join('') +
+    AREAS.map(areaBlockHtml).join('') +
     `<div class="flex items-center justify-end gap-2 pt-1">
        <button class="btn btn-ghost" data-cancel="1">Cancel</button>
        <button class="btn btn-save" id="save-btn">Save</button>
      </div>` +
     '</div>';
+}
+
+/* One of the five doors: a tick, the nurseries it is confined to, and — for
+   the FC Portal alone — the pages inside it. */
+function areaBlockHtml(area) {
+  const on = areaOn(draft, area.key);
+  const list = areaNurseries(draft, area.key);
+  const all = list === null;
+  const chosen = new Set(all ? [] : list);
+  return `
+    <div class="area-block ${on ? 'on' : ''}">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" class="chk mt-0.5" data-area="${area.key}" ${on ? 'checked' : ''}>
+        <span class="min-w-0">
+          <span class="block text-[14px] font-black text-slate-800">${esc(area.label)}</span>
+          <span class="block text-[11px] text-slate-400 leading-snug">${esc(area.desc || '')}</span>
+        </span>
+      </label>
+
+      <div class="mt-2.5 ${on ? '' : 'hidden'}">
+        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nurseries</div>
+        <div class="flex flex-wrap gap-2">
+          <label class="nur ${all ? 'sel' : ''}">
+            <input type="checkbox" data-anall="${area.key}" ${all ? 'checked' : ''}> All
+          </label>
+          ${nurseries.map((n) => `
+            <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
+              <input type="checkbox" data-narea="${area.key}" data-nname="${esc(n)}"
+                     ${!all && chosen.has(n) ? 'checked' : ''}>
+              ${esc(n)}
+            </label>`).join('')}
+        </div>
+      </div>
+
+      ${(area.pages && area.pages.length) ? `
+        <div class="area-pages ${on ? '' : 'hidden'}">
+          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+            What they may open in it
+          </div>
+          <div class="space-y-2.5">${area.pages.map(pageBlockHtml).join('')}</div>
+        </div>` : ''}
+    </div>`;
 }
 
 /* One tick, and whatever is nested under it. Recursive so Record work's five
@@ -314,9 +448,10 @@ function actionRowHtml(pg, ac) {
 
 function pageBlockHtml(pg) {
   const on = pageOn(draft, pg.key);
-  const list = pageNurseries(draft, pg.key);
-  const all = list === null;
-  const chosen = new Set(all ? [] : list);
+  const follows = pageFollowsPortal(draft, pg.key);
+  const chosen = new Set(follows ? [] : pageNurseries(draft, pg.key) || []);
+  // Only what the portal itself holds — a page cannot reach past it.
+  const offer = areaNurseries(draft, 'fc') || nurseries;
   return `
     <div class="page-block ${on ? 'on' : ''}">
       <label class="flex items-center gap-3 cursor-pointer">
@@ -332,16 +467,20 @@ function pageBlockHtml(pg) {
         </div>
       </div>` : ''}
 
+      ${/* A page may narrow the portal's nurseries but never widen them, so
+            only the portal's own are offered here. Following the portal is
+            the normal state and the first chip; picking nurseries makes this
+            page an exception to it. */''}
       <div class="mt-2.5 ${on ? '' : 'hidden'}" data-nur-for="${pg.key}">
         <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nurseries</div>
         <div class="flex flex-wrap gap-2">
-          <label class="nur ${all ? 'sel' : ''}">
-            <input type="checkbox" data-nall="${pg.key}" ${all ? 'checked' : ''}> All
+          <label class="nur ${follows ? 'sel' : ''}">
+            <input type="checkbox" data-nsame="${pg.key}" ${follows ? 'checked' : ''}> Same as portal
           </label>
-          ${nurseries.map((n) => `
-            <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
+          ${offer.map((n) => `
+            <label class="nur ${!follows && chosen.has(n) ? 'sel' : ''}">
               <input type="checkbox" data-npage="${pg.key}" data-nname="${esc(n)}"
-                     ${!all && chosen.has(n) ? 'checked' : ''}>
+                     ${!follows && chosen.has(n) ? 'checked' : ''}>
               ${esc(n)}
             </label>`).join('')}
         </div>
@@ -366,6 +505,19 @@ function openRow(uid) {
   draft = JSON.parse(JSON.stringify(p.permissions || {}));
   draft.scan_actions = draft.scan_actions || {};
   draft.scan_nurseries = draft.scan_nurseries || {};
+  draft.scan_areas = draft.scan_areas || {};
+  draft.scan_area_nurseries = draft.scan_area_nurseries || {};
+
+  /* The five doors, settled the same way and for the same reason as the pages
+     below: areaOn() falls back to whatever governed each door before this
+     screen existed, so what is drawn is what this person actually holds — and
+     saving must record that rather than turning an unasked question into a no.
+     Somebody who could open Worker System yesterday must still be able to
+     after an admin opens their row and presses Save without touching it. */
+  AREAS.forEach((a) => {
+    const entry = draft.scan_areas[a.key];
+    draft.scan_areas[a.key] = { ...(entry || {}), view: areaOn(draft, a.key) };
+  });
 
   /* Settle what the panel SHOWS into the draft the moment the row is opened,
      so Save records what the admin was looking at.
@@ -400,18 +552,22 @@ function openRow(uid) {
     draft.scan_actions[pg.key] = seeded;
   });
 
-  /* Settle the pre-per-page list into the five pages too, and drop it.
+  /* Settle the pre-per-page list, and drop it.
 
-     Without this, ticking "All" on a page did nothing at all for anyone still
-     on that list: "All" means removing the per-page entry, the old list then
-     answered in its place, and the tick came straight back off. The panel has
-     to be reading only what the panel writes. */
+     It used to be copied onto all five pages. Its home is the FC Portal now:
+     that is what it always meant — the nurseries this person works in — and
+     one list on the portal with the pages following it says so, where five
+     identical copies said it five times and drifted apart the first time
+     anybody edited one.
+
+     It has to be settled somewhere, not merely read: "All" means removing the
+     entry, and while the old list survived it would answer in its place and
+     the tick would come straight back off. The panel has to be reading only
+     what the panel writes. */
   if (Array.isArray(draft.plot_status_nurseries)) {
-    PAGES.forEach((pg) => {
-      if (!Array.isArray(draft.scan_nurseries[pg.key])) {
-        draft.scan_nurseries[pg.key] = draft.plot_status_nurseries.slice();
-      }
-    });
+    if (!Array.isArray(draft.scan_area_nurseries.fc)) {
+      draft.scan_area_nurseries.fc = draft.plot_status_nurseries.slice();
+    }
     delete draft.plot_status_nurseries;
   }
 
@@ -431,6 +587,56 @@ document.addEventListener('change', (e) => {
   if (!draft) return;
   const t = e.target;
 
+  if (t.dataset.area) {
+    draft.scan_areas = draft.scan_areas || {};
+    const entry = draft.scan_areas[t.dataset.area] || {};
+    entry.view = t.checked;
+    draft.scan_areas[t.dataset.area] = entry;
+    return render();
+  }
+  if (t.dataset.anall) {
+    // "All" is the ABSENCE of a list, so a nursery added next month is
+    // included without anybody re-ticking every person.
+    const key = t.dataset.anall;
+    draft.scan_area_nurseries = draft.scan_area_nurseries || {};
+    if (t.checked) delete draft.scan_area_nurseries[key];
+    else draft.scan_area_nurseries[key] = nurseries.slice();
+    return render();
+  }
+  if (t.dataset.narea) {
+    const key = t.dataset.narea;
+    draft.scan_area_nurseries = draft.scan_area_nurseries || {};
+    /* Coming out of "All" by picking one: that nursery becomes the whole
+       selection there and then, rather than making somebody untick All (which
+       selects everything) and then untick the rest. */
+    if (!Array.isArray(draft.scan_area_nurseries[key])) {
+      draft.scan_area_nurseries[key] = [t.dataset.nname];
+    } else {
+      draft.scan_area_nurseries[key] = [...document.querySelectorAll('[data-narea="' + key + '"]')]
+        .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
+    }
+    /* A page cannot reach past the portal it is in. Narrowing the portal
+       therefore narrows every page inside it, here and now — leaving a page
+       naming a nursery the portal no longer holds would be a setting that
+       reads one way and behaves another. */
+    if (key === 'fc') {
+      const held = new Set(draft.scan_area_nurseries[key] || []);
+      PAGES.forEach((pg) => {
+        const list = draft.scan_nurseries[pg.key];
+        if (!Array.isArray(list)) return;
+        const kept = list.filter((n) => held.has(n));
+        if (kept.length) draft.scan_nurseries[pg.key] = kept;
+        else delete draft.scan_nurseries[pg.key];   // back to following the portal
+      });
+    }
+    return render();
+  }
+  if (t.dataset.nsame) {
+    // Following the portal IS the absence of a page list.
+    delete draft.scan_nurseries[t.dataset.nsame];
+    return render();
+  }
+
   if (t.dataset.page) {
     const acts = draft.scan_actions[t.dataset.page] || {};
     acts.view = t.checked;
@@ -443,34 +649,25 @@ document.addEventListener('change', (e) => {
     draft.scan_actions[t.dataset.act] = acts;
     return render();
   }
-  if (t.dataset.nall) {
-    const key = t.dataset.nall;
-    // "All" is the ABSENCE of a list, not a list of everything — so a nursery
-    // added next month is included without anybody re-ticking every person.
-    if (t.checked) delete draft.scan_nurseries[key];
-    else draft.scan_nurseries[key] = nurseries.slice();
-    return render();
-  }
   if (t.dataset.npage) {
     const key = t.dataset.npage;
 
-    /* Coming out of "All" by picking a nursery: that nursery becomes the
-       whole selection, there and then.
-
-       These boxes used to be disabled while All was on, so narrowing to one
-       nursery meant unticking All — which selected every nursery — and then
-       unticking the other two. Three clicks, and a state in between that said
-       something nobody meant. Ticking the one you want now says it directly.
-
-       Only the ticking case exists: under All every box renders unticked, so
-       a click here is always a tick. */
+    /* Coming off "Same as portal" by picking a nursery: that nursery becomes
+       the whole selection there and then, rather than making somebody first
+       untick the follow and then untick the ones they do not want. Under the
+       follow every box renders unticked, so that click is always a tick. */
     if (!Array.isArray(draft.scan_nurseries[key])) {
       draft.scan_nurseries[key] = [t.dataset.nname];
       return render();
     }
 
-    draft.scan_nurseries[key] = [...document.querySelectorAll('[data-npage="' + key + '"]')]
+    const picked = [...document.querySelectorAll('[data-npage="' + key + '"]')]
       .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
+    // Unticking the last one is not "no nurseries at all" — an empty list
+    // would leave the page open and every plot hidden, which reads as broken.
+    // It means they have stopped making this page an exception.
+    if (picked.length) draft.scan_nurseries[key] = picked;
+    else delete draft.scan_nurseries[key];
     return render();
   }
   if (t.id === 'q') render();
@@ -480,6 +677,17 @@ $('q').addEventListener('input', render);
 async function save() {
   const p = profiles.find((x) => x.id === openUid);
   if (!p || !draft) return;
+
+  /* Nobody may close their own Setting door. It is the only way back in, and
+     an admin who unticks it on their own row has to be let back in by hand
+     from the database. The worker portal refuses the same thing for the same
+     reason — see worker_set_portal in shared/create_worker_portal.sql. */
+  const me = MJMAccess.user();
+  if (me && me.id === p.id && !((draft.scan_areas || {}).setting || {}).view) {
+    flash('You cannot switch Setting off for yourself — it is the way back in.');
+    return;
+  }
+
   const btn = $('save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
 
@@ -510,7 +718,12 @@ async function save() {
     await MJMAccess.load(_supabase);
     if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
     $('loading').classList.add('hidden');
-    if (!MJMAccess.canManageUsers()) { $('forbidden').classList.remove('hidden'); return; }
+    /* Setting is its own tick now, falling back to Manage Users for anybody
+       nobody has set one for. Kept as canScanArea rather than canManageUsers
+       so this screen answers to the same rule it writes — an admin who takes
+       Setting away from themselves loses it, which is honest, and the row
+       above refuses to be the one that does it. */
+    if (!MJMAccess.canScanArea('setting')) { $('forbidden').classList.remove('hidden'); return; }
 
     const [plots, people] = await Promise.all([
       _supabase.from('shared_plots').select('nursery_name'),

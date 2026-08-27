@@ -783,9 +783,12 @@ async function removeWorker(id) {
     if (!u) { window.location.href = '../index.html'; return; }
     userEmail = u.email || '';
 
-    /* The same gate the tab had. Reached from Worker Portal Manage now, but it is
-       still the payroll register and still answers to that module's access. */
-    if (!may('workers')) {
+    /* Its own tick on Setting now, which falls back to the payroll module's
+       access — the gate this tab has always had — for anybody nobody has been
+       through that screen for. See canScanArea() in shared/shared_access.js. */
+    if (typeof MJMAccess.canScanArea === 'function'
+        ? !MJMAccess.canScanArea('workers')
+        : !may('workers')) {
       alert('You do not have access to the Worker System.');
       window.location.href = 'scan_admin.html';
       return;

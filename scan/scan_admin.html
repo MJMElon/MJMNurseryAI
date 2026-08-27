@@ -139,13 +139,20 @@ $('worker-portal-link').addEventListener('click', (e) => {
       return;
     }
 
-    /* This is the back office, not the field. Anyone who is not an admin of
-       the module is sent where they were going anyway — the phone app — rather
-       than being shown a page of settings they cannot use. The module card on
-       the hub already routes them past it; this is for a typed URL or an old
-       bookmark. */
-    if (!MJMAccess.isAdminOf('scan')) {
-      window.location.replace('https://scan.mjmnursery.com/?cb=' + Date.now());
+    /* This is the back office, not the field. Anyone without it is sent where
+       they were going anyway — their own portal — rather than being shown a
+       page of settings they cannot use. The module card on the hub already
+       routes them past it; this is for a typed URL or an old bookmark.
+
+       WHICH portal is the point: a Field Conductor gets the FC Portal and a
+       supervisor who holds only the worker portal gets that one. Sending
+       everybody to the FC Portal, as this did, put the second kind in front
+       of a login for an app they do not use. Somebody holding neither goes
+       back to the hub instead of bouncing between two doors that are both
+       shut. */
+    if (!MJMAccess.canScanArea('manage')) {
+      const home = MJMAccess.scanHome();
+      window.location.replace(home || '../index.html');
       return;
     }
 
@@ -153,16 +160,14 @@ $('worker-portal-link').addEventListener('click', (e) => {
     // second copy in the header bar that has gone with it.
     // User Access writes other people's permissions, which the database policy
     // only lets a user-manager do — so it is not offered to anyone else.
-    if (!MJMAccess.canManageUsers()) $('tool-access').classList.add('hidden');
-
-    /* The Worker System came here from the Payroll module and kept that
-       module's access with it — a move should not quietly hand the payroll
-       register to anybody who can open this page. Shown to whoever could
-       open the tab before, and to nobody else. */
-    const mayWorkers = (typeof MJMAccess.canDo === 'function')
-      ? MJMAccess.canDo('npayroll', 'workers', 'view')
-      : true;
-    if (!mayWorkers) $('tool-workers').classList.add('hidden');
+    /* Each door on this page, by its own tick on Setting. Every one of them
+       falls back to the rule that governed it before that screen existed, so
+       nobody's access changed on the day the ticks arrived — see
+       canScanArea() in shared/shared_access.js. */
+    if (!MJMAccess.canScanArea('setting')) $('tool-access').classList.add('hidden');
+    if (!MJMAccess.canScanArea('workers')) $('tool-workers').classList.add('hidden');
+    if (!MJMAccess.canScanArea('fc')) $('portal-link').classList.add('hidden');
+    if (!MJMAccess.canScanArea('worker')) $('worker-portal-link').classList.add('hidden');
 
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');
