@@ -1222,6 +1222,9 @@ const I18N = {
     'pdf.include':'Include schedules', 'btn.cancel':'Cancel', 'btn.downloadPdf':'⬇ Download PDF',
     'rec.tarikh':'Date', 'rec.jenis':'Work Type', 'rec.racun':'Chemical',
     'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Quantity', 'rec.gaia':'Gaia', 'rec.remark':'Remark',
+    'rec.audit':'Audit', 'rec.auditOk':'Satisfied', 'rec.auditBad':'Unsatisfied',
+    'rec.auditOkTip':'The auditor checked this job and passed it',
+    'rec.auditBadTip':'The auditor checked this job and did not pass it',
     'rec.allJenis':'All Work Types', 'rec.allPlot':'All Plots', 'rec.filterDate':'Filter by date…',
     'rec.totalTasks':'Total Tasks', 'rec.gaiaDone':'Gaia Done', 'rec.gaiaPending':'Gaia Pending',
     'rec.donePct':'Done %', 'rec.none':'No records found.',
@@ -1306,6 +1309,9 @@ const I18N = {
     'pdf.include':'Sertakan jadual', 'btn.cancel':'Batal', 'btn.downloadPdf':'⬇ Muat Turun PDF',
     'rec.tarikh':'Tarikh', 'rec.jenis':'Jenis Kerja', 'rec.racun':'Racun / Bahan',
     'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Kuantiti', 'rec.gaia':'Gaia', 'rec.remark':'Catatan',
+    'rec.audit':'Audit', 'rec.auditOk':'Memuaskan', 'rec.auditBad':'Tidak Memuaskan',
+    'rec.auditOkTip':'Juruaudit telah memeriksa kerja ini dan meluluskannya',
+    'rec.auditBadTip':'Juruaudit telah memeriksa kerja ini dan tidak meluluskannya',
     'rec.allJenis':'Semua Jenis Kerja', 'rec.allPlot':'Semua Plot', 'rec.filterDate':'Tapis ikut tarikh…',
     'rec.totalTasks':'Jumlah Tugasan', 'rec.gaiaDone':'Gaia Selesai', 'rec.gaiaPending':'Gaia Belum',
     'rec.donePct':'% Selesai', 'rec.none':'Tiada rekod dijumpai.',
@@ -1821,12 +1827,20 @@ function renderAll() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   WHAT THE FIELD RECORDED
+   WHAT THE FIELD RECORDED — ONCE SOMEBODY HAS VERIFIED IT
    The FC Scan Portal's Maintenance module saves one row per job done into
    nops_maint_field_records — the date the work actually happened and the
    batches that were standing in the plot. Those are the two columns this
    page otherwise chases by phone, so they are read back here and written
    onto the matching work-record row.
+
+   VERIFIED ONES ONLY. Saving is a worker saying what they did; it is not
+   the nursery agreeing it happened. Until a Field Conductor presses Verify
+   on that record, it does not reach this list, does not fill in a date, does
+   not tick anybody on the Worker Record, and does not count towards the
+   month. Verifying is what links it — and unverifying unlinks it again,
+   through the same "the field record has gone" path that already handles a
+   deleted one.
 
    A field record finds its row by job + plot + the round the schedule asked
    for it in ("Round 2: ..." in the racun column is the second seven-day
@@ -1845,32 +1859,112 @@ const _FIELD_JENIS = {
   interrow: 'Meracun rumput secara selingan'
 };
 
+/* Every read here carries the same filter, in every fallback: a record that
+   nobody has verified is not this page's business. Putting it on the query
+   rather than filtering after means an unverified row never arrives, so no
+   later change to this file can forget it. */
+const _verifiedOnly = (q) => q.not('verified_at', 'is', null);
+
 async function loadFieldRecords() {
   if (!_supabase) return;
   try {
     // Paged: the field writes roughly one row per plot per job per week, so
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
-    let res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by')
+    let res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, verified_at'))
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
     // still recording the work itself, so fall back to reading what is there.
     if (res.error) {
-      res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty')
+      res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, verified_at'))
         .order('id', { ascending: true }));
       // Still no? Then this database predates the batch columns too.
       if (res.error && /column .* does not exist|schema cache/i.test(String(res.error.message || ''))) {
-        res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-          .select('id, work_date, plot_name, work_type, jenis')
+        res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+          .select('id, work_date, plot_name, work_type, jenis, verified_at'))
           .order('id', { ascending: true }));
       }
     }
-    if (res.error) { console.warn('[maint] field records unavailable:', res.error.message); return; }
+    if (res.error) {
+      /* If verified_at is what is missing, this database predates
+         shared/add_maint_field_verify.sql and nothing here can tell a
+         verified record from an unverified one. Link NOTHING and say so —
+         linking everything would be this page quietly deciding that unchecked
+         work counts, which is the one thing the change was made to stop. */
+      if (/verified_at/i.test(String(res.error.message || ''))) {
+        console.warn('[maint] this database has no verified_at column on '
+          + 'nops_maint_field_records, so verified work cannot be told from '
+          + 'unverified. Nothing is linked. Run shared/add_maint_field_verify.sql.');
+        fieldRecords = [];
+        return;
+      }
+      console.warn('[maint] field records unavailable:', res.error.message);
+      return;
+    }
     fieldRecords = res.data || [];
   } catch (e) { console.warn('[maint] field records unavailable:', e); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WHAT THE AUDITOR SAID
+   The Auditor Portal's Maintenance module files one verdict per job into
+   audit_maintenance_audits — Satisfied or Unsatisfied, with the photo and
+   the remark that go with it. Only the verdict is read here: this list is
+   showing whether the work passed, not conducting the audit.
+
+   task_id is a STRING of whichever id the auditor's card was built from —
+   the field record's for a job the portal submitted, this page's own record
+   id for one keyed here. Both are looked up, in that order, because a job
+   can exist as both and the field record is the one the auditor sees.
+
+   A missing verdict is not a failure. Most rows have not been audited, and
+   the ones that never will be still render an em dash rather than a gap.
+══════════════════════════════════════════════════════════════ */
+let maintAudits = {};             // task_id (string) → 'Satisfactory' | 'Unsatisfactory' | …
+
+async function loadMaintAudits() {
+  if (!_supabase) return;
+  try {
+    const res = await _mvFetchAll(() => _supabase
+      .from('audit_maintenance_audits')
+      .select('id, task_id, result, date')
+      .order('id', { ascending: true }));
+    if (res.error) {
+      /* Almost always RLS: the audit tables are readable by staff only once
+         shared/migration_audit_rls_align.sql has been run, and before that
+         only by audit-module users. Say which, because a silently empty
+         column looks exactly like "nothing has been audited yet". */
+      console.warn('[maint] audit verdicts unavailable, so the Audit column '
+        + 'will stay empty:', res.error.message);
+      return;
+    }
+    const by = {};
+    (res.data || []).forEach((a) => {
+      const k = String(a.task_id == null ? '' : a.task_id);
+      if (!k) return;
+      /* Re-audited: the later verdict is the answer. Ordered by id above, so
+         this is simply the last one seen. */
+      by[k] = a.result || '';
+    });
+    maintAudits = by;
+  } catch (e) { console.warn('[maint] audit verdicts unavailable:', e); }
+}
+
+/* Satisfied / Unsatisfied and nothing else. The auditor's table can also
+   hold 'Not Done' and a row can be half-filled offline; neither is a verdict
+   on the work, so neither is shown as one. */
+function _auditCell(r) {
+  const v = maintAudits[String(r._fieldId)] || maintAudits[String(r.id)] || '';
+  if (v === 'Satisfactory') {
+    return `<span class="audit-pill audit-ok" title="${t('rec.auditOkTip')}">${t('rec.auditOk')}</span>`;
+  }
+  if (v === 'Unsatisfactory') {
+    return `<span class="audit-pill audit-bad" title="${t('rec.auditBadTip')}">${t('rec.auditBad')}</span>`;
+  }
+  return '<span style="color:var(--text-faint);">—</span>';
 }
 
 /* "Round 2: Daconil 50gm" → 2 */
@@ -1985,9 +2079,16 @@ function applyFieldRecords(nursery, monthLbl) {
       if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
       if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
       if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
+      delete r._fieldId;
       syncTicks(r, null);
       return;
     }
+    /* Which field record this row is showing, so the Audit column can find
+       the auditor's verdict for it — the auditor files against the field
+       record's id, not this page's. Cleared above when the link goes, so an
+       unverified or deleted record does not leave a verdict pointing at
+       nothing. */
+    r._fieldId = f.id;
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
       r.tarikh = f.work_date || '-';
       r._fromFieldDate = 1;
@@ -3352,7 +3453,7 @@ function renderRecords() {
 
   const tbody = document.getElementById('rec-body');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
     return;
   }
 
@@ -3370,7 +3471,7 @@ function renderRecords() {
   sortedPlots.forEach(plot => {
     const recs = plotGroups[plot];
     html += `<tr class="plot-group-row">
-      <td colspan="9" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
+      <td colspan="10" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
         text-transform:uppercase;color:var(--green-text);background:var(--green-light);
         border-top:2px solid var(--green-mid);border-bottom:1px solid var(--green-mid);">
         📍 Plot ${plot}
@@ -3390,6 +3491,7 @@ function renderRecords() {
         <td style="text-align:center;font-weight:700;color:var(--text-head);">${_qtyCell(r)}</td>
         <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
+        <td style="text-align:center;">${_auditCell(r)}</td>
         <td style="white-space:nowrap;">
           ${r.checked
             ? `<span class="rec-checked-badge" title="Checked — locked for normal users">✓ Checked</span>` +
@@ -4251,6 +4353,8 @@ async function initDb() {
       // What the Field Conductors have already recorded — read alongside the
       // rest so the first paint of Work Record already carries their dates.
       loadFieldRecords(),
+      // And what the auditor made of them, for the Audit column.
+      loadMaintAudits(),
       // The Setting tab's own four lists, and the plot names they hang off.
       loadSharedPlots(),
       loadSettingLists()

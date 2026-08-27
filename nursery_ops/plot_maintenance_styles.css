@@ -418,6 +418,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
   color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:999px;padding:6px 14px;margin-right:6px;vertical-align:middle;}
 .chk-btn.chk-locked{cursor:not-allowed;opacity:.55;}
 
+/* ─── AUDIT VERDICT ───
+   The Auditor Portal's answer for this job, in that portal's own two
+   colours so the same verdict looks the same on both screens. Read-only:
+   deliberately not a button, because the audit is not conducted here. */
+.audit-pill{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.4px;
+  text-transform:uppercase;border-radius:999px;padding:5px 12px;white-space:nowrap;
+  vertical-align:middle;}
+.audit-ok {color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;}
+.audit-bad{color:#b91c1c;background:#fff1f1;border:1.5px solid #fecaca;}
+#recview-list .rec-table .audit-pill{font-size:11px;padding:4px 10px;}
+
 /* ─── DOSAGE CALC — larger type throughout ───
    !important is needed because much of this panel carries inline font-size. */
 #tab-calc, #tab-calc div, #tab-calc label, #tab-calc span{ }
