@@ -38,7 +38,7 @@
 <div id="loading" class="max-w-[1200px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="wrap hidden">
-  <a class="page-back" href="scan_admin.html">&larr; FC Portal Manage</a>
+  <a class="page-back" href="scan_admin.html">&larr; Worker Portal Manage</a>
 
 <section id="tab-workers" class="panel">
     <div class="bar">
@@ -677,7 +677,7 @@ async function removeWorker(id) {
     if (!u) { window.location.href = '../index.html'; return; }
     userEmail = u.email || '';
 
-    /* The same gate the tab had. Reached from FC Portal Manage now, but it is
+    /* The same gate the tab had. Reached from Worker Portal Manage now, but it is
        still the payroll register and still answers to that module's access. */
     if (!may('workers')) {
       alert('You do not have access to the Worker System.');
