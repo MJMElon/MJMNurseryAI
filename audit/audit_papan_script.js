@@ -691,15 +691,24 @@ function renderAuditList(){
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
 
-  // Completion section — visible to all, re-audit only for admin
-  if(audited.length){
-    if(compSection)compSection.style.display='block';
-    document.getElementById('completion-count').textContent=fmtNum(audited.length)+' audited';
-    const admin=isAdmin();
-    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot))
-      .map(b=>makeCard(b,{canView:true,canAudit:admin})).join('');
-  } else {
-    if(compSection)compSection.style.display='none';
+  /* The Completion section is gone from the markup — Completed Records
+     below answers the same question across every month. Kept as a guarded
+     no-op rather than deleted outright: `audited` is still computed above
+     and still used by the counts, and a page that reintroduced the section
+     would want this back. Every lookup is null-checked now; the old code
+     assumed #completion-count and #completion-list existed and would have
+     thrown the moment the markup went. */
+  if(compSection && compListEl){
+    if(audited.length){
+      compSection.style.display='block';
+      const cnt = document.getElementById('completion-count');
+      if(cnt) cnt.textContent=fmtNum(audited.length)+' audited';
+      const admin=isAdmin();
+      compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot))
+        .map(b=>makeCard(b,{canView:true,canAudit:admin})).join('');
+    } else {
+      compSection.style.display='none';
+    }
   }
 }
 

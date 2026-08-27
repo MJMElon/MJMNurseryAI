@@ -26,6 +26,19 @@ const NURSERY_LABELS = {
   UNN1: 'UNN 1 — Ulu Niah Nursery 1',
   UNN2: 'UNN 2 — Ulu Niah Nursery 2'
 };
+/* The code as it is WRITTEN, for the places that show it on its own — the
+   nursery circles across the top and the pill beside them. NURSERY_LABELS
+   already spells "UNN 1"; those spots were printing the stored code, so one
+   screen said UNN 1 and the next said UNN1 for the same nursery.
+
+   Display only. UNN1 without the space is what the column holds and what
+   every record, plot map and report is keyed by — nothing here changes
+   that, and nothing here may. */
+const NURSERY_SHORT = {
+  PN: 'PN', BNN: 'BNN', UNN1: 'UNN 1', UNN2: 'UNN 2'
+};
+const nurseryShort = n => NURSERY_SHORT[n] || n;
+
 /* Plain nursery name (no code prefix) for the big page header:
    "Batu Niah Nursery — Apr 2026". */
 const NURSERY_NAMES = {
@@ -614,7 +627,7 @@ function downloadPayrollPDF() {
     doc.setFontSize(12);
     doc.text(t('pay.form').toUpperCase(), MID, y + 12, { align: 'center' });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-    doc.text(`${NURSERY_NAMES[n] || n} (${n})  ·  ${t('pay.month')} ${m}`, MID, y + 19, { align: 'center' });
+    doc.text(`${NURSERY_NAMES[n] || n} (${nurseryShort(n)})  ·  ${t('pay.month')} ${m}`, MID, y + 19, { align: 'center' });
     doc.setDrawColor(13, 122, 71); doc.setLineWidth(0.6);
     doc.line(MARGIN, y + 23, PW - MARGIN, y + 23);
     doc.setLineWidth(0.2);
@@ -1773,7 +1786,7 @@ function _syncMonthButtons() {
 }
 
 function onNurseryChange() {
-  document.getElementById('nursery-pill').textContent = getNursery();
+  document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
 syncNurseryCircles();
   renderAll();
   autoSyncRecords();
@@ -4200,7 +4213,7 @@ try {
   if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
 } catch (_) {}
 _syncMonthButtons();
-document.getElementById('nursery-pill').textContent = getNursery();
+document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
 syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
 applySchedFolds();  // whichever schedule blocks this person keeps folded
