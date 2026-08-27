@@ -148,51 +148,24 @@ const PAGES = [
   { key:'barcode',     label:'Scan Barcode Counter' },
   { key:'do',          label:'Issue Collection DO' },
   { key:'maintenance', label:'Maintenance',
-    /* What the page is actually made of, one switch at a time.
+    /* What a person may do inside Maintenance, beyond opening it.
 
-       Maintenance is two jobs with a form between them — reading the office's
-       plan for the month, and recording a morning's work against it — and the
-       record form is five separate things, not all of which every nursery
-       wants keyed. So each is its own tick, and Record work carries its five
-       nested under it.
+       ONLY the three that are genuinely about the person. Which parts the
+       RECORD FORM offers — the schedule, batch selection, worker selection,
+       GPS, photos, the remark — used to be ticked here as well, and they are
+       not a question about a person at all: they are how this company records
+       maintenance, the same for everyone doing it. They live in one place
+       now, System Setting → Portal View & Function, and this screen no longer
+       asks the same question a second time in a way that could disagree.
 
-       THE SAME LIST, WITH THE SAME KEYS AND THE SAME DEFAULTS, is offered in
-       the 555 Worker Portal's own Settings screen — see
-       src/modules/maintenance/functions.js in the Barcode_Counter repository.
-       Change one, change the other, or the two portals stop agreeing about
-       what a tick means.
-
-       `dflt` is what an ABSENT answer means, and it matters. Everything is on
-       by default so this screen takes nothing away from anybody: a Field
-       Conductor saved before these switches existed has no `batches` entry at
-       all, and reading that as off would empty his record form on the morning
-       of the deploy. GPS is the exception — it asks the phone for a location
-       and stores it against a person's name, which is not a thing to switch
-       on for the whole estate because a new version shipped.
-
-       Left without a `dflt`: record, verify and export, the three that were
-       here first. They keep the older rule — an absent answer on a page that
-       HAS been configured is a no — because changing what they mean would
-       change access already saved. */
+       Signing off is different, and stays here. Verifying, approving and
+       taking the month away are things one person may do and the next may
+       not, which is exactly what a per-person screen is for. */
     actions:[
-      { key:'schedule', label:'Schedule maintenance work', dflt:true,
-        desc:'This week’s outstanding plots and the month’s plan. Switched off, work can still be recorded — the plan simply is not on the phone' },
-      { key:'record', label:'Record work',
-        desc:'Key in a job from the work sheet — what a Field Conductor does himself',
-        children:[
-          { key:'batches', label:'Batch selection', dflt:true,
-            desc:'Tick which batches standing in the plot were worked on; the quantity is their sum' },
-          { key:'workers', label:'Worker selection', dflt:true,
-            desc:'Credit the job to the workers who did it — a broken phone, a PIN that will not take' },
-          { key:'gps', label:'GPS track record', dflt:false,
-            desc:'Walk the plot on a satellite map and keep the line walked. Will not start until the phone’s fix is better than 30 m, and the phone asks the person’s permission the first time' },
-          { key:'photos', label:'Upload photo', dflt:true,
-            desc:'Up to three pictures of the work done' },
-          { key:'remark', label:'Remark', dflt:true,
-            desc:'A line of free text on the record' }
-        ] },
       { key:'verify', label:'Verify work done',
         desc:'Sign off a record a worker made, so the office can see it was checked' },
+      { key:'approve', label:'Approve work done',
+        desc:'The second signature, after verifying — the office agreeing the work stands' },
       { key:'export', label:'Download the month',
         desc:'Take the nursery\u2019s records away as a spreadsheet' }
     ] },
