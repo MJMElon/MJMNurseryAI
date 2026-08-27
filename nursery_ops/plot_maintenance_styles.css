@@ -175,9 +175,33 @@ td.check-td.ticked::after{content:"";position:absolute;left:50%;top:50%;width:6p
 td.check-td.modified::before{border-color:#f0b429;background:#fef3c7;}
 td.check-td.modified.ticked::before{border-color:#d97706;background:#d97706;}
 tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background:var(--green-light) !important;color:var(--green-text) !important;border-top:2px solid var(--green-mid);text-transform:uppercase;vertical-align:middle;white-space:normal;line-height:1.3;}
+/* Fixed layout, so the colgroup in the HTML decides the columns and the
+   content never does. Auto layout gave every nursery a different table —
+   UNN 2's longer chemical names squeezed the date column until the year
+   wrapped, BNN's did not — and two screens of the same thing that are not
+   the same shape cannot be read side by side.
+
+   min-width is what keeps that promise on a narrow screen: below it the
+   wrapper scrolls (.tbl-wrap is overflow-x:auto) rather than the columns
+   quietly collapsing back into whatever fits. */
+.rec-table{table-layout:fixed;width:100%;min-width:1325px;}
 .rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-bottom:2px solid var(--border-strong);white-space:nowrap;}
 .rec-table thead th.th-left{text-align:left;}
 .rec-table tbody td{padding:10px 14px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
+/* The date is one line, always. It is the column that gave the game away —
+   "07 Aug 2026" over two lines in one nursery and one in another — and the
+   fixed width above is chosen to hold it, so saying so here means a future
+   change to that width fails loudly (an overflow) instead of quietly
+   re-wrapping. Batch, Quantity and Audit are short and fixed-shape for the
+   same reason. */
+.rec-table tbody td:nth-child(1),
+.rec-table tbody td:nth-child(5),
+.rec-table tbody td:nth-child(6),
+.rec-table tbody td:nth-child(9){white-space:nowrap;}
+/* Work type and remark are free text and may run long: wrap them rather
+   than letting them spill over the column beside them. */
+.rec-table tbody td:nth-child(2),
+.rec-table tbody td:nth-child(8){overflow-wrap:anywhere;}
 .rec-table tbody tr:last-child td{border-bottom:none;}
 .rec-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .rec-table tbody tr:hover td{background:var(--green-bg);}

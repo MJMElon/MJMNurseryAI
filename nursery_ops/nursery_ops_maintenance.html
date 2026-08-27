@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=51">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=52">
 </head>
 <body>
 
@@ -94,20 +94,47 @@
         </div>
         <div class="card"><div class="tbl-wrap">
           <table class="rec-table">
+            <!-- The columns are PINNED here rather than left to the browser.
+
+                 With the default auto layout a table divides itself up by
+                 what happens to be in it, so the same page laid itself out
+                 differently for every nursery — UNN 2's longer chemical names
+                 squeezed the date column until "07 Aug 2026" wrapped onto two
+                 lines, while BNN's fitted on one. Same screen, same columns,
+                 different shape, and no way to compare one nursery with
+                 another at a glance.
+
+                 With table-layout:fixed (see the stylesheet) these widths are
+                 the whole answer and the content is never consulted, so every
+                 nursery draws identically. They are proportions, not pixels:
+                 spare width is shared out among them, so the table still
+                 fills a wide screen and still scrolls on a narrow one. -->
+            <colgroup>
+              <col style="width:110px;"><!-- Date     — fits "07 Aug 2026" unwrapped -->
+              <col style="width:185px;"><!-- Work Type -->
+              <col style="width:250px;"><!-- Chemical — the pill ellipsises past this -->
+              <col style="width:62px;" ><!-- Plot     -->
+              <col style="width:105px;"><!-- Batch    -->
+              <col style="width:105px;"><!-- Quantity -->
+              <col style="width:58px;" ><!-- Gaia     -->
+              <col style="width:125px;"><!-- Remark   -->
+              <col style="width:105px;"><!-- Audit    -->
+              <col style="width:220px;"><!-- Check / Edit / Del -->
+            </colgroup>
             <thead><tr>
-              <th class="th-left" style="min-width:95px;"  data-i18n="rec.tarikh">Tarikh</th>
-              <th class="th-left" style="min-width:190px;" data-i18n="rec.jenis">Jenis Kerja</th>
-              <th class="th-left" style="min-width:210px;" data-i18n="rec.racun">Racun / Chemical</th>
-              <th style="text-align:center;"               data-i18n="rec.plot">Plot</th>
-              <th style="text-align:center;min-width:115px;" data-i18n="rec.batch">Batch</th>
-              <th style="text-align:center;min-width:95px;"  data-i18n="rec.qty">Quantity</th>
-              <th style="text-align:center;min-width:60px;"  data-i18n="rec.gaia">Gaia</th>
-              <th class="th-left" style="min-width:110px;" data-i18n="rec.remark">Remark</th>
+              <th class="th-left"          data-i18n="rec.tarikh">Tarikh</th>
+              <th class="th-left"          data-i18n="rec.jenis">Jenis Kerja</th>
+              <th class="th-left"          data-i18n="rec.racun">Racun / Chemical</th>
+              <th style="text-align:center;" data-i18n="rec.plot">Plot</th>
+              <th style="text-align:center;" data-i18n="rec.batch">Batch</th>
+              <th style="text-align:center;" data-i18n="rec.qty">Quantity</th>
+              <th style="text-align:center;" data-i18n="rec.gaia">Gaia</th>
+              <th class="th-left"          data-i18n="rec.remark">Remark</th>
               <!-- The Auditor Portal's verdict on this job. Read-only here:
                    the audit is conducted there, this list only shows how it
                    came out. -->
-              <th style="text-align:center;min-width:100px;" data-i18n="rec.audit">Audit</th>
-              <th style="min-width:90px;"></th>
+              <th style="text-align:center;" data-i18n="rec.audit">Audit</th>
+              <th></th>
             </tr></thead>
             <tbody id="rec-body"></tbody>
           </table>
@@ -561,7 +588,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=68"></script>
+<script src="plot_maintenance_script.js?v=69"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
