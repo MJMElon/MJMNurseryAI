@@ -158,6 +158,19 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
    The list below is what the page opens on, before the read lands. Losing
    the nursery read must not leave the register with nowhere to file
    anybody, so the seed is the six sections it has always had. */
+/* The four the register has always filed people under. operation_nurseries
+   does not necessarily carry all of them — it holds three today, and the
+   Worker System has four — so they are offered whatever that table says.
+   A section offered after its nursery is gone is a section nobody picks;
+   a section missing while people are still filed under it is a hole in the
+   register. Where a code IS in the table, the table's name wins. */
+const KEEP_NURSERIES = [
+  { code:'PN',   name:'PN — Pre Nursery'  },
+  { code:'BNN',  name:'BNN — Batu Niah'   },
+  { code:'UNN1', name:'UNN1 — Ulu Niah 1' },
+  { code:'UNN2', name:'UNN2 — Ulu Niah 2' }
+];
+/* Not nurseries, never in that table, and last on the list. */
 const FIXED_SECTIONS = [
   { code:'UNE',    name:'UNE'    },
   { code:'Driver', name:'Driver' }
@@ -205,7 +218,15 @@ async function loadSections() {
     out.push({ code, name });
   };
   /* A nursery whose name already IS its code reads "BNN — BNN" otherwise. */
-  nurseries.forEach(n => add(n.code, n.code === n.name ? n.code : n.code + ' — ' + n.name));
+  const byCode = new Map();
+  nurseries.forEach(n => byCode.set(n.code, n.code === n.name ? n.code : n.code + ' — ' + n.name));
+
+  /* The four always-offered nurseries first, in the order the yard says
+     them, wearing the table's name where the table has one. Then whatever
+     else the table holds — the new ones, which is the point of reading it.
+     Then UNE and Driver, which are not nurseries and belong at the end. */
+  KEEP_NURSERIES.forEach(k => add(k.code, byCode.get(k.code) || k.name));
+  nurseries.forEach(n => add(n.code, byCode.get(n.code)));
   FIXED_SECTIONS.forEach(f => add(f.code, f.name));
   setSections(out);
 }
