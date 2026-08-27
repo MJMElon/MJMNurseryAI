@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_worker_locations.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <!-- The register's own stylesheet, borrowed rather than copied. The screen
      moved; it did not get redrawn, and two copies of a stylesheet are two
@@ -158,23 +159,20 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
    The list below is what the page opens on, before the read lands. Losing
    the nursery read must not leave the register with nowhere to file
    anybody, so the seed is the six sections it has always had. */
-/* The four the register has always filed people under. operation_nurseries
-   does not necessarily carry all of them — it holds three today, and the
-   Worker System has four — so they are offered whatever that table says.
-   A section offered after its nursery is gone is a section nobody picks;
-   a section missing while people are still filed under it is a hole in the
-   register. Where a code IS in the table, the table's name wins. */
-const KEEP_NURSERIES = [
-  { code:'PN',   name:'PN — Pre Nursery'  },
-  { code:'BNN',  name:'BNN — Batu Niah'   },
-  { code:'UNN1', name:'UNN1 — Ulu Niah 1' },
-  { code:'UNN2', name:'UNN2 — Ulu Niah 2' }
-];
-/* Not nurseries, never in that table, and last on the list. */
-const FIXED_SECTIONS = [
-  { code:'UNE',    name:'UNE'    },
-  { code:'Driver', name:'Driver' }
-];
+/* Which section sits in which location, and the four the register has
+   always filed people under, are in shared_worker_locations.js — read by
+   this page and by System Setting's Location card, so the Team Board's
+   headings and that card cannot drift apart.
+
+   The four are offered whatever operation_nurseries says. It holds three
+   today and the register files people under four: a section offered after
+   its nursery is gone is a section nobody picks, while a section missing
+   while people are still filed under it is a hole in the register. */
+const LOC = MJMWorkerLocations;
+const KEEP_NURSERIES = LOC.KEEP_NURSERIES;
+/* Estate is a location with one section; Driver is not a location at all.
+   Both come last, after the nurseries. */
+const FIXED_SECTIONS = [{ code:'UNE', name:'UNE' }].concat(LOC.NON_LOCATION);
 let SECTIONS = [
   { code:'PN',     name:'PN — Pre Nursery'     },
   { code:'BNN',    name:'BNN — Batu Niah'      },
@@ -185,7 +183,7 @@ let SECTIONS = [
 ];
 let SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
 
-const nurseryCode = n => String(n || '').replace(/\s+/g, '').toUpperCase();
+const nurseryCode = n => LOC.code(n);
 
 function setSections(list) {
   SECTIONS = list;
@@ -381,18 +379,16 @@ function renderWorkers() { renderWorkerBoard(); }
    them. A division is a heading over sections, not a third column — Main
    Nursery is the three nurseries seen together, and nothing in the database
    has to learn the word. */
-const DIVISIONS = [
-  { name: 'Pre Nursery',  sections: ['PN'] },
-  /* Main Nursery is Batu Niah and the Ulu Niah nurseries. Matched rather
-     than listed, so a UNN 3 created in Operation Settings joins the two
-     already there instead of standing on its own at the end of the board
-     under a heading of its own — which is what an unplaced section gets,
-     and is right for a section nobody has decided about, but wrong for the
-     third of something. */
-  { name: 'Main Nursery', match: c => c === 'BNN' || /^UNN\d+$/.test(c) },
-  { name: 'Estate',       sections: ['UNE'] },
-  { name: 'Driver',       sections: ['Driver'] }
-];
+/* Pre Nursery, Main Nursery, Estate — the three places, straight from the
+   shared file — and then Driver, which is a section rather than a place and
+   still needs a column of its own on the board.
+
+   The locations RECOGNISE their sections rather than listing them, so a
+   UNN 3 created in Operation Settings joins the Main Nursery instead of
+   standing alone at the end under a heading of its own. */
+const DIVISIONS = LOC.LOCATIONS
+  .map(l => ({ name: l.name, match: l.match }))
+  .concat(LOC.NON_LOCATION.map(n => ({ name: n.name, sections: [n.code] })));
 
 function boardColumns() {
   const codes = SECTIONS.map(s => s.code);

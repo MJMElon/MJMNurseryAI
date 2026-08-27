@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_worker_locations.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -39,16 +40,24 @@
     .back-btn { justify-self:center; }
   }
 
-  /* Nursery rows: the name as somebody typed it, then the code the rest of
-     the system files work under. Both, because they are not the same string
-     and the difference is exactly what this table exists to show. */
-  .n-row { display:flex; align-items:center; gap:12px; padding:11px 4px;
+  /* A location and the sections in it. The name is given a fixed column so
+     the three read as a list of places rather than three sentences of
+     different lengths; the sections wrap under it on a narrow screen. */
+  .l-row { display:flex; align-items:flex-start; gap:14px; padding:12px 4px;
            border-bottom:1px solid #f8fafc; }
-  .n-row:last-child { border-bottom:none; }
-  .n-name { flex:1; font-size:13px; font-weight:800; color:#1e293b; }
+  .l-row:last-child { border-bottom:none; }
+  .l-name { width:130px; flex-shrink:0; font-size:13px; font-weight:800; color:#1e293b;
+            padding-top:3px; }
+  .l-codes { flex:1; display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+  .l-chip { display:inline-flex; align-items:center; gap:7px; padding:3px 10px 3px 3px;
+            border-radius:999px; background:#f8fafc; border:1px solid #eef2ff; }
+  .l-chip-name { font-size:11.5px; font-weight:600; color:#64748b; }
   .n-code { padding:3px 11px; border-radius:999px; background:#eef2ff; color:#4338ca;
             font-size:11px; font-weight:900; letter-spacing:.06em; }
-  .n-lic  { font-size:11px; font-weight:600; color:#94a3b8; }
+  @media (max-width:560px) {
+    .l-row { flex-direction:column; gap:8px; }
+    .l-name { width:auto; padding-top:0; }
+  }
 
   /* A switch per module. Big enough to hit on a tablet, and the label is
      part of the target — a 20px box is a miss waiting to happen. */
@@ -106,20 +115,20 @@
     <span aria-hidden="true"></span>
   </div>
 
-  <!-- ═══════════ NURSERIES ═══════════ -->
+  <!-- ═══════════ LOCATION ═══════════ -->
   <div class="card">
     <div class="card-head">
-      <span class="card-ico">🏢</span>
+      <span class="card-ico">📍</span>
       <span>
-        <span class="card-name">Nurseries</span>
-        <div class="card-sub">Kept in Operation → Settings → Manage Nurseries &amp; Base Maps.
-          Shown here because the Worker System files every worker under one of these,
-          so a nursery added there becomes a section here without anybody keying it twice.</div>
+        <span class="card-name">Location</span>
+        <div class="card-sub">Where the company works: Pre Nursery, Main Nursery, Estate.
+          The Main Nursery is more than one nursery, and those come from Operation →
+          Settings → Manage Nurseries &amp; Base Maps — so a nursery added there appears
+          here, and in the Worker System, without anybody keying it twice.</div>
       </span>
     </div>
     <div class="card-body">
       <div id="n-list"></div>
-      <div id="n-empty" class="muted hidden">No nursery has been created yet.</div>
       <div class="note note-info" style="margin-top:14px;">
         The <b>code</b> is the nursery's name with the spaces taken out — “UNN 1” files as
         <b>UNN1</b>. It is what every worker row, tick sheet and payroll listing is stored
@@ -128,7 +137,7 @@
       </div>
       <div style="margin-top:12px;">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block;"
-           href="../operation/operation_settings.html">Manage nurseries →</a>
+           href="../operation/operation_settings.html">Manage Main Nursery nurseries →</a>
       </div>
     </div>
   </div>
@@ -212,37 +221,72 @@ const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let userEmail = null;
 
-/* ══════════════ NURSERIES ══════════════
-   Read, never written. operation_nurseries is the register; a second list
-   here would be a second answer to the same question.
+/* ══════════════ LOCATION ══════════════
+   Three places, and the sections that sit in each. Read, never written:
+   operation_nurseries is the register, and a second list here would be a
+   second answer to the same question.
 
-   The code is the name with its spaces removed. That is not a guess about
-   the naming — the nurseries ARE named as codes with a space in them ("UNN
-   1"), and a new one goes in the same way, so the rule is a transcription
-   rather than an interpretation. Shown beside every name so a nursery named
-   some other way is obvious here, on a page somebody is already reading,
-   rather than in a payroll listing three weeks later. */
-function nurseryCode(name) {
-  return String(name || '').replace(/\s+/g, '').toUpperCase();
-}
+   Which section belongs to which location is not decided here either — it
+   is in shared_worker_locations.js, so the headings on this card and the
+   columns on the Worker System's Team Board cannot drift apart.
 
-async function loadNurseries() {
+   The four nursery sections the register has always used are shown whether
+   or not the nursery table carries them. It holds three today and the
+   register files people under four; a location card that showed only what
+   came back would be quietly missing one. */
+const LOC = MJMWorkerLocations;
+
+async function loadLocations() {
   const box = $('n-list');
+  let named = new Map();                     // code → {name, license}
+  let failed = null;
   try {
     const { data, error } = await _supabase
       .from('operation_nurseries').select('name,license').order('name');
     if (error) throw error;
-    const rows = data || [];
-    if (!rows.length) { box.innerHTML = ''; $('n-empty').classList.remove('hidden'); return; }
-    box.innerHTML = rows.map(n => `
-      <div class="n-row">
-        <span class="n-name">${esc(n.name)}</span>
-        ${n.license ? `<span class="n-lic">${esc(n.license)}</span>` : ''}
-        <span class="n-code">${esc(nurseryCode(n.name))}</span>
-      </div>`).join('');
+    (data || []).forEach(n => {
+      const c = LOC.code(n.name);
+      if (c) named.set(c, { name: String(n.name || '').trim(), license: n.license || '' });
+    });
   } catch (e) {
-    box.innerHTML = `<div class="note note-warn">Could not read the nursery list.<br>${esc(e.message || e)}</div>`;
+    failed = e;
   }
+
+  /* Everything the register can file somebody under: what the table holds,
+     plus the four it has always had. */
+  const codes = [];
+  LOC.KEEP_NURSERIES.forEach(k => { if (!codes.includes(k.code)) codes.push(k.code); });
+  [...named.keys()].forEach(c => { if (!codes.includes(c)) codes.push(c); });
+  if (!codes.includes('UNE')) codes.push('UNE');
+
+  const { locations, unplaced } = LOC.group(codes);
+
+  const chip = c => {
+    const n = named.get(c);
+    return `<span class="l-chip" title="${n ? esc(n.name) + (n.license ? ' · ' + esc(n.license) : '')
+                                            : 'Not in the nursery list'}">
+              <span class="n-code">${esc(c)}</span>
+              ${n && n.name !== c ? `<span class="l-chip-name">${esc(n.name)}</span>` : ''}
+            </span>`;
+  };
+
+  box.innerHTML =
+    locations.map(l => `
+      <div class="l-row">
+        <span class="l-name">${esc(l.name)}</span>
+        <span class="l-codes">${
+          l.codes.length ? l.codes.map(chip).join('')
+                         : '<span class="muted">Nothing filed here yet.</span>'}</span>
+      </div>`).join('') +
+    (unplaced.length ? `
+      <div class="l-row">
+        <span class="l-name" style="color:#92400e;">Not in a location</span>
+        <span class="l-codes">${unplaced.map(chip).join('')}</span>
+      </div>` : '') +
+    (failed ? `<div class="note note-warn" style="margin-top:12px;">
+                 Could not read the nursery list, so only the built-in sections are shown.<br>
+                 ${esc(failed.message || failed)}
+               </div>` : '');
 }
 
 /* ══════════════ PORTAL VIEW & FUNCTION ══════════════
@@ -562,7 +606,7 @@ async function clearBoundary() {
     /* Three independent reads. One failing — a table not yet created —
        must not leave the other two sections blank, so each says its own
        piece rather than one catch swallowing the page. */
-    loadNurseries();
+    loadLocations();
     loadPortals();
     loadBoundary();
   } catch (e) {
