@@ -1744,49 +1744,40 @@ function loadAuditTodo(){
            nothing. Work that placed fine and simply belongs to another
            nursery raises nothing here, which is the whole point of the
            scope test and is not a failure. */
-        /* What the strict walk already placed AND is going to render, so
-           the same job is not listed twice under two different dates.
+        /* What the strict walk already placed AS A BUCKET IN THE CURRENT
+           MONTH counts as "visible today". Anything else — a placed
+           bucket in a past month (beforeStart, or older than
+           LOOKBACK_MONTHS), a placed bucket in a future month, or
+           nothing at all — stays "missing" and gets a today-bucket so
+           the invariant holds: if the maintenance module can see a
+           task, this list can too.
 
-           Deadlines that land in a month before START_M never render:
-           beforeStart() excludes them from both occurrences() and
-           carriedOverdue(). An item placed in one of those buckets is
-           silently gone. The auditor sees no row, the module page still
-           lists it as overdue, and the invariant (if the module can see
-           it, this list can too) is broken.
+           The past-month buckets carriedOverdue() rescues are fine to
+           double: an overdue August-25 task shows both on its real
+           deadline (via carriedOverdue when the auditor pages forward)
+           and on today's row, and either read makes sense. Future-month
+           buckets similarly surface twice — once on today ("this is
+           coming"), once at their real deadline when the auditor pages
+           to that month.
 
-           So a strict-walk bucket only counts as "placed" if its month
-           will actually appear somewhere in this view — current month,
-           or one of the past LOOKBACK_MONTHS that is not beforeStart. An
-           item in an out-of-view bucket stays "missing" and gets
-           surfaced on today by the fallback below.
-
-           The set of renderable months matches carriedOverdue() +
-           current — anything past the lookback stays out (it belongs to
-           the auditor scrolling forward, not to today). */
-        const renderableMonths = new Set();
-        for (let back = 0; back <= LOOKBACK_MONTHS; back++) {
-          const d = new Date(year, month - back, 1);
-          const y = d.getFullYear(), m = d.getMonth();
-          if (beforeStart(y, m)) continue;
-          renderableMonths.add(y + '-' + m);
-        }
+           Current-month buckets are the one thing we DO NOT duplicate:
+           they render on today's view already, so a today-bucket for
+           the same task would put the same chip twice next to itself. */
+        const currentMonthKey = year + '-' + month;
         const placedKeys = new Set();
         MAINT_OCCURRENCES.forEach(mo => {
-          if (!renderableMonths.has(mo.y + '-' + mo.m)) return;
+          if ((mo.y + '-' + mo.m) !== currentMonthKey) return;
           (mo.items || []).forEach(it =>
             placedKeys.add(it.nursery + '|' + it.plot + '|' + it.wt));
         });
         const missing = loose.filter(it =>
           !placedKeys.has(it.nursery + '|' + it.plot + '|' + it.wt));
         diag.filledGaps = missing.length;
-        diag.renderableMonths = [...renderableMonths];
+        diag.currentMonthKey = currentMonthKey;
+        diag.visibleKeys     = placedKeys.size;
+        diag.looseItems      = loose.length;
 
-        /* Same trigger widening as `missing`: strict-walk buckets that
-           will never render must not veto the fallback. Otherwise an
-           unplaceable count is silenced by an invisible July bucket. */
-        const renderableStrictCount = MAINT_OCCURRENCES.filter(
-          mo => renderableMonths.has(mo.y + '-' + mo.m)).length;
-        if (missing.length || (unplaceable && !renderableStrictCount)) {
+        if (missing.length || (unplaceable && !placedKeys.size)) {
           const now = new Date();
           const plots = new Map();
           const nurseries = new Set();
@@ -2357,7 +2348,14 @@ function loadAuditTodo(){
        answer. */
     const showingToday = (viewY === year && viewM === month && selDay === day);
     if (selDay !== null) list = list.filter(o =>
-      (showingToday && occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue') ||
+      /* Maintenance always rides on today's view. Its deadline is set by
+         somebody else's work — a task the field files this morning is
+         pending the moment it lands, and the row that carries it needs
+         to be visible whether it happens to be due today, in the past
+         (overdue), or two days from now. The other modules run on the
+         auditor's own calendar and are date-scoped as before. */
+      (showingToday && (o.mod === 'maint' ||
+                        occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue')) ||
       (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
     if (active.size)     list = list.filter(o =>
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
