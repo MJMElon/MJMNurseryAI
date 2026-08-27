@@ -337,6 +337,10 @@ const PAYROLL_TYPES = {
 let _payrollView = 'pd';
 let payrollData  = {};   // `${nursery}_${month}_${type}` → { recId: { worker: qty } }
 let _payrollSaveTimer = null;
+/* `${nursery}_${month}` → names the field credited that matched no column on
+   that sheet. Filled by applyFieldRecords, shown by renderPayroll. Not saved:
+   it is a fact about the last sync, not about the month. */
+let _fieldUnmatched = {};
 
 function payrollKey(n, m, type) { return `${n}_${m}_${type}`; }
 
@@ -404,8 +408,17 @@ function renderPayroll() {
     const known = new Set(wk);
     const gone = [...new Set(Object.values(store).flatMap(c =>
       Object.keys(c || {}).filter(name => c[name] && !known.has(name))))].sort();
-    off.style.display = gone.length ? 'block' : 'none';
-    off.textContent = gone.length ? `${t('pay.offRegister')} ${gone.join(', ')}` : '';
+    /* And the other direction: a name the FIELD credited that never found a
+       column, so there was no tick to lose in the first place. See
+       applyFieldRecords — it is a worker's share of a plot going missing, and
+       it belongs on the sheet the share was supposed to land on. */
+    const nofit = (_fieldUnmatched[`${n}_${m}`] || []).filter((x) => !known.has(x));
+    const lines = [];
+    if (gone.length)  lines.push(`${t('pay.offRegister')} ${gone.join(', ')}`);
+    if (nofit.length) lines.push(`${t('pay.fieldNoColumn')} ${nofit.join(', ')}`);
+    off.style.display = lines.length ? 'block' : 'none';
+    off.textContent = lines.join('\n');
+    off.style.whiteSpace = 'pre-line';
   }
 
   if (!wk.length) {
@@ -1185,6 +1198,7 @@ const I18N = {
     'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them on the 555 Worker Portal\u2019s Manage page and they will appear here.',
     'pay.linkedNote':'Worker names come from the Worker System on the 555 Worker Portal\u2019s Manage page and follow any change made there.',
     'pay.offRegister':'⚠ Ticked this month but no longer a general worker of this nursery on the register, so their capacity is not counted:',
+    'pay.fieldNoColumn':'⚠ The field credited work to these names and they have no column here, so their share of the plot is not counted. Check the spelling against the register, or that they are a general worker of this nursery:',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
     /* Salary claim form (PDF) */
@@ -1272,6 +1286,7 @@ const I18N = {
     'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di halaman Manage Portal 555 FC dan nama akan muncul di sini.',
     'pay.linkedNote':'Nama pekerja diambil daripada Worker System di halaman Manage Portal 555 FC dan mengikut sebarang pindaan di sana.',
     'pay.offRegister':'⚠ Ditanda bulan ini tetapi bukan lagi pekerja am nurseri ini dalam daftar, jadi kapasiti mereka tidak dikira:',
+    'pay.fieldNoColumn':'⚠ Lapangan mengkreditkan kerja kepada nama ini tetapi tiada lajur di sini, jadi bahagian mereka tidak dikira. Semak ejaan dengan daftar, atau sama ada mereka pekerja am nurseri ini:',
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja', 'pay.workersRange':'Pekerja', 'pay.ofTotal':'daripada',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
@@ -2193,10 +2208,23 @@ function applyFieldRecords(nursery, monthLbl) {
   touched.forEach((type) => persistPayroll(nursery, monthLbl, type));
   if (touched.size) renderPayroll();
 
+  /* Somebody the field credited who has no column on this sheet.
+
+     This used to be a console warning and nothing else, which was tolerable
+     while the field only ever credited names a conductor had typed. It is not
+     any more: a worker recording their own morning IS the credit now, so a
+     name that does not match a column is that worker's share of the plot
+     going missing — quietly, from a piece-rate sheet, with the row still
+     looking complete. It gets said on the screen where the consequence is.
+
+     Usually a spelling that differs by more than punctuation, or somebody
+     whose register row is not a general worker of this nursery. */
+  _fieldUnmatched[`${nursery}_${monthLbl}`] = [...unmatched].sort();
   if (unmatched.size) {
     console.warn('[maint] the field credited work to names with no column on '
       + 'this nursery\'s Worker Record, so their capacity is not counted:',
       [...unmatched].join(', '));
+    try { renderPayroll(); } catch (_) {}
   }
 }
 
