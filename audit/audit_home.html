@@ -1650,8 +1650,26 @@ function loadAuditTodo(){
          The month is today's, not the one being browsed: this runs once
          at load, and the answer it is standing in for is "what do I owe
          now". */
-      const _thisMonth = MAINT_OCCURRENCES.some(mo => mo.y === year && mo.m === month);
-      if (!_thisMonth) {
+      /* ── THE PERMISSIVE WALK ALWAYS RUNS ──
+         It used to be a fallback, guarded first by "no buckets at all"
+         and then by "nothing this month". Both guards were guesses about
+         when the strict walk above could be trusted, and both were wrong
+         in turn: the row showed empty, then vanished, then stayed away
+         while the module page listed the very same work as overdue.
+
+         The strict walk drops a record for any of five reasons — a work
+         type set to zero days, no work date, a plot it cannot place, a
+         nursery out of scope, already audited. Four of those are right.
+         The ones that are not are invisible from here, and every round
+         of guessing which had cost a deploy.
+
+         So it runs every time now, and anything it finds that the strict
+         walk did not already place is added on today's date. The rule is
+         simple and does not depend on knowing which filter misfired: if
+         the maintenance module can see a task, this list can too. Work
+         already placed with a real deadline keeps that deadline — this
+         only fills gaps, it never duplicates. */
+      {
         /* The buckets came out empty, but that is not the same as "no
            work pending": push() also drops a record whose deadline could
            not be worked out. So the same rows are walked again with only
@@ -1705,11 +1723,20 @@ function loadAuditTodo(){
            nothing. Work that placed fine and simply belongs to another
            nursery raises nothing here, which is the whole point of the
            scope test and is not a failure. */
-        if (loose.length || unplaceable) {
+        /* What the strict walk already placed, so the same job is not
+           listed twice under two different dates. */
+        const placedKeys = new Set();
+        MAINT_OCCURRENCES.forEach(mo => (mo.items || []).forEach(it =>
+          placedKeys.add(it.nursery + '|' + it.plot + '|' + it.wt)));
+        const missing = loose.filter(it =>
+          !placedKeys.has(it.nursery + '|' + it.plot + '|' + it.wt));
+        diag.filledGaps = missing.length;
+
+        if (missing.length || (unplaceable && !MAINT_OCCURRENCES.length)) {
           const now = new Date();
           const plots = new Map();
           const nurseries = new Set();
-          loose.forEach(it => {
+          missing.forEach(it => {
             nurseries.add(it.nursery);
             if (!plots.has(it.nursery)) plots.set(it.nursery, new Set());
             plots.get(it.nursery).add(it.plot);
@@ -1723,8 +1750,8 @@ function loadAuditTodo(){
             d: now.getDate(),
             nurseries: nurseries.size ? nurseries : new Set(SCOPE_NURSERIES),
             plots: plots,
-            items: loose,
-            _why: loose.length ? null
+            items: missing,
+            _why: missing.length ? null
                 : (unplaceable + ' pending record' + (unplaceable === 1 ? '' : 's') +
                    ' could not be matched to a nursery. Their plot names are not in ' +
                    'the standard ranges and are not listed under a nursery in ' +
