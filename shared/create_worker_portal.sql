@@ -190,6 +190,52 @@ END;
 $$;
 
 
+/* The company's master switches for the worker portal.
+ *
+ * Carried to the phone rather than read by it: a PIN sign-in is `anon`, and
+ * shared_portal_settings is deliberately not readable by anon — a straight
+ * grant would hand it the FC portal's row too, which is none of a worker's
+ * business. This runs inside worker_signin and worker_whoami, so the read
+ * happens as the owner and only the worker's own row comes back.
+ *
+ * Guarded twice, because the two files that make this system can be run in
+ * either order and neither should need the other to have gone first:
+ *
+ *   the TABLE may not exist   — create_scan_system_setting.sql not run yet
+ *   the COLUMN may not exist  — an older install of that file, before
+ *                               `actions` was added to it
+ *
+ * Either way the answer is an empty object, which vetoes nothing and is
+ * exactly how the portal behaved before any of this existed.
+ */
+CREATE OR REPLACE FUNCTION public.worker_company_switches()
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  nothing CONSTANT JSONB := jsonb_build_object('modules', '{}'::jsonb,
+                                               'actions', '{}'::jsonb);
+  out JSONB;
+BEGIN
+  IF to_regclass('public.shared_portal_settings') IS NULL THEN
+    RETURN nothing;
+  END IF;
+  -- through to_jsonb so a table without the `actions` column still answers
+  EXECUTE $q$
+    SELECT jsonb_build_object(
+             'modules', COALESCE(to_jsonb(s) -> 'modules', '{}'::jsonb),
+             'actions', COALESCE(to_jsonb(s) -> 'actions', '{}'::jsonb))
+      FROM shared_portal_settings s
+     WHERE s.portal = 'worker'
+  $q$ INTO out;
+  RETURN COALESCE(out, nothing);
+END;
+$fn$;
+
+
 -- What the phone is told about itself. Never includes the PIN.
 CREATE OR REPLACE FUNCTION public.worker_identity(w mjmnpayroll_workers, p_token UUID)
 RETURNS JSONB
@@ -214,6 +260,9 @@ AS $$
     -- ai.mjmnursery.com. Absent means the app's documented defaults, so a
     -- worker nobody has touched still gets the ordinary form.
     'actions',  public.worker_portal(w) -> 'actions',
+    /* The COMPANY's master switches for this portal — System Setting → Portal
+       View & Function. Off there beats on anywhere else. */
+    'company',  public.worker_company_switches(),
     'boundary', public.worker_portal(w) -> 'boundary'
   );
 $$;

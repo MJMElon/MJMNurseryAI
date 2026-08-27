@@ -38,6 +38,19 @@ CREATE TABLE IF NOT EXISTS public.shared_portal_settings (
   updated_by  TEXT
 );
 
+-- What each module is made of, one switch deeper:
+--
+--   actions  { "maintenance": { "gps": false, "remark": true } }
+--
+-- Added after the table shipped, so it is an ALTER rather than a column in
+-- the CREATE above — a database that already has this table gets it too.
+--
+-- Same rule as `modules`: a function ABSENT is not vetoed. New functions ship
+-- working rather than invisible until somebody remembers this screen, and the
+-- person's own permission still decides whether they actually get it.
+ALTER TABLE public.shared_portal_settings
+  ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 ALTER TABLE public.shared_portal_settings ENABLE ROW LEVEL SECURITY;
 
 DO $$

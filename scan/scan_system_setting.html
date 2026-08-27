@@ -77,6 +77,18 @@
   /* Keyboard focus has to be visible or the switch is mouse-only. */
   .m-row input:focus-visible + .sw { box-shadow:0 0 0 3px rgba(139,92,246,.35); }
 
+  /* The functions inside a module, indented under it with a rule down the
+     side. A flat column of thirteen switches reads as thirteen unrelated
+     things, and the ones under Maintenance are not — switching Maintenance
+     off takes every one of them with it. */
+  .m-kids { margin:2px 0 8px 14px; padding-left:10px; border-left:2px solid #ede9fe; }
+  .m-kids.hidden { display:none; }
+  .m-sub { padding:7px 12px; }
+  .m-sub .m-name { font-size:12px; font-weight:600; color:#64748b; }
+  .m-sub .sw { width:36px; height:21px; }
+  .m-sub .sw::after { width:15px; height:15px; }
+  .m-sub.on .sw::after { transform:translateX(15px); }
+
   .portal-col { flex:1; min-width:240px; }
   .portal-head { display:flex; align-items:center; gap:8px; padding:0 12px 8px;
                  font-size:11px; font-weight:900; letter-spacing:.1em;
@@ -164,10 +176,15 @@
           <div id="m-worker"></div>
         </div>
       </div>
-      <div class="note note-warn" style="margin-top:14px;">
-        <b>Saved, but not yet obeyed.</b> These switches are stored and read back here.
-        The FC Portal and the Worker Portal are separate apps and do not consult them yet —
-        wiring each one to hide a switched-off module is a change in those apps.
+      <div class="note" style="margin-top:14px;">
+        <b>Off beats on.</b> Both portals read these on the way in — the FC Portal from
+        this table, the Worker Portal with the PIN sign-in, since a worker's phone cannot
+        read it directly. Switching something off here closes it for everybody, whatever
+        their own permission says. Switching it back on does not grant it: who may then
+        use it is still <a href="scan_user_access.html">Setting</a> per person, and the
+        Worker Portal's own Settings per worker.
+        <br><br>
+        A phone already signed in picks a change up when it is next reopened.
       </div>
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
@@ -297,40 +314,98 @@ async function loadLocations() {
 
    A module absent from the saved JSON is ON. New modules ship working
    rather than invisible until somebody remembers this screen. */
+/* The functions inside Maintenance.
+
+   THE SAME LIST, WITH THE SAME KEYS, appears in two other places:
+     scan/scan_user_access.html                    per Field Conductor
+     Barcode_Counter src/modules/maintenance/functions.js   the apps
+
+   Three layers, and they answer different questions. This one is the
+   company's: does MJM do this at all. The other two are "may this person do
+   it". Off here beats on there — that is what the card above promises, and
+   applyCompanySwitches in the app is what keeps the promise. */
+const MAINT_FUNCTIONS = [
+  { key:'schedule', name:'Schedule maintenance work' },
+  { key:'record',   name:'Record work' },
+  { key:'batches',  name:'— Batch selection' },
+  { key:'workers',  name:'— Worker selection', fcOnly:true },
+  { key:'gps',      name:'— GPS track record' },
+  { key:'photos',   name:'— Upload photo', fcOnly:true },
+  { key:'remark',   name:'— Remark' }
+];
+
 const PORTAL_MODULES = {
   fc: [
     { key:'dashboard',   name:'Dashboard' },
     { key:'scan',        name:'Scan' },
     { key:'do',          name:'Delivery Order' },
-    { key:'maintenance', name:'Maintenance' },
+    { key:'maintenance', name:'Maintenance', functions: MAINT_FUNCTIONS },
     { key:'palms',       name:'PALMS' },
     { key:'culling',     name:'Culling Calculator' }
   ],
   worker: [
-    { key:'maintenance', name:'Maintenance' },
+    { key:'maintenance', name:'Maintenance', functions: MAINT_FUNCTIONS },
     { key:'settings',    name:'Settings' }
   ]
 };
 let portalOn = { fc:{}, worker:{} };
+/* Per module, per function: { maintenance: { gps:false } }. A function absent
+   is NOT vetoed — same rule as the modules, so a function added to the apps
+   next month works without anybody coming here first. */
+let portalFn = { fc:{}, worker:{} };
 
 function drawPortals() {
   Object.keys(PORTAL_MODULES).forEach(p => {
     $('m-' + p).innerHTML = PORTAL_MODULES[p].map(m => {
       const on = portalOn[p][m.key] !== false;      // absent means on
-      return `<label class="m-row ${on ? 'on' : ''}" data-portal="${p}" data-key="${m.key}">
+      const row = `<label class="m-row ${on ? 'on' : ''}" data-portal="${p}" data-key="${m.key}">
                 <span class="m-name">${esc(m.name)}</span>
                 <span class="m-key">${esc(m.key)}</span>
                 <input type="checkbox" ${on ? 'checked' : ''}
                        onchange="toggleModule('${p}','${m.key}',this.checked)">
                 <span class="sw" aria-hidden="true"></span>
               </label>`;
+      if (!m.functions) return row;
+
+      /* Drawn, but hidden while the module itself is off — switching the
+         module back on should put the answers back rather than an empty
+         space. Two of them cannot be honoured in the Worker Portal whatever
+         this says: a PIN sign-in is `anon`, which has no upload path for a
+         photo and is never handed the roster. Left out of that column rather
+         than shown as a switch that does nothing. */
+      const fns = m.functions
+        .filter(f => !(p === 'worker' && f.fcOnly))
+        .map(f => {
+          const fon = ((portalFn[p][m.key] || {})[f.key]) !== false;
+          return `<label class="m-row m-sub ${fon ? 'on' : ''}"
+                         data-portal="${p}" data-key="${m.key}" data-fn="${f.key}">
+                    <span class="m-name">${esc(f.name)}</span>
+                    <span class="m-key">${esc(f.key)}</span>
+                    <input type="checkbox" ${fon ? 'checked' : ''}
+                           onchange="toggleFunction('${p}','${m.key}','${f.key}',this.checked)">
+                    <span class="sw" aria-hidden="true"></span>
+                  </label>`;
+        }).join('');
+      return row + `<div class="m-kids ${on ? '' : 'hidden'}"
+                         data-kids-for="${p}:${m.key}">${fns}</div>`;
     }).join('');
   });
 }
 
 function toggleModule(portal, key, on) {
   portalOn[portal][key] = !!on;
-  const row = document.querySelector(`.m-row[data-portal="${portal}"][data-key="${key}"]`);
+  const row = document.querySelector(`.m-row[data-portal="${portal}"][data-key="${key}"]:not(.m-sub)`);
+  if (row) row.classList.toggle('on', !!on);
+  const kids = document.querySelector(`[data-kids-for="${portal}:${key}"]`);
+  if (kids) kids.classList.toggle('hidden', !on);
+  $('m-status').textContent = 'Not saved yet.';
+}
+
+function toggleFunction(portal, moduleKey, fnKey, on) {
+  if (!portalFn[portal][moduleKey]) portalFn[portal][moduleKey] = {};
+  portalFn[portal][moduleKey][fnKey] = !!on;
+  const row = document.querySelector(
+    `.m-sub[data-portal="${portal}"][data-key="${moduleKey}"][data-fn="${fnKey}"]`);
   if (row) row.classList.toggle('on', !!on);
   $('m-status').textContent = 'Not saved yet.';
 }
@@ -338,10 +413,11 @@ function toggleModule(portal, key, on) {
 async function loadPortals() {
   try {
     const { data, error } = await _supabase
-      .from('shared_portal_settings').select('portal,modules');
+      .from('shared_portal_settings').select('portal,modules,actions');
     if (error) throw error;
     (data || []).forEach(r => {
       if (portalOn[r.portal]) portalOn[r.portal] = r.modules || {};
+      if (portalFn[r.portal]) portalFn[r.portal] = r.actions || {};
     });
   } catch (e) {
     /* No row, or the table is not there yet. Everything on is the same
@@ -360,7 +436,7 @@ async function savePortals() {
   $('m-status').textContent = 'Saving…';
   try {
     const rows = Object.keys(PORTAL_MODULES).map(p => ({
-      portal: p, modules: portalOn[p],
+      portal: p, modules: portalOn[p], actions: portalFn[p],
       updated_at: new Date().toISOString(), updated_by: userEmail || null
     }));
     const { error } = await _supabase
