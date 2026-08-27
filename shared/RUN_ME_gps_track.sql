@@ -260,16 +260,20 @@ BEGIN
   PERFORM public.worker_from_token(p_token);
 
   RETURN QUERY
-    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
-           r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
-           r.batch_name, r.week_no, r.schedule_month,
+    -- Cast to the declared type: qty is INTEGER on this table and week_no
+    -- is SMALLINT, and RETURN QUERY wants the same type, not a convertible
+    -- one. See shared/RUN_ME_fix_worker_board.sql.
+    SELECT r.id::BIGINT, r.work_date, r.nursery_name::TEXT, r.plot_name::TEXT,
+           r.work_type::TEXT, r.jenis::TEXT, r.chemical::TEXT, r.qty::NUMERIC,
+           r.remark::TEXT, r.reported_by::TEXT,
+           r.batch_name::TEXT, r.week_no::INT, r.schedule_month::TEXT,
            -- Who the conductor credited the job to, when he keyed it for
            -- somebody whose phone was broken. NULL means reported_by did it.
-           r.worked_by,
+           r.worked_by::TEXT,
            -- So a worker can see their morning has been checked off. Read
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
-           r.verified_by, r.verified_at,
+           r.verified_by::TEXT, r.verified_at,
            -- Where the track started, and how far it went. For the people the
            -- office has switched GPS on for; null everywhere else, and the
            -- board simply does not draw the line.
@@ -279,8 +283,8 @@ BEGIN
            -- them is tens of megabytes down a nursery's signal to draw a list
            -- that only ever shows "820 m". The summary is stored beside the
            -- track exactly so this query does not have to carry it.
-           r.gps_lat, r.gps_lng, r.gps_accuracy,
-           r.gps_points, r.gps_distance_m
+           r.gps_lat::NUMERIC, r.gps_lng::NUMERIC, r.gps_accuracy::NUMERIC,
+           r.gps_points::INT, r.gps_distance_m::NUMERIC
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)

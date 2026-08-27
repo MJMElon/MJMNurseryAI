@@ -378,8 +378,15 @@ BEGIN
   nur := b -> 'nurseries';
   plt := b -> 'plots';
 
+  -- Cast to the declared type rather than trusting the column to be it.
+  -- plpgsql compares the query's types to the RETURNS TABLE list exactly —
+  -- not "can this be converted", the same type — and raises "structure of
+  -- query does not match function result type" when they differ. A column
+  -- somebody once declared VARCHAR, or an INTEGER where this says NUMERIC,
+  -- then breaks the whole board rather than one field. The casts cost
+  -- nothing and make these functions independent of the table's spelling.
   RETURN QUERY
-    SELECT p.nursery_name, p.plot_name
+    SELECT p.nursery_name::TEXT, p.plot_name::TEXT
       FROM shared_plots p
      WHERE (jsonb_typeof(nur) <> 'array'
             OR public.worker_key(p.nursery_name) IN (
@@ -410,7 +417,7 @@ BEGIN
   END IF;
 
   RETURN QUERY EXECUTE $q$
-    SELECT v.plot_name, v.batch_name, v.qty
+    SELECT v.plot_name::TEXT, v.batch_name::TEXT, v.qty::NUMERIC
       FROM shared_plot_batch_balance v
       JOIN worker_plots($1) wp ON public.worker_key(wp.plot_name) = public.worker_key(v.plot_name)
      WHERE v.qty > 0
@@ -542,7 +549,8 @@ DECLARE w mjmnpayroll_workers;
 BEGIN
   w := public.worker_from_token(p_token);
   RETURN QUERY
-    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type, r.qty, r.remark
+    SELECT r.id::BIGINT, r.work_date, r.nursery_name::TEXT, r.plot_name::TEXT,
+           r.work_type::TEXT, r.qty::NUMERIC, r.remark::TEXT
       FROM nops_maint_field_records r
      WHERE r.reported_by = w.full_name
      ORDER BY r.work_date DESC, r.id DESC
@@ -605,16 +613,22 @@ BEGIN
   PERFORM public.worker_from_token(p_token);
 
   RETURN QUERY
-    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
-           r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
-           r.batch_name, r.week_no, r.schedule_month,
+    -- Every column cast to what the RETURNS TABLE list above says. qty is
+    -- INTEGER on this table and week_no is SMALLINT, and plpgsql wants the
+    -- same type, not a convertible one — without the casts this raises
+    -- "structure of query does not match function result type" and the
+    -- worker's whole board goes red.
+    SELECT r.id::BIGINT, r.work_date, r.nursery_name::TEXT, r.plot_name::TEXT,
+           r.work_type::TEXT, r.jenis::TEXT, r.chemical::TEXT, r.qty::NUMERIC,
+           r.remark::TEXT, r.reported_by::TEXT,
+           r.batch_name::TEXT, r.week_no::INT, r.schedule_month::TEXT,
            -- Who the conductor credited the job to, when he keyed it for
            -- somebody whose phone was broken. NULL means reported_by did it.
-           r.worked_by,
+           r.worked_by::TEXT,
            -- So a worker can see their morning has been checked off. Read
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
-           r.verified_by, r.verified_at,
+           r.verified_by::TEXT, r.verified_at,
            -- Where the track started, and how far it went. For the people the
            -- office has switched GPS on for; null everywhere else, and the
            -- board simply does not draw the line.
@@ -624,8 +638,8 @@ BEGIN
            -- them is tens of megabytes down a nursery's signal to draw a list
            -- that only ever shows "820 m". The summary is stored beside the
            -- track exactly so this query does not have to carry it.
-           r.gps_lat, r.gps_lng, r.gps_accuracy,
-           r.gps_points, r.gps_distance_m
+           r.gps_lat::NUMERIC, r.gps_lng::NUMERIC, r.gps_accuracy::NUMERIC,
+           r.gps_points::INT, r.gps_distance_m::NUMERIC
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
@@ -659,7 +673,7 @@ BEGIN
   END IF;
 
   RETURN QUERY EXECUTE $q$
-    SELECT s.nursery, s.month, s.payload
+    SELECT s.nursery::TEXT, s.month::TEXT, s.payload::JSONB
       FROM nops_maint_state s
      WHERE EXISTS (
              SELECT 1 FROM public.worker_plots($1) wp
@@ -689,7 +703,8 @@ BEGIN
   END IF;
 
   RETURN QUERY
-    SELECT wk.id, wk.worker_no, wk.full_name, wk.nursery, wk.job_title,
+    SELECT wk.id::BIGINT, wk.worker_no::TEXT, wk.full_name::TEXT,
+           wk.nursery::TEXT, wk.job_title::TEXT,
            (wk.pin IS NOT NULL) AS has_pin,
            public.worker_portal(wk)
       FROM mjmnpayroll_workers wk
@@ -741,13 +756,13 @@ BEGIN
   END IF;
 
   RETURN QUERY
-    SELECT wk.full_name,
-           wk.nursery,
-           to_jsonb(wk) ->> 'section',
-           to_jsonb(wk) ->> 'role',
-           wk.job_title,
-           to_jsonb(wk) ->> 'maint_general' = 'true',
-           wk.active
+    SELECT wk.full_name::TEXT,
+           wk.nursery::TEXT,
+           (to_jsonb(wk) ->> 'section')::TEXT,
+           (to_jsonb(wk) ->> 'role')::TEXT,
+           wk.job_title::TEXT,
+           (to_jsonb(wk) ->> 'maint_general' = 'true')::BOOLEAN,
+           wk.active::BOOLEAN
       FROM mjmnpayroll_workers wk
      WHERE wk.active
        -- Inside the boundary. Matched on letters and digits alone, because

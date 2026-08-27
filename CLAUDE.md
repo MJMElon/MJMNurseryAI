@@ -68,6 +68,33 @@ Getting these confused is the single easiest mistake here.
 Off beats on. A company switch decides for the people nobody has decided
 about, and never overrules the ones somebody has.
 
+## `RETURN QUERY` compares types exactly, and will not convert
+
+A `RETURNS TABLE` function whose select list has INTEGER where the promise
+says NUMERIC does not convert it. It raises
+
+    structure of query does not match function result type
+
+the first time somebody opens the screen, and takes the WHOLE call down —
+which in the worker portal means the whole board, over one column. It cost a
+day: `nops_maint_field_records.qty` is INTEGER, `week_no` is SMALLINT,
+`shared_plot_batch_balance.qty` is BIGINT, and all three were promised as
+something else.
+
+So **cast every column in a `RETURN QUERY` to the type the `RETURNS TABLE`
+list names** — `r.qty::NUMERIC`, `wk.full_name::TEXT`. Do not instead change
+the promise to match today's column; the cast keeps working when somebody
+widens the column later.
+
+Two more things about these functions:
+
+- **Postgres will not `CREATE OR REPLACE` a function whose OUT columns
+  changed.** `DROP FUNCTION IF EXISTS` first — and the drop takes the grants
+  with it, so re-`GRANT EXECUTE ... TO anon, authenticated` after, or the
+  portal is shut.
+- `NOTIFY pgrst, 'reload schema';` at the end, or PostgREST goes on serving
+  the old picture.
+
 ## Testing without the database
 
 There is a scratch PostgreSQL 16 for exactly this:
