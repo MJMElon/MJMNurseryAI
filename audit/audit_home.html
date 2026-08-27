@@ -1522,6 +1522,43 @@ function loadAuditTodo(){
     }));
     return m;
   })();
+  /* ── WHICH NURSERY A PLOT BELONGS TO ──
+     _PLOT_NUR knows the fixed ranges only — P01–P52, B01–B14, U01–U18,
+     N01–N20. The maintenance module lets a nursery carry plots outside
+     them: it keeps those in nops_maint_custom_plots and merges them into
+     its own NURSERY_PLOTS on load (plot_maintenance_script.js:262).
+
+     This page never read that table, so every custom plot resolved to no
+     nursery and was dropped — out of push(), which is why the deadline
+     buckets came out empty and the fallback had to fire at all, and then
+     out of the fallback too once that started applying the same test.
+     A yard using custom plot names got a maintenance row with nothing in
+     it, and then no row.
+
+     Filled in by loadMaintTimeline before it walks anything. */
+  let _CUSTOM_PLOT_NUR = {};
+
+  /* Field records carry nursery_name; office Work Record rows do not —
+     they have tarikh, jenis and plot and nothing else, so for those the
+     plot IS the only route to a nursery. Hence the order: the maps
+     first, the column as a backstop for the source that has it. */
+  const _NUR_ALIAS = {
+    PN:'PN', 'PRE NURSERY':'PN', 'PRE-NURSERY':'PN',
+    BNN:'BNN', 'BATU NIAH':'BNN', 'BATU NIAH NURSERY':'BNN',
+    UNN1:'UNN1', 'ULU NIAH 1':'UNN1', 'ULU NIAH NURSERY 1':'UNN1',
+    UNN2:'UNN2', 'ULU NIAH 2':'UNN2', 'ULU NIAH NURSERY 2':'UNN2'
+  };
+  const _NUR_CODES = ['PN', 'BNN', 'UNN1', 'UNN2'];
+  function _nurFromName(raw){
+    const k = String(raw || '').trim().toUpperCase();
+    return k ? (_NUR_ALIAS[k] || null) : null;
+  }
+  function _nurseryFor(plotCanon, nurseryNameRaw){
+    return (plotCanon && (_CUSTOM_PLOT_NUR[plotCanon] || _PLOT_NUR[plotCanon]))
+        || _nurFromName(nurseryNameRaw)
+        || null;
+  }
+
   function _tarikhToISO(t){
     if (!t || t === '-' || t === '—') return '';
     const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
@@ -1532,16 +1569,27 @@ function loadAuditTodo(){
                    skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
                    skippedNoDate: 0, sampleKept: [] };
     try {
-      const [fRows, aRows, oRows] = await Promise.all([
-        sb.select('nops_maint_field_records', 'select=id,work_date,plot_name,work_type,jenis').catch(e => { diag.fError = String(e?.message||e); return []; }),
+      const [fRows, aRows, oRows, cRows] = await Promise.all([
+        sb.select('nops_maint_field_records', 'select=id,work_date,nursery_name,plot_name,work_type,jenis').catch(e => { diag.fError = String(e?.message||e); return []; }),
         sb.select('audit_maintenance_audits', 'select=task_id').catch(e => { diag.aError = String(e?.message||e); return []; }),
-        sb.select('nops_maint_records',       'select=records').catch(e => { diag.oError = String(e?.message||e); return []; })
+        sb.select('nops_maint_records',       'select=records').catch(e => { diag.oError = String(e?.message||e); return []; }),
+        /* The plots this yard added by hand. Fails open: without it the
+           fixed ranges still resolve, which is where this page was. */
+        sb.select('nops_maint_custom_plots',  'select=nursery,plot').catch(e => { diag.cError = String(e?.message||e); return []; })
       ]);
       diag.fRows = (fRows||[]).length;
+      /* Built before either walk, so both see the same plot map. */
+      _CUSTOM_PLOT_NUR = {};
+      (cRows||[]).forEach(r => {
+        const n = _nurFromName(r.nursery) || String(r.nursery||'').trim().toUpperCase();
+        const p = _canonPlot(r.plot);
+        if (n && p && _NUR_CODES.indexOf(n) !== -1) _CUSTOM_PLOT_NUR[p] = n;
+      });
+      diag.customPlots = Object.keys(_CUSTOM_PLOT_NUR).length;
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
       diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
-      const push = (id, workDateISO, workType, plotRaw) => {
+      const push = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
         if (_wtWinFor(workType) <= 0)              { diag.skippedPd++; return; }
         if (audited.has(String(id)))               { diag.skippedAudited++; return; }
         if (!workDateISO)                          { diag.skippedNoDate++; return; }
@@ -1550,7 +1598,7 @@ function loadAuditTodo(){
         dl.setDate(dl.getDate() + _wtWinFor(workType));
         const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
         const plot = _canonPlot(plotRaw);
-        const n = plot ? _PLOT_NUR[plot] : null;
+        const n = _nurseryFor(plot, nurseryNameRaw);
         if (!n)                                    { diag.skippedNoPlot++; return; }
         if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
         const k = y + '-' + m + '-' + d;
@@ -1574,7 +1622,7 @@ function loadAuditTodo(){
         diag.kept++;
         if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
       };
-      (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name));
+      (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
       const officeRecs = (oRows && oRows[0] && Array.isArray(oRows[0].records)) ? oRows[0].records : [];
       diag.oRecs = officeRecs.length;
       officeRecs.forEach(rec => {
@@ -1613,17 +1661,17 @@ function loadAuditTodo(){
            not otherwise. */
         const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
         const loose = [];
-        const pushLoose = (id, workDateISO, workType, plotRaw) => {
+        const pushLoose = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
           if (SKIP_FALLBACK_TYPES.has(String(workType||'').toLowerCase())) return;
           if (auditedIds.has(String(id)))  return;
           if (!workDateISO)                return;
           const plot = _canonPlot(plotRaw);
-          const n = plot ? _PLOT_NUR[plot] : null;
+          const n = _nurseryFor(plot, nurseryNameRaw);
           if (!n) return;                              // cannot say which nursery
           if (SCOPE_NURSERIES.indexOf(n) === -1) return;
           loose.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
         };
-        (fRows||[]).forEach(r => pushLoose(r.id, r.work_date, r.work_type, r.plot_name));
+        (fRows||[]).forEach(r => pushLoose(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
         const looseOffice = (oRows && oRows[0] && Array.isArray(oRows[0].records))
           ? oRows[0].records : [];
         looseOffice.forEach(rec => {
