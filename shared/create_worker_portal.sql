@@ -448,19 +448,27 @@ BEGIN
       USING NULLIF(btrim(COALESCE(p_payload ->> 'photo_urls', '')), ''), new_id;
   END IF;
 
-  -- Where the phone was (shared/add_maint_field_gps.sql). The app sends the
-  -- keys whether or not it has a fix, so an absent POSITION and an absent
-  -- COLUMN are two different things and both are checked: a worker whose GPS
-  -- switch is off, or who is under a shed roof with no sky, records the job
-  -- exactly as before.
+  -- The track walked while the job was done (shared/add_maint_field_gps.sql).
+  -- The app sends the keys whether or not it has a track, so an absent WALK
+  -- and an absent COLUMN are two different things and both are checked: a
+  -- worker whose GPS switch is off, or who never pressed start, records the
+  -- job exactly as before.
   IF (p_payload ->> 'gps_lat') IS NOT NULL
      AND (p_payload ->> 'gps_lng') IS NOT NULL
      AND EXISTS (SELECT 1 FROM information_schema.columns
-                  WHERE table_name = 'nops_maint_field_records' AND column_name = 'gps_lat') THEN
+                  WHERE table_name = 'nops_maint_field_records' AND column_name = 'gps_track') THEN
     EXECUTE 'UPDATE nops_maint_field_records
-                SET gps_lat = $1, gps_lng = $2, gps_accuracy = $3
-              WHERE id = $4'
-      USING (p_payload ->> 'gps_lat')::numeric,
+                SET gps_track = $1, gps_points = $2, gps_distance_m = $3,
+                    gps_started_at = $4, gps_ended_at = $5,
+                    gps_lat = $6, gps_lng = $7, gps_accuracy = $8
+              WHERE id = $9'
+      USING CASE WHEN jsonb_typeof(p_payload -> 'gps_track') = 'array'
+                 THEN p_payload -> 'gps_track' ELSE NULL END,
+            NULLIF(p_payload ->> 'gps_points', '')::int,
+            NULLIF(p_payload ->> 'gps_distance_m', '')::numeric,
+            NULLIF(p_payload ->> 'gps_started_at', '')::timestamptz,
+            NULLIF(p_payload ->> 'gps_ended_at', '')::timestamptz,
+            (p_payload ->> 'gps_lat')::numeric,
             (p_payload ->> 'gps_lng')::numeric,
             NULLIF(p_payload ->> 'gps_accuracy', '')::numeric,
             new_id;
@@ -502,14 +510,19 @@ ALTER TABLE nops_maint_field_records
   ADD COLUMN IF NOT EXISTS verified_by TEXT,
   ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 
--- And the GPS stamp — shared/add_maint_field_gps.sql, repeated here for the
+-- And the GPS track — shared/add_maint_field_gps.sql, repeated here for the
 -- same reason. It has to be here rather than later in the file: the function
 -- below names these columns, and a function that names a column which does
 -- not exist fails the first time somebody opens the board.
 ALTER TABLE nops_maint_field_records
-  ADD COLUMN IF NOT EXISTS gps_lat      NUMERIC(9,6),
-  ADD COLUMN IF NOT EXISTS gps_lng      NUMERIC(9,6),
-  ADD COLUMN IF NOT EXISTS gps_accuracy NUMERIC;
+  ADD COLUMN IF NOT EXISTS gps_track      JSONB,
+  ADD COLUMN IF NOT EXISTS gps_points     INTEGER,
+  ADD COLUMN IF NOT EXISTS gps_distance_m NUMERIC,
+  ADD COLUMN IF NOT EXISTS gps_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS gps_ended_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS gps_lat        NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_lng        NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_accuracy   NUMERIC;
 
 
 -- ── 8b. What the maintenance board needs ────────────────────────────────
@@ -533,7 +546,8 @@ RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
                remark TEXT, reported_by TEXT, batch_name TEXT,
                week_no INT, schedule_month TEXT,
                worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ,
-               gps_lat NUMERIC, gps_lng NUMERIC, gps_accuracy NUMERIC)
+               gps_lat NUMERIC, gps_lng NUMERIC, gps_accuracy NUMERIC,
+               gps_points INT, gps_distance_m NUMERIC)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -552,10 +566,17 @@ BEGIN
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
            r.verified_by, r.verified_at,
-           -- Where the phone was when the record was written, for the people
-           -- the office has switched GPS on for. Null everywhere else, and
-           -- the board simply does not draw the line.
-           r.gps_lat, r.gps_lng, r.gps_accuracy
+           -- Where the track started, and how far it went. For the people the
+           -- office has switched GPS on for; null everywhere else, and the
+           -- board simply does not draw the line.
+           --
+           -- The TRACK ITSELF is deliberately not here. This returns up to two
+           -- thousand records to a phone, and a thousand-point walk on each of
+           -- them is tens of megabytes down a nursery's signal to draw a list
+           -- that only ever shows "820 m". The summary is stored beside the
+           -- track exactly so this query does not have to carry it.
+           r.gps_lat, r.gps_lng, r.gps_accuracy,
+           r.gps_points, r.gps_distance_m
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
