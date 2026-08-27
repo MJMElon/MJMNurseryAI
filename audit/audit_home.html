@@ -351,8 +351,16 @@
                 letter-spacing:.6px;color:var(--fc-ink);min-width:0}
 
     .hist-list{display:flex;flex-direction:column}
+    /* A row opens its summary now, so it has to look like it does
+       something. Same restraint as the rest of this list: a tint and a
+       cursor, no chevron competing with the date on the right. */
     .hist-row{display:flex;align-items:center;gap:12px;padding:12px 4px;
-              border-bottom:1px solid var(--fc-line)}
+              border-bottom:1px solid var(--fc-line);
+              cursor:pointer;border-radius:10px;
+              -webkit-tap-highlight-color:transparent;
+              transition:background .15s}
+    .hist-row:hover{background:#f4f7fa}
+    .hist-row:focus-visible{outline:2px solid #22a34a;outline-offset:-2px}
     .hist-row:last-child{border-bottom:0}
     .hist-ico{width:34px;height:34px;border-radius:10px;flex-shrink:0;
               display:flex;align-items:center;justify-content:center}
@@ -1063,6 +1071,12 @@
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
 <script src="audit_settings.js?v=2"></script>
+<!-- The record summary shared with the module pages' Completed Records.
+     On this page it only exports MJMAuditSummary — the completed-records
+     section it also carries is the manage view's and does not mount
+     here. It injects the dialog's own styles, so this page needs no
+     stylesheet of ours. -->
+<script src="audit_history.js?v=20260827d"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
@@ -2714,16 +2728,36 @@ async function loadHistory(){
        longer exists fails the whole row silently (which is how the
        old sign-in showed "Auditor" for everyone). * is safe under
        RLS and only a shade heavier for a page-sized read. */
-    const results = await Promise.all([
-      sb.select('audit_plot_audits',       'select=date,nursery,plot,auditor_name').catch(()=>[]),
-      sb.select('audit_height_records',    'select=date,nursery,plot,auditor_name').catch(()=>[]),
-      sb.select('audit_papan_audits',      'select=date,nursery,plot,auditor_name').catch(()=>[]),
-      sb.select('audit_maintenance_audits','select=date,nursery,plot,auditor_name').catch(()=>[])
-    ]);
-    const mods = ['plot','height','papan','maint'];
+    /* Each row now carries what its summary needs — the module's own
+       findings and its photo columns — so tapping it can open the same
+       dialog the module pages use rather than a second, thinner one.
+
+       The column list comes from MJMAuditSummary.spec(), which is the
+       same list audit_history.js reads with. One definition, so the two
+       surfaces cannot describe a record differently.
+
+       Two levels of fallback, because this section must never be the
+       thing that breaks: no spec (the script did not load) reads the
+       four plain columns as before, and a SELECT that PostgREST refuses
+       drops back to them too. History keeps working; only the summary
+       is thinner. */
+    const MODS = ['plot','height','papan','maint'];
+    const TABLES = {
+      plot:  'audit_plot_audits',   height: 'audit_height_records',
+      papan: 'audit_papan_audits',  maint:  'audit_maintenance_audits'
+    };
+    const PLAIN = 'select=date,nursery,plot,auditor_name';
+    const readMod = (mod) => {
+      const spec = (window.MJMAuditSummary && MJMAuditSummary.spec)
+        ? MJMAuditSummary.spec(mod) : null;
+      if (!spec) return sb.select(TABLES[mod], PLAIN).catch(()=>[]);
+      return sb.select(TABLES[mod], 'select=' + spec.cols)
+               .catch(()=> sb.select(TABLES[mod], PLAIN).catch(()=>[]));
+    };
+    const results = await Promise.all(MODS.map(readMod));
     const all = [];
     results.forEach((rows, i) => {
-      const mod = mods[i];
+      const mod = MODS[i];
       (rows || []).forEach(r => {
         if (r && r.date && okNur(r.nursery)) {
           all.push({
@@ -2731,7 +2765,8 @@ async function loadHistory(){
             date: String(r.date).slice(0,10),
             nursery: r.nursery,
             plot: r.plot || '',
-            auditor: r.auditor_name || ''
+            auditor: r.auditor_name || '',
+            raw: r                     /* what the summary renders from */
           });
         }
       });
@@ -2805,14 +2840,19 @@ function renderHistory(){
     return;
   }
 
-  list.innerHTML = rows.map(r => {
+  list.innerHTML = rows.map((r, i) => {
     const mod = HIST_MODS[r.mod];
     if (!mod) return '';
     const d = new Date(r.date + 'T00:00:00');
     const dstr = d.toLocaleDateString(lang, { day:'numeric', month:'short' });
     const nur  = (typeof NURSERY_LABELS !== 'undefined' && NURSERY_LABELS[r.nursery]) || r.nursery;
     const meta = [nur, r.auditor].filter(Boolean).join(' · ');
-    return '<div class="hist-row">' +
+    /* A row opens its summary. data-hi indexes the month's rows, which
+       is what the delegated listener below reads — the list is redrawn
+       on every month change, so anything bound to a row would die with
+       it. */
+    return '<div class="hist-row" data-hi="' + i + '" role="button" tabindex="0" ' +
+                'aria-label="' + mod.label + (r.plot ? ' ' + r.plot : '') + ' — open summary">' +
       '<div class="hist-ico" style="background:' + mod.bg + '">' +
         '<svg viewBox="0 0 24 24" style="stroke:' + mod.fg + '">' + mod.icon + '</svg>' +
       '</div>' +
@@ -2823,6 +2863,34 @@ function renderHistory(){
       '<div class="hist-date">' + dstr + '</div>' +
     '</div>';
   }).join('');
+
+  /* Remembered so the listener can find the record behind a row without
+     re-filtering, and so a month change cannot hand back a stale one. */
+  HIST_SHOWN = rows;
+}
+
+/* One delegated listener for the whole section: the list is rebuilt
+   from scratch on every month change and on every language switch. */
+let HIST_SHOWN = [];
+document.addEventListener('click', e => {
+  const row = e.target.closest && e.target.closest('.hist-row[data-hi]');
+  if (!row) return;
+  openHistorySummary(+row.dataset.hi);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest && e.target.closest('.hist-row[data-hi]');
+  if (!row) return;
+  e.preventDefault();
+  openHistorySummary(+row.dataset.hi);
+});
+function openHistorySummary(i){
+  const rec = HIST_SHOWN[i];
+  if (!rec) return;
+  /* Without the shared summary this stays a plain list rather than
+     opening something half-built. */
+  if (!window.MJMAuditSummary || !MJMAuditSummary.open) return;
+  MJMAuditSummary.open(rec.raw || rec, rec.mod);
 }
 
 /* Kick history now that its definitions above are in place. Kept at the
