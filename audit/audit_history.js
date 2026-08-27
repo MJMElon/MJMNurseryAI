@@ -45,10 +45,18 @@
 (function () {
   'use strict';
 
-  /* The manage view, and nothing else. First line of the file, so on
-     the auditor portal this costs one function call and no query. */
-  if (!window.MJMAuditLogin || typeof MJMAuditLogin.fromManage !== 'function') return;
-  if (!MJMAuditLogin.fromManage()) return;
+  /* TWO THINGS LIVE HERE, AND THEY ARE GATED DIFFERENTLY.
+
+     The completed-records SECTION under a module's plot grid is the
+     manage view's, and still returns early below.
+
+     The SUMMARY — the dialog that opens on a record, its values and its
+     photos — is not. The auditor portal's own Audit History wants the
+     same thing on the same records, so it is exported as
+     MJMAuditSummary and the styles it needs are injected by this file
+     rather than assumed from a stylesheet. That keeps it portable to a
+     page which loads neither audit_theme.css nor anything else of
+     ours. */
 
   /* ── WHAT EACH MODULE KEEPS, AND WHAT IS WORTH SHOWING ──
      `cols` is copied from audit_report.html's query for the same
@@ -56,7 +64,7 @@
      SELECT. `row` is the one line in the list; `fields` is the
      summary that opens, in the order it should be read. */
   var MODULES = {
-    'audit_plot_audit.html': {
+    plot: {
       table: 'audit_plot_audits',
       key:   'audit_id',
       cols:  'audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,auditor_name,date,'
@@ -71,7 +79,7 @@
         ['Leaf colour',        'warna_daun']
       ]
     },
-    'audit_height_index.html': {
+    height: {
       table: 'audit_height_records',
       key:   'record_id',
       cols:  'record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date,'
@@ -89,7 +97,7 @@
         ['Average',  'avg_height', 'cm']
       ]
     },
-    'audit_papan_index.html': {
+    papan: {
       table: 'audit_papan_audits',
       key:   'audit_id',
       cols:  'audit_id,nursery,plot,batch_no,presence,info_correct,condition,auditor_name,date,'
@@ -103,7 +111,7 @@
         ['Condition',       'condition']
       ]
     },
-    'audit_maintenance_index.html': {
+    maint: {
       table: 'audit_maintenance_audits',
       key:   'audit_id',
       cols:  'audit_id,nursery,plot,task_type,result,auditor_name,date,'
@@ -124,11 +132,27 @@
     }
   };
 
-  var page = location.pathname.split('/').pop();
-  var CFG  = MODULES[page];
-  if (!CFG) return;
+  /* Which module a module PAGE is. The auditor portal asks by key
+     instead, because its history already knows which table a row came
+     from. */
+  var PAGE_MOD = {
+    'audit_plot_audit.html':        'plot',
+    'audit_height_index.html':      'height',
+    'audit_papan_index.html':       'papan',
+    'audit_maintenance_index.html': 'maint'
+  };
+  var CFG = MODULES[PAGE_MOD[location.pathname.split('/').pop()]] || null;
 
   var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  /* Shared with audit_home.html's Audit History. `spec(mod)` hands back
+     the same field list, photo columns and label this file uses, so the
+     two surfaces cannot describe the same record differently. */
+  window.MJMAuditSummary = {
+    open:  function (record, mod) { openSummary(record, MODULES[mod] || mod); },
+    close: function () { close(); },
+    spec:  function (mod) { return MODULES[mod] || null; }
+  };
   var rows = [];      // every nursery; the tab and the filters narrow it at render time
   var loaded = false;
   var fMonth = '';    // '' = every month;  otherwise 'YYYY-MM'
@@ -311,7 +335,7 @@
 
     listEl.querySelectorAll('.hist-item').forEach(function (b) {
       b.addEventListener('click', function () {
-        openSummary(mine[+b.dataset.i]);
+        openSummary(mine[+b.dataset.i], CFG);
       });
     });
   }
@@ -321,6 +345,49 @@
      delete confirmation, with its own body and its own handlers bound
      in each module's init(). Reuses the .modal-* classes so it is
      styled by audit_theme.css along with everything else. */
+  /* The dialog carries its own look. audit_theme.css has the same rules
+     for the module pages, which is harmless duplication; the point is
+     that audit_home.html loads no stylesheet of ours and still gets a
+     correct dialog. Scoped to #hist-modal so nothing here can reach the
+     auditor portal's own .hist-row / .hist-empty / .hist-date. */
+  var STYLE_ID = 'mjm-audit-summary-css';
+  function injectStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    var st = document.createElement('style');
+    st.id = STYLE_ID;
+    st.textContent =
+      '#hist-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;' +
+        'justify-content:center;background:rgba(16,40,60,.45);opacity:0;pointer-events:none;' +
+        'transition:opacity .2s}' +
+      '#hist-modal.show{opacity:1;pointer-events:auto}' +
+      '#hist-modal .modal-box{background:#fff;border:1px solid #e6ecf2;border-radius:18px;' +
+        'box-shadow:0 20px 50px rgba(16,40,60,.2);max-width:460px;width:calc(100% - 32px);' +
+        'max-height:86vh;overflow:auto;padding:18px 18px 16px;' +
+        "font-family:'DM Sans',system-ui,-apple-system,sans-serif}" +
+      '#hist-modal .hist-modal-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}' +
+      '#hist-modal .modal-title{font-size:16px;font-weight:800;color:#16323f}' +
+      '#hist-modal .hist-modal-sub{font-size:11px;font-weight:700;color:#94a7b4;margin-top:3px;' +
+        'text-transform:uppercase;letter-spacing:.6px}' +
+      '#hist-modal .hist-close{margin-left:auto;width:30px;height:30px;border-radius:9px;' +
+        'background:#f4f7fa;border:1px solid #e6ecf2;color:#5b7280;font-size:19px;line-height:1;' +
+        'cursor:pointer;flex-shrink:0;font-family:inherit}' +
+      '#hist-modal .hist-close:hover{background:#eaeff5;color:#16323f}' +
+      '#hist-modal .hist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}' +
+      '#hist-modal .hist-cell{background:#f8fafc;border:1px solid #e6ecf2;border-radius:12px;padding:10px 12px}' +
+      '#hist-modal .hist-cell-label{font-size:9.5px;font-weight:800;text-transform:uppercase;' +
+        'letter-spacing:.7px;color:#94a7b4}' +
+      '#hist-modal .hist-cell-val{font-size:14px;font-weight:700;color:#16323f;margin-top:3px;' +
+        'word-break:break-word}' +
+      '#hist-modal .hist-shots{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}' +
+      '#hist-modal .hist-shot{display:block;width:78px;height:78px;border-radius:12px;overflow:hidden;' +
+        'border:1px solid #e6ecf2;background:#f8fafc;flex-shrink:0}' +
+      '#hist-modal .hist-shot:hover{border-color:#a7f3d0}' +
+      '#hist-modal .hist-shot img{width:100%;height:100%;object-fit:cover;display:block}' +
+      '#hist-modal .hist-meta{display:flex;justify-content:space-between;gap:12px;margin-top:14px;' +
+        'padding-top:12px;border-top:1px solid #e6ecf2;font-size:11px;font-weight:700;color:#94a7b4}';
+    document.head.appendChild(st);
+  }
+
   function overlay() {
     var el = document.getElementById('hist-modal');
     if (el) return el;
@@ -341,8 +408,13 @@
   }
   window.closeAuditSummary = close;
 
-  function openSummary(r) {
-    if (!r) return;
+  function openSummary(r, spec) {
+    /* The spec is always passed. It used to fall back to a file-level
+       CFG, which only existed on a module page — and reaching for it via
+       arguments.callee is a TypeError under 'use strict' anyway. */
+    var CFG = spec;
+    if (!r || !CFG) return;
+    injectStyles();
     var el  = overlay();
     var box = el.querySelector('.modal-box');
 
@@ -457,6 +529,14 @@
   }
 
   function start() {
+    /* The completed-records section is the manage view's. Without
+       ?from=manage this file has still defined MJMAuditSummary above —
+       which is all the auditor portal wants from it — and does nothing
+       else. */
+    if (typeof MJMAuditLogin === 'undefined' ||
+        typeof MJMAuditLogin.fromManage !== 'function' ||
+        !MJMAuditLogin.fromManage()) return;
+    if (!CFG) return;
     if (!mount()) return;
     render();
     load();
