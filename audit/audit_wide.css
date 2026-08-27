@@ -75,12 +75,10 @@
   .fab:active { transform: none; scale: .95; }
 
   /* ── WHAT THE WIDTH IS FOR ──
-     The grid is already auto-fill, so it spreads on its own; the cells
-     grow a little because at this size they are being pointed at with
-     a mouse, not a thumb, and 52px circles look lost. */
-  /* Fixed cells rather than 1fr, and the grid centres what fits. At
-     1fr the eleven columns each stretched to ~95px around a 52px
-     circle, so 52 plots read as scattered rather than as a block. */
+     Fixed cells rather than the phone's auto-fill 1fr, and the grid
+     centres what fits. Left as 1fr the eleven columns each stretched
+     to ~95px around a 52px circle, and 52 plots read as scattered
+     rather than as a block. */
   .plot-grid {
     grid-template-columns: repeat(auto-fill, 78px);
     justify-content: center;
