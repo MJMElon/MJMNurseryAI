@@ -91,6 +91,12 @@
       key:   'audit_id',
       cols:  'audit_id,nursery,plot,task_type,result,auditor_name,date',
       name:  'Maintenance',
+      /* The only one of the four with a real work type on the record.
+         The others store findings (pest / disease / leaf colour,
+         presence / info / condition) or numbers, so they get the month
+         filter alone rather than a dropdown of something that is not
+         the work that was done. */
+      work:  { field: 'task_type', label: 'Work' },
       sub:   function (r) { return r.task_type || '—'; },
       fields: [
         ['Task',   'task_type'],
@@ -104,8 +110,10 @@
   if (!CFG) return;
 
   var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var rows = [];      // every nursery; the active tab filters at render time
+  var rows = [];      // every nursery; the tab and the filters narrow it at render time
   var loaded = false;
+  var fMonth = '';    // '' = every month;  otherwise 'YYYY-MM'
+  var fWork  = '';    // '' = every kind of work
 
   function esc(v) {
     return String(v == null ? '' : v)
@@ -144,9 +152,93 @@
         '<span class="list-heading">Completed Records</span>' +
         '<span class="list-count" id="hist-count">—</span>' +
       '</div>' +
+      '<div class="hist-filters" id="hist-filters"></div>' +
       '<div class="record-list" id="hist-list"></div>';
     list.appendChild(wrap);
     return wrap;
+  }
+
+  /* ── THE FILTERS ──
+     Both are built from the records actually in hand rather than from a
+     fixed list: a month with nothing in it is not worth offering, and
+     the work types a nursery has actually been audited for are the only
+     ones worth choosing between. Rebuilt on every render so switching
+     nursery re-offers the months that nursery has.
+
+     The nursery is deliberately NOT one of them — it is the tab bar at
+     the foot of the page, and a second control for it would be two
+     places to set one thing. */
+  function monthsIn(list) {
+    var seen = {}, out = [];
+    list.forEach(function (r) {
+      var m = String(r.date || '').slice(0, 7);
+      if (m.length === 7 && !seen[m]) { seen[m] = 1; out.push(m); }
+    });
+    return out.sort().reverse();
+  }
+  function worksIn(list) {
+    if (!CFG.work) return [];
+    var seen = {}, out = [];
+    list.forEach(function (r) {
+      var v = r[CFG.work.field];
+      if (v && !seen[v]) { seen[v] = 1; out.push(v); }
+    });
+    return out.sort();
+  }
+  function monthLabel(m) {
+    var p = m.split('-');
+    return MONTHS[(+p[1]) - 1] + ' ' + p[0];
+  }
+
+  function renderFilters(scoped) {
+    var bar = document.getElementById('hist-filters');
+    if (!bar) return;
+
+    var months = monthsIn(scoped);
+    var works  = worksIn(scoped);
+
+    /* A filter set to something the current nursery has none of would
+       hide every row with no way back other than guessing. Reset it. */
+    if (fMonth && months.indexOf(fMonth) === -1) fMonth = '';
+    if (fWork  && works.indexOf(fWork)   === -1) fWork  = '';
+
+    var html = '';
+    if (works.length) {
+      html += '<label class="hist-filter">' +
+                '<span class="hist-filter-label">' + esc(CFG.work.label) + '</span>' +
+                '<select class="input hist-select" id="hist-f-work">' +
+                  '<option value="">All</option>' +
+                  works.map(function (w) {
+                    return '<option value="' + esc(w) + '"' +
+                           (w === fWork ? ' selected' : '') + '>' + esc(w) + '</option>';
+                  }).join('') +
+                '</select>' +
+              '</label>';
+    }
+    if (months.length) {
+      html += '<label class="hist-filter">' +
+                '<span class="hist-filter-label">Month</span>' +
+                '<select class="input hist-select" id="hist-f-month">' +
+                  '<option value="">All months</option>' +
+                  months.map(function (m) {
+                    return '<option value="' + m + '"' +
+                           (m === fMonth ? ' selected' : '') + '>' + esc(monthLabel(m)) + '</option>';
+                  }).join('') +
+                '</select>' +
+              '</label>';
+    }
+    if ((fMonth || fWork)) {
+      html += '<button type="button" class="hist-clear" id="hist-clear">Clear</button>';
+    }
+    bar.innerHTML = html;
+    bar.style.display = html ? '' : 'none';
+
+    var w = document.getElementById('hist-f-work');
+    if (w) w.addEventListener('change', function () { fWork = w.value; render(); });
+    var m = document.getElementById('hist-f-month');
+    if (m) m.addEventListener('change', function () { fMonth = m.value; render(); });
+    var c = document.getElementById('hist-clear');
+    if (c) c.addEventListener('click', function () { fMonth = ''; fWork = ''; render(); });
   }
 
   function render() {
@@ -161,12 +253,24 @@
     }
 
     var n = activeNursery();
-    var mine = n ? rows.filter(function (r) { return r.nursery === n; }) : rows.slice();
+    /* The nursery scopes what the filters are built from, so a month
+       with records only in another nursery is not offered here. */
+    var scoped = n ? rows.filter(function (r) { return r.nursery === n; }) : rows.slice();
+    renderFilters(scoped);
+
+    var mine = scoped.filter(function (r) {
+      if (fMonth && String(r.date || '').slice(0, 7) !== fMonth) return false;
+      if (fWork && CFG.work && r[CFG.work.field] !== fWork) return false;
+      return true;
+    });
 
     countEl.textContent = mine.length + (mine.length === 1 ? ' record' : ' records');
     if (!mine.length) {
-      listEl.innerHTML = '<div class="hist-empty">No completed records yet' +
-                         (n ? ' for ' + esc(n) : '') + '.</div>';
+      listEl.innerHTML = '<div class="hist-empty">' +
+        (scoped.length
+          ? 'No records match this filter.'
+          : 'No completed records yet' + (n ? ' for ' + esc(n) : '') + '.') +
+        '</div>';
       return;
     }
 

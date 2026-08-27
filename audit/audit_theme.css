@@ -474,3 +474,79 @@ textarea.input:focus {
   font-weight: 700;
   color: var(--text4);
 }
+
+/* ── THE HISTORY LIST IS ONE COLUMN ──
+   audit_wide.css makes `#view-list .record-list` two-up on a wide
+   screen, which is right for the pending lists it was written for —
+   short rows, scanned for a plot code. A completed record carries a
+   date on the right and a batch-and-auditor line under it, and two of
+   those side by side read as a table with no headings. One column,
+   full width, at every size.
+
+   Two ids, because one is not enough: the rule being overridden is
+   `#view-list .record-list` (1,1,0) and a bare `#hist-list` is (1,0,0),
+   which loses however late it is loaded. */
+#view-list #hist-list { display: block; }
+
+/* ── THE FILTER BAR ──
+   Sits between the section heading and the list. The nursery is not one
+   of these — that is the tab bar at the foot of the page, and a second
+   control for it would be two places to set one thing. */
+.hist-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 14px 12px;
+}
+.hist-filter { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hist-filter-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text4);
+  padding-left: 2px;
+}
+/* Narrower than a form input — these are a control strip, not a form,
+   and on a phone two of them plus Clear have to share one row. */
+/* select.hist-select, not .hist-select: the rule this has to sit on top
+   of is `select.input { background: #f8fafc }` — a shorthand, so it
+   resets background-image, and at (0,1,1) it beats a bare class however
+   much later it is written. Matching its specificity lets source order
+   decide, which is what puts the arrow back. */
+select.hist-select {
+  height: 38px;
+  width: auto;
+  min-width: 132px;
+  padding: 0 30px 0 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text3) 50%),
+    linear-gradient(135deg, var(--text3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 17px, calc(100% - 10px) 17px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.hist-clear {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.hist-clear:hover { background: #eaeff5; color: var(--text1); }
+
+@media (max-width: 420px) {
+  .hist-filters { gap: 8px; padding: 0 12px 10px; }
+  .hist-filter { flex: 1 1 0; min-width: 0; }
+  .hist-select { min-width: 0; width: 100%; }
+}
