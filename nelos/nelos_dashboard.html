@@ -339,6 +339,9 @@
   .s-shot svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:currentColor;
                 stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
   .s-shot-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  /* Sits under the photo control inside the one section, so it makes its
+     own gap rather than relying on a heading above it. */
+  .s-remark { margin-top:11px; }
   .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
             display:block; border:1.5px solid #ede9fe; }
   .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
@@ -511,19 +514,22 @@
 <div id="solve-scrim" class="scrim hidden">
   <div class="sheet">
     <div class="m-head">
-      <!-- The heading and its line of explanation are separate elements
-           because the heading is rewritten per case, and setting
-           textContent on a parent would take the subtitle with it. -->
-      <div class="m-title"><span id="s-heading">Solve Case</span>
-        <span class="m-sub" id="s-sub">Say what was done, and show it</span></div>
+      <!-- Heading only. The line of explanation under it said what the two
+           controls below already say on their faces, twice over. -->
+      <div class="m-title"><span id="s-heading">Solve Case</span></div>
       <button id="solve-close" class="m-x" aria-label="Close">&times;</button>
     </div>
 
     <div class="m-body">
       <div id="s-case" class="s-case"></div>
 
-      <div class="m-sec">
-        <div class="m-sec-h">Attach photo</div>
+      <!-- The photo and the remark are one answer to one question, so they
+           are one section. Neither carries a label of its own: the photo
+           control says what it does across its face, and the remark box
+           asks in its placeholder. Two sub-headings over two self-evident
+           controls was the page reading itself out loud. -->
+      <div class="m-sec" id="s-details">
+        <div class="m-sec-h">Solve Case Details</div>
         <!-- A bare file input renders as the browser's grey "Choose file",
              which on a phone says nothing about the camera it opens. The
              real input is hidden and this label drives it. -->
@@ -535,11 +541,8 @@
         </label>
         <input id="s-photo" class="s-shot-file" type="file" accept="image/*">
         <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
-      </div>
-
-      <div class="m-sec">
-        <div class="m-sec-h">Solve case remark</div>
-        <textarea id="s-remark" class="inp" rows="3"></textarea>
+        <textarea id="s-remark" class="inp s-remark" rows="3"
+                  placeholder="What was done" aria-label="Solve case remark"></textarea>
       </div>
 
       <div id="s-err" class="s-err hidden"></div>
@@ -1167,11 +1170,10 @@ function openSolve(c) {
      it, for somebody whose ticks allow that. */
   const done = c.status === 'resolved';
   $('s-heading').textContent = (done ? 'Close ' : 'Solve ') + (c.case_no || 'Case');
-  $('s-sub').textContent = done ? 'The work is done — accept it and close the case'
-                                : 'Say what was done, and show it';
   $('s-save').classList.toggle('hidden', done);
-  $('s-remark').closest('.m-sec').classList.toggle('hidden', done);
-  $('s-photo').closest('.m-sec').classList.toggle('hidden', done);
+  // One section now, so one thing to hide: a case already solved has
+  // nothing left to photograph or write up.
+  $('s-details').classList.toggle('hidden', done);
   $('s-close-case').classList.toggle('hidden', !(rights.may_close && done));
 
   $('solve-scrim').classList.remove('hidden');
