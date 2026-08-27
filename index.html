@@ -191,7 +191,7 @@
     <div id="sector-list" class="flex flex-col gap-6 w-full max-w-4xl">
 
       <!-- ── NURSERY SECTOR ── -->
-      <div class="sector-block" data-sector="nursery" draggable="true">
+      <div class="sector-block" id="sector-nursery" data-sector="nursery" draggable="true">
         <div class="sector-head" title="Drag to reorder sectors">
           <div class="drag-handle"><span></span><span></span><span></span></div>
           <div class="sector-title">🌱 Nursery Sector</div>
@@ -315,8 +315,8 @@
             <path d="M6 8h4M24 8h4M6 26h4M24 26h4" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </div>
-        <div class="module-name">555 FC<br>Portal</div>
-        <div class="module-tag">555_FC</div>
+        <div class="module-name">555 Worker<br>Portal</div>
+        <div class="module-tag">555_WORKER</div>
       </a>
 
       <!-- 555 Admin Portal — the ops portal that used to live in the Mobile
@@ -542,6 +542,15 @@
     authScreen.style.display='none';
     document.getElementById('pending-screen').style.display='none';
     hubScreen.style.display='block';
+    /* A module's back arrow can name the sector it came from
+       (…/index.html#sector-nursery). The browser tries that jump while the
+       hub is still hidden behind the sign-in screen, so it lands nowhere;
+       repeat it now the sectors are actually on the page. */
+    if (location.hash) {
+      const target = document.querySelector(location.hash);
+      if (target) requestAnimationFrame(() =>
+        target.scrollIntoView({ block: 'start', behavior: 'auto' }));
+    }
   }
 
   let isSignUpMode = false;

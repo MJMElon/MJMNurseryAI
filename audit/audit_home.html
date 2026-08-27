@@ -1052,10 +1052,10 @@
 
 <script src="audit_lang.js?v=20260825b"></script>
 <script src="audit_supabase.js"></script>
-<script src="audit_ribbon.js?v=20260824b"></script>
+<script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
-<script src="audit_pending.js?v=20260824a"></script>
+<script src="audit_pending.js?v=20260826b"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
 <script src="audit_settings.js?v=2"></script>
@@ -1578,6 +1578,37 @@ function loadAuditTodo(){
       });
       MAINT_OCCURRENCES = Array.from(buckets.values());
       diag.buckets = MAINT_OCCURRENCES.length;
+      /* Fallback: if the deadline-buckets came out empty but the raw
+         task tables have rows that the maintenance page would show
+         as pending, still surface a maintenance row on the To Do
+         list — tied to today so the auditor can tap through and see
+         what's there. Deadline windowing / plot mapping can fail
+         for a stray task without hiding the whole module from the
+         home page. */
+      if (!MAINT_OCCURRENCES.length) {
+        const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
+        const fieldPending = (fRows||[]).some(r =>
+          !SKIP_FALLBACK_TYPES.has(String(r.work_type||'').toLowerCase()) &&
+          r.work_date &&
+          !auditedIds.has(String(r.id))
+        );
+        const officePending = (function(){
+          if (!oRows || !oRows[0] || !Array.isArray(oRows[0].records)) return false;
+          return oRows[0].records.some(rec =>
+            rec && rec.tarikh && rec.plot && !auditedIds.has(String(rec.id)));
+        })();
+        if (fieldPending || officePending) {
+          const now = new Date();
+          MAINT_OCCURRENCES = [{
+            y: now.getFullYear(),
+            m: now.getMonth(),
+            d: now.getDate(),
+            nurseries: new Set(SCOPE_NURSERIES),
+            plots: new Map()
+          }];
+          diag.fallback = true;
+        }
+      }
       console.log('[audit-home] maintenance timeline:', diag,
                   'SCOPE_NURSERIES=', SCOPE_NURSERIES);
     } catch (e) {
@@ -1585,6 +1616,9 @@ function loadAuditTodo(){
       MAINT_OCCURRENCES = [];
     }
   }
+  /* P & D is audited elsewhere; every other work type contributes to
+     the fallback pending check above. */
+  const SKIP_FALLBACK_TYPES = new Set(['pd']);
 
   /* Which nurseries have been audited inside this window. Maintenance
      is a different shape: each occurrence carries a set of nurseries

@@ -249,7 +249,7 @@
                     'nursery_name,plot_name,batch_name,assignee_id,assignee_name,due_date,' +
                     'created_at,resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
-  var FULL_COLS   = ROUTED_COLS + ',photo_url';
+  var FULL_COLS   = ROUTED_COLS + ',photo_url,raised_by';
 
   /* Asked for in this order, dropping to the next on a 400 — two different
      migrations add the columns above the base set, and a database may have
@@ -574,6 +574,31 @@
                       background:#fff; border:1.5px solid #ede9fe; border-radius:18px; overflow:hidden;
                       box-shadow:0 22px 55px rgba(15,23,42,.22); display:flex; flex-direction:column; }
   #nelos-dock-panel[hidden] { display:none; }
+
+  /* ── the same panel, shown as a modal ──
+     A dashboard's To-Do block raises a case through this. A floating panel
+     unfolding in the corner is not what a button in the middle of a page
+     should do, so the presentation changes and NOTHING else does: same
+     markup, same form, same handlers — centred over a backdrop, with the
+     circle and the resize grip out of the way.
+
+     !important throughout: the dock's corner is written INLINE by
+     applyPos() and the panel's size by applySize(), so it can be dragged
+     and resized, and an inline declaration outranks a stylesheet one
+     whatever the selector. Without it the modal would still be pinned to
+     the bottom-right at 370px. */
+  #nelos-dock.nd-modal { left:0 !important; right:0 !important; top:0 !important; bottom:0 !important;
+                         flex-direction:column !important; align-items:center !important;
+                         justify-content:center; padding:18px; }
+  #nelos-dock.nd-modal::before { content:''; position:fixed; inset:0; background:rgba(15,23,42,.5); }
+  #nelos-dock.nd-modal #nelos-dock-panel {
+      position:relative; z-index:1;
+      width:min(430px, calc(100vw - 32px)) !important; height:auto !important;
+      max-width:none !important; max-height:calc(100vh - 40px) !important; }
+  #nelos-dock.nd-modal #nelos-dock-fab { display:none !important; }
+  #nelos-dock.nd-modal .nd-grip { display:none !important; }
+  #nelos-dock.nd-modal .nd-hist { display:none !important; }
+  #nelos-dock.nd-modal .nd-min { font-size:19px; line-height:1; }
   #nelos-dock-panel.nd-in { animation:nd-in .18s ease-out; }
   @keyframes nd-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 
@@ -587,40 +612,46 @@
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
-  .nd-list { overflow-y:auto; flex:1; padding:0 0 4px; -webkit-overflow-scrolling:touch; }
+  .nd-list { overflow-y:auto; flex:1; padding:0 10px 10px; background:#fbfaff;
+             -webkit-overflow-scrolling:touch; }
   .nd-list[hidden] { display:none; }
 
   /* the overdue block, pinned to the top of the scroll */
-  .nd-sec { padding:7px 14px 5px; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
-            color:#94a3b8; background:#fff; }
-  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fef2f2;
-                 border-bottom:1px solid #fee2e2; padding:7px 14px; }
+  .nd-sec { padding:11px 4px 6px; font-size:9px; font-weight:900; letter-spacing:.1em;
+            text-transform:uppercase; color:#94a3b8; background:#fbfaff; }
+  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fbfaff;
+                 padding:11px 4px 6px; }
 
   /* A button, not a link: the case opens in this panel. The reset is
      what a <button> needs to keep looking like the row it replaced. */
-  /* The row is a container now, not a button: three buttons live inside
-     it, and a button cannot hold buttons. The reading half is the button. */
-  .nd-row { display:flex; align-items:stretch; padding:0 8px 0 0;
-            border-bottom:1px dashed #f1f5f9; color:inherit; }
-  .nd-row:last-child { border-bottom:none; }
-  .nd-row:hover { background:#faf5ff; }
-  .nd-row-over { background:#fffbfb; }
-  .nd-row-over:hover { background:#fef2f2; }
-  .nd-open { display:flex; align-items:flex-start; gap:8px; flex:1; min-width:0;
-             padding:10px 6px 10px 12px; text-align:left; background:none; border:none;
+  /* One card per case, so where one ends and the next begins is a border
+     rather than a judgement about spacing. The card is a container, not a
+     button: three buttons live inside it, and a button cannot hold
+     buttons — the reading part is the button. */
+  .nd-row { display:flex; flex-direction:column; margin-bottom:8px; color:inherit;
+            background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+            box-shadow:0 1px 2px rgba(76,29,149,.04); }
+  .nd-row:last-child { margin-bottom:0; }
+  .nd-row:hover { border-color:#c4b5fd; }
+  .nd-row-over { background:#fffbfb; border-color:#fecaca; }
+  .nd-row-over:hover { border-color:#fca5a5; }
+  .nd-open { display:flex; align-items:flex-start; gap:9px; min-width:0;
+             padding:11px 12px 8px; text-align:left; background:none; border:none;
              font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .nd-n { font-size:10px; font-weight:900; color:#c0c7d2; line-height:1.5; margin-top:1px;
+  .nd-n { font-size:10px; font-weight:900; color:#c0c7d2; line-height:1.6; margin-top:1px;
           min-width:13px; flex-shrink:0; font-variant-numeric:tabular-nums; }
   .nd-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
   .nd-p-urgent { background:#dc2626; } .nd-p-high { background:#f97316; }
   .nd-p-normal { background:#0ea5e9; } .nd-p-low  { background:#94a3b8; }
   .nd-main  { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
-  /* Case number, then the work it is about, on one line. */
+  /* The case number heads the card; the work it is about sits under it,
+     where it has the whole width and does not have to be cut short. */
   .nd-l1    { display:flex; align-items:center; gap:6px; min-width:0; }
-  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.04em; color:#7c3aed;
+  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.06em; color:#7c3aed;
               flex-shrink:0; font-variant-numeric:tabular-nums; }
   .nd-title { font-size:12.5px; font-weight:700; color:#1e293b; line-height:1.3;
-              white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+              overflow:hidden; }
   .nd-where { font-size:10.5px; font-weight:800; color:#64748b; line-height:1.35; }
   .nd-remark{ font-size:10px; font-weight:600; color:#a3adbb; line-height:1.4;
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -628,10 +659,12 @@
   .nd-shotpic { width:40px; height:40px; object-fit:cover; border-radius:8px; flex-shrink:0;
                 border:1px solid #ede9fe; margin-top:1px; }
 
-  /* Stacked, so three of them cost 26px of width rather than 90. */
-  .nd-acts { display:flex; flex-direction:column; justify-content:center; gap:4px;
-             padding:8px 0; flex-shrink:0; }
-  .nd-act { width:24px; height:22px; border-radius:6px; cursor:pointer; padding:0;
+  /* Side by side along the foot of the card, inside its border, where
+     three buttons read as three buttons rather than a column of marks
+     down the edge of the list. */
+  .nd-acts { display:flex; justify-content:flex-end; gap:6px;
+             padding:0 11px 9px; margin-top:-4px; }
+  .nd-act { width:30px; height:26px; border-radius:8px; cursor:pointer; padding:0;
             border:1px solid #e9e3fb; background:#fff; color:#7c3aed;
             font-family:inherit; font-size:11px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; }
@@ -644,9 +677,9 @@
   .nd-act-del:hover { background:#fef2f2; }
 
   /* Said once, at the top of the list, after a case is raised. */
-  .nd-flash { display:flex; align-items:center; gap:7px; padding:9px 14px;
-              background:#f0fdf4; border-bottom:1px solid #dcfce7;
-              font-size:11px; font-weight:800; color:#15803d; }
+  .nd-flash { display:flex; align-items:center; gap:7px; margin:10px 0 8px;
+              padding:9px 12px; background:#f0fdf4; border:1.5px solid #bbf7d0;
+              border-radius:11px; font-size:11px; font-weight:800; color:#15803d; }
   /* the due date and the owner read as one thing each, so they wrap
      whole rather than splitting across two lines */
   .nd-nw    { white-space:nowrap; }
@@ -709,8 +742,12 @@
      can add, and both are optional except the remark — a resolution
      nobody described is one nobody can check. */
   .nd-solve { margin-top:16px; border-top:1px solid #e9e3fb; padding-top:13px; }
-  .nd-solve-h { font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
-                color:#6d28d9; margin-bottom:9px; }
+  /* The heading over each of the two blocks — what is being asked, then
+     the answer to it. Same mark in both places so they read as a pair. */
+  .nd-d-sec { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
+              color:#6d28d9; margin-bottom:9px; }
+  .nd-solve-lab { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+                  color:#64748b; margin:12px 0 -2px; }
   .nd-shot { display:flex; gap:8px; align-items:stretch; }
   .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
                    justify-content:center; gap:3px; min-height:64px; cursor:pointer;
@@ -743,18 +780,25 @@
   .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
   .nd-detail[hidden] { display:none; }
   .nd-d-title { font-size:15px; font-weight:800; color:#0f172a; line-height:1.35; }
-  .nd-d-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
-  .nd-d-chip { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
-               padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; }
-  .nd-d-chip.hot  { background:#fee2e2; color:#b91c1c; }
-  .nd-d-chip.due  { background:#fef3c7; color:#92400e; }
+  .nd-d-meta { font-size:11px; font-weight:700; color:#94a3b8; margin-top:5px; }
+  /* Three facts across on anything wider than a narrow dock, stacked when
+     the panel is dragged small — the labels are short but the values are
+     names, and three names on one 300px line is a wall. */
+  .nd-d-facts { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+                gap:9px 10px; margin-top:12px; padding:11px 12px;
+                background:#f8fafc; border:1px solid #eef2f7; border-radius:11px; }
+  /* Three across, as one row — but not on a dock dragged down to its
+     narrowest, where three names in 300px is a column of single words. */
+  @media (max-width:340px) { .nd-d-facts { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .nd-d-fact { min-width:0; }
+  .nd-d-fact .nd-d-k { font-size:9px; font-weight:900; letter-spacing:.09em; text-transform:uppercase;
+                       color:#94a3b8; }
+  .nd-d-fact .nd-d-v { font-size:12.5px; font-weight:700; color:#1e293b; margin-top:2px;
+                       line-height:1.3; word-break:break-word; }
+  .nd-d-fact .nd-d-v em { font-style:normal; color:#94a3b8; font-weight:600; }
   .nd-d-body { margin-top:12px; font-size:12.5px; line-height:1.55; color:#334155;
                white-space:pre-wrap; word-break:break-word; }
   .nd-d-none { margin-top:12px; font-size:12px; color:#94a3b8; font-style:italic; }
-  .nd-d-grid { margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px;
-               display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:11.5px; }
-  .nd-d-k { color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-  .nd-d-v { color:#334155; font-weight:600; word-break:break-word; }
   .nd-d-open { display:inline-block; margin-top:14px; font-size:11px; font-weight:800;
                color:#6d28d9; text-decoration:none; letter-spacing:.03em; }
   .nd-d-open:hover { text-decoration:underline; }
@@ -886,8 +930,8 @@
                    '<span class="nd-no">' + esc(c.case_no || '') + '</span>' +
                    '<span class="nd-dot nd-p-' + esc(c.priority || 'normal') + '" ' +
                          'title="' + esc(PRIORITY_LABEL[c.priority] || '') + '"></span>' +
-                   '<span class="nd-title">' + esc(c.title) + '</span>' +
                  '</span>' +
+                 '<span class="nd-title">' + esc(c.title) + '</span>' +
                  (where  ? '<span class="nd-where">' + esc(where) + '</span>' : '') +
                  (remark ? '<span class="nd-remark">' + esc(remark) + '</span>' : '') +
                  (c.due_date ? '<span class="nd-due">' + dueText(c.due_date) + '</span>' : '') +
@@ -1042,9 +1086,19 @@
       if (fab.dataset.ndDragged === '1') { fab.dataset.ndDragged = '0'; e.preventDefault(); return; }
       setOpen(!open);
     });
-    dock.querySelector('.nd-min').addEventListener('click', function () { setOpen(false); });
+    dock.querySelector('.nd-min').addEventListener('click', function () {
+      if (modal) { closeModal(); return; }
+      setOpen(false);
+    });
+    /* Clicking the darkened area around a modal closes it. The backdrop is
+       a pseudo-element, so the click lands on the dock itself — which is
+       only ever the target when nothing inside the panel was hit. */
+    dock.addEventListener('click', function (e) {
+      if (modal && e.target === dock) closeModal();
+    });
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape' || !open) return;
+      if (modal) { closeModal(); return; }
       if (view !== 'list') showList(); else setOpen(false);
     });
 
@@ -1055,6 +1109,56 @@
 
   /* Expanded or minimised — remembered, so it carries across pages. */
   var _inTimer = null;
+
+  /* Shown as a modal rather than as the corner dock. Only ever entered
+     through newCase(), and left the moment that one job is done — the
+     modal is opened FOR raising a case, so "back to the list" means there
+     is nothing left to do here. */
+  var modal = false;
+  var hidBeforeModal = false;
+
+  function setModal(on) {
+    modal = !!on;
+    if (!dock) return;
+    dock.classList.toggle('nd-modal', modal);
+
+    /* The dock hides its own ROOT when it cannot read the case list — a
+       dropped connection, a stale session, no nelos_cases table — so that
+       no unexplained circle floats over the page. That rule is about the
+       circle appearing on its own; it must not swallow a button somebody
+       pressed. Left alone, "+ New Case" on a dashboard would open this
+       modal inside a display:none element and the press would do visibly
+       nothing at all.
+
+       So the modal unhides the root, and putting it back afterwards
+       restores exactly what was there — a dock that was standing down goes
+       back to standing down rather than leaving a circle behind. */
+    if (modal) {
+      hidBeforeModal = dock.hidden;
+      dock.hidden = false;
+    } else if (hidBeforeModal) {
+      dock.hidden = true;
+      hidBeforeModal = false;
+    }
+
+    /* Two header buttons belong to the dock, not to a modal. Minimise means
+       "put it back in the corner", which a modal has no corner to go to —
+       here the same button closes, so it says so and looks like a close.
+       The history button opens the solved-but-not-closed LIST, and a modal
+       raising a case has no list to show it in; it is hidden rather than
+       left to lead somewhere that is not there. */
+    var min = dock.querySelector('.nd-min');
+    if (min) {
+      min.textContent = modal ? '\u00d7' : '\u2013';
+      min.title = modal ? 'Close' : 'Minimise';
+      min.setAttribute('aria-label', min.title);
+    }
+  }
+
+  function closeModal() {
+    setModal(false);
+    setOpen(false);
+  }
 
   function setOpen(next) {
     open = !!next;
@@ -1067,9 +1171,15 @@
     fab.setAttribute('aria-expanded', open ? 'true' : 'false');
     try { localStorage.setItem(LS_OPEN, open ? '1' : '0'); } catch (_) {}
     if (open) {
-      /* Reopening lands on the list, not on a half-filled form somebody
-         walked away from — except when they minimised mid-edit and came
-         straight back, which the form pane keeps. */
+      /* Reopening lands on the list. It always said so in this comment and
+         never did it — nothing here changed the pane, so whatever was on
+         screen when the dock was minimised came back: a half-filled form, or
+         one case's detail, with the list nowhere in sight until something
+         else was pressed.
+
+         Not in a modal: newCase() opens one and shows the form immediately
+         after this, and showList() in a modal closes it. */
+      if (!modal) showList();
       applyPos(pos);
       refresh();
     }
@@ -1477,6 +1587,10 @@
   }
 
   function showList() {
+    /* In a modal there is no list to go back to. Cancel, Escape, the
+       minimise button and a finished save all arrive here, and all four
+       mean the same thing: done. */
+    if (modal) { closeModal(); return; }
     view = 'list';
     editing = null;
     showPane('list');
@@ -1513,25 +1627,27 @@
   }
 
   function detailHtml(c, full) {
-    var subject = [c.batch_name && 'Batch ' + c.batch_name, c.plot_name, c.nursery_name]
-      .filter(Boolean).join(' · ');
-    var due = dueLabel(c.due_date);
-    var chips =
-      '<span class="nd-d-chip">' + esc(SOURCE_LABEL[c.source_module] || c.source_module || 'Nelos') + '</span>' +
-      '<span class="nd-d-chip' + (c.priority === 'urgent' || c.priority === 'high' ? ' hot' : '') + '">' +
-        esc(PRIORITY_LABEL[c.priority] || c.priority || 'normal') + '</span>' +
-      (c.status ? '<span class="nd-d-chip">' + esc(String(c.status).replace('_', ' ')) + '</span>' : '') +
-      (due ? '<span class="nd-d-chip' + (isOverdue(c) ? ' hot' : ' due') + '">' + esc(due) + '</span>' : '');
+    var f = full || c;
 
-    var rowsOut = [];
-    var put = function (k, v) { if (v) rowsOut.push(
-      '<div class="nd-d-k">' + esc(k) + '</div><div class="nd-d-v">' + esc(v) + '</div>'); };
-    put('Case', c.case_no);
-    put('Subject', subject);
-    put('Category', c.category);
-    put('Queue', SOURCE_LABEL[c.assigned_module] || c.assigned_module);
-    put('Assignee', c.assignee_name || 'Unassigned');
-    put('Raised', (c.created_at || '').slice(0, 10));
+    /* Where the work is. Nursery with its plot in brackets, and the batch
+       only when there is one — a batch case that did not say so would be
+       missing the one thing that identifies it. */
+    var where = f.nursery_name
+      ? esc(f.nursery_name) + (f.plot_name ? ' (' + esc(f.plot_name) + ')' : '')
+      : (f.plot_name ? esc(f.plot_name) : '');
+    if (f.batch_name) where = (where ? where + ' · ' : '') + 'Batch ' + esc(f.batch_name);
+
+    var fact = function (k, v) {
+      return '<div class="nd-d-fact"><div class="nd-d-k">' + esc(k) + '</div>' +
+             '<div class="nd-d-v">' + (v || '&#8212;') + '</div></div>';
+    };
+
+    /* Created, and by whom. raised_by is on the top column tier only, so on
+       a database that has not got it this simply reads as the date. */
+    var made = (f.created_at || '').slice(0, 10);
+    var when = made ? prettyDate(made) : '';
+    var meta = (when ? 'Created ' + esc(when) : '') +
+               (f.raised_by ? (when ? ' · ' : '') + 'by ' + esc(f.raised_by) : '');
 
     var body = full === null
       ? '<div class="nd-d-none">Could not load the detail — the case above is what the list knows.</div>'
@@ -1542,12 +1658,34 @@
           : '<div class="nd-d-none">Loading detail…</div>';
 
     var solved = (full && full.status === 'resolved') || c.status === 'resolved';
-    return '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
-           '<div class="nd-d-chips">' + chips + '</div>' +
+
+    /* Two blocks, in the order the job is done: read what is being asked,
+       then answer it. The chips that used to sit under the title — the
+       module, the priority, the status — said "Nelos · Normal · Open" on
+       almost every case, which is three words of nothing above the one
+       thing being read. The case number is in the panel heading already. */
+    return '<div class="nd-d-sec">Pending Case Details</div>' +
+           '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
+           (meta ? '<div class="nd-d-meta">' + meta + '</div>' : '') +
+           '<div class="nd-d-facts">' +
+             fact('Nursery (Plot)', where) +
+             fact('Assigned to', esc(SOURCE_LABEL[f.assigned_module || f.source_module] ||
+                                     f.assigned_module || f.source_module || '')) +
+             fact('PIC', f.assignee_name ? esc(f.assignee_name) : '<em>Unassigned</em>') +
+           '</div>' +
            body +
-           (rowsOut.length ? '<div class="nd-d-grid">' + rowsOut.join('') + '</div>' : '') +
            '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>' +
            (solved ? solvedCardHtml(full || c) : solveBlockHtml());
+  }
+
+  /* 2026-08-26 → 26 Aug 2026. Falls back to the ISO string rather than
+     printing "Invalid Date" at somebody. */
+  function prettyDate(iso) {
+    try {
+      var d = new Date(iso + 'T00:00:00');
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (_) { return iso; }
   }
 
   /* ── SOLVING ─────────────────────────────────────────────────────
@@ -1635,16 +1773,20 @@
 
   function solveBlockHtml() {
     return '<div class="nd-solve">' +
-             '<div class="nd-solve-h">Solve</div>' +
+             '<div class="nd-d-sec">Solve Case</div>' +
              '<div class="nd-shot">' +
                '<label>' +
                  '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-                 '<span>Add photo</span>' +
+                 '<span>Take or attach a photo</span>' +
                  '<input type="file" accept="image/*" capture="environment" class="nd-shot-in">' +
                '</label>' +
              '</div>' +
-             '<textarea class="nd-solve-note" maxlength="2000" ' +
-                       'placeholder="What did you do? — this is what the person closing it reads"></textarea>' +
+             /* Labelled rather than prompted from inside the box: a
+                placeholder is gone the moment anybody types, so the one
+                thing telling them what the box is for disappears exactly
+                when they start filling it in. */
+             '<div class="nd-solve-lab">Solve Case Remark</div>' +
+             '<textarea class="nd-solve-note" maxlength="2000"></textarea>' +
            '</div>';
   }
 
@@ -2053,6 +2195,13 @@
       var no = was ? (was.case_no || (made && made.case_no))
                    : ((made && made.case_no) || null);
       setFlash(no ? (no + (was ? ' saved' : ' raised')) : (was ? 'Case saved' : 'Case raised'));
+      /* Anything else on the page showing these cases — a dashboard's
+         To-Do block — is now out of date by exactly this case. It has no
+         other way to know: the modal it was raised through is the dock's,
+         not the block's. */
+      try {
+        document.dispatchEvent(new CustomEvent('nelos:changed', { detail: { caseNo: no } }));
+      } catch (_) { /* very old browser: the block simply refreshes later */ }
       showList();
       refresh();
     } catch (err) {
@@ -2176,7 +2325,10 @@
           warn(out.error === 'http-404'
             ? 'no nelos_cases table — run shared/migration_nelos.sql. Standing down.'
             : 'no usable session (' + out.error + '). Standing down.');
-          dock.hidden = true;
+          /* Never while a modal is up. refresh() runs as part of opening
+             one, and standing down here would pull the form out from under
+             somebody who had just pressed a button to get it. */
+          if (!modal) dock.hidden = true;
           stopTimer();
           return;
         }
@@ -2187,7 +2339,7 @@
         // comes back.
         if (!loaded) {
           warn('could not read the case list (' + out.error + '). Hiding until it answers.');
-          dock.hidden = true;
+          if (!modal) dock.hidden = true;
         }
         return;
       }
@@ -2264,6 +2416,18 @@
     refresh: function () { if (dock) refresh(); },
     open:    function () { if (dock) setOpen(true); },
     close:   function () { if (dock) setOpen(false); },
+    /* Open straight onto the raise form. This is the only new-case form in
+       the system — the To-Do block on a dashboard opens THIS rather than
+       carrying a second copy of it, which is how the two stay identical.
+       Returns false when there is no dock on the page, so a caller can
+       fall back to the hub. */
+    newCase: function () {
+      if (!dock) return false;
+      setModal(true);
+      setOpen(true);
+      showForm();
+      return true;
+    },
     /* Back to the bottom-right corner at its default size, for a circle
        someone has parked somewhere unhelpful. */
     reset:   function () {

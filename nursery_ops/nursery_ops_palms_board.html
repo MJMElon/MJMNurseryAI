@@ -11,6 +11,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_palms.js"></script>
 <script src="../shared/shared_plot_map.js"></script>
+<script src="../shared/shared_plot_draw.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -34,23 +35,44 @@
      anything once the table has a width, and a layout that exists only if a
      CDN answered is a layout that cannot be checked. */
   table { table-layout:fixed; width:100%; }
+  /* Centred, headers and data alike. Every column here is a short value —
+     a plot name, a stage, a date, a count of days — and centring them makes
+     the row read as one line instead of five ragged left edges. */
+  /* Tight rows on purpose. This table is 52 plots long and every cell holds
+     one short value, so the height is set by the tallest control in it — the
+     dropdown — and nothing else is allowed to add to it. */
   th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
-       padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
-  td { padding:11px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; vertical-align:top; }
+       padding:8px 10px; text-align:center; background:#f8fafc; white-space:nowrap; }
+  td { padding:3px 10px; font-size:12.5px; color:#334155; border-top:1px solid #f1f5f9;
+       vertical-align:middle; text-align:center; line-height:1.3; }
   /* The action square is fixed, Plot is as wide as a plot name ever gets,
      Current Status takes the slack because it carries the longest text —
      two activity names joined by " + " — and the last three are equal so
      the eye can run down them. */
-  .c-act    { width:56px; }
-  .c-plot   { width:88px; }
-  .c-status { width:auto; min-width:190px; }
+  .c-plot   { width:92px; }
+  /* Current Status holds a dropdown, so it needs a fixed, generous width of
+     its own rather than "whatever is left" — a select that changes width
+     with its longest option is what made the column look ragged. */
+  .c-status { width:262px; }
   /* Narrower than the header text, so the header wraps to two lines and the
      width the column actually needs is the DATA's, not the label's. That is
      what frees the room Current Status wants. */
-  .c-eq     { width:16%; white-space:normal; }
-  td.wrap   { white-space:normal; }
-  .pill { display:inline-block; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-          border-radius:999px; padding:3px 9px; border:1px solid; white-space:nowrap; }
+  .c-eq     { width:auto; white-space:normal; }
+  /* The plot name opens the panel from here as well as from the map. A plot
+     with no boundary drawn has no polygon to click — which is exactly the
+     plot somebody wants to hide — so the map alone was not a way in. */
+  .hid-chip { display:inline-flex; align-items:center; gap:7px; padding:5px 6px 5px 11px; border-radius:999px;
+              border:1.5px solid #e2e8f0; background:white; font-size:12px; font-weight:900; color:#475569; }
+  .hid-back { border:none; background:#f0fdfa; color:#0f766e; font-family:inherit; font-weight:900;
+              font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:4px 9px;
+              border-radius:999px; cursor:pointer; }
+  .hid-back:hover { background:#ccfbf1; }
+  .plot-link { background:none; border:none; padding:0; font-family:inherit; font-size:12.5px;
+               font-weight:900; color:#0f172a; cursor:pointer; text-decoration:underline;
+               text-decoration-color:#cbd5e1; text-underline-offset:3px; }
+  .plot-link:hover { color:#0f766e; text-decoration-color:#14b8a6; }
+  .pill { display:inline-block; font-size:9.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+          border-radius:999px; padding:2px 8px; border:1px solid; white-space:nowrap; }
   .p-late { background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
   .p-ok   { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
   .p-idle { background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
@@ -68,19 +90,67 @@
      is its content, so without it the list refuses to shrink, the card grows
      past max-height and the OK button ends up off the bottom of the screen —
      with eleven stages that is every time. */
-  #up-list { flex:1 1 auto; min-height:0; overflow-y:auto; }
-  #up-modal .modal-card > :not(#up-list) { flex:none; }
-  .act-row { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:11px 14px;
-             border-radius:14px; border:1.5px solid #e2e8f0; background:white; cursor:pointer;
-             transition:all .12s; font-family:inherit; }
-  .act-row:hover { border-color:#99f6e4; }
-  .act-row.on { border-color:#10b981; background:#ecfdf5; }
-  .act-n { width:28px; height:28px; border-radius:999px; background:#f1f5f9; color:#64748b; font-weight:900;
-           font-size:11px; display:flex; align-items:center; justify-content:center; flex:none; }
-  .act-row.on .act-n { background:#059669; color:white; }
-  .act-name { font-weight:900; color:#1e293b; font-size:13px; flex:1; min-width:0; }
-  .act-row.on .act-name { color:#065f46; }
-  .act-d { font-weight:900; color:#94a3b8; font-size:11px; flex:none; }
+  .pv-row { display:flex; align-items:baseline; gap:12px; padding:7px 0; border-top:1px solid #f8fafc; }
+  .pv-row:first-child { border-top:none; }
+  .pv-k { font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.1em;
+          flex:0 0 132px; }
+  .pv-v { font-size:13px; font-weight:700; color:#334155; flex:1 1 auto; }
+  /* flex:none is the point. .modal-card is a flex column with a max-height,
+     and a flex item's default is to shrink — so on a short window the photo
+     was squeezed to nothing and the panel looked like it had no map at all.
+     It keeps its height and the panel scrolls instead. */
+  .pv-map { position:relative; background:#0f172a; overflow:hidden;
+            flex:none; height:clamp(260px, 44vh, 420px); }
+  .pv-frame { position:absolute; inset:0; overflow:hidden; }
+  /* The photo is positioned and scaled so the plot's own bounding box fills
+     the frame — a crop, done with CSS, so no second image is needed and the
+     polygon percentages stay the percentages the database holds. */
+  .pv-img { position:absolute; transform-origin:top left; user-select:none; -webkit-user-drag:none; }
+  .pv-svg { position:absolute; inset:0; width:100%; height:100%; }
+  .pv-tags { position:absolute; inset:0; pointer-events:none; }
+  .pv-shape { cursor:pointer; transition:fill-opacity .15s; }
+  .pv-shape:hover { fill-opacity:.85; }
+  .pv-tag { position:absolute; transform:translate(-50%,-50%); font-size:11px; font-weight:900;
+            background:rgba(255,255,255,.94); color:#0f172a; padding:2px 8px; border-radius:7px;
+            white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+  .pv-strip { position:absolute; left:0; right:0; bottom:0; padding:11px 14px;
+              background:linear-gradient(to top, rgba(15,23,42,.93), rgba(15,23,42,.72) 70%, transparent);
+              color:white; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; }
+  .pv-s-name { font-size:14px; font-weight:900; }
+  .pv-s-k { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.12em; color:#94a3b8; }
+  .pv-s-v { font-size:12px; font-weight:800; color:#e2e8f0; }
+  .pv-s-late { color:#fda4af; }
+  .pv-none { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+             color:#94a3b8; font-size:12px; font-weight:800; text-align:center; padding:20px; }
+  /* One line per boundary, all of them, no clicking. */
+  .pv-strip { max-height:44%; overflow-y:auto; }
+  .pv-line { display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 12px; padding:5px 0; }
+  .pv-line + .pv-line { border-top:1px solid rgba(255,255,255,.13); }
+  .pv-sw { width:11px; height:11px; border-radius:3px; border:1.5px solid rgba(255,255,255,.5); flex:none;
+           align-self:center; }
+  /* The same shape and weight as the pills beside it, so the row reads as
+     one set of things rather than a form dropped into a table. Symmetric
+     padding with the arrow drawn inside the right pad keeps the TEXT
+     centred — text-align:center on a select with one-sided padding is
+     centred within the leftover space, which looks off by exactly the
+     arrow's width. */
+  .st-pick { width:100%; max-width:230px; appearance:none; -webkit-appearance:none; font-family:inherit;
+             padding:4px 24px; border-radius:999px; border:1.5px solid #e2e8f0; background:white;
+             color:#0f172a; font-weight:900; font-size:11.5px; line-height:1.4; cursor:pointer; outline:none;
+             text-align:center; text-align-last:center; text-overflow:ellipsis;
+             background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%2394a3b8' d='M5 6L0 0h10z'/></svg>");
+             background-repeat:no-repeat; background-position:right 10px center; background-size:9px; }
+  .st-pick:hover { border-color:#99f6e4; background-color:#f0fdfa; }
+  .st-pick:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
+  /* The options themselves are drawn by the OS and cannot be centred, so
+     they are left as they come — legible beats half-styled. */
+  .st-pick option { text-align:left; font-weight:700; }
+  .cf-was { background:#f8fafc; border:1.5px solid #e2e8f0; }
+  .cf-now { background:#ecfdf5; border:1.5px solid #a7f3d0; }
+  .cf-box { border-radius:14px; padding:12px 14px; }
+  .cf-k { font-size:9px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#94a3b8; }
+  .cf-v { font-size:15px; font-weight:900; color:#0f172a; margin-top:3px; }
+  .cf-s { font-size:11px; font-weight:700; color:#64748b; margin-top:3px; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -114,17 +184,28 @@
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th class="c-act"></th>
             <th class="c-plot">Plot</th>
             <th class="c-status">Current Status</th>
             <th class="c-eq">Expected Completion</th>
-            <th class="c-eq text-right">Days Left / Over</th>
+            <th class="c-eq">Days Left / Over</th>
             <th class="c-eq">Last Update</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
+    <div id="hidden-bar" class="hidden px-4 py-3 border-t border-slate-100 bg-slate-50/60">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hidden plots</span>
+        <span id="hidden-count" class="text-[11px] font-bold text-slate-400"></span>
+        <div id="hidden-list" class="flex flex-wrap gap-2 ml-auto"></div>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">
+        Not on the map, not in the table above, and not offered to the Field Conductor. Everything
+        else about them is untouched — restore one and it comes straight back.
+      </p>
+    </div>
+
     <div id="empty" class="hidden px-6 py-14 text-center">
       <p class="text-[13px] font-black text-slate-600 uppercase tracking-widest">No plots registered for this nursery</p>
       <p class="text-[12px] text-slate-500 mt-2 max-w-[440px] mx-auto leading-relaxed">
@@ -136,24 +217,62 @@
 
 </div>
 
-  <div id="up-modal" class="modal-bg hidden">
-  <div class="modal-card">
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div>
-        <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Update status</div>
-        <div id="up-plot" class="text-lg font-black text-slate-800">—</div>
+  <div id="pv-modal" class="modal-bg hidden">
+  <div class="modal-card" style="max-width:860px">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+      <div class="flex items-baseline gap-2.5 min-w-0">
+        <span id="pv-nursery" class="text-base font-black text-teal-600 uppercase tracking-widest">—</span>
+        <span class="text-slate-300 font-black text-lg">·</span>
+        <span id="pv-title" class="text-2xl font-black text-slate-800 truncate">—</span>
       </div>
-      <button id="up-close" class="ml-auto text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
+      <button id="pv-hide" class="ml-auto px-4 py-2 rounded-xl bg-white border-[1.5px] border-rose-200 hover:bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Hide plot</button>
+      <button id="pv-edit" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
+      <span id="pv-note" class="ml-auto text-[11px] font-bold text-slate-400 hidden">Admins can redraw this</span>
+      <button id="pv-close" class="text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
     </div>
-    <div class="px-5 py-3 text-[12px] text-slate-500 leading-relaxed border-b border-slate-100">
-      Choose what this plot is on today — up to two at once.
-      <strong class="text-slate-700">Anything you leave out is recorded as finished today.</strong>
-      This writes the same record the Field Conductor's app writes.
+
+    <!-- The plot's own map, zoomed to it. Its areas are clickable; the one
+         picked reports itself in the strip across the bottom of the photo,
+         so nothing has to sit under the map. -->
+    <div class="pv-map" id="pv-map">
+      <div class="pv-frame" id="pv-frame">
+        <img class="pv-img" id="pv-img" alt="">
+        <svg class="pv-svg" id="pv-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+        <div class="pv-tags" id="pv-tags"></div>
+      </div>
+      <div class="pv-strip" id="pv-strip"></div>
+      <div class="pv-none" id="pv-none">No boundary drawn for this plot yet.</div>
     </div>
-    <div id="up-list" class="px-5 py-4 space-y-2 overflow-y-auto"></div>
+  </div>
+</div>
+
+<div id="cf-modal" class="modal-bg hidden">
+  <div class="modal-card" style="max-width:470px">
+    <div class="px-5 py-4 border-b border-slate-100">
+      <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest">Change plot status</div>
+      <div id="cf-plot" class="text-lg font-black text-slate-800">—</div>
+    </div>
+    <div class="px-5 py-4 space-y-2">
+      <div class="cf-box cf-was">
+        <div class="cf-k">Before</div>
+        <div id="cf-was-v" class="cf-v">—</div>
+        <div id="cf-was-s" class="cf-s"></div>
+      </div>
+      <div class="text-center text-slate-300 font-black text-lg leading-none">↓</div>
+      <div class="cf-box cf-now">
+        <div class="cf-k">After</div>
+        <div id="cf-now-v" class="cf-v">—</div>
+        <div id="cf-now-s" class="cf-s"></div>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed pt-1">
+        The stage running now is recorded as finished today and the new one starts today. This is the
+        same record the Field Conductor's app writes, saved under your name.
+      </p>
+    </div>
     <div class="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
-      <span id="up-msg" class="text-[11px] font-bold text-slate-400"></span>
-      <button id="up-save" class="ml-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest cursor-pointer">OK</button>
+      <span id="cf-msg" class="text-[11px] font-bold text-slate-400"></span>
+      <button id="cf-cancel" class="ml-auto px-4 py-2.5 rounded-xl bg-white border-[1.5px] border-slate-200 hover:bg-slate-50 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-pointer">Cancel</button>
+      <button id="cf-ok" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-widest cursor-pointer">Confirm change</button>
     </div>
   </div>
 </div>
@@ -170,6 +289,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
                                              .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let LOGS = {};
+let AREAS = {};      // plot_name → [{ area_key, polygon, batch_name }]
+let CAN_DRAW = false;   // may this account redraw a boundary?
+let CAN_UPDATE = false; // may this account change a plot's status?
+let HIDDEN = [];        // plots taken out of sight, so they can be brought back
+let MAP_SCOPE = {};   // what MAP.load was given, so a reload matches
 let ME = '';        // the name written into anything saved from this page
 let MAP = null;
 let LINES = new Map();   // plot key → the line boardLines() built for it
@@ -182,8 +306,19 @@ let SCOPE = 'all';       // 'all', or a nursery key, or the list the user may se
    the honest answer. */
 const rankOf = (st) => (st === 'overdue' ? 0 : st === 'ontrack' ? 1 : 2);
 
+/* Answers for a plot ("B2") or for one of its areas ("B2#A").
+
+   Given an area, only that area's own log counts — the whole point of
+   splitting a plot is that its halves are on different stages, so rolling
+   them together would undo it. Given a whole plot, the worst of whatever it
+   has stands for it. */
 function lineForPlot(plot) {
   const want = String(plot).toUpperCase();
+  if (want.indexOf('#') !== -1) {
+    let hit = null;
+    LINES.forEach((ln, key) => { if (String(key).toUpperCase() === want) hit = ln; });
+    return hit;
+  }
   let best = null;
   LINES.forEach((ln, key) => {
     if (MJMPalms.plotOf(key).toUpperCase() !== want) return;
@@ -196,19 +331,6 @@ function lineForPlot(plot) {
   return best;
 }
 
-/* What the map paints. 'over' is red, 'ok' green, anything else grey. */
-/* The key beside the map: which stages share a colour, and what colour.
-   Grouped by stage NUMBER rather than by name, so renaming a stage in
-   Settings keeps its colour and the key picks the new name up on its own.
-
-   Colours chosen by the office. Blue is the one they left open — the three
-   ground-preparation stages — and it is the hue that separates cleanest
-   from the other four. The set is validated with all pairs in play: worst
-   normal-vision ΔE 16.3, all inside the lightness band and over the chroma
-   floor. Red against green is the one soft pair at CVD ΔE 7.2, which is
-   legal only with a second encoding — every plot carries its name, the key
-   spells its stages out and the table under the map gives the exact stage,
-   so it holds. Do not add a sixth colour without re-running that check. */
 /* The colours come from the office now — one per work status, set on
    PALMS → Settings → Ideal Work (nops_plot_status_stages.color).
 
@@ -218,7 +340,13 @@ function lineForPlot(plot) {
    the one stage you care about its own colour and it stands out.
 
    A stage with no colour set is grey. That is deliberate and visible — a
-   wrong colour on a map is worse than an obviously unassigned one. */
+   wrong colour on a map is worse than an obviously unassigned one.
+
+   HOW MANY COLOURS. Plots sit beside each other, so every colour on this
+   map is compared with every other one, not just its neighbour in the key.
+   That supports about five distinct fills, not eleven — measured, and the
+   figures are in migration_palms_stage_colours.sql. Anyone adding a sixth
+   should check it separates before trusting it. */
 function buildPhases() {
   const acts = MJMPalms.ACTIVITIES || [];
   const groups = [];
@@ -254,17 +382,21 @@ function mapStatusOf(plot) {
 function renderTable() {
   const nursery = MAP ? MAP.active() : null;
   $('tbl-nursery').textContent = nursery || '—';
-  const plots = MAP ? MAP.plotsOf(nursery) : [];
+  /* The SAME list the map draws, not shared_plots. A split plot is two
+     shapes on the map, so it is two rows here — listing it once meant B1#B
+     had a polygon and no row, and the row it did have was labelled B1 · A.
+     One source, and the two cannot disagree. */
+  const units = MAP ? MAP.units(nursery) : [];
 
-  $('empty').classList.toggle('hidden', plots.length > 0);
-  if (!plots.length) { $('rows').innerHTML = ''; return; }
+  $('empty').classList.toggle('hidden', units.length > 0);
+  if (!units.length) { $('rows').innerHTML = ''; return; }
 
   /* Plot order, B1 · B2 · B3 — asked for, and right: the map above is laid
      out in space and the eye moves between the two. A worst-first table makes
      you hunt for the plot you just clicked. Urgency is carried by the red
      pill and the red polygon, which is where it belongs. shared_plot_map
      already sorts on the number, so this order is simply the map's. */
-  const rows = plots.map((p) => ({ plot: p.plot_name, ln: lineForPlot(p.plot_name) }));
+  const rows = units.map((u) => ({ plot: u.key, label: u.label, ln: lineForPlot(u.key) }));
 
   $('rows').innerHTML = rows.map((r) => {
     const ln = r.ln;
@@ -273,169 +405,435 @@ function renderTable() {
         ? esc(MJMPalms.prettyD(ln.lastDate)) + (ln.lastBy ? ' · ' + esc(ln.lastBy) : '')
         : '<span class="text-slate-300">—</span>';
       return '<tr>' +
-        upCell(r.plot) +
-        '<td class="font-black text-slate-800">' + esc(r.plot) + '</td>' +
-        '<td colspan="3"><span class="pill p-idle">Nothing running</span></td>' +
+        '<td><button class="plot-link" data-open="' + esc(r.plot) + '">' + esc(r.label) + '</button></td>' +
+        statusCell(r.plot, ln) +
+        '<td class="text-slate-300">—</td>' +
+        '<td class="text-slate-300">—</td>' +
         '<td class="text-slate-500">' + seen + '</td></tr>';
     }
     const over = ln.state === 'overdue';
     const days = over ? (-ln.left) + 'd over' : ln.left + 'd left';
     return '<tr>' +
-      upCell(MJMPalms.plotOf(ln.key)) +
-      '<td class="font-black text-slate-800">' + esc(ln.label) + '</td>' +
-      '<td class="wrap">' + esc(ln.status || '—') + '</td>' +
+      '<td><button class="plot-link" data-open="' + esc(r.plot) + '">' + esc(r.label) + '</button></td>' +
+      statusCell(r.plot, ln) +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.due)) + '</td>' +
-      '<td class="text-right"><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
+      '<td><span class="pill ' + (over ? 'p-late' : 'p-ok') + '">' + esc(days) + '</span></td>' +
       '<td class="text-slate-500">' + esc(MJMPalms.prettyD(ln.lastDate)) +
         (ln.lastBy ? ' · ' + esc(ln.lastBy) : '') + '</td>' +
       '</tr>';
   }).join('');
 }
 
-/* ── Updating a plot's status from here ──────────────────────────────────
-   The same record the Field Conductor's app writes: what is running now is
-   an OPEN entry (end_date null), finishing it is stamping today's date on
-   its end. So "update the status" is close what is no longer running, open
-   what is — which is exactly what applyDailySelection does on the phone.
-
-   The office writing this is new. It is meant for the day a Field Conductor
-   cannot key it in, not as the normal route: the person standing in the plot
-   is the one who knows. Whoever saves here has their own name recorded, so
-   the log says where the entry came from. */
-const upCell = (plot) =>
-  '<td><button class="up-btn" data-up="' + esc(plot) + '" title="Update this plot\'s status" aria-label="Update status">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 20h9"></path>' +
-      '<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>' +
-    '</svg></td>';
-
-let UP_PLOT = null;    // the plot the modal is open for
-let UP_SEL = [];       // act numbers ticked in the modal
-const MAX_AT_ONCE = 2; // matches MAX_CONCURRENT in the field app's data.js
-
-function openUpdate(plot) {
-  UP_PLOT = plot;
-  // The plot may be split into areas; the modal edits the plot as a whole,
-  // which is the unit the office reads. An area-split plot keeps its areas —
-  // this opens whichever unit key the board is showing for it.
-  const ln = lineForPlot(plot);
-  const key = ln ? ln.key : plot;
-  UP_PLOT = key;
-  UP_SEL = MJMPalms.currentEntries(LOGS, key).map((e) => e.actN);
-  $('up-plot').textContent = MJMPalms.keyLabel(key);
-  $('up-msg').textContent = '';
-  renderUpList();
-  $('up-modal').classList.remove('hidden');
+/* Which plots have been split, and where. Its own read and its own try: a
+   map that draws every plot whole is worth more than one that does not draw,
+   and the table below does not depend on this at all. */
+async function loadAreas() {
+  try {
+    const res = await _supabase.from('nops_plot_areas')
+      .select('plot_name, area_key, polygon, batch_name').order('plot_name').order('area_key');
+    if (res.error) throw res.error;
+    const by = {};
+    (res.data || []).forEach((a) => { (by[a.plot_name] = by[a.plot_name] || []).push(a); });
+    AREAS = by;
+  } catch (e) {
+    console.warn('[palms] plot areas not read:', (e && e.message) || e);
+    AREAS = {};
+  }
 }
 
-function renderUpList() {
-  $('up-list').innerHTML = MJMPalms.ACTIVITIES.map((a) => {
-    const on = UP_SEL.indexOf(a.n) !== -1;
-    return '<button type="button" class="act-row' + (on ? ' on' : '') + '" data-act="' + a.n + '">' +
-      '<span class="act-n">' + (on ? '✓' : a.n) + '</span>' +
-      '<span class="act-name">' + esc(a.name) + '</span>' +
-      '<span class="act-d">' + (a.days == null ? '—' : a.days + 'd') + '</span>' +
-      '</button>';
+/* Clicking a plot on the map opens the plot on its OWN map: the same photo,
+   cropped to that plot, with its boundary drawn. A split plot shows its
+   areas, each clickable, and whichever is picked reports itself across the
+   bottom of the photo — so there is nothing under the map to read.
+
+   The crop is CSS, not a second image. The polygon percentages stay exactly
+   the percentages the database holds, and the SVG keeps its 0–100 viewBox;
+   only the photo behind it is scaled and shifted. */
+let PV_PLOT = null;   // the plot the panel is open for
+
+/* The key entry a unit is coloured by, so its swatch in the list below
+   matches its shape on the photo. */
+function pvEntry(key) {
+  const ln = lineForPlot(key);
+  const act = ln ? MJMPalms.actByN(ln.actN) : null;
+  return act ? (PAL.legend || []).find((e) => e.key === PAL.keyOf[act.name]) : null;
+}
+
+function pvUnits(plot) {
+  return (MAP ? MAP.units() : []).filter((u) => u.plot === plot);
+}
+
+function pvPoly(u) {
+  if (!u || !u.raw || !String(u.raw).startsWith('[')) return null;
+  try {
+    const v = JSON.parse(u.raw);
+    return Array.isArray(v) && v.length ? v : null;
+  } catch (e) { return null; }
+}
+
+function openPlot(unit) {
+  const plot = MJMPalms.plotOf(unit);
+  PV_PLOT = plot;
+  $('pv-nursery').textContent = MJMPalms.nurseryOfPlot(plot) || '—';
+  $('pv-title').textContent = plot;
+  $('pv-edit').classList.toggle('hidden', !CAN_DRAW);
+  $('pv-hide').classList.toggle('hidden', !CAN_DRAW);
+  $('pv-note').classList.toggle('hidden', CAN_DRAW);
+  $('pv-modal').dataset.plot = plot;
+  $('pv-modal').classList.remove('hidden');
+  drawPv();
+}
+
+function drawPv() {
+  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u));
+  const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
+
+  $('pv-none').style.display = units.length && nur && nur.map_image_url ? 'none' : 'flex';
+  if (!units.length || !nur || !nur.map_image_url) {
+    $('pv-svg').innerHTML = ''; $('pv-tags').innerHTML = ''; $('pv-strip').innerHTML = '';
+    $('pv-img').removeAttribute('src');
+    return;
+  }
+
+  /* Bounding box of everything this plot owns, with a margin so the plot is
+     not jammed against the edge. Clamped to the photo. */
+  let x0 = 100, y0 = 100, x1 = 0, y1 = 0;
+  units.forEach((u) => pvPoly(u).forEach((p) => {
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+    x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+  }));
+  const pad = Math.max(2, Math.max(x1 - x0, y1 - y0) * 0.22);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(100, x1 + pad); y1 = Math.min(100, y1 + pad);
+  const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+
+  /* The frame shows the box; the photo is blown up by 100/box and slid so
+     the box's top-left lands on the frame's. Percent units throughout, so
+     this holds at any panel size. */
+  const img = $('pv-img');
+  img.src = nur.map_image_url;
+  img.style.width = (100 / w * 100) + '%';
+  img.style.height = (100 / h * 100) + '%';
+  img.style.left = (-x0 / w * 100) + '%';
+  img.style.top = (-y0 / h * 100) + '%';
+  // The SVG covers the frame, so its 0–100 space is the BOX, not the photo.
+  $('pv-svg').setAttribute('viewBox', x0 + ' ' + y0 + ' ' + w + ' ' + h);
+
+  const shapes = [], tags = [];
+  units.forEach((u) => {
+    const pts = pvPoly(u);
+    const st = mapStatusOf(u.key) || {};
+    const entry = pvEntry(u.key);
+    const late = st.tone === 'over';
+    shapes.push(
+      '<polygon points="' + pts.map((p) => p.x + ',' + p.y).join(' ') + '" ' +
+      'fill="' + (entry ? entry.fill : 'rgba(148,163,184,.35)') + '" ' +
+      'fill-opacity="0.72" ' +
+      /* Selected is a WHITE ring, not a thicker one in its own colour: the
+         late ring is near-black, and near-black on a dark photograph is no
+         ring at all — the area I had just clicked looked like the one I had
+         not. Being late still reads, from the strip below and from the main
+         map's outline. */
+      'stroke="' + (late ? '#111827' : (entry ? entry.stroke : '#ffffff')) + '" ' +
+      /* Stroke width is in the viewBox's units, and the box is `w` wide, not
+         100 — so a width meant for the full map has to be scaled DOWN by
+         w/100 to look the same thickness here, not up. */
+      'stroke-width="' + (0.6 * (w / 100)) + '" ' +
+      'class="pv-shape" data-pv-unit="' + esc(u.key) + '"/>');
+    const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length;
+    const cy = pts.reduce((t, p) => t + p.y, 0) / pts.length;
+    tags.push('<div class="pv-tag" style="left:' + ((cx - x0) / w * 100) + '%; top:' +
+      ((cy - y0) / h * 100) + '%">' + esc(u.label) + '</div>');
+  });
+  $('pv-svg').innerHTML = shapes.join('');
+  $('pv-tags').innerHTML = tags.join('');
+  drawPvStrip();
+}
+
+/* Every boundary's own line, all of them, always. Clicking to find out what
+   a shape is was a step for nothing when a plot has one or two of them —
+   and with two, the comparison IS the answer. */
+function drawPvStrip() {
+  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u));
+  const areas = AREAS[PV_PLOT] || [];
+  if (!units.length) { $('pv-strip').innerHTML = ''; return; }
+
+  $('pv-strip').innerHTML = units.map((u) => {
+    const ln = lineForPlot(u.key);
+    const area = u.area ? areas.find((a) => a.area_key === u.area) : null;
+    const entry = pvEntry(u.key);
+    const bits = [];
+    bits.push(['Batch', area ? (area.batch_name || 'none pinned') : '—', false]);
+    if (ln && ln.state !== 'none') {
+      bits.push(['Status', ln.status || '—', false]);
+      bits.push(['Due', MJMPalms.prettyD(ln.due), false]);
+      bits.push([ln.left < 0 ? 'Overdue' : 'Days left',
+                 (ln.left < 0 ? -ln.left : ln.left) + 'd', ln.left < 0]);
+    } else {
+      bits.push(['Status', 'Nothing running', false]);
+    }
+    return '<div class="pv-line">' +
+      '<span class="pv-sw" style="background:' + esc(entry ? entry.stroke : '#94a3b8') + '"></span>' +
+      '<span class="pv-s-name">' + esc(u.label) + '</span>' +
+      bits.map((x) =>
+        '<span><span class="pv-s-k">' + esc(x[0]) + '</span> ' +
+        '<span class="pv-s-v' + (x[2] ? ' pv-s-late' : '') + '">' + esc(x[1]) + '</span></span>'
+      ).join('') +
+      '</div>';
   }).join('');
 }
 
-$('up-list').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-act]');
-  if (!b) return;
-  const n = Number(b.dataset.act);
-  const i = UP_SEL.indexOf(n);
-  if (i !== -1) UP_SEL.splice(i, 1);
-  else {
-    // Oldest tick drops off rather than refusing the new one: on the phone
-    // this is a thumb correcting itself, and a dead tap reads as broken.
-    UP_SEL.push(n);
-    while (UP_SEL.length > MAX_AT_ONCE) UP_SEL.shift();
+/* ── Hidden plots ─────────────────────────────────────────────────────────
+   A hidden plot is off the map and out of the table, which means the place
+   it was hidden from is no longer a place it can be found. So the list of
+   them lives here, under the table it is missing from — the round trip
+   stays in one screen instead of ending in a SQL editor. */
+async function loadHidden() {
+  HIDDEN = [];
+  if (!CAN_DRAW) return;
+  try {
+    const res = await _supabase.from('shared_plots')
+      .select('plot_name, nursery_name, is_active').eq('is_active', false).order('plot_name');
+    // No column means nothing can be hidden yet, which is not an error.
+    if (res.error) { if (!/is_active/i.test(res.error.message || '')) throw res.error; return; }
+    HIDDEN = res.data || [];
+  } catch (e) {
+    console.warn('[palms] hidden plots not read:', (e && e.message) || e);
   }
-  renderUpList();
+}
+
+function renderHidden() {
+  const bar = $('hidden-bar');
+  bar.classList.toggle('hidden', !HIDDEN.length);
+  if (!HIDDEN.length) return;
+  $('hidden-count').textContent = HIDDEN.length + (HIDDEN.length === 1 ? ' plot' : ' plots');
+  $('hidden-list').innerHTML = HIDDEN.map((p) =>
+    '<span class="hid-chip">' + esc(p.plot_name) +
+    '<button class="hid-back" data-unhide="' + esc(p.plot_name) + '">Restore</button></span>').join('');
+}
+
+$('hidden-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-unhide]');
+  if (!b) return;
+  b.disabled = true;
+  b.textContent = '…';
+  try {
+    const res = await _supabase.from('shared_plots')
+      .update({ is_active: true }).eq('plot_name', b.dataset.unhide);
+    if (res.error) throw res.error;
+    await reloadMap();
+  } catch (err) {
+    console.warn(err);
+    alert((err && err.message) || 'Could not restore that plot.');
+    b.disabled = false;
+    b.textContent = 'Restore';
+  }
 });
 
-const closeUpdate = () => { $('up-modal').classList.add('hidden'); UP_PLOT = null; };
-$('up-close').addEventListener('click', closeUpdate);
-$('up-modal').addEventListener('click', (e) => { if (e.target === $('up-modal')) closeUpdate(); });
+/* ── The plot panel's buttons ─────────────────────────────────────────── */
+const closePv = () => $('pv-modal').classList.add('hidden');
+$('pv-close').addEventListener('click', closePv);
+$('pv-modal').addEventListener('click', (e) => { if (e.target === $('pv-modal')) closePv(); });
+
+/* Taking a plot out of sight without deleting it. shared_plots is read by the
+   map, this table, the Field Conductor's picker, Maintenance and the batch
+   screens, and every one of those names a plot by its TEXT — so deleting the
+   row leaves that history pointing at nothing. is_active does the job and
+   keeps the records. */
+$('pv-hide').addEventListener('click', async () => {
+  const plot = $('pv-modal').dataset.plot;
+  if (!plot) return;
+  if (!confirm('Hide ' + plot + '?\n\nIt comes off this map, out of the table and out of the ' +
+               'Field Conductor\'s list. Nothing is deleted — its batches, its maintenance rows ' +
+               'and its plot log all stay, and it is listed under the table here to restore ' +
+               'whenever you want it back.')) return;
+  try {
+    const res = await _supabase.from('shared_plots').update({ is_active: false }).eq('plot_name', plot);
+    if (res.error) throw res.error;
+    closePv();
+    await reloadMap();
+  } catch (err) {
+    console.warn(err);
+    alert(/is_active/i.test((err && err.message) || '')
+      ? 'Hiding a plot needs migration_plot_hide.sql to be run first.'
+      : ((err && err.message) || 'Could not hide that plot.'));
+  }
+});
+
+$('pv-edit').addEventListener('click', () => {
+  const plot = $('pv-modal').dataset.plot;
+  if (!plot) return;
+  const rec = MAP.plotsOf().find((p) => p.plot_name === plot);
+  const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
+  closePv();
+  MJMPlotDraw.open({
+    supa: _supabase,
+    plot: plot,
+    nursery: MAP.active(),
+    imageUrl: nur ? nur.map_image_url : null,
+    mapTop: rec ? rec.map_top : null,
+    by: ME,
+    // Re-read rather than patch: the editor may have added, moved and removed
+    // areas in one go, and the server is the record.
+    onSaved: reloadMap,
+  });
+});
+
+/* Everything the map draws, read again. Used after a boundary is redrawn and
+   after a plot is hidden — both change which shapes exist, not just their
+   colour, so a refresh() would not be enough. */
+async function reloadMap() {
+  await MAP.load(_supabase, MAP_SCOPE);
+  await loadAreas();
+  await loadHidden();
+  MAP.setAreas(AREAS);
+  render();
+}
+
+/* ── Changing a plot's status from the table ──────────────────────────────
+   The Current Status cell IS the control: pick a different stage and a
+   before/after panel asks you to confirm it. No pencil, no separate modal to
+   find, and nothing is written until Confirm.
+
+   What gets written is the same record the Field Conductor's app writes:
+   whatever is running is closed with today's date, and the chosen stage is
+   opened starting today. See applyDailySelection in the field app.
+
+   ONE THING THIS GIVES UP: PALMS allows two activities at once, and a
+   dropdown is one. Setting two concurrent stages is still done in the field
+   app; from here a plot is on one stage, which is what the office is
+   answering when it corrects a status. */
+const MAX_AT_ONCE = 2;   // matches MAX_CONCURRENT in the field app's data.js
+
+let CF = null;   // { unit, fromN, toN } awaiting confirmation
+
+function statusCell(unitKey, ln) {
+  const cur = ln && ln.state !== 'none' ? MJMPalms.currentEntries(LOGS, unitKey) : [];
+  const curN = cur.length === 1 ? cur[0].actN : null;
+  if (!CAN_UPDATE) {
+    return '<td>' + esc(ln && ln.status ? ln.status : '—') + '</td>';
+  }
+  /* Two stages running at once cannot be shown in one dropdown honestly, so
+     that plot keeps plain text and stays the field app's to change. */
+  if (cur.length > 1) {
+    return '<td>' + esc(ln.status) +
+           '<div class="text-[10px] font-bold text-slate-400 mt-1">two at once — change in the app</div></td>';
+  }
+  const opts = MJMPalms.ACTIVITIES.map((a) =>
+    '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+  return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' + (curN == null ? '' : curN) + '">' +
+    (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
+    opts + '</select></td>';
+}
+
+$('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-open]');
+  if (b) openPlot(b.dataset.open);
+});
+
+$('rows').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-st]');
+  if (!sel) return;
+  const unit = sel.dataset.st;
+  const toN = Number(sel.value);
+  const fromN = sel.dataset.cur === '' ? null : Number(sel.dataset.cur);
+  if (!toN || toN === fromN) return;
+  askChange(unit, fromN, toN);
+});
+
+function askChange(unit, fromN, toN) {
+  CF = { unit: unit, fromN: fromN, toN: toN };
+  const today = MJMPalms.todayStr();
+  const from = fromN == null ? null : MJMPalms.actByN(fromN);
+  const to = MJMPalms.actByN(toN);
+  const ln = lineForPlot(unit);
+
+  $('cf-plot').textContent = MJMPalms.keyLabel(unit);
+  $('cf-was-v').textContent = from ? from.name : 'Nothing running';
+  $('cf-was-s').textContent = from && ln && ln.state !== 'none'
+    ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
+      ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
+    : '';
+  // The new due date, worked out the same way the board will once it is
+  // saved — so what is promised here is what appears in the row.
+  const due = MJMPalms.addDays(today, to && to.days != null ? to.days : 0);
+  $('cf-now-v').textContent = to ? to.name : '—';
+  $('cf-now-s').textContent = 'Starts today · due ' + MJMPalms.prettyD(due) +
+    ' · ' + MJMPalms.diffDays(today, due) + 'd';
+  $('cf-msg').textContent = '';
+  $('cf-msg').className = 'text-[11px] font-bold text-slate-400';
+  $('cf-modal').classList.remove('hidden');
+}
+
+function closeCf(redraw) {
+  $('cf-modal').classList.add('hidden');
+  CF = null;
+  // A cancelled dropdown is still showing the stage that was picked, so the
+  // table is redrawn to put it back to what is actually recorded.
+  if (redraw) renderTable();
+}
+
+$('cf-cancel').addEventListener('click', () => closeCf(true));
+$('cf-modal').addEventListener('click', (e) => { if (e.target === $('cf-modal')) closeCf(true); });
 
 function newUid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-$('up-save').addEventListener('click', async () => {
-  if (!UP_PLOT) return;
-  const btn = $('up-save');
+$('cf-ok').addEventListener('click', async () => {
+  if (!CF) return;
+  const btn = $('cf-ok');
   btn.disabled = true;
-  $('up-msg').textContent = 'Saving…';
+  $('cf-msg').textContent = 'Saving…';
   const today = MJMPalms.todayStr();
-  const key = UP_PLOT;
+  const key = CF.unit;
   const open = MJMPalms.currentEntries(LOGS, key);
-  const sel = UP_SEL.slice().sort((a, b) => a - b);
-
-  // Finished: open, and no longer ticked.
-  const finish = open.filter((e) => sel.indexOf(e.actN) === -1);
-  // Started: ticked, and not already open.
-  const startN = sel.filter((n) => !open.some((e) => e.actN === n));
+  const act = MJMPalms.actByN(CF.toN);
 
   try {
-    if (!finish.length && !startN.length) { $('up-msg').textContent = 'Nothing changed.'; btn.disabled = false; return; }
-
-    for (const e of finish) {
-      if (!e.uid) continue;   // never synced, so there is no server row to close
+    for (const e of open) {
+      if (!e.uid) continue;          // never synced — no server row to close
       const res = await _supabase.from('fcportal_palms_plot_logs')
         .update({ end_date: today, updated_at: new Date().toISOString() })
         .eq('client_uid', e.uid);
       if (res.error) throw res.error;
     }
 
-    if (startN.length) {
-      // seq_no orders a plot's log; the motion study reads it back in that
-      // order to tell one cycle from the next, so a new entry goes after
-      // everything this plot already has.
-      let seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0);
-      const rows = startN.map((n) => {
-        const act = MJMPalms.actByN(n);
-        return {
-          client_uid: newUid(),
-          nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
-          plot_name: key,
-          act_n: n,
-          start_date: today,
-          end_date: null,
-          ideal_days: act && act.days != null ? act.days : null,
-          recorded_by: ME || 'Office',
-          seq_no: ++seq,
-          updated_at: new Date().toISOString(),
-        };
-      });
-      const res = await _supabase.from('fcportal_palms_plot_logs').insert(rows);
-      if (res.error) throw res.error;
-    }
+    // seq_no orders a plot's log; the motion study reads it back in that
+    // order to tell one cycle from the next.
+    const seq = (LOGS[key] || []).reduce((m, e) => Math.max(m, e.no || 0), 0) + 1;
+    const res = await _supabase.from('fcportal_palms_plot_logs').insert([{
+      client_uid: newUid(),
+      nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(key)),
+      plot_name: key,
+      act_n: CF.toN,
+      start_date: today,
+      end_date: null,
+      ideal_days: act && act.days != null ? act.days : null,
+      recorded_by: ME || 'Office',
+      seq_no: seq,
+      updated_at: new Date().toISOString(),
+    }]);
+    if (res.error) throw res.error;
 
-    // Re-read rather than patching the copy in memory: the server is the
-    // record, and a board that disagrees with it is worse than a slow one.
+    /* Re-read rather than patch: last update, the new due date and the days
+       left all come off the log, and the server is the record. */
     LOGS = await MJMPalms.loadLogs(_supabase);
+    closeCf(false);
     render();
-    closeUpdate();
   } catch (err) {
     console.warn(err);
-    // The likeliest failure by far is the row-level policy: writing the plot
-    // log needs the FC Portal module, which an office-only account may not
-    // hold. Saying so beats "something went wrong".
-    $('up-msg').textContent = (err && err.message) || 'Could not save.';
-    $('up-msg').className = 'text-[11px] font-bold text-rose-600';
+    // The likeliest failure is the row-level policy: writing the plot log
+    // needs the FC Portal module, which an office-only account may not hold.
+    $('cf-msg').className = 'text-[11px] font-bold text-rose-600';
+    $('cf-msg').textContent = (err && err.message) || 'Could not save.';
+    btn.disabled = false;
   }
-  btn.disabled = false;
-});
-
-$('rows').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-up]');
-  if (b) openUpdate(b.dataset.up);
 });
 
 function render() {
+  renderHidden();
   LINES = new Map();
   MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
   if (MAP) MAP.refresh();
@@ -468,6 +866,27 @@ function render() {
        just because the office page is a different screen. */
     const u = MJMAccess.user();
     ME = (u && (u.full_name || u.email)) || '';
+    /* Guarded like the rest: an older cached shared_access.js has no
+       isAdminOf, and it must not take the page down. Fails closed. */
+    /* Changing a status writes the plot log, which the RLS gives to whoever
+       holds the FC Portal (or manages users) — NOT to an ops admin as such.
+       Offering a dropdown that always fails would be worse than plain text,
+       so the check matches the policy. Guarded and fails closed, like the
+       rest. */
+    CAN_UPDATE = (function () {
+      try {
+        const perms = MJMAccess.permissions() || {};
+        const mods = perms.modules || {};
+        return (mods.scan && mods.scan !== 'none') || !!perms.manage_users;
+      } catch (e) { return false; }
+    })();
+
+    CAN_DRAW = (function () {
+      try {
+        return (typeof MJMAccess.isAdminOf === 'function' && MJMAccess.isAdminOf('nursery_ops'))
+            || (typeof MJMAccess.canManageUsers === 'function' && MJMAccess.canManageUsers());
+      } catch (e) { return false; }
+    })();
 
     const perms = MJMAccess.permissions() || {};
     const allowed = Array.isArray(perms.plot_status_nurseries) ? perms.plot_status_nurseries : null;
@@ -492,8 +911,13 @@ function render() {
       legendTitle: 'Current stage',
       statusOf: mapStatusOf,
       onNurseryChange: renderTable,
+      onPlotClick: openPlot,
     });
-    await MAP.load(_supabase, allowed ? { nurseries: visible } : {});
+    MAP_SCOPE = allowed ? { nurseries: visible } : {};
+    await MAP.load(_supabase, MAP_SCOPE);
+    await loadAreas();
+    await loadHidden();
+    MAP.setAreas(AREAS);
 
     render();
     $('loading').classList.add('hidden');
@@ -510,5 +934,9 @@ function render() {
   }
 })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

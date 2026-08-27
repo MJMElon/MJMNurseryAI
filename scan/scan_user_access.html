@@ -73,7 +73,7 @@
 <script src="../shared/shared_ribbon.js"></script>
 <!-- Manage, not Setting: the bar names the portal you are in, and it does
      not change as you move around inside it. The page names itself below. -->
-<script src="../shared/shared_fc_brand.js" data-sub="Manage"></script>
+<script src="../shared/shared_fc_brand.js" data-portal="Worker Portal" data-sub="Manage"></script>
 
 <div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -448,5 +448,12 @@ async function save() {
   }
 })();
 </script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     Nelos is a tool that follows the person, not a feature of one module:
+     anyone who holds it gets the circle on every page they can reach, and
+     the dock itself decides — no session or no Nelos and it never draws.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
 </body>
 </html>

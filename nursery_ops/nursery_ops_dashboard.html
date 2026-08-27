@@ -138,7 +138,6 @@
          rather than as four separate ones that gave no hint they belonged
          together. The PALMS pages carry their own tab strip. -->
     <a draggable="false" class="tool-btn" data-page="palms_board"  href="nursery_ops_palms_board.html"><span class="tl">PALMS</span></a>
-    <a draggable="false" class="tool-btn" data-page="plot_life"   href="nursery_ops_plot_life.html"><span class="tl">Life of Plot</span></a>
     <!-- Shown only to users who may change other people's access. It carries
          a data-page like the rest so it drags and is remembered with them;
          being hidden is about the right to open it, not about where it sits. -->
@@ -363,7 +362,7 @@ $('next-month').addEventListener('click', () => { boardMonth = shiftMonth(boardM
       MJMNelos.init(_supabase, { root: '../' });
       MJMNelos.mountTodo('#nelos-todo', {
         module: 'nursery_ops',
-        title:  'Nelos — Cases For This Module',
+        title:  'Nelos To Do List',
         hideIfEmpty: true
       });
     }

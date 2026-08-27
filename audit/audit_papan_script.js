@@ -52,6 +52,15 @@ function fmtDate(iso){
   const s=iso.split('T')[0].split('-');
   return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
 }
+/* Month + year only (e.g. "June 2026") for the PN papan's
+   D. Transplanting row, which is planted month + 3 months. Full
+   month name matches the physical sign. */
+function _fmtMonthYear(iso){
+  if(!iso||iso==='—')return'—';
+  const s=iso.split('T')[0].split('-');
+  const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return names[+s[1]-1]+' '+s[0];
+}
 /* First day of this calendar month as YYYY-MM-01 — the window for
    auto-detecting new transplant/planted events from the operation
    ledger. Papan tanda gets checked on newly-placed plants, so
@@ -159,13 +168,25 @@ function setView(v){
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
   const fab=document.getElementById('fab');
   if(fab)fab.classList.toggle('hidden',!(v==='list'&&activeTab==='batch'));
-  /* One back arrow at a time. Sub-views carry their own back button in
-     the sub-header, so the outer top-bar back steps aside; on the list
-     view it returns as the only way back to audit_home. */
-  const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  /* Outer top-bar carries the context now — the sub-header rows inside
+     each view were removed. Show the form title only when a form view
+     is active; hide it back on the list. */
+  const ctxForm=document.getElementById('ctx-form');
+  const navToday=document.getElementById('nav-today');
+  const inForm=(v==='batch-form'||v==='audit-form');
+  if(ctxForm)ctxForm.style.display=inForm?'':'none';
+  if(navToday)navToday.style.display=inForm?'none':'';
   window.scrollTo(0,0);
 }
+/* Outer top-bar back is context-aware: from a form → list; from list
+   → audit_home (the anchor's own href takes over when we return true). */
+function goBack(e){
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
+  return true;
+}
+window.goBack=goBack;
 /* Audit/Batch view toggle — now the segmented control at the top of the
    list view, not a bottom bar. `el` is the seg-btn that was clicked (or
    omitted when called programmatically); we mark it and its twin
@@ -386,6 +407,50 @@ async function loadAll(){
       });
     });
 
+    /* Backfill datePlanted for MN batches. Main-nursery cards come from
+       Transplanted* events in the current month, so their datePlanted
+       is empty — the seeds were sown months earlier as Planted events
+       and that record still lives in shared_inventory_logs. Read all
+       Planted events for the batch_names we have, take the earliest
+       transaction_date per batch, and fill it in.
+
+       Same source the Batch Record → Seeds Planting & Damage Report
+       page writes to, so what the auditor reads on the papan matches
+       what the office keyed. */
+    try {
+      const needsPlanted = batches
+        .filter(b => !b.datePlanted && b.batch)
+        .map(b => b.batch);
+      if (needsPlanted.length) {
+        const uniqBatches = Array.from(new Set(needsPlanted));
+        /* .in. filter — one round-trip covers every batch. Order by
+           transaction_date ascending so the first row we see per
+           batch is the earliest sowing (chunked planting stays
+           anchored to the first tray). */
+        const inList = uniqBatches.map(x => '"' + String(x).replace(/"/g,'\\"') + '"').join(',');
+        const q = 'select=batch_name,transaction_date,created_at'
+                + '&transaction_type=eq.Planted'
+                + '&batch_name=in.(' + inList + ')'
+                + '&order=transaction_date.asc.nullslast,created_at.asc';
+        const pRows = await sb.select('shared_inventory_logs', q).catch(e => {
+          console.warn('[papan] Planted lookup for MN batches failed:', e);
+          return [];
+        });
+        const firstPlanted = new Map();
+        (pRows||[]).forEach(r => {
+          const d = r.transaction_date || (r.created_at ? String(r.created_at).split('T')[0] : '');
+          if (!d || !r.batch_name) return;
+          if (!firstPlanted.has(r.batch_name)) firstPlanted.set(r.batch_name, d);
+        });
+        batches.forEach(b => {
+          if (!b.datePlanted && firstPlanted.has(b.batch))
+            b.datePlanted = firstPlanted.get(b.batch);
+        });
+      }
+    } catch (e) {
+      console.warn('[papan] datePlanted backfill error:', e);
+    }
+
     // Fill in the maturity date for every MN batch that doesn't already
     // carry one from the office. Both the manual + log-derived batches
     // pass through the same helper so the auditor sees the same "Mature:
@@ -413,10 +478,36 @@ async function loadAll(){
     renderPapanAlerts();
     renderBatchTable();
     updateStats();
-    /* Arrived from a pending-plot circle on the portal? This page is a
-       list rather than a grid, so there is no plot screen to open —
-       scroll its row into view and flash it instead. */
-    MJMAuditDeepLink.reveal();
+    /* Arrived from a pending-plot circle on the portal? Open the
+       audit form for that plot directly — the module page's own
+       list is gone (see init redirect), so there is nothing else
+       here for the auditor to reach. Falls back to the reveal-and-
+       flash behaviour if no batch is standing on the plot, so a
+       stale link is not a silent dead end. */
+    (function _deepPlot(){
+      try {
+        const p = MJMAuditDeepLink.plot();
+        if (!p) return;
+        /* Find the latest batch on the plot within the active
+           nursery, matching the same "one card per plot" rule the
+           list uses. If more than one nursery holds the code
+           (never expected in practice) the auditor's current tab
+           wins. */
+        const latest = getLatestBatchPerPlot();
+        const target = latest.find(b => _canonicalPlot(b.plot) === p && b.nursery === activeNursery)
+                    || latest.find(b => _canonicalPlot(b.plot) === p);
+        if (!target) { MJMAuditDeepLink.reveal(); return; }
+        /* If the audit is already done, open its detail. Otherwise
+           open the form for a new audit. Same branch openAuditForm
+           takes when called via a card. */
+        const existing = getAuditForBatch(target.uid);
+        if (existing) openDetail(existing.uid);
+        else openAuditForm(target.uid, false, null);
+      } catch (e) {
+        console.warn('[papan] deep-link openAuditForm failed:', e);
+        try { MJMAuditDeepLink.reveal(); } catch (_) {}
+      }
+    })();
   }catch(e){
     showToast('⚠ Failed to load');console.error(e);
   }
@@ -565,10 +656,38 @@ function renderAuditList(){
     </div>`;
   }
 
-  // Plots to audit (pending only)
+  /* Plots to audit — round chips only, one per plot with pending
+     work. The full card ate three screenfuls when a nursery had a
+     dozen plots outstanding, most of it repeating the breed / qty
+     info already on the physical papan. Tap a chip and land on the
+     audit form directly; the batch info card inside the form still
+     spells everything out for the auditor mid-audit.
+
+     A tap always opens the latest pending batch on that plot; the
+     roster returned by getLatestBatchPerPlot() is already one row
+     per plot, so this holds even when several batches were sown on
+     the same plot in one month. */
   if(pending.length){
-    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot))
-      .map(b=>makeCard(b,{canView:true,canAudit:true})).join('');
+    listEl.innerHTML =
+      '<div class="plot-chip-list" style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 12px">' +
+      pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b => {
+        const plotLabel = String(b.plot||'').replace(/[^A-Za-z0-9]/g,'') || '—';
+        return '<button type="button" class="plot-chip" '
+          + 'onclick="openAuditForm(\''+b.uid+'\',false,null)" '
+          + 'aria-label="Audit plot '+plotLabel+' — batch '+(b.batch||'')+'" '
+          + 'title="'+plotLabel+' · Batch '+(b.batch||'')+'" '
+          + 'style="min-width:58px;height:58px;padding:0 14px;border-radius:999px;'
+          + 'background:#fff;border:2px solid #e65100;color:#c2410c;'
+          + 'font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.3px;'
+          + 'cursor:pointer;display:inline-flex;align-items:center;justify-content:center;'
+          + 'transition:transform .12s,background .12s,color .12s;'
+          + '-webkit-tap-highlight-color:transparent" '
+          + 'onmouseover="this.style.background=\'#e65100\';this.style.color=\'#fff\'" '
+          + 'onmouseout="this.style.background=\'#fff\';this.style.color=\'#c2410c\'">'
+          + plotLabel
+          + '</button>';
+      }).join('') +
+      '</div>';
   } else {
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
@@ -661,8 +780,14 @@ function openAddBatch(){
   document.getElementById('bf-date-planted').value='';
   document.getElementById('bf-date-transplant').value='';
   document.getElementById('bf-date-mature').value='';
-  document.getElementById('batch-form-title').textContent='New Batch';
-  document.getElementById('batch-form-id').textContent='';
+  /* form-view-header retired — the outer ribbon carries context now.
+     Guarded so stale calls don't throw against the removed elements. */
+  const _bftN=document.getElementById('batch-form-title');
+  if(_bftN)_bftN.textContent='New Batch';
+  const _bfiN=document.getElementById('batch-form-id');
+  if(_bfiN)_bfiN.textContent='';
+  const _aftN=document.getElementById('audit-form-title');
+  if(_aftN)_aftN.textContent='New Batch';
   setView('batch-form');
 }
 function openEditBatch(uid){
@@ -678,8 +803,12 @@ function openEditBatch(uid){
   document.getElementById('bf-date-planted').value=b.datePlanted||'';
   document.getElementById('bf-date-transplant').value=b.dateTransplant||'';
   document.getElementById('bf-date-mature').value=b.dateMature||'';
-  document.getElementById('batch-form-title').textContent='Edit Batch';
-  document.getElementById('batch-form-id').textContent=b.id;
+  const _bftE=document.getElementById('batch-form-title');
+  if(_bftE)_bftE.textContent='Edit Batch';
+  const _bfiE=document.getElementById('batch-form-id');
+  if(_bfiE)_bfiE.textContent=b.id;
+  const _aftE=document.getElementById('audit-form-title');
+  if(_aftE)_aftE.textContent='Edit Batch';
   setView('batch-form');
 }
 async function saveBatch(){
@@ -728,15 +857,43 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   }
 
   // Fill banner
-  document.getElementById('banner-nursery').textContent=b.nursery||'—';
-  document.getElementById('banner-plot').textContent=b.plot;
-  document.getElementById('banner-batch').textContent=b.batch||'—';
-  document.getElementById('banner-breed').textContent=b.breed||'—';
-  document.getElementById('banner-qty').textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
-  document.getElementById('banner-dt').textContent=fmtDate(b.dateTransplant);
-  document.getElementById('banner-dm').textContent=fmtDate(b.dateMature);
-  document.getElementById('audit-form-title').textContent='Audit — '+b.plot;
-  document.getElementById('audit-form-id').textContent=editMode?editId:nextAuditID();
+  /* Batch info rewritten to match the physical papan tanda: Plot +
+     Batch on the top line, then Breed, Planted, Transplanted (MN
+     only), Quantity. Nursery and Mature rows retired. Every write is
+     guarded so a stale cache with the old markup does not throw. */
+  const _bp =document.getElementById('banner-plot');   if(_bp) _bp.textContent=b.plot;
+  const _bb =document.getElementById('banner-batch');  if(_bb) _bb.textContent=b.batch||'—';
+  const _br =document.getElementById('banner-breed');  if(_br) _br.textContent=b.breed||'—';
+  const _bdp=document.getElementById('banner-dp');     if(_bdp)_bdp.textContent=fmtDate(b.datePlanted);
+  const _bdt=document.getElementById('banner-dt');     if(_bdt)_bdt.textContent=fmtDate(b.dateTransplant);
+  const _bq =document.getElementById('banner-qty');    if(_bq) _bq.textContent=b.qtyTransplant?fmtNum(b.qtyTransplant):'—';
+  /* PN is a seed bed — no keyed transplant to record. Hide the
+     Transplanted Date row entirely, and instead compute a
+     "D. Transplanting" row from planted month + 3 months, shown as
+     Month YYYY only (matching the physical PN papan). */
+  const isPN = (b.nursery==='PN');
+  const dtRow=document.getElementById('banner-dt-row');
+  if(dtRow)dtRow.style.display=isPN?'none':'';
+  const dp3Row=document.getElementById('banner-dp3-row');
+  const dp3El =document.getElementById('banner-dp3');
+  if(dp3Row && dp3El){
+    if(isPN && b.datePlanted){
+      dp3Row.style.display='';
+      dp3El.textContent=_fmtMonthYear(_addMonthsISO(b.datePlanted, 3));
+    } else {
+      dp3Row.style.display='none';
+    }
+  }
+  /* Legacy elements the old layout carried, guarded so nothing throws
+     if this page is still hydrated from an old cache. */
+  const _bn=document.getElementById('banner-nursery'); if(_bn) _bn.textContent=b.nursery||'—';
+  const _bdm=document.getElementById('banner-dm');     if(_bdm)_bdm.textContent=fmtDate(b.dateMature);
+  /* Title reads on the outer ribbon (#audit-form-title inside #ctx-form).
+     Audit ID pill was retired at the auditor's request. */
+  const _aft=document.getElementById('audit-form-title');
+  if(_aft)_aft.textContent='Audit — '+b.plot;
+  const _afi=document.getElementById('audit-form-id');
+  if(_afi)_afi.textContent='';
 
   // Reset tri buttons
   ['presence','info','cond'].forEach(f=>{
@@ -954,6 +1111,20 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Papan Tanda has no landing list of its own any more — the To Do
+     card on audit_home already carries the pending plot chips, so
+     opening the module page without a specific plot lands the auditor
+     on a redundant "Plots to Audit" strip. Redirect back to the To Do
+     list; a ?plot= deep link (or the admin ?admin=1 escape hatch)
+     still opens the form for the plot it names. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot  = !!qs.get('plot');
+    const isAdmin  = qs.get('admin') === '1';
+    const looksMissing = !hasPlot && !isAdmin;
+    if (looksMissing) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))cancelDelete();});
   selectTab('audit');setView('list');

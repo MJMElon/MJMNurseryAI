@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=38">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=50">
 </head>
 <body>
 
@@ -31,7 +31,7 @@
           <input type="hidden" id="global-month">
           <button type="button" class="top-sel" id="global-month-btn" style="min-width:110px;text-align:left;" onclick="openMonthWheel('global')">—</button>
         </div>
-        <div class="top-ctrl"><label data-i18n="top.nursery">Nursery</label>
+        <div class="top-ctrl" id="top-nursery-ctrl"><label data-i18n="top.nursery">Nursery</label>
           <select id="global-nursery" style="display:none;" onchange="onNurseryChange()">
             <option value="PN">PN</option><option value="BNN">BNN</option>
             <option value="UNN1">UNN1</option><option value="UNN2">UNN2</option>
@@ -155,73 +155,89 @@
       </div>
     </div>
 
-    <!-- SCHEDULE — P&D / Manuring / Weeding / Interrow as sub-tabs -->
+    <!-- SCHEDULE — the month's four programs, one under another.
+         There used to be a sub-tab per program, and a ➕ Add Row and 💾 Save
+         Schedule button inside each of the four. Those Save buttons were four
+         copies of the same button: saveSchedule() has always written all four
+         programs at once, whichever tab happened to be showing. So the tabs
+         were hiding three quarters of what you were about to save.
+         One page, one toolbar, one Save — and the four programs stacked in
+         the order they are worked. -->
     <div id="tab-schedule" class="tab-panel">
-      <!-- Download Schedule PDF lives here only — the schedules are the only
-           thing the PDF covers, so it no longer sits in the top bar. -->
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
-        <div class="subtabs-bar" style="margin-bottom:0;">
-          <button class="subtab-btn active" onclick="switchSchedView('pd',this)"       data-i18n="tab.pd">P &amp; D — Racun</button>
-          <button class="subtab-btn"        onclick="switchSchedView('manuring',this)" data-i18n="tab.manuring">Manuring</button>
-          <button class="subtab-btn"        onclick="switchSchedView('weeding',this)"  data-i18n="tab.weeding">Weeding</button>
-          <button class="subtab-btn"        onclick="switchSchedView('interrow',this)" data-i18n="tab.interrow">Interrow Spray</button>
+      <!-- Everything you can do to the month, said once. -->
+      <div class="section-hdr">
+        <div><div class="page-hdr-title" id="sched-nursery-line"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+          <button class="btn-pdf" onclick="openPdfModal()" style="font-size:11px;padding:6px 14px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
         </div>
-        <button class="btn-pdf" onclick="openPdfModal()" style="font-size:12px;padding:8px 16px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
       </div>
+
       <!-- Shown when this month's sheet was carried forward from an earlier one. -->
       <div id="carry-notice" style="display:none;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:var(--r-md);
            padding:10px 14px;margin-bottom:14px;font-size:12px;font-weight:600;color:#78350f;"></div>
-      <!-- P&D -->
-      <div id="sched-pd" class="sched-panel active">
-        <div class="section-hdr">
-          <div><div class="page-hdr-title" id="pd-nursery-line"></div></div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="section-badge" data-i18n="badge.pd">JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA</div>
-            <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
-            <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
-          </div>
-        </div>
-        <div class="card"><div class="tbl-wrap"><table class="sched-table" id="pd-table"></table></div></div>
+
+      <!-- Jump chips. Four stacked grids is a long page; these do what the
+           sub-tabs did for reaching one — without hiding the other three. -->
+      <div class="sched-jump">
+        <button type="button" onclick="jumpToSched('pd')"       data-i18n="tab.pd">P &amp; D — Racun</button>
+        <button type="button" onclick="jumpToSched('manuring')" data-i18n="tab.manuring">Manuring</button>
+        <button type="button" onclick="jumpToSched('weeding')"  data-i18n="tab.weeding">Weeding</button>
+        <button type="button" onclick="jumpToSched('interrow')" data-i18n="tab.interrow">Interrow Spray</button>
       </div>
+
+      <!-- P&D -->
+      <section class="sched-block" id="sched-pd">
+        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('pd')" aria-expanded="true" aria-controls="sched-body-pd">
+          <span class="sched-caret" aria-hidden="true">▾</span>
+          <span class="sched-name" data-i18n="tab.pd">P &amp; D — Racun</span>
+          <span class="section-badge" data-i18n="badge.pd">JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA</span>
+          <span class="sched-count" id="sched-count-pd"></span>
+        </button>
+        <div class="sched-block-body" id="sched-body-pd">
+          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="pd-table"></table></div></div>
+        </div>
+      </section>
 
       <!-- MANURING -->
-      <div id="sched-manuring" class="sched-panel">
-        <div class="section-hdr">
-          <div><div class="page-hdr-title" id="manuring-nursery-line"></div></div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="section-badge" data-i18n="badge.manuring">JADUAL MANURING</div>
-            <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
-            <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
-          </div>
+      <section class="sched-block" id="sched-manuring">
+        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('manuring')" aria-expanded="true" aria-controls="sched-body-manuring">
+          <span class="sched-caret" aria-hidden="true">▾</span>
+          <span class="sched-name" data-i18n="tab.manuring">Manuring</span>
+          <span class="section-badge" data-i18n="badge.manuring">JADUAL MANURING</span>
+          <span class="sched-count" id="sched-count-manuring"></span>
+        </button>
+        <div class="sched-block-body" id="sched-body-manuring">
+          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="manuring-table"></table></div></div>
         </div>
-        <div class="card"><div class="tbl-wrap"><table class="sched-table" id="manuring-table"></table></div></div>
-      </div>
+      </section>
 
       <!-- WEEDING -->
-      <div id="sched-weeding" class="sched-panel">
-        <div class="section-hdr">
-          <div><div class="page-hdr-title" id="weeding-nursery-line"></div></div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="section-badge" data-i18n="badge.weeding">JADUAL WEEDING</div>
-            <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
-            <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
-          </div>
+      <section class="sched-block" id="sched-weeding">
+        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('weeding')" aria-expanded="true" aria-controls="sched-body-weeding">
+          <span class="sched-caret" aria-hidden="true">▾</span>
+          <span class="sched-name" data-i18n="tab.weeding">Weeding</span>
+          <span class="section-badge" data-i18n="badge.weeding">JADUAL WEEDING</span>
+          <span class="sched-count" id="sched-count-weeding"></span>
+        </button>
+        <div class="sched-block-body" id="sched-body-weeding">
+          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="weeding-table"></table></div></div>
         </div>
-        <div class="card"><div class="tbl-wrap"><table class="sched-table" id="weeding-table"></table></div></div>
-      </div>
+      </section>
 
       <!-- INTERROW SPRAY -->
-      <div id="sched-interrow" class="sched-panel">
-        <div class="section-hdr">
-          <div><div class="page-hdr-title" id="interrow-nursery-line"></div></div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="section-badge" data-i18n="badge.interrow">JADUAL INTERROW SPRAY</div>
-            <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
-            <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
-          </div>
+      <section class="sched-block" id="sched-interrow">
+        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('interrow')" aria-expanded="true" aria-controls="sched-body-interrow">
+          <span class="sched-caret" aria-hidden="true">▾</span>
+          <span class="sched-name" data-i18n="tab.interrow">Interrow Spray</span>
+          <span class="section-badge" data-i18n="badge.interrow">JADUAL INTERROW SPRAY</span>
+          <span class="sched-count" id="sched-count-interrow"></span>
+        </button>
+        <div class="sched-block-body" id="sched-body-interrow">
+          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="interrow-table"></table></div></div>
         </div>
-        <div class="card"><div class="tbl-wrap"><table class="sched-table" id="interrow-table"></table></div></div>
-      </div>
+      </section>
 
     </div>
 
@@ -310,35 +326,136 @@
       <div id="payroll-hint" style="font-size:11px;color:var(--text-faint);margin-top:8px;"></div>
     </div>
 
-    <!-- SETTING -->
+    <!-- SETTING —————————————————————————————————————————————
+         Four things the schedules and the calculator read from, and
+         nothing that belongs to another module. Piece rates and workers
+         used to live here; they have gone to their own module and to the
+         FC Portal, and the plot list has gone to shared_plots, which every
+         other module already reads. -->
     <div id="tab-setting" class="tab-panel">
-      <div class="page-hdr"><div class="page-hdr-title" id="setting-nursery-line"></div></div>
+      <div class="page-hdr" style="justify-content:center;text-align:center;">
+        <div class="page-hdr-title" id="setting-nursery-line">Setting</div>
+      </div>
+
+      <!-- PLOT CAPACITY ————————————————————————————————————
+           Every nursery at once, laid out the way the Chemical List below
+           is: a headed column of short rows. It used to be one nursery at a
+           time behind its own tab bar, which meant somebody setting
+           capacities up — which is going through all four, not looking at
+           one — clicked between four screens to do one job. There is room
+           for all of them side by side, so they are.
+
+           A nursery with more plots than fit a readable column is split
+           into more than one column, each headed with the range it covers.
+           Pre Nursery has 52 plots; one column of 52 is a page of
+           scrolling, four of 14 is a glance.
+
+           The nurseries and their plots come from Seedling Stock —
+           operation_nurseries and shared_plots — so there is nothing to key
+           in twice. -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Plots in this nursery</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rows added from a schedule's “Add Row” button appear here. Removing one takes its row out of all four schedules.</div>
-        <div id="setting-plot-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-          <input type="text" id="setting-new-plot" placeholder="New plot name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:200px;">
-          <button class="btn btn-primary" style="font-size:12px;" onclick="addPlotFromSetting()">➕ Add Plot</button>
+        <div class="lst-top">
+          <div class="set-h">Plot Capacity</div>
+          <button class="btn lst-edit" id="cap-edit-btn" onclick="startCapEdit()">&#9998; Edit</button>
+        </div>
+
+        <div id="cap-cols" class="cap-cols"></div>
+        <div id="cap-empty" class="set-empty" style="display:none;"></div>
+
+        <!-- One Edit and one Save for the whole block: the four nurseries
+             are one job, and saving three of them is not a thing anybody
+             means to do. -->
+        <div class="lst-foot" id="cap-actions" style="display:none;">
+          <button class="btn" onclick="cancelCapEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveCapEdit()">Save</button>
         </div>
       </div>
 
-      <!-- PIECE RATE -->
+      <!-- CHEMICAL LIST ————————————————————————————————————
+           One block, two columns. Pest and disease are the same kind of
+           record kept against two different problems; side by side they are
+           obviously two halves of one list rather than two lists that
+           happen to look alike. -->
       <div class="card" style="padding:18px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Piece Rate</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Rate paid per unit of work <b>for this nursery</b>. Applies to every month from now on until you change it, and feeds Monthly Payroll.</div>
-        <div id="setting-rate-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;"></div>
-        <div id="setting-rate-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);"></div>
+        <div class="lst-top">
+          <div class="set-h">Chemical List</div>
+          <button class="btn lst-edit" id="chem-edit-btn" onclick="startChemEdit()">&#9998; Edit</button>
+        </div>
+
+        <!-- One pump covers this many seedlings, unless a chemical says
+             otherwise in its own Covers box. Editable with the list, because
+             it is the same kind of fact and the same person changes it. -->
+        <div class="preset-row">
+          <span class="preset-l">One pump covers</span>
+          <input type="number" min="1" step="1" id="pump-coverage" class="set-in"
+                 style="width:104px;text-align:right;" disabled
+                 oninput="onPresetInput(this.value)">
+          <span class="preset-l">seedlings</span>
+        </div>
+
+        <div class="three-col">
+          <div class="col-block">
+            <div class="col-h col-h-pest">&#128027; Pest</div>
+            <div class="lst-head">
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span><span></span>
+            </div>
+            <div id="chem-pest-list"></div>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('pest')"
+                    style="display:none;">&#65291; Add chemical</button>
+          </div>
+
+          <div class="col-block">
+            <div class="col-h col-h-disease">&#127810; Disease</div>
+            <div class="lst-head">
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span><span></span>
+            </div>
+            <div id="chem-disease-list"></div>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('disease')"
+                    style="display:none;">&#65291; Add chemical</button>
+          </div>
+
+          <!-- Weedicides, stickers, and anything dosed its own way — Asir is
+               measured per seedling, which is not how the Pest list works. -->
+          <div class="col-block">
+            <div class="col-h col-h-other">&#127807; Other</div>
+            <div class="lst-head other-row">
+              <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span>
+              <span>Used on</span><span></span>
+            </div>
+            <div id="chem-other-list"></div>
+            <button type="button" class="row-add chem-add" onclick="addChemRow('other')"
+                    style="display:none;">&#65291; Add chemical</button>
+          </div>
+        </div>
+
+        <div class="lst-foot" id="chem-actions" style="display:none;">
+          <button class="btn" onclick="cancelChemEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveChemEdit()">Save</button>
+        </div>
       </div>
 
-      <!-- WORKERS -->
+      <!-- FERTILISER LIST —————————————————————————————————
+           Same block, same columns, one dose and two ticks: a fertiliser is
+           used at transplanting, at monthly manuring, or at both. -->
       <div class="card" style="padding:18px;">
-        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Workers</div>
-        <div id="setting-worker-note" style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;"></div>
-        <div id="setting-worker-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;"></div>
-        <div id="setting-worker-add" style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-          <input type="text" id="setting-new-worker" placeholder="Worker name…" style="height:36px;padding:0 11px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;min-width:220px;">
-          <button class="btn btn-primary" style="font-size:12px;" onclick="addWorkerFromSetting()">➕ Add Worker</button>
+        <div class="lst-top">
+          <div class="set-h">Fertiliser List</div>
+          <button class="btn lst-edit" id="fert-edit-btn" onclick="startFertEdit()">&#9998; Edit</button>
+        </div>
+
+        <div class="col-block" style="max-width:760px;margin:0 auto;">
+          <div class="lst-head fert-head">
+            <span>Fertiliser</span><span>Dosage / seedling</span>
+            <span>Transplant</span><span>Monthly</span><span></span>
+          </div>
+          <div id="fert-list"></div>
+          <button type="button" class="row-add" id="fert-add" onclick="addFertRow()"
+                  style="display:none;">&#65291; Add fertiliser</button>
+        </div>
+
+        <div class="lst-foot" id="fert-actions" style="display:none;">
+          <button class="btn" onclick="cancelFertEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveFertEdit()">Save</button>
         </div>
       </div>
     </div>
@@ -440,7 +557,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=54"></script>
+<script src="plot_maintenance_script.js?v=66"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

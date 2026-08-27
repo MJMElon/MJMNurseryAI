@@ -71,10 +71,10 @@ function resetPlotQty(n){
       .then(({ error }) => { if (error) console.warn('[maint] plot-qty reset failed:', error.message); });
   }
 }
-const COVERAGE_PER_PUMP = 800; // standard spray coverage (seedlings per pump)
-const CHEMICAL_COVERAGE = { // overrides for chemicals with different cover-per-pump
-  'Asir': 1, // per-seedling: capacity × dose / 1000
-};
+/* The fallback until nops_maint_config is read, and the number the whole
+   system has always sprayed to. The live figure is `pumpCoverage`, preset on
+   the Setting page; a chemical with a coverage of its own overrides both. */
+const COVERAGE_PER_PUMP = 800;
 
 function fmtUsage(totalAmount, unit, decimals = 2){
   // gm → kg, mL → L; default 2 decimals (no round-up)
@@ -83,25 +83,20 @@ function fmtUsage(totalAmount, unit, decimals = 2){
   const rounded = Math.round(big * factor) / factor;
   return rounded + (unit === 'gm' ? ' kg' : ' L');
 }
-/* Unit per chemical — used to auto-set mL/gm when a chemical is selected */
-const CHEMICAL_UNITS = {
-  // Pest
-  'Cyper':'mL','Destroy':'mL','Becker':'mL','Asir':'gm',
-  // Disease
-  'Antracol':'gm','Dithane':'gm','Thiram':'gm','Daconil':'gm','Manzate':'gm',
-  // Weedicide / sticker
-  'Widex':'gm','Sentry':'mL','Ally':'gm','Basta':'mL','Monex':'mL','Acosta':'mL',
-  'Bond':'mL','Activator':'mL',
-  // Fertilizer
-  'Sk Cote':'gm','Yaramila':'gm','Compound 55':'gm','Ajimino':'gm','ERP':'gm','Organic Matter':'gm',
-};
-function getUnitForChem(name){ return CHEMICAL_UNITS[name] || 'gm'; }
+/* Unit per chemical — used to auto-set mL/gm when one is selected. Reads
+   the list; a fertiliser answers too, since the manuring sheet asks the same
+   question of a fertiliser name. */
+function getUnitForChem(name){
+  const c = chemByName(name) || fertByName(name);
+  return (c && c.unit) || 'gm';
+}
 
 function calcMaxChem(seedlings, chemName, dose, unit, decimals = 2){
   if(!seedlings || !chemName || chemName === '—' || !dose) return '—';
-  // Formula: (plot capacity / coverage per pump) × dose per pump / 1000
-  const coverage = CHEMICAL_COVERAGE[chemName] || COVERAGE_PER_PUMP;
-  const totalUnits = (seedlings / coverage) * dose;
+  // Formula: (plot capacity / coverage per pump) × dose per pump / 1000.
+  // The chemical's own coverage when it has one, the preset when it does not
+  // — the same rule the Setting page shows.
+  const totalUnits = (seedlings / coverageFor(chemName)) * dose;
   return fmtUsage(totalUnits, unit, decimals);
 }
 function sumSeedlings(nursery, plots, ticked){
@@ -110,22 +105,73 @@ function sumSeedlings(nursery, plots, ticked){
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 /* Chemical option lists — only chemicals MJM Nursery uses. Names only; dose set separately. */
-const PD_SERANGGA_OPTIONS = ['Cyper','Destroy','Becker','Asir','—'];
-const PD_KULAT_OPTIONS    = ['Antracol','Dithane','Thiram','Daconil','Manzate','—'];
-const PD_STICKER_OPTIONS  = ['Bond','—'];
-const FERT_OPTIONS        = ['Sk Cote','Yaramila','Compound 55','Ajimino','ERP','Organic Matter','—'];
-/* Fertilizer catalog — dose per seedling and bag size for kg/bag calculation */
-const FERTILIZER_INFO = {
-  'Sk Cote':        { defaultDose:5,  bagSizeGm:25000,   bagLabel:'25 kg' },
-  'Yaramila':       { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Compound 55':    { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Ajimino':        { defaultDose:20, bagSizeGm:25000,   bagLabel:'25 kg' },
-  'ERP':            { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Organic Matter': { defaultDose:60, bagSizeGm:1000000, bagLabel:'1,000 kg' },
-};
+
+/* Loaded from nops_maint_chemicals / nops_maint_fertilisers / nops_maint_config
+   by loadSettingLists(). Declared here rather than beside the Setting tab at
+   the foot of the file because the calculators and the schedules read them,
+   and a `let` further down would leave those in the temporal dead zone. */
+let chemicals   = [];
+let fertilisers = [];
+let pumpCoverage = 800;   // COVERAGE_PER_PUMP; the preset overrides it
+
+/* Every one of these lists is typed in by a person, and every one of them is
+   printed straight back into innerHTML. A plot called B<img onerror=…> is
+   unlikely; a fertiliser name with an ampersand in it is not. Defined up
+   here because the schedule dropdowns below use it. */
+const esc = v => String(v == null ? '' : v)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/* ── One source for the chemicals and the fertilisers ──────────────────
+   These were two hardcoded catalogues — CHEMICAL_CATEGORIES and
+   FERTILIZER_INFO — which the Setting page could not edit and the
+   calculators read straight from. Both are gone. Everything now reads
+   `chemicals` and `fertilisers`, loaded from nops_maint_chemicals and
+   nops_maint_fertilisers, so a dose corrected on the Setting page is the
+   dose the calculator and the schedules use.
+
+   Every lookup below has to survive the arrays being empty. They are, until
+   the first read lands, and a page that throws before its data arrives is
+   worse than one that shows a blank dropdown for a moment. */
+const fertByName = n => fertilisers.find(f => f.name === n) || null;
+/* What one pump of this chemical covers: its own figure when it has one,
+   the preset when it does not. Same rule the Setting page shows, and the
+   only place the arithmetic lives now. */
+function coverageFor(name) {
+  const c = chemByName(name);
+  const own = c && c.coverage != null && c.coverage !== '' ? +c.coverage : 0;
+  return Math.max(1, own || +pumpCoverage || COVERAGE_PER_PUMP);
+}
+const chemByName = n => chemicals.find(c => c.name === n) || null;
+
+/* Names for a dropdown. The trailing '—' is how every one of these lists has
+   always offered "none"; it stays. */
+const chemNames = kind => chemicals.filter(c => c.kind === kind).map(c => c.name).concat('—');
+const taggedNames = tag => chemicals.filter(c => c.tag === tag).map(c => c.name).concat('—');
+/* With no usage, every fertiliser — which is what the calculator wants,
+   since it is asked about both kinds of work. With one, only the fertilisers
+   ticked for it: the Manuring sheet is monthly manuring, and offering a
+   transplanting-only fertiliser there is offering a rate that does not
+   exist. That is what the ticks are for. */
+const fertNames = usage => fertilisers
+  .filter(f => !usage || (usage === 'transplant' ? f.dose_transplant : f.dose_monthly) != null)
+  .map(f => f.name).concat('—');
+
+/* A fertiliser's dose for the work being done. Transplanting when that is
+   what is being planned, monthly otherwise, and whichever one is set when
+   only one is. */
+function fertDoseFor(name, usage) {
+  const f = fertByName(name);
+  if (!f) return 0;
+  const first = usage === 'transplant' ? f.dose_transplant : f.dose_monthly;
+  const other = usage === 'transplant' ? f.dose_monthly : f.dose_transplant;
+  return +(first != null ? first : other != null ? other : 0) || 0;
+}
+
 function calcFertUsage(seedlings, fertName, doseGm, decimals = 2){
   if (!seedlings || !fertName || fertName === '—' || !doseGm) return { kg:'—', bags:'—', totalGm:0 };
-  const info = FERTILIZER_INFO[fertName];
+  const f = fertByName(fertName);
+  const info = f && f.bag_size_gm ? { bagSizeGm: +f.bag_size_gm, bagLabel: f.bag_label || '' } : null;
   const totalGm = seedlings * doseGm;
   const totalKg = totalGm / 1000;
   const factor = Math.pow(10, decimals);
@@ -133,42 +179,6 @@ function calcFertUsage(seedlings, fertName, doseGm, decimals = 2){
   const bagsStr = info ? (Math.round((totalGm / info.bagSizeGm) * factor) / factor) + ' ' + t('unit.bags') + ' (' + info.bagLabel + ' ' + t('unit.each') + ')' : '—';
   return { kg: kgStr, bags: bagsStr, totalGm };
 }
-const INTERROW_CHEM_OPTIONS = ['Basta','Monex','Acosta'];
-
-/* Categorized chemical catalog with default dose per chemical — used by Chemical Calculator */
-const CHEMICAL_CATEGORIES = [
-  { group: 'Pest', chems: [
-    { name:'Cyper',   dose:60, unit:'mL' },
-    { name:'Destroy', dose:30, unit:'mL' },
-    { name:'Becker',  dose:20, unit:'mL' },
-    { name:'Asir',    dose:5,  unit:'gm' },
-  ]},
-  { group: 'Disease', chems: [
-    { name:'Antracol', dose:30, unit:'gm' },
-    { name:'Dithane',  dose:30, unit:'gm' },
-    { name:'Thiram',   dose:30, unit:'gm' },
-    { name:'Daconil',  dose:30, unit:'gm' },
-    { name:'Manzate',  dose:30, unit:'gm' },
-  ]},
-  { group: 'Weedicide : Contact', chems: [
-    { name:'Widex', dose:8, unit:'gm' },
-  ]},
-  { group: 'Weedicide : Systemic', chems: [
-    { name:'Sentry', dose:200, unit:'mL' },
-    { name:'Ally',   dose:3,   unit:'gm' },
-  ]},
-  { group: 'Weedicide : Contact + Systemic', chems: [
-    { name:'Basta',  dose:200, unit:'mL' },
-    { name:'Monex',  dose:200, unit:'mL' },
-    { name:'Acosta', dose:200, unit:'mL' },
-  ]},
-  { group: 'Sticker for fungicide', chems: [
-    { name:'Bond', dose:15, unit:'mL' },
-  ]},
-  { group: 'Sticker for weedicide', chems: [
-    { name:'Activator', dose:15, unit:'mL' },
-  ]},
-];
 
 /* ════════════════════════════
    DEFAULT CONFIGS
@@ -275,7 +285,7 @@ function addCustomPlot(n, name) {
   customPlots[n].push(name);
   if (NURSERY_PLOTS[n]) NURSERY_PLOTS[n].push(name);
   persistCustomPlot(n, name, false);
-  renderAll(); autoSyncRecords(); renderSettingPlots(); renderSettingWorkers();
+  renderAll(); autoSyncRecords();
 }
 
 function removeCustomPlot(n, name) {
@@ -286,7 +296,7 @@ function removeCustomPlot(n, name) {
     if (i >= 0) NURSERY_PLOTS[n].splice(i, 1);
   }
   persistCustomPlot(n, name, true);
-  renderAll(); autoSyncRecords(); renderSettingPlots(); renderSettingWorkers();
+  renderAll(); autoSyncRecords();
 }
 
 function persistCustomPlot(n, name, remove) {
@@ -752,6 +762,10 @@ let _rateLoadErr = null;
 
 /* Typing edits a draft, not the live rates — nothing reaches the database or
    the payroll until Save & Lock is pressed. */
+/* The boxes that edited these left the Setting tab when piece rates moved
+   to their own module. What is below stays because Worker Record still
+   computes payroll from `rates`; the draft/save half of it is unreachable
+   until the new module wires its own screen to it. */
 let _rateDraft = null;   // { nursery, values:{code:number|null} }
 
 /* Re-seed the draft from the saved rates unless the user has actually typed
@@ -775,28 +789,6 @@ function _seedRateDraft(n, force) {
 function _rateDirty(n) {
   const rates = nurseryRates(n), d = _seedRateDraft(n);
   return PIECE_RATE_TYPES.some(rt => (d.values[rt.code] ?? null) !== (rates[rt.code] ?? null));
-}
-
-function renderSettingRates() {
-  const box = document.getElementById('setting-rate-list');
-  if (!box) return;
-  const n = getNursery();
-  // Freeze the boxes when the saved rates could not be read — they would look
-  // blank, and saving that would wipe real rates.
-  const locked = rateLocked(n) || !!_rateLoadErr;
-  const d = _seedRateDraft(n);
-
-  box.innerHTML = PIECE_RATE_TYPES.map(rt => `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:${locked ? '#f6f8f7' : '#fff'};border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
-      <span style="font-size:12px;font-weight:700;color:var(--text-head);">${t(rt.key)}</span>
-      <span style="display:flex;align-items:center;gap:5px;">
-        <span style="font-size:11px;font-weight:700;color:var(--text-muted);">RM</span>
-        <input type="number" min="0" step="0.01" value="${d.values[rt.code] ?? ''}" placeholder="0.00"
-          ${locked ? 'disabled' : ''} oninput="onRateInput('${rt.code}', this.value)"
-          style="width:88px;height:32px;padding:0 8px;font-size:12px;text-align:right;border:1.5px solid var(--border);border-radius:4px;font-family:inherit;${locked ? 'background:#eceeed;color:var(--text-muted);cursor:not-allowed;' : ''}">
-      </span>
-    </div>`).join('');
-  renderRateActions();
 }
 
 /* Save / lock bar under the rate cards. */
@@ -888,7 +880,7 @@ async function savePieceRates() {
   }
   rateLocks[n] = true;
   _seedRateDraft(n, true);      // draft now matches what is stored
-  renderSettingRates(); renderPayroll();
+  renderPayroll();
   alert(`Piece rates saved and locked for ${NURSERY_NAMES[n]}.`);
 }
 
@@ -904,11 +896,10 @@ async function unlockPieceRates() {
   }
   rateLocks[n] = false;
   _seedRateDraft(n, true);      // start again from what is actually saved
-  renderSettingRates();
 }
 
 /* ── Workers (per nursery) ────────────────────────────────────────────────
-   Names come from the Worker System in the Nursery Payroll System, so one
+   Names come from the Worker System on the 555 Worker Portal's Manage page, so one
    register covers both modules: add, rename or deactivate somebody there and
    the tick sheets here follow, this month included. Only the general workers
    of that nursery are taken — a nursery's own section, minus the roles that
@@ -1030,63 +1021,13 @@ function isLinked(n) { return (_linkedWorkers[n] || []).length > 0; }
 function refreshLinkedWorkers(force) {
   if (!_supabase || !_dbReady) return;
   if (!force && Date.now() - _linkAt < 15000) return;
-  loadLinkedWorkers().then(() => { renderPayroll(); renderSettingWorkers(); });
-}
-
-function renderSettingWorkers() {
-  const box = document.getElementById('setting-worker-list');
-  if (!box) return;
-  const n = getNursery();
-  const linked = isLinked(n);
-  const list = workers[n] || [];
-  const note = document.getElementById('setting-worker-note');
-  const add  = document.getElementById('setting-worker-add');
-
-  if (note) note.innerHTML = linked
-    ? `Linked from the <b>Worker System</b> in the Nursery Payroll System —
-       the general workers filed under ${NURSERY_NAMES[n]}. Add or change somebody
-       <a href="../npayroll/npayroll_dashboard.html" style="color:var(--green-text);font-weight:700;">there</a>
-       and this list follows, for this month too.`
-    : `No general worker is on the <b>Worker System</b> register for ${NURSERY_NAMES[n]} yet, so this
-       module's own list is being used. Once somebody is added
-       <a href="../npayroll/npayroll_dashboard.html" style="color:var(--green-text);font-weight:700;">there</a>
-       the register takes over.${_linkErr ? ` <span style="color:var(--text-faint);">(${_linkErr})</span>` : ''}`;
-  if (add) add.style.display = linked ? 'none' : 'flex';
-
-  box.innerHTML = list.length
-    ? list.map(w => `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
-          <span style="font-size:12px;font-weight:700;color:var(--text-head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${w}</span>
-          ${linked
-            ? '<span style="font-size:10px;font-weight:700;color:var(--green-text);white-space:nowrap;">🔗 linked</span>'
-            : `<button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeWorker('${String(w).replace(/'/g, "\\'")}')">Remove</button>`}
-        </div>`).join('')
-    : '<div style="font-size:12px;color:var(--text-faint);">No workers for this nursery yet.</div>';
-}
-
-function addWorkerFromSetting() {
-  const el = document.getElementById('setting-new-worker');
-  const name = (el?.value || '').trim();
-  if (!name) { alert('Key in a worker name first.'); return; }
-  const n = getNursery();
-  if (isLinked(n)) {
-    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System in the Nursery Payroll System.\n\n` +
-          `Add the worker there and they will appear here — a name added here would be overwritten on the next load.`);
-    return;
-  }
-  if (!_localWorkers[n]) _localWorkers[n] = [];
-  if (_localWorkers[n].some(w => w.toLowerCase() === name.toLowerCase())) { alert(`"${name}" is already on this nursery's list.`); return; }
-  _localWorkers[n].push(name);
-  resolveWorkers();
-  persistWorker(n, name, false);
-  if (el) el.value = '';
-  renderSettingWorkers(); renderPayroll();
+  loadLinkedWorkers().then(() => { renderPayroll(); });
 }
 
 function removeWorker(name) {
   const n = getNursery();
   if (isLinked(n)) {
-    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System in the Nursery Payroll System.\n\n` +
+    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System on the 555 Worker Portal's Manage page.\n\n` +
           `Remove or deactivate the worker there instead.`);
     return;
   }
@@ -1094,7 +1035,7 @@ function removeWorker(name) {
   _localWorkers[n] = (_localWorkers[n] || []).filter(w => w !== name);
   resolveWorkers();
   persistWorker(n, name, true);
-  renderSettingWorkers(); renderPayroll();
+  renderPayroll();
 }
 
 function persistWorker(n, name, remove) {
@@ -1106,27 +1047,6 @@ function persistWorker(n, name, remove) {
 }
 
 /* Setting tab — list of user-added plots for the current nursery. */
-function renderSettingPlots() {
-  const box = document.getElementById('setting-plot-list');
-  if (!box) return;
-  const n = getNursery();
-  const list = customPlots[n] || [];
-  box.innerHTML = list.length
-    ? list.map(p => `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;">
-          <span style="font-size:13px;font-weight:700;color:var(--green-text);">${p}</span>
-          <button class="btn btn-sm btn-danger" style="font-size:11px;" onclick="removeCustomPlot('${n}','${p}')">Remove</button>
-        </div>`).join('')
-    : '<div style="font-size:12px;color:var(--text-faint);">No added plots yet — use “➕ Add Row” on a schedule, or add one below.</div>';
-}
-
-function addPlotFromSetting() {
-  const el = document.getElementById('setting-new-plot');
-  const name = (el?.value || '').trim().toUpperCase();
-  if (!name) { alert('Key in a plot name first.'); return; }
-  addCustomPlot(getNursery(), name);
-  if (el) el.value = '';
-}
 let _dbReady     = false; // guards writes until the initial DB load lands
 
 /* ════════════════════════════
@@ -1165,6 +1085,7 @@ function persistState(n, m) {
     manuring:       s.manuring,
     weeding:        s.weeding,
     interrow:       s.interrow,
+    periods:        s.periods,
     _savedPd:       s._savedPd,
   };
   dbStateCache[stateKey(n, m)] = JSON.parse(JSON.stringify(_payload));
@@ -1242,13 +1163,14 @@ const I18N = {
     'btn.pdf':'⬇ Download Schedule PDF', 'btn.save':'💾 Save Schedule',
     'btn.addRecord':'+ Add Record', 'btn.sync':'↺ Sync from Schedule',
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
+    'sched.ticked':'ticked', 'sched.none':'not set yet',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
     'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
-    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them in the Nursery Payroll System and they will appear here.',
-    'pay.linkedNote':'Worker names come from the Worker System in the Nursery Payroll System and follow any change made there.',
+    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them on the 555 Worker Portal\u2019s Manage page and they will appear here.',
+    'pay.linkedNote':'Worker names come from the Worker System on the 555 Worker Portal\u2019s Manage page and follow any change made there.',
     'pay.offRegister':'⚠ Ticked this month but no longer a general worker of this nursery on the register, so their capacity is not counted:',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
@@ -1263,6 +1185,8 @@ const I18N = {
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
     'badge.calc':'💊 DOSAGE CALCULATOR',
+    'period.head':'When does this round run?', 'period.from':'First day', 'period.to':'Last day',
+    'period.apply':'Set dates', 'period.reset':'Use the default week', 'period.tip':'Click to set this round\u2019s dates',
     'col.plot':'PLOT', 'hdr.week':'WEEK', 'hdr.round':'Round',
     'hdr.pSerangga':'P — PEST', 'hdr.dKulat':'D — DISEASE',
     'hdr.manuringRounds':'MANURING ROUNDS', 'hdr.interrowRounds':'INTERROW SPRAY ROUNDS',
@@ -1323,13 +1247,14 @@ const I18N = {
     'btn.pdf':'⬇ Muat Turun Jadual PDF', 'btn.save':'💾 Simpan Jadual',
     'btn.addRecord':'+ Tambah Rekod', 'btn.sync':'↺ Segerak dari Jadual',
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
+    'sched.ticked':'ditanda', 'sched.none':'belum ditetapkan',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
     'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
     'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
-    'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di Sistem Penggajian Nurseri dan nama akan muncul di sini.',
-    'pay.linkedNote':'Nama pekerja diambil daripada Worker System di Sistem Penggajian Nurseri dan mengikut sebarang pindaan di sana.',
+    'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di halaman Manage Portal 555 FC dan nama akan muncul di sini.',
+    'pay.linkedNote':'Nama pekerja diambil daripada Worker System di halaman Manage Portal 555 FC dan mengikut sebarang pindaan di sana.',
     'pay.offRegister':'⚠ Ditanda bulan ini tetapi bukan lagi pekerja am nurseri ini dalam daftar, jadi kapasiti mereka tidak dikira:',
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja', 'pay.workersRange':'Pekerja', 'pay.ofTotal':'daripada',
@@ -1344,6 +1269,8 @@ const I18N = {
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
     'badge.calc':'💊 KALKULATOR DOS',
+    'period.head':'Bila pusingan ini berjalan?', 'period.from':'Hari pertama', 'period.to':'Hari terakhir',
+    'period.apply':'Tetapkan tarikh', 'period.reset':'Guna minggu asal', 'period.tip':'Klik untuk tetapkan tarikh pusingan ini',
     'col.plot':'PLOT', 'hdr.week':'MINGGU', 'hdr.round':'Pusingan',
     'hdr.pSerangga':'P — SERANGGA', 'hdr.dKulat':'D — KULAT',
     'hdr.manuringRounds':'PUSINGAN MEMBAJA', 'hdr.interrowRounds':'PUSINGAN RACUN SELINGAN',
@@ -1575,6 +1502,179 @@ function periodLabel(n, monthLabel) {
   return from === to ? ordinalDay(from) : `${ordinalDay(from)} - ${ordinalDay(to)}`;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   WHEN A ROUND ACTUALLY RUNS
+
+   A column used to be named by where it sat: the first was the 1st–7th,
+   the second the 8th–14th, and so on, seven days each whatever the work
+   really was. That is a sensible default and a poor rule — a manuring
+   round is not a calendar week, and the second round of the month is not
+   always the second week of it.
+
+   So a round may be given its own dates, and the header says them. What
+   is stored is the two DAY NUMBERS, not two full dates: the month is
+   already chosen in the top bar, and a range that carried its own month
+   would fight the picker and break carry-forward into the next month.
+
+   Sparse on purpose — s.periods holds only the rounds somebody has
+   actually dated. A round with nothing stored falls back to the seven-day
+   block exactly as before, so every month saved before this reads the
+   same as it always did.
+══════════════════════════════════════════════════════════════ */
+const PERIOD_KINDS = ['pd', 'manuring', 'weeding', 'interrow'];
+
+function periodsOf(s, kind) {
+  if (!s.periods) s.periods = {};
+  if (!s.periods[kind]) s.periods[kind] = {};
+  return s.periods[kind];
+}
+
+/* i is 0-based. Returns null when the default block falls off the end of
+   the month, which is what makes a 5th round in February keep its number. */
+function periodRange(kind, i, n, m) {
+  const days = daysInMonthLabel(m);
+  const r = (appState[n]?.[m]?.periods?.[kind] || {})[i];
+  if (r && +r.from >= 1 && +r.to >= +r.from && +r.from <= days) {
+    return { from: +r.from, to: Math.min(+r.to, days), custom: true };
+  }
+  const from = i * 7 + 1;
+  if (from > days) return null;
+  return { from, to: Math.min(from + 6, days), custom: false };
+}
+
+function periodText(kind, i, n, m) {
+  const r = periodRange(kind, i, n, m);
+  if (!r) return `${t('hdr.round')} ${i + 1}`;
+  return r.from === r.to ? ordinalDay(r.from) : `${ordinalDay(r.from)} - ${ordinalDay(r.to)}`;
+}
+
+/* The header as a button. A dated round is marked, so it is obvious at a
+   glance which columns were set by hand and which are still the default. */
+function periodBtn(kind, i, n, m) {
+  const r = periodRange(kind, i, n, m);
+  return `<button type="button" class="period-btn${r && r.custom ? ' period-set' : ''}" ` +
+    `onclick="openPeriodPicker('${kind}',${i},event)" ` +
+    `title="${esc(t('period.tip'))}">${periodText(kind, i, n, m)}</button>`;
+}
+
+/* ── Picking the dates ──────────────────────────────────────────────
+   Two date boxes, limited to the month on screen, over the header that
+   opened them. Real date inputs rather than two "day number" boxes: the
+   question is "which days", and a calendar is how that question is
+   normally answered. Only the day numbers are kept. */
+let _periodPick = null;   // { kind, i }
+
+function monthISO(m) {
+  const mm = /^([A-Za-z]{3})\s+(\d{4})$/.exec((m || '').trim());
+  if (!mm) return null;
+  const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === mm[1].toLowerCase());
+  if (idx < 0) return null;
+  return `${mm[2]}-${String(idx + 1).padStart(2, '0')}`;
+}
+
+function openPeriodPicker(kind, i, ev) {
+  if (ev) ev.stopPropagation();
+  if (!canEditSchedule) return;
+  closePeriodPicker();
+  const n = getNursery(), m = getMonth();
+  const iso = monthISO(m);
+  if (!iso) return;                       // no month to hang dates off
+  const days = daysInMonthLabel(m);
+  const r = periodRange(kind, i, n, m) || { from: 1, to: Math.min(7, days) };
+  _periodPick = { kind, i };
+
+  const box = document.createElement('div');
+  box.className = 'period-pop';
+  box.id = 'period-pop';
+  box.innerHTML =
+    `<div class="period-pop-h">${esc(t('period.head'))}</div>` +
+    `<label>${esc(t('period.from'))}<input type="date" id="period-from" ` +
+      `min="${iso}-01" max="${iso}-${String(days).padStart(2,'0')}" ` +
+      `value="${iso}-${String(r.from).padStart(2,'0')}"></label>` +
+    `<label>${esc(t('period.to'))}<input type="date" id="period-to" ` +
+      `min="${iso}-01" max="${iso}-${String(days).padStart(2,'0')}" ` +
+      `value="${iso}-${String(r.to).padStart(2,'0')}"></label>` +
+    `<div class="period-pop-f">` +
+      `<button type="button" class="btn" onclick="clearPeriod()">${esc(t('period.reset'))}</button>` +
+      `<button type="button" class="btn" onclick="closePeriodPicker()">${esc(t('btn.cancel'))}</button>` +
+      `<button type="button" class="btn btn-primary" onclick="applyPeriod()">${esc(t('period.apply'))}</button>` +
+    `</div>`;
+  document.body.appendChild(box);
+
+  // Over the button that opened it, nudged back inside the window.
+  const btn = ev && ev.currentTarget && ev.currentTarget.getBoundingClientRect();
+  const w = box.offsetWidth || 250;
+  const left = btn ? Math.min(Math.max(8, btn.left), window.innerWidth - w - 8)
+                   : (window.innerWidth - w) / 2;
+  box.style.left = left + 'px';
+  box.style.top  = ((btn ? btn.bottom : 120) + window.scrollY + 6) + 'px';
+
+  setTimeout(() => document.addEventListener('mousedown', _periodOutside), 0);
+  document.addEventListener('keydown', _periodEsc);
+}
+
+function _periodOutside(e) {
+  const box = document.getElementById('period-pop');
+  if (box && !box.contains(e.target)) closePeriodPicker();
+}
+function _periodEsc(e) { if (e.key === 'Escape') closePeriodPicker(); }
+
+function closePeriodPicker() {
+  const box = document.getElementById('period-pop');
+  if (box) box.remove();
+  document.removeEventListener('mousedown', _periodOutside);
+  document.removeEventListener('keydown', _periodEsc);
+  _periodPick = null;
+}
+
+const _dayOf = (v) => { const d = /-(\d{2})$/.exec(v || ''); return d ? +d[1] : 0; };
+
+function applyPeriod() {
+  if (!_periodPick) return;
+  const from = _dayOf(document.getElementById('period-from')?.value);
+  const to   = _dayOf(document.getElementById('period-to')?.value);
+  if (!from || !to) return;
+  if (to < from) { alert('The last day cannot come before the first.'); return; }
+  const { kind, i } = _periodPick;
+  const n = getNursery(), m = getMonth();
+  periodsOf(getState(n, m), kind)[i] = { from, to };
+  closePeriodPicker();
+  persistStateSoon(n, m);
+  renderPeriodOwner(kind);
+}
+
+/* Back to the seven-day block. Removing the entry rather than writing the
+   default back means a round is either dated or it is not — there is no
+   third state that looks dated but is not. */
+function clearPeriod() {
+  if (!_periodPick) return;
+  const { kind, i } = _periodPick;
+  const n = getNursery(), m = getMonth();
+  delete periodsOf(getState(n, m), kind)[i];
+  closePeriodPicker();
+  persistStateSoon(n, m);
+  renderPeriodOwner(kind);
+}
+
+/* Opens the date picker over a round that has just been added. Deferred a
+   frame, because the header it points at does not exist until the table
+   that was just asked for has painted. */
+function askNewRoundDates(kind, i) {
+  setTimeout(() => {
+    const want = "'" + kind + "'," + i + ",";
+    const btn = [...document.querySelectorAll('.period-btn')]
+      .find(b => (b.getAttribute('onclick') || '').includes(want));
+    if (btn) btn.click();
+  }, 60);
+}
+
+function renderPeriodOwner(kind) {
+  if (kind === 'pd')            renderPD();
+  else if (kind === 'manuring') renderManuring();
+  else if (kind === 'weeding')  renderWeeding();
+  else if (kind === 'interrow') renderInterrow();
+}
+
 
 const getNursery = () => document.getElementById('global-nursery').value;
 
@@ -1687,26 +1787,21 @@ function renderAll() {
     const el = document.getElementById(`${k}-nursery-line`);
     if (el) el.textContent = bigHdr;
   });
-  // Setting has no month dimension — its values apply to every month — so its
-  // header names the nursery only.
-  const setHdr = document.getElementById('setting-nursery-line');
-  if (setHdr) setHdr.textContent = `${NURSERY_NAMES[n] || lbl} — Setting`;
+  // Setting has neither a month nor the top bar's nursery — it shows every
+  // nursery on its own tabs — so its header is just the word.
   // Remember the last-viewed month & nursery (restored on next visit).
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
-  ['pd','manuring','weeding','interrow'].forEach(k => {
-    const el = document.getElementById(`${k}-nursery-line`);
-    if (el) el.textContent = bigHdr;
-  });
+  // The four schedule grids share one header now, above all of them.
+  const schedHdr = document.getElementById('sched-nursery-line');
+  if (schedHdr) schedHdr.textContent = bigHdr;
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
+  renderSchedCounts();
   updateCarryNotice();
   // Re-render analytics when its sub-view inside Work Record is showing
   const chartView = document.getElementById('recview-chart');
   if (chartView && chartView.classList.contains('active')) renderCharts();
   const payTab = document.getElementById('tab-payroll');
   if (payTab && payTab.classList.contains('active')) renderPayroll();
-  // Setting is entirely per-nursery (plots, rates, workers) — repaint it so
-  // switching nursery never leaves another nursery's lists on screen.
-  renderSettingPlots(); renderSettingRates(); renderSettingWorkers();
   // Re-render calculator if its tab is active (clear ticks since plots may differ between nurseries)
   const calcTab = document.getElementById('tab-calc');
   if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
@@ -2002,7 +2097,8 @@ function switchTab(name, btn) {
   // is hidden for everyone else, but guard the switch too so a stale button, a
   // restored tab or a console call can't get in either.
   if (name === 'setting' && !isNopsAdmin) {
-    alert('Setting is for administrators only.\n\nAsk an admin if a piece rate, plot or worker needs changing.');
+    alert('Setting is for administrators only.\n\nAsk an admin if a plot capacity, ' +
+          'chemical or fertiliser needs changing.');
     return;
   }
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -2014,7 +2110,14 @@ function switchTab(name, btn) {
   if (name==='calc')    renderCalc();
   // Re-read the register on the way in, so an amendment made in the payroll
   // module a moment ago is already reflected without reloading the page.
-  if (name==='setting') { renderSettingPlots(); renderSettingRates(); renderSettingWorkers(); refreshLinkedWorkers(); }
+  /* Setting has its own nursery tabs and no month, so the two pickers in the
+     top bar would be choosing something it does not use. */
+  const topCtrl = document.getElementById('top-nursery-ctrl');
+  const topPill = document.getElementById('nursery-pill');
+  if (topCtrl) topCtrl.style.display = name === 'setting' ? 'none' : '';
+  if (topPill) topPill.style.display = name === 'setting' ? 'none' : '';
+
+  if (name==='setting') renderSetting();
   if (name==='payroll') { renderPayroll(); refreshLinkedWorkers(); }
 }
 
@@ -2033,14 +2136,107 @@ function switchRecordView(view, btn) {
 }
 
 /* Schedule sub-tabs: P&D / Manuring / Weeding / Interrow. */
-function switchSchedView(name, btn) {
-  const bar = btn ? btn.closest('.subtabs-bar') : null;
-  if (bar) bar.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  document.querySelectorAll('.sched-panel').forEach(p => p.classList.remove('active'));
-  const el = document.getElementById('sched-' + name);
-  if (el) el.classList.add('active');
+/* ══════════════════════════════════════════════════════════════
+   THE SCHEDULE, ALL FOUR PROGRAMS ON ONE PAGE
+
+   There used to be a sub-tab per program and, inside each one, its own
+   ➕ Add Row and 💾 Save Schedule. Those Save buttons were four copies of
+   one button: saveSchedule() has always written all four programs at once,
+   whichever tab happened to be showing. The tabs were hiding three
+   quarters of what you were about to save.
+
+   So: one toolbar, one Save, and the four programs stacked in the order
+   they are worked. Each is a slab you can fold shut, and each says how
+   much of itself is set, so a folded one is still answering the question
+   you came to the page with. Which ones you keep folded is remembered.
+   Nothing about the grids themselves changed.
+══════════════════════════════════════════════════════════════ */
+const SCHED_BLOCKS = ['pd', 'manuring', 'weeding', 'interrow'];
+const SCHED_FOLD_KEY = 'mjm_maint_sched_folded';
+
+function getFoldedSched() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SCHED_FOLD_KEY));
+    return Array.isArray(raw) ? raw.filter(k => SCHED_BLOCKS.includes(k)) : [];
+  } catch (_) {
+    return [];
+  }
 }
+function setFoldedSched(list) {
+  try { localStorage.setItem(SCHED_FOLD_KEY, JSON.stringify(list)); } catch (_) {}
+}
+
+function toggleSchedBlock(name) {
+  const el = document.getElementById('sched-' + name);
+  if (!el) return;
+  const folded = el.classList.toggle('collapsed');
+  const hdr = el.querySelector('.sched-block-hdr');
+  if (hdr) hdr.setAttribute('aria-expanded', folded ? 'false' : 'true');
+  const list = getFoldedSched().filter(k => k !== name);
+  if (folded) list.push(name);
+  setFoldedSched(list);
+}
+
+/* Applied on load, and never on a later render: re-folding a block somebody
+   has just opened, because the month changed under them, would be the page
+   arguing with them. */
+function applySchedFolds() {
+  const folded = getFoldedSched();
+  SCHED_BLOCKS.forEach(name => {
+    const el = document.getElementById('sched-' + name);
+    if (!el) return;
+    const off = folded.includes(name);
+    el.classList.toggle('collapsed', off);
+    const hdr = el.querySelector('.sched-block-hdr');
+    if (hdr) hdr.setAttribute('aria-expanded', off ? 'false' : 'true');
+  });
+}
+
+/* A jump chip on a folded block opens it first — otherwise it scrolls you to
+   a closed door. */
+function jumpToSched(name) {
+  const el = document.getElementById('sched-' + name);
+  if (!el) return;
+  if (el.classList.contains('collapsed')) toggleSchedBlock(name);
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* How many plot-ticks each program is carrying this month. This is what
+   makes a folded block still worth looking at, and it is counted from the
+   same state saveSchedule() reads, so it cannot disagree with what gets
+   published. */
+function schedTickCount(name) {
+  const n = getNursery(), m = getMonth(), s = getState(n, m), plots = NURSERY_PLOTS[n] || [];
+  let count = 0;
+  if (name === 'pd') {
+    ['W1','W2','W3','W4'].forEach(w => plots.forEach(p => {
+      if (s.pd[w]?.[p]?.P) count++;
+      if (s.pd[w]?.[p]?.D) count++;
+    }));
+  } else if (name === 'weeding') {
+    ['R1','R2'].forEach(r => plots.forEach(p => { if (s.weeding[p]?.[r]) count++; }));
+  } else if (name === 'manuring') {
+    s.manuringConfig.forEach((round, ri) => round.forEach((_, ci) =>
+      plots.forEach(p => { if (s.manuring[p]?.[ri]?.[ci]) count++; })));
+  } else if (name === 'interrow') {
+    s.interrowConfig.forEach((round, ri) => round.forEach((_, ci) =>
+      plots.forEach(p => { if (s.interrow[p]?.[ri]?.[ci]) count++; })));
+  }
+  return count;
+}
+
+function renderSchedCount(name) {
+  const el = document.getElementById('sched-count-' + name);
+  if (!el) return;
+  const n = schedTickCount(name);
+  el.textContent = n ? `${n} ${t('sched.ticked')}` : t('sched.none');
+  el.classList.toggle('is-set', n > 0);
+}
+function renderSchedCounts() { SCHED_BLOCKS.forEach(renderSchedCount); }
+
+/* Kept so a stale bookmark, a console call or anything else still holding the
+   old name lands somewhere sensible rather than throwing. */
+function switchSchedView(name) { jumpToSched(name); }
 
 /* Nursery circle buttons drive the (hidden) select, so every existing
    getNursery() caller keeps working untouched. */
@@ -2059,44 +2255,37 @@ function syncNurseryCircles() {
 /* ════════════════════════════
    CHEMICAL USAGE CALCULATOR
 ════════════════════════════ */
-const CALC_CHEMICALS = (() => {
-  const out = [];
-  CHEMICAL_CATEGORIES.forEach(cat => {
-    cat.chems.forEach(c => {
-      out.push({ name: c.name, dose: c.dose, unit: c.unit, group: cat.group });
-    });
-  });
-  return out;
-})();
-
 let calcTicked = {}; // {plot: true}
-let calcChemIdx = 0;
+let calcChemName = '';
 let calcInited = false;
 
 function initCalcChemDropdown() {
   const sel = document.getElementById('calc-chem');
-  if (!sel || calcInited) return;
-  // Build with optgroups so chemicals are visually grouped by category — show NAME only
-  let html = '';
-  CALC_CHEMICALS.forEach((c, i) => { c._idx = i; });
-  CHEMICAL_CATEGORIES.forEach(cat => {
-    const options = CALC_CHEMICALS
-      .filter(c => c.group === cat.group)
-      .map(c => `<option value="${c._idx}">${c.name}</option>`).join('');
-    if (options) html += `<optgroup label="${cat.group}">${options}</optgroup>`;
-  });
-  sel.innerHTML = html;
-  calcInited = true;
+  if (!sel) return;
+  /* Rebuilt whenever the list changes rather than once: the Setting page can
+     add a chemical while this tab is open, and a dropdown built once would
+     never show it. The chosen chemical is kept by NAME across the rebuild —
+     an index into a list that just changed length points at the wrong one. */
+  const was = sel.value;
+  const GROUPS = [['pest', 'Pest'], ['disease', 'Disease'], ['other', 'Other']];
+  sel.innerHTML = GROUPS.map(([kind, label]) => {
+    const opts = chemicals.filter(c => c.kind === kind)
+      .map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    return opts ? `<optgroup label="${label}">${opts}</optgroup>` : '';
+  }).join('');
+  if (was && chemByName(was)) sel.value = was;
+  calcInited = chemicals.length > 0;
   onCalcChemChange();
 }
 
 function onCalcChemChange() {
   const sel = document.getElementById('calc-chem');
-  calcChemIdx = +sel.value;
-  const c = CALC_CHEMICALS[calcChemIdx];
-  if (!c) return;
+  if (!sel) return;
+  calcChemName = sel.value;
+  const c = chemByName(calcChemName);
+  if (!c) { renderCalcResults(); return; }
   document.getElementById('calc-dose').value = c.dose;
-  document.getElementById('calc-unit').value = c.unit;
+  document.getElementById('calc-unit').value = c.unit || 'gm';
   renderCalcResults();
 }
 
@@ -2135,12 +2324,12 @@ function renderCalcResults() {
   if (!wrap) return;
   const n = getNursery();
   const plots = NURSERY_PLOTS[n];
-  const chem = CALC_CHEMICALS[calcChemIdx];
+  const chem = chemByName(calcChemName);
   const dose = +document.getElementById('calc-dose').value || 0;
   const unit = document.getElementById('calc-unit').value || 'gm';
   const tickedCount = plots.filter(p => calcTicked[p]).length;
   const seedlings = sumSeedlings(n, plots, p => calcTicked[p]);
-  const maxUsage = calcMaxChem(seedlings, chem?.name || '', dose, unit);
+  const maxUsage = calcMaxChem(seedlings, calcChemName || '', dose, unit);
   wrap.innerHTML = `
     <div class="calc-result-card"><div class="lbl">${t('calc.plotsSel')}</div><div class="val">${tickedCount}</div></div>
     <div class="calc-result-card"><div class="lbl">${t('calc.jumlahBibit')}</div><div class="val">${seedlings ? seedlings.toLocaleString() : '—'}</div></div>
@@ -2206,21 +2395,24 @@ let fertCalcInited = false;
 
 function initFertCalcDropdown() {
   const sel = document.getElementById('fcalc-fert');
-  if (!sel || fertCalcInited) return;
-  const names = FERT_OPTIONS.filter(x => x !== '—');
-  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
-  fertCalcInited = true;
+  if (!sel) return;
+  // Rebuilt on every load, keyed by name — see initCalcChemDropdown.
+  const was = sel.value;
+  sel.innerHTML = fertilisers.map(f =>
+    `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('');
+  if (was && fertByName(was)) sel.value = was;
+  fertCalcInited = fertilisers.length > 0;
   onFertCalcChange();
 }
 
 function onFertCalcChange() {
   const sel = document.getElementById('fcalc-fert');
-  const name = sel.value;
-  const info = FERTILIZER_INFO[name];
-  if (info) {
-    document.getElementById('fcalc-dose').value = info.defaultDose;
-    document.getElementById('fcalc-bag').value = info.bagLabel;
-  }
+  if (!sel) return;
+  const f = fertByName(sel.value);
+  // Monthly manuring is what this calculator is used for; a fertiliser set
+  // up for transplanting only falls back to that rate rather than to blank.
+  document.getElementById('fcalc-dose').value = f ? fertDoseFor(sel.value, 'monthly') : '';
+  document.getElementById('fcalc-bag').value  = (f && f.bag_label) || '—';
   renderFertCalcResults();
 }
 
@@ -2310,20 +2502,20 @@ function renderPD() {
   const W=['W1','W2','W3','W4'];
   let h='<thead>';
   h+=`<tr><th rowspan="4" class="plot-col-hdr">${t('col.plot')}</th>`;
-  W.forEach(w=>h+=`<th colspan="2" class="wk-th">${periodLabel(+w[1], m)}</th>`);
+  W.forEach((w,wi)=>h+=`<th colspan="2" class="wk-th">${periodBtn('pd', wi, n, m)}</th>`);
   h+='</tr><tr>';
   W.forEach(()=>h+=`<th class="p-th">${t('hdr.pSerangga')}</th><th class="d-th">${t('hdr.dKulat')}</th>`);
   h+='</tr><tr>';
   W.forEach(w=>{
     const c=cfg[w];
-    h+=`<th class="hdr-input-cell p-bg">${mkSel(PD_SERANGGA_OPTIONS,c.P,`updatePDChem('${w}','P',this.value)`)}${mkDose(c.P_dose,c.P_unit,`updatePDDose('${w}','P_dose',+this.value)`)}</th>`;
-    h+=`<th class="hdr-input-cell d-bg">${mkSel(PD_KULAT_OPTIONS,c.D,`updatePDChem('${w}','D',this.value)`)}${mkDose(c.D_dose,c.D_unit,`updatePDDose('${w}','D_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell p-bg">${mkSel(chemNames('pest'),c.P,`updatePDChem('${w}','P',this.value)`)}${mkDose(c.P_dose,c.P_unit,`updatePDDose('${w}','P_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell d-bg">${mkSel(chemNames('disease'),c.D,`updatePDChem('${w}','D',this.value)`)}${mkDose(c.D_dose,c.D_unit,`updatePDDose('${w}','D_dose',+this.value)`)}</th>`;
   });
   h+='</tr><tr>';
   W.forEach(w=>{
     const c=cfg[w];
-    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(PD_STICKER_OPTIONS,c.P_sticker,`updatePDChem('${w}','P_sticker',this.value)`)}${mkDose(c.P_sticker_dose,c.P_sticker_unit,`updatePDDose('${w}','P_sticker_dose',+this.value)`)}</th>`;
-    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(PD_STICKER_OPTIONS,c.D_sticker,`updatePDChem('${w}','D_sticker',this.value)`)}${mkDose(c.D_sticker_dose,c.D_sticker_unit,`updatePDDose('${w}','D_sticker_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(taggedNames('sticker'),c.P_sticker,`updatePDChem('${w}','P_sticker',this.value)`)}${mkDose(c.P_sticker_dose,c.P_sticker_unit,`updatePDDose('${w}','P_sticker_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(taggedNames('sticker'),c.D_sticker,`updatePDChem('${w}','D_sticker',this.value)`)}${mkDose(c.D_sticker_dose,c.D_sticker_unit,`updatePDDose('${w}','D_sticker_dose',+this.value)`)}</th>`;
   });
   h+='</tr></thead><tbody>';
 
@@ -2391,6 +2583,7 @@ function renderPD() {
   });
   h+='</tr></tbody>';
   document.getElementById('pd-table').innerHTML=h;
+  renderSchedCount('pd');
 }
 function togPD(n,m,w,plot,type,el){
   if(!canEditSchedule) return;
@@ -2452,11 +2645,18 @@ function addManuringRound(){
     s.manuring[p].push([false]);
   });
   renderManuring();
+  // Asked for its dates straight away: adding a round is the moment somebody
+  // knows when it runs, and a round left on the default week is a round
+  // nobody meant to schedule for the default week.
+  askNewRoundDates('manuring', s.manuringConfig.length - 1);
 }
 function removeManuringRound(){
   if(!canEditSchedule) return;
   const s = getState(getNursery(),getMonth());
   if (s.manuringConfig.length <= 1) return;
+  // The dates go with it, or the next round added would inherit the dates
+  // of the one that was removed.
+  delete periodsOf(s, 'manuring')[s.manuringConfig.length - 1];
   s.manuringConfig.pop();
   NURSERY_PLOTS[getNursery()].forEach(p => {
     if (s.manuring[p]) s.manuring[p].pop();
@@ -2510,7 +2710,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${periodLabel(ri+1, m)}</span>
+        <span class="th-title">${periodBtn('manuring', ri, n, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addManuringCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeManuringCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2524,7 +2724,7 @@ function renderManuring() {
   h+='<tr>';
   cfg.forEach((round, ri) => {
     round.forEach((c, ci) => {
-      h+=`<th class="hdr-input-cell f-bg">${mkSel(FERT_OPTIONS,c.name,`updateManuringChem(${ri},${ci},this.value)`)}</th>`;
+      h+=`<th class="hdr-input-cell f-bg">${mkSel(fertNames('monthly'),c.name,`updateManuringChem(${ri},${ci},this.value)`)}</th>`;
     });
   });
   h+='</tr>';
@@ -2545,7 +2745,7 @@ function renderManuring() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.manuring[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllManuring(${ri},${ci})" title="${t('act.selectAll')} ${periodText('manuring', ri, n, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -2603,6 +2803,7 @@ function renderManuring() {
   });
   h+='</tr></tbody>';
   document.getElementById('manuring-table').innerHTML=h;
+  renderSchedCount('manuring');
 }
 function togManuring(n,m,plot,ri,ci,el){
   if(!canEditSchedule) return;
@@ -2640,7 +2841,7 @@ function renderWeeding() {
   h+=`<th rowspan="2" class="plot-col-hdr">${t('col.plot')}</th>`;
   h+=`<th colspan="2" class="wk-th">${t('hdr.weeding')}</th>`;
   h+='</tr><tr>';
-  rounds.forEach(r=>h+=`<th class="p-th" style="min-width:130px;">${periodLabel(+r[1], m)}</th>`);
+  rounds.forEach((r,ri)=>h+=`<th class="p-th" style="min-width:130px;">${periodBtn('weeding', ri, n, m)}</th>`);
   h+='</tr></thead><tbody>';
 
   // Select-all row
@@ -2663,6 +2864,7 @@ function renderWeeding() {
   rounds.forEach(r=>h+=`<td>${plots.filter(p=>s.weeding[p]?.[r]).length}</td>`);
   h+='</tr></tbody>';
   document.getElementById('weeding-table').innerHTML=h;
+  renderSchedCount('weeding');
 }
 function togWeeding(n,m,plot,r,el){
   if(!canEditSchedule) return;
@@ -2716,11 +2918,15 @@ function addInterrowRound(){
     s.interrow[p].push([false]);
   });
   renderInterrow();
+  askNewRoundDates('interrow', s.interrowConfig.length - 1);
 }
 function removeInterrowRound(){
   if(!canEditSchedule) return;
   const s = getState(getNursery(),getMonth());
   if (s.interrowConfig.length <= 1) return;
+  // The dates go with it, or the next round added would inherit the dates
+  // of the one that was removed.
+  delete periodsOf(s, 'interrow')[s.interrowConfig.length - 1];
   s.interrowConfig.pop();
   NURSERY_PLOTS[getNursery()].forEach(p => {
     if (s.interrow[p]) s.interrow[p].pop();
@@ -2779,7 +2985,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     h+=`<th colspan="${round.length}" class="wk-th" style="background:#0d7a47;">
       <div class="th-flex">
-        <span class="th-title">${periodLabel(ri+1, m)}</span>
+        <span class="th-title">${periodBtn('interrow', ri, n, m)}</span>
         <span class="th-actions">
           <button class="th-action-btn" onclick="addInterrowCol(${ri})">${t('act.addCol')}</button>
           ${round.length>1?`<button class="th-action-btn th-action-danger" onclick="removeInterrowCol(${ri})">${t('act.removeCol')}</button>`:''}
@@ -2794,7 +3000,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((c, ci) => {
       h+=`<th class="hdr-input-cell" style="background:#f0f9ff !important;">
-        ${mkSel(INTERROW_CHEM_OPTIONS,c.chem,`updateInterrowChem(${ri},${ci},this.value)`)}
+        ${mkSel(taggedNames('interrow'),c.chem,`updateInterrowChem(${ri},${ci},this.value)`)}
         ${mkDose(c.chem_dose,c.chem_unit,`updateInterrowDose(${ri},${ci},'chem_dose',+this.value)`)}
       </th>`;
     });
@@ -2818,7 +3024,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((_, ci) => {
       const all = plots.every(p => s.interrow[p]?.[ri]?.[ci]);
-      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodLabel(ri+1, m)}"></td>`;
+      h+=`<td class="check-td${all?' ticked':''}" style="background:#eef6ff" onclick="toggleAllInterrow(${ri},${ci})" title="${t('act.selectAll')} ${periodText('interrow', ri, n, m)}"></td>`;
     });
   });
   h+='</tr>';
@@ -2875,6 +3081,7 @@ function renderInterrow() {
   });
   h+='</tr></tbody>';
   document.getElementById('interrow-table').innerHTML=h;
+  renderSchedCount('interrow');
 }
 function togInterrow(n,m,plot,ri,ci,el){
   if(!canEditSchedule) return;
@@ -3469,7 +3676,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*4, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     W.forEach((w, wi) => {
       const x = startX + plotColW + wi*colW*2;
-      cell(x, y, colW*2, rowH, periodLabel(+w[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW*2, rowH, periodText('pd', wi, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
 
@@ -3581,7 +3788,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     cfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodText('manuring', ri, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3681,7 +3888,7 @@ function downloadPDF() {
     cell(startX, y, plotColW, rowH*2, t('col.plot'), {...PALETTE.headerDark, style:'bold', size:8});
     rounds.forEach((r, i) => {
       const x = startX + plotColW + i*colW;
-      cell(x, y, colW, rowH, periodLabel(+r[1], pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(x, y, colW, rowH, periodText('weeding', i, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
     });
     y += rowH;
     rounds.forEach((r, i) => {
@@ -3725,7 +3932,7 @@ function downloadPDF() {
     let xCursor = startX + plotColW;
     icfg.forEach((round, ri) => {
       const w = colW * round.length;
-      cell(xCursor, y, w, rowH, periodLabel(ri+1, pM), {...PALETTE.headerDark, style:'bold', size:8});
+      cell(xCursor, y, w, rowH, periodText('interrow', ri, pN, pM), {...PALETTE.headerDark, style:'bold', size:8});
       xCursor += w;
     });
     y += rowH;
@@ -3996,6 +4203,7 @@ _syncMonthButtons();
 document.getElementById('nursery-pill').textContent = getNursery();
 syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
+applySchedFolds();  // whichever schedule blocks this person keeps folded
 autoSyncRecords();
 
 /* ── Initial load from Supabase ─────────────────────────────────
@@ -4015,7 +4223,11 @@ async function initDb() {
     const [stRes, recRes, qtyRes, cpRes, prRes, wkRes, regRes, payRes, lockRes] = await Promise.all([
       _supabase.from('nops_maint_state').select('nursery, month, payload'),
       _supabase.from('nops_maint_records').select('records').eq('id', 1).maybeSingle(),
-      _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty'),
+      // trays arrives with migration_nops_maint_settings.sql; without it the
+      // select 400s, so ask for it and fall back to the columns that predate it.
+      _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty, trays')
+        .then(r => r.error ? _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty') : r,
+              () => _supabase.from('nops_maint_plot_qty').select('nursery, plot, qty')),
       _supabase.from('nops_maint_custom_plots').select('nursery, plot').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_piece_rates').select('nursery, work_type, rate').then(r => r, () => ({ data: [] })),
       _supabase.from('nops_maint_workers').select('nursery, name').then(r => r, () => ({ data: [] })),
@@ -4025,7 +4237,10 @@ async function initDb() {
       _supabase.from('nops_maint_rate_lock').select('nursery, locked').then(r => r, () => ({ data: [] })),
       // What the Field Conductors have already recorded — read alongside the
       // rest so the first paint of Work Record already carries their dates.
-      loadFieldRecords()
+      loadFieldRecords(),
+      // The Setting tab's own four lists, and the plot names they hang off.
+      loadSharedPlots(),
+      loadSettingLists()
     ]);
     (stRes.data || []).forEach(r => {
       dbStateCache[`${r.nursery}_${r.month}`] = r.payload;
@@ -4081,11 +4296,21 @@ async function initDb() {
       payrollData[payrollKey(r.nursery, r.month, r.work_type)] = r.data || {};
     });
     ((lockRes && lockRes.data) || []).forEach(r => { rateLocks[r.nursery] = !!r.locked; });
+    ((qtyRes && qtyRes.data) || []).forEach(r => {
+      if (r.trays == null) return;
+      if (!plotTrays[r.nursery]) plotTrays[r.nursery] = {};
+      plotTrays[r.nursery][r.plot] = +r.trays || 0;
+    });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
+  /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
+     and the calculators from both — none of which existed at first paint.
+     renderAll() redraws the sheets; the two calculators are rebuilt here
+     because they are only initialised on the way into their tab. */
+  try { initCalcChemDropdown(); } catch (_) {}
+  try { initFertCalcDropdown(); } catch (_) {}
   renderAll();
   autoSyncRecords();
-  renderSettingPlots(); renderSettingRates(); renderSettingWorkers();
 
   // The batch-report ledger is a separate, larger read — don't hold the page
   // on it. Repaint the pieces that show a linked quantity once it lands.
@@ -4097,3 +4322,779 @@ async function initDb() {
   });
 }
 initDb();
+/* ═══════════════════════════════════════════════════════════════════════
+   SETTING TAB
+   Four lists the schedules and the calculator read from. What used to be
+   here — piece rates, workers, a hand-keyed plot list — has gone to its own
+   module, to the FC Portal, and to shared_plots respectively.
+   See shared/migration_nops_maint_settings.sql for the tables.
+═══════════════════════════════════════════════════════════════════════ */
+
+let traySize   = {};    // { nursery: seedlings per tray }
+let plotTrays  = {};    // { nursery: { plot: trays } }
+/* Stock Management's own list, kept apart from NURSERY_PLOTS.
+
+   NURSERY_PLOTS is the hardcoded list the four schedules and the payroll
+   still run on. Merging stock's plots into it looked tidy and was not: the
+   two spellings differ — "UNN1" here is "UNN 1" there — so the merge added
+   nurseries rather than reconciling them, and the Setting page grew six
+   tabs for four places. The Setting page reads THESE and nothing else. */
+let stockNurseries = [];   // names, in Stock Management's own order
+let stockPlots     = {};   // { nursery name: [plot, ...] }
+let _sharedPlotsLoaded = false;
+
+/* ── Where the plot names come from ────────────────────────────────────
+   shared_plots, which Seedling Stock owns and every other module already
+   reads. MERGED into NURSERY_PLOTS rather than replacing it: a plot that
+   only the hardcoded list knows about is still carrying saved schedule
+   rows, and dropping it would take those rows off the screen. So shared
+   data adds what is missing and nothing is taken away. */
+async function loadSharedPlots() {
+  if (!_supabase) return;
+  const [nRes, pRes] = await Promise.all([
+    _supabase.from('operation_nurseries').select('name').order('name')
+      .then(r => r, e => ({ error: e })),
+    _supabase.from('shared_plots').select('nursery_name, plot_name')
+      .then(r => r, e => ({ error: e }))
+  ]);
+
+  if (pRes && pRes.error) console.warn('[maint] shared_plots read failed:', pRes.error.message);
+  const plots = (pRes && pRes.data) || [];
+  stockPlots = {};
+  plots.forEach(r => {
+    const n = (r.nursery_name || '').trim();
+    const p = (r.plot_name || '').trim();
+    if (!n || !p) return;
+    if (!stockPlots[n]) stockPlots[n] = [];
+    if (stockPlots[n].indexOf(p) === -1) stockPlots[n].push(p);
+  });
+  Object.keys(stockPlots).forEach(n => stockPlots[n].sort(plotOrder));
+  _sharedPlotsLoaded = plots.length > 0;
+
+  /* Nurseries in Stock Management's own order, and only ones that have
+     plots — a tab onto an empty list is a tab onto nothing. A nursery that
+     only shared_plots knows about is added after, so no plot is unreachable. */
+  if (nRes && nRes.error) console.warn('[maint] operation_nurseries read failed:', nRes.error.message);
+  stockNurseries = (((nRes && nRes.data) || []).map(r => (r.name || '').trim()))
+    .filter(n => n && (stockPlots[n] || []).length);
+  Object.keys(stockPlots).forEach(n => {
+    if (stockNurseries.indexOf(n) === -1) stockNurseries.push(n);
+  });
+}
+
+/* B1, B2, B10 — not B1, B10, B2. A plot name is a letter run and a number,
+   and the number is a number. Anything after it (B13-R) sorts beside the
+   plot it belongs to rather than at the end of the alphabet. */
+function plotOrder(a, b) {
+  const m = v => (String(v).match(/^([^0-9]*)(\d*)(.*)$/) || []).slice(1);
+  const [ap, an, at] = m(a), [bp, bn, bt] = m(b);
+  if (ap !== bp) return ap.localeCompare(bp, 'en');
+  if (an !== bn) return (+an || 0) - (+bn || 0);
+  return at.localeCompare(bt, 'en');
+}
+
+async function loadSettingLists() {
+  if (!_supabase) return;
+  const [tsRes, chRes, feRes, cfgRes] = await Promise.all([
+    _supabase.from('nops_maint_tray_size').select('nursery, per_tray').then(r => r, () => ({ data: [] })),
+    _supabase.from('nops_maint_chemicals').select('*').order('sort_order').order('name')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nops_maint_fertilisers').select('*').order('sort_order').order('name')
+      .then(r => r, () => ({ data: [] })),
+    _supabase.from('nops_maint_config').select('key, num_value').then(r => r, () => ({ data: [] }))
+  ]);
+  ((tsRes && tsRes.data) || []).forEach(r => { traySize[r.nursery] = +r.per_tray || 0; });
+  const cfg = ((cfgRes && cfgRes.data) || []).find(r => r.key === 'pump_coverage');
+  if (cfg && +cfg.num_value > 0) pumpCoverage = +cfg.num_value;
+  chemicals   = (chRes && chRes.data) || [];
+  fertilisers = (feRes && feRes.data) || [];
+}
+
+/* ── Plot capacity ─────────────────────────────────────────────────────
+   Every nursery at once, in the shape the Chemical List uses: headed
+   columns of thin rows.
+
+   It used to be one nursery at a time behind its own tab bar. Somebody
+   setting capacities up is going through all four, not looking at one, so
+   the tabs made one job into four screens — and made "Edit" and "Save"
+   mean one nursery, which is not what anybody means by saving a capacity
+   table. Now Edit opens all of them and Save writes all of them.
+
+   A nursery with more plots than fit a readable column is split across
+   several, each headed with the range it covers: Pre Nursery's 52 plots
+   are four columns of fourteen rather than one column of fifty-two.
+
+   A main nursery plot is counted in polybags; a pre nursery plot in trays,
+   which come to seedlings once. Same row, different question — so the pre
+   nursery columns carry a third figure and their own tray size.
+────────────────────────────────────────────────────────────────────────── */
+const isPreNursery = n => n === 'PN' || /^pre/i.test(n || '');
+
+/* How many plots to a column. Fourteen keeps every column about the same
+   height whatever the nursery, and happens to be exactly BNN. */
+const CAP_CHUNK = 14;
+
+let capEditing = false;
+let capDraft   = null;   // { nursery: { plots:{plot:number}, perTray:number } }
+
+function trayQty(n, p) {
+  return (plotTrays[n] && plotTrays[n][p] != null) ? +plotTrays[n][p] || 0 : 0;
+}
+
+/* What the dosage is worked out from, whichever way the plot is counted. */
+function capacityOf(n, p) {
+  return isPreNursery(n) ? trayQty(n, p) * (traySize[n] || 0) : getPlotQty(n, p);
+}
+
+/* The nurseries this block offers, and the plots under each. Both come from
+   Seedling Stock. Falls back to the built-in list so the block is never
+   empty on a database that cannot be read. */
+function capNurseries() { return stockNurseries; }
+function capPlots(n)     { return (stockPlots[n] || []).slice(); }
+
+function renderSetting() {
+  renderCapacity();
+  renderChemBoth();
+  renderFertilisers();
+}
+
+function renderCapacity() {
+  const wrap = document.getElementById('cap-cols');
+  if (!wrap) return;
+
+  const editBtn = document.getElementById('cap-edit-btn');
+  if (editBtn) editBtn.style.display = capEditing ? 'none' : '';
+  const acts = document.getElementById('cap-actions');
+  if (acts) acts.style.display = capEditing ? 'flex' : 'none';
+
+  const nurseries = capNurseries().filter(n => capPlots(n).length);
+  const empty = document.getElementById('cap-empty');
+  if (!nurseries.length) {
+    wrap.innerHTML = '';
+    if (empty) {
+      empty.style.display = '';
+      empty.innerHTML = 'No plots yet. They come from Seedling Stock — add them ' +
+        'there and they appear here.';
+    }
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  wrap.innerHTML = nurseries.map(capNurseryHtml).join('');
+}
+
+/* One nursery: its name and, if it counts in trays, its tray size — said
+   once over however many columns its plots need. The columns wrap as a
+   group, so a nursery is never split across two rows of the page. */
+function capNurseryHtml(n) {
+  const pre = isPreNursery(n), plots = capPlots(n);
+
+  /* Divide evenly rather than filling columns to CAP_CHUNK and leaving the
+     last one short: eighteen plots is two columns of nine, not fourteen and
+     four. Ragged columns read as if the short one meant something. */
+  const parts = Math.max(1, Math.ceil(plots.length / CAP_CHUNK));
+  const size  = Math.ceil(plots.length / parts);
+
+  let h = '<div class="cap-nursery' + (pre ? ' cap-nursery-tray' : '') + '" data-nursery="' + esc(n) + '">';
+  h += '<div class="cap-nursery-h"><span class="cap-nursery-n">' + esc(n) + '</span>';
+  if (pre) {
+    h += '<span class="cap-tray"><span>Per tray</span>' +
+         '<input type="number" min="0" step="1" data-tray="' + esc(n) + '" ' +
+           'value="' + ((capEditing ? capDraft[n].perTray : traySize[n]) || '') + '" ' +
+           (capEditing ? '' : 'disabled ') +
+           'oninput="onDraftTraySize(\'' + esc(n) + '\', this.value)"></span>';
+  }
+  h += '</div><div class="cap-nursery-cols">';
+
+  for (let i = 0; i < parts; i++) {
+    h += '<div class="cap-col">';
+    h += '<div class="cap-head"><span>Plot</span>' +
+         (pre ? '<span>Trays</span><span>Seedlings</span>' : '<span>Capacity</span>') +
+         '</div>';
+    h += plots.slice(i * size, (i + 1) * size).map(p => capRowHtml(n, p, pre)).join('');
+    h += '</div>';
+  }
+  return h + '</div></div>';
+}
+
+function capRowHtml(n, p, pre) {
+  const shown = pre ? trayQty(n, p) : getPlotQty(n, p);
+  const draft = capEditing ? (capDraft[n].plots[p] ?? '') : null;
+  return '<div class="cap-row" data-nursery="' + esc(n) + '" data-plot="' + esc(p) + '">' +
+    '<span class="cap-row-n">' + esc(p) + '</span>' +
+    (capEditing
+      ? '<input type="number" min="0" step="1" value="' + draft + '" placeholder="0" ' +
+          'oninput="onDraftInput(\'' + esc(n) + '\', \'' + esc(p) + '\', this.value)">'
+      : '<span class="cap-row-v' + (shown ? '' : ' muted') + '">' +
+          (shown ? shown.toLocaleString() : '—') + '</span>') +
+    (pre ? '<span class="cap-row-d" data-derived>' + derivedText(n, p) + '</span>' : '') +
+    '</div>';
+}
+
+/* What a pre nursery plot's trays come to, from whichever numbers are live —
+   the draft while editing, the saved ones otherwise. */
+function derivedText(n, p) {
+  const trays = capEditing ? (+capDraft[n].plots[p] || 0) : trayQty(n, p);
+  const per   = capEditing ? (+capDraft[n].perTray || 0) : (traySize[n] || 0);
+  if (!per || !trays) return '—';
+  return (trays * per).toLocaleString();
+}
+
+/* ── The edit cycle ────────────────────────────────────────────────────
+   Nothing is written until Save. A capacity is read by every dosage on the
+   page, so a half-typed number must not be one of them, and a mistake has
+   to be undoable by walking away. Edit takes in every nursery at once,
+   because that is the job. */
+function startCapEdit() {
+  capDraft = {};
+  capNurseries().forEach(n => {
+    const pre = isPreNursery(n);
+    const d = { plots: {}, perTray: traySize[n] || '' };
+    capPlots(n).forEach(p => {
+      const v = pre ? trayQty(n, p) : getPlotQty(n, p);
+      d.plots[p] = v || '';
+    });
+    capDraft[n] = d;
+  });
+  capEditing = true;
+  renderCapacity();
+}
+
+function cancelCapEdit() {
+  capEditing = false; capDraft = null;
+  renderCapacity();
+}
+
+function onDraftInput(n, plot, val) {
+  if (!capEditing || !capDraft[n]) return;
+  capDraft[n].plots[plot] = val === '' ? '' : Math.max(0, +val || 0);
+  refreshDerived(n, plot);
+}
+
+function onDraftTraySize(n, val) {
+  if (!capEditing || !capDraft[n]) return;
+  capDraft[n].perTray = val === '' ? '' : Math.max(0, +val || 0);
+  // Every plot's seedling figure in that nursery just changed and none of the
+  // boxes did, so the derived lines redraw and the inputs are left alone.
+  capPlots(n).forEach(p => refreshDerived(n, p));
+  // The nursery's other columns each carry the same box; keep them level
+  // without repainting the one being typed in.
+  document.querySelectorAll('[data-tray="' + CSS.escape(n) + '"]').forEach(el => {
+    if (el !== document.activeElement) el.value = capDraft[n].perTray;
+  });
+}
+
+/* Only the line beside the box being typed in — repainting the grid would
+   take the focus out of it on every keystroke. */
+function refreshDerived(n, plot) {
+  if (!isPreNursery(n)) return;
+  const row = document.querySelector(
+    '.cap-row[data-nursery="' + CSS.escape(n) + '"][data-plot="' + CSS.escape(plot) + '"]');
+  const el = row && row.querySelector('[data-derived]');
+  if (el) el.textContent = derivedText(n, plot);
+}
+
+async function saveCapEdit() {
+  if (!capEditing || !_supabase) { cancelCapEdit(); return; }
+  const btns = document.getElementById('cap-actions');
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  /* Every nursery, in one pass. One upsert per nursery rather than one for
+     the lot, because the pre nursery's rows carry a column the others do
+     not and the trays fallback below is per nursery. */
+  const nurseries = capNurseries().filter(n => capDraft[n] && capPlots(n).length);
+  const staged = [];
+  let failure = null;
+
+  for (const n of nurseries) {
+    const pre = isPreNursery(n);
+    const stamp = new Date().toISOString();
+    const rows = capPlots(n).map(p => {
+      const v = capDraft[n].plots[p] === '' ? 0 : +capDraft[n].plots[p] || 0;
+      return pre
+        ? { nursery: n, plot: p, trays: v, qty: v * (+capDraft[n].perTray || 0), updated_at: stamp }
+        : { nursery: n, plot: p, qty: v, updated_at: stamp };
+    });
+
+    let { error } = await _supabase.from('nops_maint_plot_qty')
+      .upsert(rows, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e }));
+
+    /* No trays column → migration_nops_maint_settings.sql has not been run.
+       The seedling figure is the one everything else reads, so it is saved
+       without the trays rather than not at all. */
+    if (error && pre && /trays/i.test(error.message || '')) {
+      const flat = rows.map(r => ({ nursery: r.nursery, plot: r.plot, qty: r.qty, updated_at: r.updated_at }));
+      ({ error } = await _supabase.from('nops_maint_plot_qty')
+        .upsert(flat, { onConflict: 'nursery,plot' }).then(r => r, e => ({ error: e })));
+    }
+
+    if (!error && pre) {
+      await _supabase.from('nops_maint_tray_size')
+        .upsert({ nursery: n, per_tray: +capDraft[n].perTray || 0, updated_at: stamp },
+                { onConflict: 'nursery' })
+        .then(r => r, () => ({}));
+    }
+
+    if (error) { failure = { n, error }; break; }
+    staged.push({ n, pre, rows });
+  }
+
+  /* Whatever landed is made true on screen, even if a later nursery failed —
+     re-rendering those back to their old figures would be telling somebody
+     their saved numbers were not saved. */
+  staged.forEach(({ n, pre, rows }) => {
+    if (!plotQtyOverrides[n]) plotQtyOverrides[n] = {};
+    if (!plotTrays[n]) plotTrays[n] = {};
+    rows.forEach(r => {
+      plotQtyOverrides[n][r.plot] = r.qty;
+      if (pre) plotTrays[n][r.plot] = r.trays;
+    });
+    if (pre) traySize[n] = +capDraft[n].perTray || 0;
+  });
+
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false);
+
+  if (failure) {
+    // Stay in edit mode: the nurseries that did not save still hold what was
+    // typed, and walking away is the one thing that would lose it.
+    renderCapacity();
+    alert('Saved ' + staged.length + ' of ' + nurseries.length + ' nurseries.\n\n' +
+          failure.n + ' could not be saved — ' + (failure.error.message || 'try again'));
+    return;
+  }
+
+  capEditing = false; capDraft = null;
+  renderCapacity();
+}
+
+/* ── Chemicals, pest and disease ───────────────────────────────────────
+   One table, one `kind`, shown as two columns of one list, edited as one
+   block: Edit unlocks both columns at once, Cancel throws the lot away and
+   Save writes it. Nothing reaches the database until Save — a dose is what
+   somebody mixes to, so a half-typed one must never be readable as a rate.
+
+   The dosage is keyed the way it is written on the drum — so much per pump
+   — and per seedling is worked out from it. `coverage` is how many
+   seedlings one pump covers: 800 for a normal spray, and 1 for a chemical
+   like Asir whose dose IS per seedling. That number used to be a hardcoded
+   exception (CHEMICAL_COVERAGE) which this page did not know about, so it
+   divided Asir by 800 as well and disagreed with the Dosage Calculator. It
+   is a column now, and shown. */
+const CHEM_LABEL = { pest: 'pest', disease: 'disease', other: 'other' };
+const CHEM_KINDS = ['pest', 'disease', 'other'];
+
+/* How many seedlings one pump covers, for every chemical that does not name
+   its own figure. Preset in nops_maint_config so it can be changed without a
+   deploy; COVERAGE_PER_PUMP is the fallback until that row is read, and
+   stays the number the rest of this file has always used. */
+let presetDraft = null;
+
+let chemEditing = false;
+let chemDraft   = null;    // [{ id?, kind, name, dose, unit, coverage, _new }]
+let fertEditing = false;
+let fertDraft   = null;
+
+/* A chemical's own coverage when it has one, the preset when it does not.
+   NULL is not 0 here: "follow the preset" and "one seedling to a pump" are
+   different answers, and only one of them should move when the preset does. */
+function livePreset() {
+  return Math.max(1, +(presetDraft != null ? presetDraft : pumpCoverage) || COVERAGE_PER_PUMP);
+}
+function coverageOf(c) {
+  return c.coverage == null || c.coverage === '' ? livePreset() : Math.max(1, +c.coverage || 1);
+}
+
+/* Enough decimal places to be worth printing. 30gm over 800 seedlings is
+   0.0375 — rounded to two it reads 0.04 and the arithmetic stops adding up. */
+function perSeedling(dose, coverage) {
+  const v = (+dose || 0) / Math.max(1, +coverage || livePreset());
+  if (!v) return null;
+  return v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : String(+v.toFixed(2));
+}
+
+function chemRows(kind) {
+  return (chemEditing ? chemDraft : chemicals).filter(c => c.kind === kind);
+}
+
+function renderChemicals(kind) {
+  const box = document.getElementById('chem-' + kind + '-list');
+  if (!box) return;
+
+  document.querySelectorAll('.chem-add').forEach(b => b.style.display = chemEditing ? '' : 'none');
+  const eb = document.getElementById('chem-edit-btn');
+  if (eb) eb.style.display = chemEditing ? 'none' : '';
+  const ac = document.getElementById('chem-actions');
+  if (ac) ac.style.display = chemEditing ? 'flex' : 'none';
+
+  const rows = chemRows(kind);
+  if (!rows.length) {
+    box.innerHTML = '<div class="lst-empty">No ' + CHEM_LABEL[kind] +
+      (chemEditing ? ' chemical yet — add one below.' : ' chemical listed.') + '</div>';
+    return;
+  }
+  /* Only the Other list carries a tag. Pest and disease already have a
+     dropdown each on the P & D sheet; the ones in Other only appear on a
+     sheet if this says which. */
+  const tagged = kind === 'other';
+  const TAG_LABEL = { sticker: 'Sticker', interrow: 'Interrow' };
+
+  box.innerHTML = rows.map((c, i) => {
+    const per = perSeedling(c.dose, c.coverage);
+    const val = per ? per + ' ' + esc(c.unit || 'gm') : '—';
+    return '<div class="lst-row' + (tagged ? ' other-row' : '') + '">' + (chemEditing
+      ? '<input type="text" value="' + esc(c.name) + '" placeholder="Chemical name" ' +
+          'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'name\', this.value)">' +
+        // The unit rides with the number it belongs to. Without it a new
+        // chemical could only ever be gm, and half of these are mL.
+        '<span class="lst-dose">' +
+          '<input type="number" min="0" step="0.01" value="' + (c.dose ?? '') + '" placeholder="0" ' +
+            'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'dose\', this.value)">' +
+          '<select onchange="onChemDraft(\'' + kind + '\',' + i + ',\'unit\', this.value)">' +
+            '<option value="gm"' + ((c.unit || 'gm') === 'gm' ? ' selected' : '') + '>gm</option>' +
+            '<option value="mL"' + (c.unit === 'mL' ? ' selected' : '') + '>mL</option>' +
+          '</select>' +
+        '</span>' +
+        '<input type="number" min="1" step="1" ' +
+          'value="' + (c.coverage == null || c.coverage === '' ? '' : c.coverage) + '" ' +
+          'placeholder="' + livePreset() + '" ' +
+          'title="Leave blank to follow the preset. 1 if the dose is already per seedling." ' +
+          'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'coverage\', this.value)">' +
+        '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        (tagged
+          ? '<select class="lst-tagsel" title="Which schedule dropdown may offer this" ' +
+              'onchange="onChemDraft(\'' + kind + '\',' + i + ',\'tag\', this.value)">' +
+              '<option value=""' + (!c.tag ? ' selected' : '') + '>—</option>' +
+              '<option value="sticker"' + (c.tag === 'sticker' ? ' selected' : '') + '>Sticker</option>' +
+              '<option value="interrow"' + (c.tag === 'interrow' ? ' selected' : '') + '>Interrow</option>' +
+            '</select>'
+          : '') +
+        '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
+          'onclick="dropChemRow(\'' + kind + '\',' + i + ')">&#10005;</button>'
+      : '<span class="lst-txt">' + esc(c.name) + '</span>' +
+        '<span class="lst-num">' + (+c.dose || 0) + ' ' + esc(c.unit || 'gm') + '</span>' +
+        '<span class="lst-num' + (c.coverage == null || c.coverage === '' ? ' preset' : '') + '">' +
+          coverageOf(c).toLocaleString() + '</span>' +
+        '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        (tagged ? '<span class="lst-num' + (c.tag ? '' : ' muted') + '">' +
+                    (TAG_LABEL[c.tag] || '—') + '</span>' : '') +
+        '<span></span>') +
+    '</div>';
+  }).join('');
+}
+
+function renderChemBoth() {
+  const inp = document.getElementById('pump-coverage');
+  if (inp) {
+    inp.disabled = !chemEditing;
+    if (document.activeElement !== inp) inp.value = livePreset();
+  }
+  CHEM_KINDS.forEach(renderChemicals);
+}
+
+function onPresetInput(val) {
+  if (!chemEditing) return;
+  presetDraft = Math.max(1, +val || 1);
+  // Every chemical following the preset just changed, and none of the boxes
+  // did — so the derived cells redraw and the inputs are left alone.
+  CHEM_KINDS.forEach(k => {
+    const box = document.getElementById('chem-' + k + '-list');
+    if (!box) return;
+    chemRows(k).forEach((c, i) => {
+      if (c.coverage != null && c.coverage !== '') return;
+      const cell = box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
+      if (!cell) return;
+      const per = perSeedling(c.dose, null);
+      cell.textContent = per ? per + ' ' + (c.unit || 'gm') : '—';
+      cell.classList.toggle('none', !per);
+    });
+  });
+}
+
+function startChemEdit() {
+  chemDraft = chemicals.map(c => ({ id: c.id, kind: c.kind, name: c.name, dose: c.dose,
+                                    unit: c.unit || 'gm', coverage: c.coverage ?? null,
+                                    tag: c.tag ?? null }));
+  presetDraft = pumpCoverage;
+  chemEditing = true;
+  renderChemBoth();
+}
+
+function cancelChemEdit() {
+  chemEditing = false; chemDraft = null; presetDraft = null;
+  renderChemBoth();
+}
+
+/* The draft is filtered per column for display, so an index within a column
+   has to be turned back into the row it names in the whole draft. */
+function draftAt(draft, kind, i) {
+  return draft.filter(c => c.kind === kind)[i];
+}
+
+function onChemDraft(kind, i, field, val) {
+  const row = draftAt(chemDraft, kind, i);
+  if (!row) return;
+  if (field === 'name') { row.name = val; return; }           // repaint would lose the caret
+  if (field === 'unit') row.unit = val === 'mL' ? 'mL' : 'gm';
+  else if (field === 'tag') row.tag = val || null;
+  // Blank is "follow the preset", which is why it is not coerced to a number.
+  else if (field === 'coverage') row.coverage = val === '' ? null : Math.max(1, +val || 1);
+  else row[field] = Math.max(0, +val || 0);
+  // Only the derived cell beside the box being typed in.
+  const box = document.getElementById('chem-' + kind + '-list');
+  const cell = box && box.querySelectorAll('.lst-row')[i]?.querySelector('.lst-calc');
+  if (cell) {
+    const per = perSeedling(row.dose, row.coverage);
+    cell.textContent = per ? per + ' ' + (row.unit || 'gm') : '—';
+    cell.classList.toggle('none', !per);
+  }
+}
+
+function addChemRow(kind) {
+  if (!chemEditing) return;
+  // No coverage of its own: a new chemical follows the preset until told
+  // otherwise, which is true of nearly all of them.
+  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm', coverage: null,
+                   tag: null, _new: true });
+  renderChemicals(kind);
+  const box = document.getElementById('chem-' + kind + '-list');
+  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
+  if (last) last.focus();
+}
+
+function dropChemRow(kind, i) {
+  const row = draftAt(chemDraft, kind, i);
+  if (!row) return;
+  if (row.name && !confirm('Remove “' + row.name + '” from the ' + CHEM_LABEL[kind] + ' list?')) return;
+  chemDraft.splice(chemDraft.indexOf(row), 1);
+  renderChemicals(kind);
+}
+
+async function saveChemEdit() {
+  const named = chemDraft.map(c => ({ ...c, name: (c.name || '').trim() })).filter(c => c.name);
+  // Two of the same name in one column would break the table's own unique
+  // index halfway through the save, leaving half of it written.
+  for (const k of CHEM_KINDS) {
+    const seen = new Set();
+    for (const c of named.filter(x => x.kind === k)) {
+      const key = c.name.toLowerCase();
+      if (seen.has(key)) { alert('“' + c.name + '” is on the ' + CHEM_LABEL[k] + ' list twice.'); return; }
+      seen.add(key);
+    }
+  }
+
+  const btns = document.getElementById('chem-actions');
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
+  const done = () => { if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false); };
+
+  if (_supabase) {
+    const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
+    const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
+    const fresh = named.filter(c => !c.id).map(c => ({
+      kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
+      coverage: c.coverage ?? null, tag: c.tag ?? null,
+      updated_at: new Date().toISOString() }));
+
+    let err = null;
+    if (gone.length) {
+      const { error } = await _supabase.from('nops_maint_chemicals').delete().in('id', gone)
+        .then(r => r, e => ({ error: e }));
+      err = err || error;
+    }
+    for (const c of named.filter(x => x.id)) {
+      if (err) break;
+      const { error } = await _supabase.from('nops_maint_chemicals').update({
+        name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
+        tag: c.tag ?? null, updated_at: new Date().toISOString() })
+        .eq('id', c.id).then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (!err && fresh.length) {
+      const { error } = await _supabase.from('nops_maint_chemicals').insert(fresh)
+        .then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
+      const { error } = await _supabase.from('nops_maint_config').upsert({
+        key: 'pump_coverage', num_value: +presetDraft,
+        updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .then(r => r, e => ({ error: e }));
+      if (!error) pumpCoverage = +presetDraft;
+      else console.warn('[maint] pump coverage save failed:', error.message);
+    }
+    if (err) {
+      done();
+      alert('Could not save — ' + (err.message || 'try again') +
+            (/coverage/i.test(err.message || '')
+              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
+            (/kind/i.test(err.message || '')
+              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
+      return;
+    }
+    // Read it back, so what is on screen is what is stored — and so the new
+    // rows arrive with the ids the next edit needs.
+    const { data } = await _supabase.from('nops_maint_chemicals').select('*')
+      .order('sort_order').order('name').then(r => r, () => ({ data: null }));
+    if (data) chemicals = data;
+    else chemicals = named;
+  } else {
+    chemicals = named.map((c, i) => ({ ...c, id: c.id || 'local-' + i }));
+  }
+
+  done();
+  if (presetDraft != null) pumpCoverage = livePreset();
+  chemEditing = false; chemDraft = null; presetDraft = null;
+  renderChemBoth();
+}
+
+
+/* ── Fertilisers ───────────────────────────────────────────────────────
+   One dosage and two ticks. The table keeps a dose per usage, which is the
+   shape to grow into if transplanting and monthly manuring ever want
+   different rates; until then a tick writes this dose into that usage and
+   clearing it writes NULL, so "not used for this work" stays distinct from
+   "used at nothing per seedling". */
+function fertDose(f) {
+  return f.dose_transplant != null ? f.dose_transplant
+       : f.dose_monthly    != null ? f.dose_monthly : '';
+}
+
+function renderFertilisers() {
+  const box = document.getElementById('fert-list');
+  if (!box) return;
+
+  const add = document.getElementById('fert-add');
+  if (add) add.style.display = fertEditing ? '' : 'none';
+  const eb = document.getElementById('fert-edit-btn');
+  if (eb) eb.style.display = fertEditing ? 'none' : '';
+  const ac = document.getElementById('fert-actions');
+  if (ac) ac.style.display = fertEditing ? 'flex' : 'none';
+
+  const rows = fertEditing ? fertDraft : fertilisers;
+  if (!rows.length) {
+    box.innerHTML = '<div class="lst-empty">No fertiliser ' +
+      (fertEditing ? 'yet — add one below.' : 'listed.') + '</div>';
+    return;
+  }
+  const tick = on => '<span class="lst-tick-ro' + (on ? '' : ' off') + '">' +
+                     (on ? '&#10003;' : '&#8211;') + '</span>';
+  box.innerHTML = rows.map((f, i) => '<div class="lst-row fert-row">' + (fertEditing
+    ? '<input type="text" value="' + esc(f.name) + '" placeholder="Fertiliser type" ' +
+        'oninput="onFertDraft(' + i + ',\'name\', this.value)">' +
+      '<span class="lst-dose">' +
+        '<input type="number" min="0" step="0.0001" value="' + fertDose(f) + '" placeholder="0" ' +
+          'oninput="onFertDraft(' + i + ',\'dose\', this.value)">' +
+        '<select onchange="onFertDraft(' + i + ',\'unit\', this.value)">' +
+          '<option value="gm"' + ((f.unit || 'gm') === 'gm' ? ' selected' : '') + '>gm</option>' +
+          '<option value="mL"' + (f.unit === 'mL' ? ' selected' : '') + '>mL</option>' +
+        '</select>' +
+      '</span>' +
+      '<span class="lst-tick"><input type="checkbox" ' + (f.dose_transplant != null ? 'checked ' : '') +
+        'onchange="onFertUse(' + i + ',\'dose_transplant\', this.checked)"></span>' +
+      '<span class="lst-tick"><input type="checkbox" ' + (f.dose_monthly != null ? 'checked ' : '') +
+        'onchange="onFertUse(' + i + ',\'dose_monthly\', this.checked)"></span>' +
+      '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
+        'onclick="dropFertRow(' + i + ')">&#10005;</button>'
+    : '<span class="lst-txt">' + esc(f.name) + '</span>' +
+      '<span class="lst-num">' + (fertDose(f) === '' ? '—' : fertDose(f) + ' ' + esc(f.unit || 'gm')) + '</span>' +
+      tick(f.dose_transplant != null) + tick(f.dose_monthly != null) +
+      '<span></span>') +
+  '</div>').join('');
+}
+
+function startFertEdit() {
+  fertDraft = fertilisers.map(f => ({ ...f }));
+  fertEditing = true;
+  renderFertilisers();
+}
+
+function cancelFertEdit() { fertEditing = false; fertDraft = null; renderFertilisers(); }
+
+function onFertDraft(i, field, val) {
+  const f = fertDraft[i];
+  if (!f) return;
+  if (field === 'name') { f.name = val; return; }
+  if (field === 'unit') { f.unit = val === 'mL' ? 'mL' : 'gm'; return; }
+  // The dosage goes to whichever usages are ticked, and only those.
+  const d = val === '' ? 0 : Math.max(0, +val || 0);
+  if (f.dose_transplant != null) f.dose_transplant = d;
+  if (f.dose_monthly    != null) f.dose_monthly    = d;
+  if (f.dose_transplant == null && f.dose_monthly == null) f._pending = d;
+}
+
+function onFertUse(i, field, on) {
+  const f = fertDraft[i];
+  if (!f) return;
+  const d = +fertDose(f) || +f._pending || 0;
+  f[field] = on ? d : null;
+  renderFertilisers();
+}
+
+function addFertRow() {
+  if (!fertEditing) return;
+  // Ticked for transplanting to start with: a fertiliser used for neither
+  // would never appear anywhere, which is not a useful row to have made.
+  fertDraft.push({ name: '', dose_transplant: 0, dose_monthly: null, unit: 'gm', _new: true });
+  renderFertilisers();
+  const box = document.getElementById('fert-list');
+  const last = box && box.querySelector('.lst-row:last-child input[type=text]');
+  if (last) last.focus();
+}
+
+function dropFertRow(i) {
+  const f = fertDraft[i];
+  if (!f) return;
+  if (f.name && !confirm('Remove “' + f.name + '” from the fertiliser list?')) return;
+  fertDraft.splice(i, 1);
+  renderFertilisers();
+}
+
+async function saveFertEdit() {
+  const named = fertDraft.map(f => ({ ...f, name: (f.name || '').trim() })).filter(f => f.name);
+  const seen = new Set();
+  for (const f of named) {
+    const key = f.name.toLowerCase();
+    if (seen.has(key)) { alert('“' + f.name + '” is on the list twice.'); return; }
+    seen.add(key);
+  }
+
+  const btns = document.getElementById('fert-actions');
+  if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = true);
+  const done = () => { if (btns) btns.querySelectorAll('button').forEach(b => b.disabled = false); };
+
+  if (_supabase) {
+    const keep = new Set(named.filter(f => f.id).map(f => String(f.id)));
+    const gone = fertilisers.filter(f => !keep.has(String(f.id))).map(f => f.id);
+    const cols = f => ({ name: f.name, dose_transplant: f.dose_transplant,
+                         dose_monthly: f.dose_monthly, unit: f.unit || 'gm',
+                         updated_at: new Date().toISOString() });
+
+    let err = null;
+    if (gone.length) {
+      const { error } = await _supabase.from('nops_maint_fertilisers').delete().in('id', gone)
+        .then(r => r, e => ({ error: e }));
+      err = err || error;
+    }
+    for (const f of named.filter(x => x.id)) {
+      if (err) break;
+      const { error } = await _supabase.from('nops_maint_fertilisers').update(cols(f))
+        .eq('id', f.id).then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    const fresh = named.filter(f => !f.id).map(cols);
+    if (!err && fresh.length) {
+      const { error } = await _supabase.from('nops_maint_fertilisers').insert(fresh)
+        .then(r => r, e => ({ error: e }));
+      err = error;
+    }
+    if (err) { done(); alert('Could not save — ' + (err.message || 'try again')); return; }
+
+    const { data } = await _supabase.from('nops_maint_fertilisers').select('*')
+      .order('sort_order').order('name').then(r => r, () => ({ data: null }));
+    fertilisers = data || named;
+  } else {
+    fertilisers = named.map((f, i) => ({ ...f, id: f.id || 'local-' + i }));
+  }
+
+  done();
+  fertEditing = false; fertDraft = null;
+  renderFertilisers();
+}

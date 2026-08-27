@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#1a4d1a"/>
 <title>Papan Tanda Audit — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="audit_papan_styles.css?v=20260822h"/>
+<link rel="stylesheet" href="audit_papan_styles.css?v=20260826c"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
 </head>
 <body>
@@ -25,11 +25,16 @@
 
   <nav class="top-bar">
     <div class="top-bar-logo">
-      <a href="audit_home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <a href="audit_home.html" class="top-bar-back" onclick="return goBack(event)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
       <div class="top-bar-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
       <div>
         <div class="top-bar-title"><span data-t="papan_title">Papan Tanda Audit</span> &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
+        <!-- Sub-headers carried up from the old .form-view-header rows
+             that used to sit inside each sub-view. setView shows one
+             at a time so the outer ribbon carries the context and the
+             back button is the only one on screen. -->
+        <div class="top-bar-sub" id="ctx-form" style="display:none"><span id="audit-form-title">Audit</span></div>
       </div>
     </div>
     <div class="top-bar-actions">
@@ -89,13 +94,11 @@
     </div>
   </div>
 
-  <!-- BATCH FORM VIEW -->
+  <!-- BATCH FORM VIEW —
+       Sub-header removed: the outer top-bar carries the context (via
+       #ctx-form) and the back button, so a second header here was one
+       extra row of chrome saying the same thing. -->
   <div id="view-batch-form" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list');selectTab('batch')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title" id="batch-form-title" data-t="add_batch">New Batch</span>
-      <span class="form-view-id" id="batch-form-id"></span>
-    </div>
 
     <div class="form-card">
       <div class="form-section-head">
@@ -173,24 +176,43 @@
     </div>
   </div>
 
-  <!-- AUDIT FORM VIEW -->
+  <!-- AUDIT FORM VIEW —
+       Sub-header removed. The plot / batch this form is on already
+       reads in the outer top-bar's #audit-form-title, and the back
+       button up there returns via goBack(). Audit ID (PTA-…) pill
+       was retired at the auditor's request. -->
   <div id="view-audit-form" class="view page-scroll">
-    <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list');selectTab('audit')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="form-view-title" id="audit-form-title">Audit Plot</span>
-      <span class="form-view-id" id="audit-form-id"></span>
-    </div>
     <div style="padding:14px 12px 0">
       <div class="batch-banner">
         <div class="batch-banner-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span data-t="batch_info"><span data-t="batch_info" data-t="batch_info">Batch Info</span></div>
+        <!-- Batch info laid out to match the physical papan tanda on
+             the plot itself: Plot / Batch on one line at the top, then
+             Breed, Planted Date, Transplanted Date, Quantity. The
+             Nursery row was retired — the outer ribbon already carries
+             it. Mature was retired — nothing on the sign, nothing to
+             cross-check against. Transplanted Date is only rendered
+             for Main Nursery batches (PN plots are seed beds, they
+             have no transplant). -->
         <div class="batch-banner-grid">
-          <div class="bbg-row"><span class="bbg-label" data-t="nursery_lbl">Nursery:</span><span class="bbg-val" id="banner-nursery"></span></div>
-          <div class="bbg-row"><span class="bbg-label" data-t="plot_lbl">Plot:</span><span class="bbg-val" id="banner-plot"></span></div>
-          <div class="bbg-row"><span class="bbg-label" data-t="batch_lbl">Batch:</span><span class="bbg-val" id="banner-batch"></span></div>
+          <div class="bbg-row bbg-pair">
+            <div class="bbg-cell">
+              <span class="bbg-label" data-t="plot_lbl">Plot:</span>
+              <span class="bbg-val" id="banner-plot"></span>
+            </div>
+            <div class="bbg-cell">
+              <span class="bbg-label" data-t="batch_lbl">Batch:</span>
+              <span class="bbg-val" id="banner-batch"></span>
+            </div>
+          </div>
           <div class="bbg-row"><span class="bbg-label" data-t="breed_lbl">Breed:</span><span class="bbg-val" id="banner-breed"></span></div>
-          <div class="bbg-row"><span class="bbg-label" data-t="qty_lbl">Qty:</span><span class="bbg-val" id="banner-qty"></span></div>
-          <div class="bbg-row"><span class="bbg-label" data-t="transplant_lbl">Transplant:</span><span class="bbg-val" id="banner-dt"></span></div>
-          <div class="bbg-row"><span class="bbg-label" data-t="mature_lbl">Mature:</span><span class="bbg-val" id="banner-dm"></span></div>
+          <div class="bbg-row"><span class="bbg-label" data-t="planted_lbl">Planted Date:</span><span class="bbg-val" id="banner-dp"></span></div>
+          <div class="bbg-row" id="banner-dt-row"><span class="bbg-label" data-t="transplanted_lbl">Transplanted Date:</span><span class="bbg-val" id="banner-dt"></span></div>
+          <div class="bbg-row"><span class="bbg-label" data-t="quantity_lbl">Quantity:</span><span class="bbg-val" id="banner-qty"></span></div>
+          <!-- D. Transplanting — Pre Nursery only. Not a keyed field; the
+               physical PN papan reads "D. TRANSPLANTING: JUNE 2026",
+               computed as the seed's planted month + 3 months. Only
+               the month and year are shown here to match the sign. -->
+          <div class="bbg-row" id="banner-dp3-row" style="display:none"><span class="bbg-label" data-t="d_transplanting_lbl">Transplanting date:</span><span class="bbg-val" id="banner-dp3"></span></div>
         </div>
       </div>
     </div>
@@ -329,13 +351,13 @@
 </div><!-- /#app -->
 <script src="audit_login_guard.js?v=20260824a"></script>
 <script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
-<script src="audit_lang.js?v=20260825b"></script>
+<script src="audit_lang.js?v=20260826e"></script>
 <script src="audit_supabase.js"></script>
 <script src="audit_dexie_offline.js?v=20260823n"></script>
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_papan_script.js?v=20260824e"></script>
+<script src="audit_papan_script.js?v=20260826i"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

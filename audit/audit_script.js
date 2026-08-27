@@ -79,16 +79,11 @@ function setView(v){
    the plot to the grid, and only from the grid out of the module — which
    is the link's own href, so ?from=home still decides where that goes. */
 function goBack(e){
-  if(activeView==='form'){
-    if(e)e.preventDefault();
-    if(window._lastOpenedPlot) openPlotDetail(window._lastOpenedPlot); else setView('list');
-    return false;
-  }
-  if(activeView==='plot'||activeView==='detail'){
-    if(e)e.preventDefault();
-    setView('list');
-    return false;
-  }
+  /* The auditor arrives here from a pending plot chip on audit_home;
+     the module page has no landing list of its own any more. Back
+     from every sub-view walks straight to Home so the auditor sees
+     the To Do list again — the anchor's own href does it, we just
+     have to not preventDefault. */
   return true;
 }
 window.goBack=goBack;
@@ -250,6 +245,10 @@ async function loadRecords(){
    form (or to the record, once there is one), and the batch box is not
    on the form at all. The batches are still read behind the scenes —
    they are how we know whether anything is standing on the plot. */
+/* PN audits by plot (one record per plot, batches as chips inside
+   the form). MN reverted to per-batch at the auditor's request — a
+   plot on MN carries several batches with distinct ages and each
+   needs its own record. */
 function byPlot(){ return activeTab === 'PN'; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
@@ -262,15 +261,45 @@ function openPlotAudit(plot){
   const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
   if (rec) { openDetail(rec.uid); return; }
   _openFormForPlot(plot, null);
+  /* Fill the read-only batches chips inside the form so the auditor
+     sees which batches sit on this plot. Sorted by batch number. */
+  _paintBatchesChips(plot);
 }
 window.openPlotAudit = openPlotAudit;
+
+function _paintBatchesChips(plot){
+  const chips = document.getElementById('f-batches-chips');
+  if (!chips) return;
+  const bs = batchesOnPlot(plot).slice().sort((a,b)=>{
+    const na=Number(a.batch)||0, nb=Number(b.batch)||0;
+    if(na!==nb)return na-nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
+  if (!bs.length){
+    chips.innerHTML='<span style="font-size:12px;color:#94a3b8">No batches on file</span>';
+    return;
+  }
+  chips.innerHTML=bs.map(b=>{
+    const breed=b.breed ? ' · '+b.breed : '';
+    return '<span class="batch-chip" style="display:inline-flex;align-items:center;padding:5px 11px;'
+      +'border-radius:999px;background:#e0f2e0;border:1px solid #a7d5b0;color:#0f5527;'
+      +'font-size:11.5px;font-weight:700;letter-spacing:.2px">Batch '+b.batch+breed+'</span>';
+  }).join('');
+}
+window._paintBatchesChips = _paintBatchesChips;
 /* The batch box belongs to a batch-by-batch audit. Hide it where the
-   audit is the plot, and hide the row it sits in so nothing gaps. */
+   audit is the plot, and hide the row it sits in so nothing gaps.
+   The "Batches on this plot" chips row is the opposite: only useful
+   when the form is per-plot (PN); hidden when the auditor is on a
+   single batch (MN). */
 function syncBatchField(){
   const bf = document.getElementById('f-batch');
-  if (!bf) return;
-  const row = bf.closest('.form-field');
-  if (row) row.style.display = byPlot() ? 'none' : '';
+  if (bf) {
+    const row = bf.closest('.form-field');
+    if (row) row.style.display = byPlot() ? 'none' : '';
+  }
+  const chipsRow = document.getElementById('f-batches-row');
+  if (chipsRow) chipsRow.style.display = byPlot() ? '' : 'none';
 }
 
 /* --- RENDER LIST --- */
@@ -409,8 +438,12 @@ function renderList(){
    plot + batch pre-selected. Existing audits show an Edit button
    instead so re-auditing takes the same path everyone else uses. */
 function openPlotDetail(plot){
-  // Remember which plot is on screen so the top-bar refresh can re-open
-  // the same detail after loadRecords() completes.
+  /* MN batch-list drill-down. PN routes to the per-plot form via
+     openPlotAudit(); this function is only called for MN now. Kept
+     tolerant to a direct call for PN by delegating. */
+  if (activeTab === 'PN' && typeof openPlotAudit === 'function') {
+    openPlotAudit(plot); return;
+  }
   window._lastOpenedPlot = plot;
   // Row order: pending on top, audited in the middle, Not-Required at
   // the bottom. Within each band, batch number ascending. That way an
@@ -955,6 +988,18 @@ async function doDelete(){
 
 /* --- INIT --- */
 function init(){
+  /* Same treatment as Papan Tanda: opening the module page without a
+     specific plot lands on a redundant plot-grid. The pending plot
+     chips on audit_home already send the auditor here with ?plot=;
+     land on Home instead when no plot is named. ?admin=1 keeps the
+     escape hatch for admins who want the grid. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const hasPlot = !!qs.get('plot');
+    const isAdm   = qs.get('admin') === '1';
+    if (!hasPlot && !isAdm) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
   // FAB was removed from the page but a stub is kept so this binding
   // still succeeds without a null-check. If a future refactor drops

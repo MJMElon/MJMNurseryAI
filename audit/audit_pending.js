@@ -223,16 +223,31 @@
     });
   }
 
-  /* Latest batch per plot, for one nursery — papan's unit of work. A
-     batch with no date still counts; it sorts below any dated one
-     rather than being dropped, so a manually keyed row that nobody
-     dated is not silently exempt from the audit. */
+  /* First of the current calendar month — papan audits track new
+     signage that went up this month, matching the module page's
+     transaction_date >= monthStart filter. Without this, the roster
+     carried every Planted/Transplanted event ever recorded and the
+     home to-do chips listed every plot in the nursery, not just the
+     ones with fresh signage due. */
+  function _startOfThisMonthISO(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+  }
+
+  /* Latest batch per plot, for one nursery — papan's unit of work.
+     Restricted to batches placed on the plot inside the current
+     month (see comment on _startOfThisMonthISO above). A batch with
+     no date is dropped rather than counted; if the office hasn't
+     dated it we can't say whether it belongs in this month's
+     window. */
   function latestPapanPerPlot(nursery){
+    const monthStart = _startOfThisMonthISO();
     const best = {};
     papanBat.forEach(b => {
       if (b.nursery !== nursery) return;
+      if (!b.date || b.date < monthStart) return;
       const cur = best[b.plot];
-      if (!cur || (b.date || '') >= (cur.date || '')) best[b.plot] = b;
+      if (!cur || b.date >= (cur.date || '')) best[b.plot] = b;
     });
     return Object.values(best);
   }

@@ -194,13 +194,22 @@ function setView(v){
   activeView=v;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
-  /* One back arrow at a time. Sub-views carry their own back button in
-     the sub-header, so the outer top-bar back steps aside; on the list
-     view it returns as the only way back to audit_home. */
-  const topBack=document.querySelector('.top-bar-back');
-  if(topBack)topBack.style.display=(v==='list')?'':'none';
+  /* Outer ribbon carries the context — the sub-header row inside the
+     form was removed. Show form title only when a form view is on. */
+  const ctxForm=document.getElementById('ctx-form');
+  const navToday=document.getElementById('nav-today');
+  const inForm=(v==='form');
+  if(ctxForm)ctxForm.style.display=inForm?'':'none';
+  if(navToday)navToday.style.display=inForm?'none':'';
   window.scrollTo(0,0);
 }
+function goBack(e){
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
+  return true;
+}
+window.goBack=goBack;
 /* selectTab was the old bottom "To Audit / History" toggle. That bar is
    gone (the bottom bar is now the nursery tabs), and the two sections
    (pending + audited) both sit on the page one under the other, so this
@@ -255,14 +264,18 @@ function selectNursery(n, el){
   setView('list');
 }
 
-/* --- STATS --- */
+/* --- STATS ---
+   The Total / Pending / Audited dashboard was cancelled — the
+   pending-count header ("N / M tasks") on the To Audit list is the
+   progress indicator now. The three stat-cards' DOM ids no longer
+   exist; writes are guarded so a stale cached page does not throw. */
 function updateStats(){
   const filtered=filterTasks(tasks);
   const pending=filtered.filter(t=>!getAuditForTask(t.id));
   const done=filtered.filter(t=>!!getAuditForTask(t.id));
-  document.getElementById('stat-total').textContent=fmtNum(filtered.length);
-  document.getElementById('stat-pending').textContent=fmtNum(pending.length);
-  document.getElementById('stat-done').textContent=fmtNum(done.length);
+  const _st=document.getElementById('stat-total');   if(_st)_st.textContent=fmtNum(filtered.length);
+  const _sp=document.getElementById('stat-pending'); if(_sp)_sp.textContent=fmtNum(pending.length);
+  const _sd=document.getElementById('stat-done');    if(_sd)_sd.textContent=fmtNum(done.length);
   // Pending count per nursery on the bottom tab bar — a green badge on
   // BNN says work exists there while you're standing on PN, so nobody
   // has to click through four tabs to find it. Same shape as the plot
@@ -481,8 +494,14 @@ function renderLists(){
   const pending  = filtered.filter(t=>!getAuditForTask(t.id));
   const done     = filtered.filter(t=>!!getAuditForTask(t.id));
 
-  document.getElementById('pending-count').textContent = fmtNum(pending.length) + ' task' + (pending.length!==1?'s':'');
-  document.getElementById('done-count').textContent    = fmtNum(done.length)    + ' task' + (done.length!==1?'s':'');
+  /* Progress on the To Audit header replaces the old Total / Pending
+     / Audited dashboard: "audited / total tasks", like the other
+     audit modules read. */
+  const _pc=document.getElementById('pending-count');
+  if(_pc)_pc.textContent = fmtNum(done.length) + ' / ' + fmtNum(filtered.length) +
+    ' task' + (filtered.length!==1?'s':'');
+  const _dc=document.getElementById('done-count');
+  if(_dc)_dc.textContent = fmtNum(done.length) + ' task' + (done.length!==1?'s':'');
 
   const pendingEl = document.getElementById('pending-list');
   if(!pending.length){
@@ -522,39 +541,36 @@ function _timelineHtml(list, isAudited){
   const WEEKS  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
   return keys.map(k => {
     const items = groups.get(k).slice().sort((a,b) => String(a.plot||'').localeCompare(String(b.plot||'')));
-    let dateBox;
-    if (k) {
-      const [y,m,d] = k.split('T')[0].split('-').map(Number);
-      const dt = new Date(y, (m||1)-1, d||1);
-      dateBox = `<div class="timeline-date">
-        <div class="td-day">${String(d).padStart(2,'0')}</div>
-        <div class="td-mon">${MONTHS[(m||1)-1]}</div>
-        <div class="td-yr">'${String(y).slice(-2)}</div>
-        <div class="td-wk">${WEEKS[dt.getDay()]}</div>
-      </div>`;
-    } else {
-      dateBox = `<div class="timeline-date">
-        <div class="td-day">—</div>
-        <div class="td-mon">NO DATE</div>
-      </div>`;
-    }
+    /* Date column retired — the "by <due date>" line under each card
+       carries the same day already, and dropping the box lets each
+       card use the full row width. */
     const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t.id) : null)).join('');
-    return `<div class="timeline-day">${dateBox}<div class="timeline-tasks">${cards}</div></div>`;
+    return `<div class="timeline-day"><div class="timeline-tasks">${cards}</div></div>`;
   }).join('');
+}
+
+/* Left-border colour by task type — one colour per kind of work so
+   the auditor sees which task a row is at a glance. Falls back to
+   grey for anything the map does not recognise. */
+function _taskTypeColour(type){
+  const s = String(type||'').toLowerCase();
+  if (s.indexOf('manur')  !== -1) return '#1e40af';   // blue
+  if (s.indexOf('weed')   !== -1) return '#166534';   // green
+  if (s.indexOf('interrow')!==-1) return '#c2410c';   // orange
+  if (s.indexOf('p&d')    !== -1 ||
+      s.indexOf('pest')   !== -1 ||
+      s.indexOf('disease')!== -1 ||
+      s.indexOf('spray')  !== -1) return '#ca8a04';   // yellow
+  return '#94a3b8';                                    // slate
 }
 
 function makeTaskCard(t, audit){
   const status = audit ? resultStatusClass(audit.result) : 'status-pending';
-  const badgeLabel = audit ? audit.result : 'Pending';
-  const badgeClass = audit ? resultBadgeClass(audit.result) : 'badge-pending';
-  // Chip row: no chemical chip (per feedback), no nursery tag (moved
-  // to context), no date pill (the timeline column carries it). Round
-  // is shown as a chip, based on week_no from the field record.
   // Countdown pill only renders while pending — the clock stops once
-  // the audit is filed.
+  // the audit is filed. Round chip and Pending status pill were
+  // retired at the auditor's request.
   const countdownHtml = audit ? '' : _countdownChip(t);
   const chips = `<div class="task-chips">
-    ${t.round?`<span class="task-chip">Round ${t.round}</span>`:''}
     ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
     ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
     ${countdownHtml}
@@ -567,15 +583,12 @@ function makeTaskCard(t, audit){
     : `<div class="task-actions">
         <button class="btn-audit-now" onclick="openForm('${t.id}',false,null)">Audit Now</button>
       </div>`;
-  // Top row now only carries the status pill (Pending / Satisfied /
-  // …). The work name is the card's big heading; the plot sits below
-  // it as a slightly smaller subtitle. Nursery tag was removed per
-  // feedback — the auditor already picked the nursery on the bottom
-  // tab bar so it's redundant on every card.
-  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}">
-    <div class="task-card-top">
-      <span class="task-status-badge ${badgeClass}">${badgeLabel}</span>
-    </div>
+  /* Left border colour is set inline so it does not need a class per
+     task type — a new work type only has to be named in
+     _taskTypeColour and the card picks it up. */
+  const tone = _taskTypeColour(t.type);
+  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}"
+                style="border-left-color:${tone}">
     <div class="task-work">${t.type}</div>
     <div class="task-plot">${t.plot}</div>
     <div class="task-meta">${t.worker?'Worker: '+t.worker:''}</div>
@@ -604,22 +617,19 @@ function openForm(taskId, isEdit, existingAuditUid){
   document.getElementById('b-batch').textContent=t.batch||'—';
   document.getElementById('b-completed').textContent=fmtDate(t.completedDate);
   document.getElementById('b-worker').textContent=t.worker||'—';
-  document.getElementById('form-title').textContent='Audit — '+t.plot;
-  document.getElementById('form-id').textContent=editMode?editId:nextAuditID();
-  // Reset tri buttons
-  document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
+  /* Title reads on the outer ribbon; audit ID pill retired. */
+  const _ftm=document.getElementById('form-title');
+  if(_ftm)_ftm.textContent='Audit — '+t.plot;
+  const _fim=document.getElementById('form-id');
+  if(_fim)_fim.textContent='';
+  // Reset chooser buttons (Satisfied / Unsatisfied)
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
   if(formState.result){
     const btn=document.querySelector(`#f-result-grp [data-val="${formState.result}"]`);
-    if(btn)btn.classList.add(getTriClass(formState.result));
+    if(btn)btn.classList.add('picked');
   }
-  // Legacy 'Not Done' audits map onto the Unsatisfied branch so their
-  // remark / photo stays visible on re-open. The button itself stays
-  // unselected (there's no 'Not Done' button any more), but the
-  // Unsatisfied section shows so the auditor can review or update.
-  const isUnsat = formState.result === 'Unsatisfactory' || formState.result === 'Not Done';
-  const wrap = document.getElementById('unsat-only');
-  if (wrap) wrap.style.display = isUnsat ? '' : 'none';
-
+  /* Remarks + photo cards are always visible now (photo compulsory,
+     remarks optional). The old #unsat-only wrapper is a hidden stub. */
   const rem = document.getElementById('f-remarks');
   if (rem) rem.value = formState.remarks || '';
   if (formState.photo) {
@@ -638,27 +648,14 @@ function getTriClass(v){
   if(v==='Unsatisfactory')return'sel-bad';
   return'sel-na';
 }
-/* Two-option flow: Satisfied is the whole audit; Unsatisfied reveals
-   the Remarks + Photo cards (photo becomes compulsory, remark stays
-   optional). Toggle #unsat-only here so the form stays honest — the
-   only time the auditor sees the photo card is when the answer needs it. */
+/* Satisfied / Unsatisfied is the only compulsory choice; a photo is
+   required for both branches now, so the Remarks + Audit Photo cards
+   stay visible either way. pickResult just marks the chosen button
+   and flips formState.result. */
 function pickResult(val,el){
-  document.querySelectorAll('#f-result-grp .tri-btn').forEach(b=>b.className='tri-btn');
-  if (el) el.classList.add(getTriClass(val));
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
+  if (el) el.classList.add('picked');
   formState.result=val;
-  const wrap = document.getElementById('unsat-only');
-  if (wrap) wrap.style.display = (val === 'Unsatisfactory') ? '' : 'none';
-  // Clear a stale Satisfied → Unsatisfied swap: if the auditor flipped
-  // back to Satisfied, drop any remark / photo they'd tentatively keyed
-  // so the saved record can't carry misleading residue.
-  if (val === 'Satisfactory') {
-    const rem = document.getElementById('f-remarks'); if (rem) rem.value = '';
-    formState.remarks = '';
-    formState.photo = null;
-    const drop = document.getElementById('photo-drop');    if (drop) drop.style.display = 'block';
-    const prev = document.getElementById('photo-preview'); if (prev) prev.style.display = 'none';
-    const img  = document.getElementById('photo-img');     if (img)  img.src = '';
-  }
 }
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
@@ -678,16 +675,14 @@ function clearPhoto(){
 function cancelForm(){setView('list');}
 
 /* --- SAVE ---
-   Two-branch validation matching the new UI:
-     Satisfied   → just needs the result; no remark or photo required
-     Unsatisfied → photo is compulsory (auditor has to show what's wrong);
-                   remark stays optional
-*/
+   Single validation shape now — the auditor picks Satisfied or
+   Unsatisfied (compulsory), attaches a photo (compulsory), and
+   optionally leaves a remark. The photo requirement is the same
+   either way, so nothing branches on the result. */
 async function saveAudit(){
-  if(!formState.result){showToast('⚠ Please select Work Quality');return;}
-  const isUnsat = (formState.result === 'Unsatisfactory');
-  if (isUnsat && !formState.photo){
-    showToast('⚠ A photo is required when the work is Unsatisfied');
+  if(!formState.result){showToast('⚠ Please pick Satisfied or Unsatisfied');return;}
+  if (!formState.photo){
+    showToast('⚠ A photo is required for every audit');
     return;
   }
   const t=tasks.find(x=>x.id===formTaskId);if(!t)return;

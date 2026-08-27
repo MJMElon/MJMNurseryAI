@@ -400,19 +400,23 @@
   const WIDGET_CSS = `
     .nelos-todo { background:#fff; border:1.5px solid #e2e8f0; border-radius:16px; padding:16px 18px;
                   box-shadow:0 4px 14px rgba(15,23,42,.05); font-family:'Outfit',system-ui,sans-serif; }
-    .nelos-todo-head { display:flex; align-items:center; gap:9px; margin-bottom:11px; }
-    .nelos-todo-title { font-size:11px; font-weight:900; letter-spacing:.11em; text-transform:uppercase; color:#334155; }
-    .nelos-todo-count { font-size:10px; font-weight:900; padding:2px 8px; border-radius:999px;
-                        background:#fee2e2; color:#b91c1c; letter-spacing:.04em; }
-    .nelos-todo-count.zero { background:#dcfce7; color:#15803d; }
-    /* The count is pushed right by the "Open Nelos" link's margin-left:auto.
-       With that link dropped (openLink:false) the count becomes the last
-       child and has to claim the space itself, or it sits tucked against
-       the title with the row's whole width empty beside it. */
-    .nelos-todo-head .nelos-todo-count:last-child { margin-left:auto; }
-    .nelos-todo-all { margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+    /* The heading is CENTRED on the block, with the count travelling beside
+       it as one unit. The two things either side — the way to the hub and
+       the raise button — are taken out of the flow and pinned to the edges,
+       because a button in the row would shove the heading off centre by
+       half its own width. Same block as the Admin Portal's
+       (Mobile/src/styles/index.css, .nelos-todo*) — keep the two in step. */
+    .nelos-todo-head { position:relative; display:flex; align-items:center; justify-content:center;
+                       gap:9px; margin-bottom:11px; min-height:32px; }
+    .nelos-todo-title { font-size:16px; font-weight:900; letter-spacing:.025em; text-transform:uppercase;
+                        color:#1e293b; white-space:nowrap; line-height:1.2; }
+    .nelos-todo-all { position:absolute; left:0; top:50%; transform:translateY(-50%);
+                      font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                       color:#7c3aed; text-decoration:none; }
     .nelos-todo-all:hover { text-decoration:underline; }
+    .nelos-sec { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+                 color:#94a3b8; padding:9px 2px 4px; }
+    .nelos-sec-over { color:#b91c1c; }
     .nelos-row { display:flex; align-items:flex-start; gap:9px; padding:8px 2px; border-bottom:1px dashed #e2e8f0;
                  text-decoration:none; color:inherit; }
     .nelos-row:last-child { border-bottom:none; }
@@ -433,12 +437,21 @@
        top-down and the action belongs with the heading it acts on —
        at the bottom it sat below however many rows happened to be
        pending, which is a different place every day. */
-    .nelos-todo-actions { display:flex; justify-content:flex-end; gap:8px; margin:-3px 0 11px; }
-    .nelos-todo-actions .nelos-new { margin-top:0; }
-    .nelos-new { display:inline-flex; align-items:center; gap:6px; margin-top:11px; padding:8px 15px; border-radius:10px;
-                 background:#7c3aed; color:#fff; font-size:10px; font-weight:900; letter-spacing:.08em;
-                 text-transform:uppercase; text-decoration:none; border:none; cursor:pointer; }
+    .nelos-new { position:absolute; right:0; top:50%; transform:translateY(-50%);
+                 display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px;
+                 border-radius:999px; border:none; background:#7c3aed; color:white; font:inherit;
+                 font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+                 cursor:pointer; white-space:nowrap; text-decoration:none; transition:background .15s; }
     .nelos-new:hover { background:#6d28d9; }
+    .nelos-new span[aria-hidden] { font-size:14px; line-height:1; letter-spacing:0; }
+    /* On a phone the button is the + alone, and the hub link goes: three
+       things cannot share a 300px row without the heading losing its
+       centre. */
+    @media(max-width:480px){
+      .nelos-new { padding:0; width:30px; justify-content:center; }
+      .nelos-new-label { display:none; }
+      .nelos-todo-all { display:none; }
+    }
   `;
 
   function injectCss() {
@@ -501,12 +514,49 @@
    * `target` is an element or a selector. Returns the number of pending
    * cases, or 0 if anything went wrong.
    */
+  /* Overdue first and pinned, then what is mine, then everything else —
+     the Admin Portal's grouping (Mobile/src/components/NelosBlock.jsx), and
+     the two are meant to read the same. A heading only earns its place when
+     there is more than one group, except Overdue: "3 pending" and "3
+     overdue" are not the same news, so that one always says so. */
+  function sections(rows) {
+    const today = new Date().toISOString().slice(0, 10);
+    const isOver = (c) => !!c.due_date && c.due_date < today;
+    const me = currentUser();
+    const uid = me && me.id;
+    const mine = (c) => !!uid && c.assignee_id === uid;
+
+    const over = rows.filter(isOver);
+    const rest = rows.filter((c) => !isOver(c));
+    const restMine = rest.filter(mine);
+    const restOther = rest.filter((c) => !mine(c));
+    const groups = [over.length, restMine.length, restOther.length].filter(Boolean).length;
+
+    const block = (list, head, cls) => !list.length ? '' :
+      (head ? `<div class="nelos-sec ${cls || ''}">${head}</div>` : '') + list.map(rowHtml).join('');
+
+    return block(over, `Overdue · ${over.length}`, 'nelos-sec-over')
+         + block(restMine, groups > 1 ? `Assigned to me · ${restMine.length}` : '')
+         + block(restOther, groups > 1 ? `Other pending cases · ${restOther.length}` : '');
+  }
+
   async function mountTodo(target, opts) {
     opts = opts || {};
     const el = typeof target === 'string' ? document.querySelector(target) : target;
     if (!el) return 0;
 
     injectCss();
+
+    /* Raised through the dock's modal, this list is one case out of date and
+       has no other way to hear about it. Bound BEFORE the early returns
+       below: a block that is empty — and with hideIfEmpty, not on the page
+       at all — is exactly the one that has to notice a first case appearing.
+       Rebound on every mount, and the previous one removed, so re-rendering
+       does not stack listeners. */
+    if (el._nelosOnChange) document.removeEventListener('nelos:changed', el._nelosOnChange);
+    el._nelosOnChange = () => { mountTodo(el, opts); };
+    document.addEventListener('nelos:changed', el._nelosOnChange);
+
     el.innerHTML = `<div class="nelos-todo"><div class="nelos-empty">loading cases…</div></div>`;
 
     const { data, error } = await pending(Object.assign({}, opts, { limit: opts.limit || 6 }));
@@ -526,26 +576,41 @@
     // form with no section chosen and the case would route as if raised in
     // Nelos itself.
     const raisedAs = opts.source || opts.module;
+    /* Where the button goes when this page has no dock on it — the hub's
+       own form, prefilled the same way. `newCase` is no longer a position
+       ('top' / foot): the button lives in the heading now, so the option is
+       only whether there is one at all. */
+    const fallback = `${homeHref()}?new=1${raisedAs ? '&source=' + encodeURIComponent(raisedAs) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}`;
     const newBtn = opts.newCase === false ? '' :
-      `<a class="nelos-new" href="${esc(homeHref())}?new=1${raisedAs ? '&source=' + encodeURIComponent(raisedAs) : ''}${opts.batch ? '&batch=' + encodeURIComponent(opts.batch) : ''}${opts.plot ? '&plot=' + encodeURIComponent(opts.plot) : ''}">${esc(opts.newCaseLabel || '➕ Raise a Case')}</a>`;
-    /* Default stays where it has always been, at the foot of the list. */
-    const topBtn = (opts.newCase === 'top') ? `<div class="nelos-todo-actions">${newBtn}</div>` : '';
-    const footBtn = (opts.newCase === 'top') ? '' : newBtn;
+      `<button type="button" class="nelos-new" title="Raise a case">` +
+        `<span aria-hidden="true">+</span>` +
+        `<span class="nelos-new-label">${esc(opts.newCaseLabel || 'New Case')}</span>` +
+      `</button>`;
 
     el.innerHTML = `
       <div class="nelos-todo">
         <div class="nelos-todo-head">
-          <span class="nelos-todo-title">📋 ${esc(opts.title || 'Nelos — Pending Cases')}</span>
-          <span class="nelos-todo-count ${total ? '' : 'zero'}">${total || 'clear'}</span>
           ${opts.openLink === false ? '' :
             `<a class="nelos-todo-all" href="${esc(homeHref())}">Open Nelos →</a>`}
+          <span class="nelos-todo-title">${esc(opts.title || 'Nelos To Do List')}</span>
+          ${newBtn}
         </div>
-        ${topBtn}
-        ${total
-          ? data.map(rowHtml).join('')
-          : '<div class="nelos-empty">Nothing pending — all clear ✓</div>'}
-        ${footBtn}
+        ${total ? sections(data) : '<div class="nelos-empty">Nothing pending ✓</div>'}
       </div>`;
+
+    /* The button opens the DOCK's raise form — the one form in the system,
+       so what a dashboard opens and what the dock opens cannot drift apart.
+       Only when the page carries a dock: newCase() says so, and without one
+       there is still the hub. */
+    const btn = el.querySelector('.nelos-new');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const dock = window.NelosDock;
+        if (!(dock && typeof dock.newCase === 'function' && dock.newCase())) {
+          window.location.href = fallback;
+        }
+      });
+    }
     return total;
   }
 
