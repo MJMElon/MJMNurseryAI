@@ -14,11 +14,28 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="MJM Audit"/>
-<meta name="theme-color" content="#1a4d1a"/>
+<meta name="theme-color" content="#ffffff"/>
 <title>Seedling Height — MJM Nursery</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="audit_height_styles.css?v=20260826b"/>
 <link rel="stylesheet" href="audit_a11y.css"/>
+<!-- DM Sans is what every one of these stylesheets asks for and what
+     audit_admin.html loads. It was never actually fetched here, so the
+     pages fell back to the system sans and read a shade different from
+     the page they open from. audit_sw.js caches Google Fonts, and the
+     stack falls back to system-ui, so a phone with no signal is no
+     worse off than before. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..900&display=swap" rel="stylesheet"/>
+<!-- The module pages in audit_admin.html's design: colour, weight and
+     shape, at every width. Before audit_wide.css so that file's
+     desktop layout keeps the last word. -->
+<link rel="stylesheet" href="audit_theme.css?v=20260827c"/>
+<!-- The desk half of the module pages: everything in it is inside a
+     min-width:768px query, so a phone in a nursery is untouched.
+     Loaded last so it wins on equal specificity. -->
+<link rel="stylesheet" href="audit_wide.css?v=20260827a"/>
 </head>
 <body>
 <div id="app">
@@ -93,7 +110,7 @@
           <div class="field-label" data-t="batches_on_plot">Batches on this plot</div>
           <div id="mf-batches-chips"
                style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;
-                      border-radius:10px;background:#f4f6f4;border:1px solid #dde8dd;
+                      border-radius:10px;background:var(--g50);border:1px solid var(--border);
                       min-height:38px;align-items:center">
             <span style="font-size:12px;color:#94a3b8">—</span>
           </div>
@@ -200,7 +217,7 @@
 
     <div style="padding:0 12px 14px">
       <button class="btn-primary" id="btn-save-plot" onclick="savePlotAudit()"
-              style="width:100%;height:50px;border-radius:12px;background:#1a4d1a;color:#fff;
+              style="width:100%;height:50px;border-radius:12px;background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;
                      font-size:14px;font-weight:700;font-family:inherit;border:none;
                      cursor:pointer;letter-spacing:.5px;text-transform:uppercase;
                      box-shadow:0 4px 12px rgba(26,77,26,.25)">
@@ -422,7 +439,7 @@
   <button class="lightbox-close" onclick="closeLightbox()">×</button>
 </div>
 
-<script src="audit_login_guard.js?v=20260824a"></script>
+<script src="audit_login_guard.js?v=20260827a"></script>
 <script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
 <script src="audit_lang.js?v=20260826b"></script>
 <script src="audit_supabase.js"></script>
@@ -432,7 +449,13 @@
 <script src="audit_deeplink.js?v=20260824a"></script>
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
-<script src="audit_height_script.js?v=20260826k"></script>
+<script src="audit_height_script.js?v=20260827a"></script>
+<!-- Completed records under the plot grid, and the summary that
+     opens on a tap. Renders only when the page was opened from
+     audit_admin.html (?from=manage); on the auditor portal it
+     returns on its first line. After the module script, so
+     #view-list and its tab bar are already built. -->
+<script src="audit_history.js?v=20260827b"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Setting — 555 Worker Portal</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%238b5cf6%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2713%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EFC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_worker_locations.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+  .card { background:white; border:1px solid #ede9fe; border-radius:20px;
+          box-shadow:0 4px 16px rgba(139,92,246,.08); overflow:hidden; margin-bottom:18px; }
+  .card-head { display:flex; align-items:center; gap:11px; padding:15px 20px;
+               border-bottom:1px solid #f5f3ff; }
+  .card-ico  { width:34px; height:34px; flex-shrink:0; border-radius:11px; background:#f5f3ff;
+               display:grid; place-items:center; font-size:16px; }
+  .card-name { font-size:12px; font-weight:900; color:#1e293b;
+               text-transform:uppercase; letter-spacing:.1em; }
+  .card-sub  { margin-top:3px; font-size:11.5px; font-weight:500; color:#64748b; line-height:1.5; }
+  .card-body { padding:16px 20px; }
+
+  .title-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+               gap:12px; margin-bottom:22px; }
+  .page-title { justify-self:center; margin:0; font-size:19px; font-weight:900; color:#1e293b;
+                letter-spacing:.08em; text-transform:uppercase; text-align:center; }
+  .back-btn { justify-self:start; display:inline-flex; align-items:center; gap:8px;
+              padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #ede9fe; color:#6d28d9; text-decoration:none;
+              font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+              line-height:1; transition:all .15s; }
+  .back-btn:hover { background:#f5f3ff; border-color:#ddd6fe; }
+  @media (max-width:700px) {
+    .title-row { grid-template-columns:1fr; justify-items:center; gap:10px; }
+    .back-btn { justify-self:center; }
+  }
+
+  /* A location and the sections in it. The name is given a fixed column so
+     the three read as a list of places rather than three sentences of
+     different lengths; the sections wrap under it on a narrow screen. */
+  .l-row { display:flex; align-items:flex-start; gap:14px; padding:12px 4px;
+           border-bottom:1px solid #f8fafc; }
+  .l-row:last-child { border-bottom:none; }
+  .l-name { width:130px; flex-shrink:0; font-size:13px; font-weight:800; color:#1e293b;
+            padding-top:3px; }
+  .l-codes { flex:1; display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+  .l-chip { display:inline-flex; align-items:center; gap:7px; padding:3px 10px 3px 3px;
+            border-radius:999px; background:#f8fafc; border:1px solid #eef2ff; }
+  .l-chip-name { font-size:11.5px; font-weight:600; color:#64748b; }
+  .n-code { padding:3px 11px; border-radius:999px; background:#eef2ff; color:#4338ca;
+            font-size:11px; font-weight:900; letter-spacing:.06em; }
+  @media (max-width:560px) {
+    .l-row { flex-direction:column; gap:8px; }
+    .l-name { width:auto; padding-top:0; }
+  }
+
+  /* A switch per module. Big enough to hit on a tablet, and the label is
+     part of the target — a 20px box is a miss waiting to happen. */
+  .m-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px;
+           cursor:pointer; transition:background .15s; }
+  .m-row:hover { background:#faf5ff; }
+  .m-name { flex:1; font-size:13px; font-weight:700; color:#334155; }
+  .m-key  { font-size:10.5px; font-weight:700; color:#cbd5e1; letter-spacing:.06em; }
+  .sw { position:relative; width:42px; height:24px; flex-shrink:0; border-radius:999px;
+        background:#e2e8f0; transition:background .18s; }
+  .sw::after { content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+               border-radius:50%; background:white; box-shadow:0 1px 3px rgba(0,0,0,.2);
+               transition:transform .18s; }
+  .m-row.on .sw { background:#8b5cf6; }
+  .m-row.on .sw::after { transform:translateX(18px); }
+  .m-row input { position:absolute; opacity:0; width:0; height:0; }
+  /* Keyboard focus has to be visible or the switch is mouse-only. */
+  .m-row input:focus-visible + .sw { box-shadow:0 0 0 3px rgba(139,92,246,.35); }
+
+  .portal-col { flex:1; min-width:240px; }
+  .portal-head { display:flex; align-items:center; gap:8px; padding:0 12px 8px;
+                 font-size:11px; font-weight:900; letter-spacing:.1em;
+                 text-transform:uppercase; color:#6d28d9; }
+
+  .btn { padding:10px 20px; border:0; border-radius:12px; cursor:pointer;
+         background:#7c3aed; color:white; font-family:inherit;
+         font-size:11.5px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+         transition:background .15s, opacity .15s; }
+  .btn:hover { background:#6d28d9; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-ghost { background:white; border:1.5px solid #ede9fe; color:#6d28d9; }
+  .btn-ghost:hover { background:#f5f3ff; }
+
+  .note { padding:11px 14px; border-radius:12px; font-size:11.5px; font-weight:600;
+          line-height:1.55; }
+  .note-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; }
+  .note-warn { background:#fffbeb; border:1px solid #fde68a; color:#78350f; }
+  .note-ok   { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; }
+  .muted { font-size:11.5px; font-weight:500; color:#64748b; line-height:1.55; }
+  a.inline { color:#6d28d9; font-weight:800; }
+</style>
+</head>
+<body>
+
+<script src="../shared/shared_ribbon.js"></script>
+<script src="../shared/shared_fc_brand.js" data-portal="Worker Portal" data-sub="Manage"></script>
+
+<div id="loading" class="max-w-[940px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[940px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <div class="title-row">
+    <a class="back-btn" href="scan_setting.html">&#8592; Back to Setting</a>
+    <h1 class="page-title">System Setting</h1>
+    <span aria-hidden="true"></span>
+  </div>
+
+  <!-- ═══════════ LOCATION ═══════════ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-ico">📍</span>
+      <span>
+        <span class="card-name">Location</span>
+        <div class="card-sub">Where the company works: Pre Nursery, Main Nursery, Estate.
+          The Main Nursery is more than one nursery, and those come from Operation →
+          Settings → Manage Nurseries &amp; Base Maps — so a nursery added there appears
+          here, and in the Worker System, without anybody keying it twice.</div>
+      </span>
+    </div>
+    <div class="card-body">
+      <div id="n-list"></div>
+      <div class="note note-info" style="margin-top:14px;">
+        The <b>code</b> is the nursery's name with the spaces taken out — “UNN 1” files as
+        <b>UNN1</b>. It is what every worker row, tick sheet and payroll listing is stored
+        under, so renaming a nursery in Operation Settings changes the code its workers
+        are filed by. Rename with that in mind.
+      </div>
+      <div style="margin-top:12px;">
+        <a class="btn btn-ghost" style="text-decoration:none;display:inline-block;"
+           href="../operation/operation_settings.html">Manage Main Nursery nurseries →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ PORTAL VIEW & FUNCTION ═══════════ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-ico">🎛️</span>
+      <span>
+        <span class="card-name">Portal View &amp; Function</span>
+        <div class="card-sub">What each portal offers at all. A module switched off here is
+          gone for everybody, whatever their own permission says; switched on, it still
+          takes a permission to use. Off beats on — that is the point of the switch.</div>
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="flex flex-wrap gap-5">
+        <div class="portal-col">
+          <div class="portal-head"><span>📱</span><span>555 FC Portal</span></div>
+          <div id="m-fc"></div>
+        </div>
+        <div class="portal-col">
+          <div class="portal-head"><span>👷</span><span>555 Worker Portal</span></div>
+          <div id="m-worker"></div>
+        </div>
+      </div>
+      <div class="note note-warn" style="margin-top:14px;">
+        <b>Saved, but not yet obeyed.</b> These switches are stored and read back here.
+        The FC Portal and the Worker Portal are separate apps and do not consult them yet —
+        wiring each one to hide a switched-off module is a change in those apps.
+      </div>
+      <div class="flex items-center gap-3" style="margin-top:14px;">
+        <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
+        <span id="m-status" class="muted"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ SITE BOUNDARY ═══════════ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-ico">🗺️</span>
+      <span>
+        <span class="card-name">Boundary</span>
+        <div class="card-sub">Upload a KML or GPX outline of this company’s site. It shows on
+          every map — for operators and admins — behind the recorded paths. After a device
+          syncs it once, the boundary stays available on that device offline.</div>
+      </span>
+    </div>
+    <div class="card-body">
+      <div id="b-current" class="muted" style="margin-bottom:14px;">Reading…</div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <input type="file" id="b-file" accept=".kml,.gpx,application/vnd.google-earth.kml+xml,application/gpx+xml"
+               class="text-[12px] font-semibold" onchange="pickBoundary()">
+        <button class="btn" id="b-save" onclick="saveBoundary()" disabled>Save boundary</button>
+        <button class="btn btn-ghost" id="b-clear" onclick="clearBoundary()">Remove</button>
+      </div>
+
+      <div id="b-preview" class="hidden" style="margin-top:14px;">
+        <div class="note note-ok" id="b-summary"></div>
+        <svg id="b-shape" viewBox="0 0 320 180" style="margin-top:12px;width:100%;max-width:420px;
+             height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;"
+             role="img" aria-label="Outline of the uploaded boundary"></svg>
+      </div>
+
+      <div class="note note-warn" style="margin-top:14px;">
+        <b>Draft — stored, not yet drawn.</b> The outline is parsed and kept, and you can see
+        it above, but no map reads it yet. Which maps draw it, and how a device keeps it
+        offline, is still to be decided.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $   = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let userEmail = null;
+
+/* ══════════════ LOCATION ══════════════
+   Three places, and the sections that sit in each. Read, never written:
+   operation_nurseries is the register, and a second list here would be a
+   second answer to the same question.
+
+   Which section belongs to which location is not decided here either — it
+   is in shared_worker_locations.js, so the headings on this card and the
+   columns on the Worker System's Team Board cannot drift apart.
+
+   The four nursery sections the register has always used are shown whether
+   or not the nursery table carries them. It holds three today and the
+   register files people under four; a location card that showed only what
+   came back would be quietly missing one. */
+const LOC = MJMWorkerLocations;
+
+async function loadLocations() {
+  const box = $('n-list');
+  let named = new Map();                     // code → {name, license}
+  let failed = null;
+  try {
+    const { data, error } = await _supabase
+      .from('operation_nurseries').select('name,license').order('name');
+    if (error) throw error;
+    (data || []).forEach(n => {
+      const c = LOC.code(n.name);
+      if (c) named.set(c, { name: String(n.name || '').trim(), license: n.license || '' });
+    });
+  } catch (e) {
+    failed = e;
+  }
+
+  /* Everything the register can file somebody under: what the table holds,
+     plus the four it has always had. */
+  const codes = [];
+  LOC.KEEP_NURSERIES.forEach(k => { if (!codes.includes(k.code)) codes.push(k.code); });
+  [...named.keys()].forEach(c => { if (!codes.includes(c)) codes.push(c); });
+  if (!codes.includes('UNE')) codes.push('UNE');
+
+  const { locations, unplaced } = LOC.group(codes);
+
+  const chip = c => {
+    const n = named.get(c);
+    return `<span class="l-chip" title="${n ? esc(n.name) + (n.license ? ' · ' + esc(n.license) : '')
+                                            : 'Not in the nursery list'}">
+              <span class="n-code">${esc(c)}</span>
+              ${n && n.name !== c ? `<span class="l-chip-name">${esc(n.name)}</span>` : ''}
+            </span>`;
+  };
+
+  box.innerHTML =
+    locations.map(l => `
+      <div class="l-row">
+        <span class="l-name">${esc(l.name)}</span>
+        <span class="l-codes">${
+          l.codes.length ? l.codes.map(chip).join('')
+                         : '<span class="muted">Nothing filed here yet.</span>'}</span>
+      </div>`).join('') +
+    (unplaced.length ? `
+      <div class="l-row">
+        <span class="l-name" style="color:#92400e;">Not in a location</span>
+        <span class="l-codes">${unplaced.map(chip).join('')}</span>
+      </div>` : '') +
+    (failed ? `<div class="note note-warn" style="margin-top:12px;">
+                 Could not read the nursery list, so only the built-in sections are shown.<br>
+                 ${esc(failed.message || failed)}
+               </div>` : '');
+}
+
+/* ══════════════ PORTAL VIEW & FUNCTION ══════════════
+   The two portals this page is the back office for, and what each one is
+   made of. Kept here rather than read from the apps: these are separate
+   builds on another host, and a switchboard that asked them what they
+   contained would have nothing to draw whenever they were unreachable.
+
+   A module absent from the saved JSON is ON. New modules ship working
+   rather than invisible until somebody remembers this screen. */
+const PORTAL_MODULES = {
+  fc: [
+    { key:'dashboard',   name:'Dashboard' },
+    { key:'scan',        name:'Scan' },
+    { key:'do',          name:'Delivery Order' },
+    { key:'maintenance', name:'Maintenance' },
+    { key:'palms',       name:'PALMS' },
+    { key:'culling',     name:'Culling Calculator' }
+  ],
+  worker: [
+    { key:'maintenance', name:'Maintenance' },
+    { key:'settings',    name:'Settings' }
+  ]
+};
+let portalOn = { fc:{}, worker:{} };
+
+function drawPortals() {
+  Object.keys(PORTAL_MODULES).forEach(p => {
+    $('m-' + p).innerHTML = PORTAL_MODULES[p].map(m => {
+      const on = portalOn[p][m.key] !== false;      // absent means on
+      return `<label class="m-row ${on ? 'on' : ''}" data-portal="${p}" data-key="${m.key}">
+                <span class="m-name">${esc(m.name)}</span>
+                <span class="m-key">${esc(m.key)}</span>
+                <input type="checkbox" ${on ? 'checked' : ''}
+                       onchange="toggleModule('${p}','${m.key}',this.checked)">
+                <span class="sw" aria-hidden="true"></span>
+              </label>`;
+    }).join('');
+  });
+}
+
+function toggleModule(portal, key, on) {
+  portalOn[portal][key] = !!on;
+  const row = document.querySelector(`.m-row[data-portal="${portal}"][data-key="${key}"]`);
+  if (row) row.classList.toggle('on', !!on);
+  $('m-status').textContent = 'Not saved yet.';
+}
+
+async function loadPortals() {
+  try {
+    const { data, error } = await _supabase
+      .from('shared_portal_settings').select('portal,modules');
+    if (error) throw error;
+    (data || []).forEach(r => {
+      if (portalOn[r.portal]) portalOn[r.portal] = r.modules || {};
+    });
+  } catch (e) {
+    /* No row, or the table is not there yet. Everything on is the same
+       behaviour the portals have today, so this is the right thing to
+       draw while the page says what to run. */
+    $('m-status').innerHTML =
+      '<span style="color:#92400e">Could not read the saved switches — showing everything on. ' +
+      'Run <b>shared/create_scan_system_setting.sql</b> if this is the first time.</span>';
+  }
+  drawPortals();
+}
+
+async function savePortals() {
+  const btn = $('m-save');
+  btn.disabled = true;
+  $('m-status').textContent = 'Saving…';
+  try {
+    const rows = Object.keys(PORTAL_MODULES).map(p => ({
+      portal: p, modules: portalOn[p],
+      updated_at: new Date().toISOString(), updated_by: userEmail || null
+    }));
+    const { error } = await _supabase
+      .from('shared_portal_settings').upsert(rows, { onConflict: 'portal' });
+    if (error) throw error;
+    $('m-status').innerHTML = '<span style="color:#065f46">Saved.</span>';
+  } catch (e) {
+    $('m-status').innerHTML = '<span style="color:#b91c1c">Could not save. ' + esc(e.message || e) + '</span>';
+  }
+  btn.disabled = false;
+}
+
+/* ══════════════ BOUNDARY ══════════════
+   KML and GPX are both XML, and both say the same thing in different
+   words. Rather than keep either, they are turned into GeoJSON on the way
+   in: it is what a map library reads without a parser of its own, and it
+   is the shape this has to be in by the time it reaches a phone. Parse
+   once here, not once per device.
+
+   Longitude first, then latitude. KML writes coordinates that way round
+   and GPX writes attributes the other way round, which is the single
+   easiest thing to get backwards — and a boundary drawn with the axes
+   swapped is not obviously wrong, it is just somewhere in the sea. */
+let pending = null;                       // {features, points, bbox, format, name}
+
+function parseCoordText(text) {
+  /* KML: "lng,lat,alt lng,lat,alt" — whitespace between tuples, and any
+     amount of it, including newlines and the indentation of the file. */
+  return String(text || '').trim().split(/\s+/).map(tuple => {
+    const p = tuple.split(',');
+    const lng = parseFloat(p[0]), lat = parseFloat(p[1]);
+    return (isFinite(lng) && isFinite(lat)) ? [lng, lat] : null;
+  }).filter(Boolean);
+}
+
+function bboxOf(rings) {
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  rings.forEach(r => r.forEach(([lng, lat]) => {
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }));
+  return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
+}
+
+function parseBoundary(text, format) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('That file is not readable XML.');
+
+  const rings = [];
+  if (format === 'kml') {
+    doc.querySelectorAll('coordinates').forEach(node => {
+      const pts = parseCoordText(node.textContent);
+      if (pts.length > 1) rings.push(pts);
+    });
+  } else {
+    /* A track is a list of segments; a route and a bare list of waypoints
+       are each one line. Segments are kept apart — joining them would draw
+       a line across whatever the surveyor walked around. */
+    doc.querySelectorAll('trkseg').forEach(seg => {
+      const pts = [...seg.querySelectorAll('trkpt')].map(readPt).filter(Boolean);
+      if (pts.length > 1) rings.push(pts);
+    });
+    const rte = [...doc.querySelectorAll('rtept')].map(readPt).filter(Boolean);
+    if (rte.length > 1) rings.push(rte);
+    if (!rings.length) {
+      const wpt = [...doc.querySelectorAll('wpt')].map(readPt).filter(Boolean);
+      if (wpt.length > 1) rings.push(wpt);
+    }
+  }
+  if (!rings.length) throw new Error('No outline found in that file.');
+
+  /* A ring that comes back to where it started is an area; one that does
+     not is a line somebody walked. Drawn differently, so kept apart. */
+  const features = rings.map(pts => {
+    const [a, b] = [pts[0], pts[pts.length - 1]];
+    const closed = pts.length > 3 && a[0] === b[0] && a[1] === b[1];
+    return {
+      type: 'Feature', properties: {},
+      geometry: closed
+        ? { type: 'Polygon',    coordinates: [pts] }
+        : { type: 'LineString', coordinates: pts }
+    };
+  });
+
+  return {
+    features, format,
+    points: rings.reduce((n, r) => n + r.length, 0),
+    bbox: bboxOf(rings)
+  };
+}
+
+function readPt(node) {
+  const lat = parseFloat(node.getAttribute('lat'));
+  const lng = parseFloat(node.getAttribute('lon'));
+  return (isFinite(lng) && isFinite(lat)) ? [lng, lat] : null;
+}
+
+function pickBoundary() {
+  const f = $('b-file').files[0];
+  if (!f) return;
+  const format = /\.gpx$/i.test(f.name) ? 'gpx' : /\.kml$/i.test(f.name) ? 'kml' : null;
+  if (!format) { alert('Choose a .kml or .gpx file.'); $('b-file').value = ''; return; }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      pending = parseBoundary(reader.result, format);
+      pending.name = f.name;
+      showPending();
+      $('b-save').disabled = false;
+    } catch (e) {
+      pending = null;
+      $('b-save').disabled = true;
+      $('b-preview').classList.add('hidden');
+      alert('Could not read that file.\n\n' + (e.message || e));
+    }
+  };
+  reader.onerror = () => alert('Could not read that file.');
+  reader.readAsText(f);
+}
+
+function showPending() {
+  const b = pending.bbox;
+  $('b-summary').innerHTML =
+    `<b>${esc(pending.name)}</b> — ${pending.features.length} shape` +
+    `${pending.features.length === 1 ? '' : 's'}, ${pending.points} points.` +
+    (b ? `<br>Corners ${b[1].toFixed(5)}, ${b[0].toFixed(5)} to ${b[3].toFixed(5)}, ${b[2].toFixed(5)}.` : '');
+  $('b-preview').classList.remove('hidden');
+  drawShape(pending);
+}
+
+/* A drawing of what was uploaded, so a file picked by mistake is caught
+   here rather than on a phone in a plot. Fitted to the box, y flipped —
+   latitude climbs northward and screen y climbs downward. */
+function drawShape(b) {
+  const svg = $('b-shape');
+  if (!b.bbox) { svg.innerHTML = ''; return; }
+  const [minLng, minLat, maxLng, maxLat] = b.bbox;
+  const W = 320, H = 180, PAD = 12;
+  const spanX = (maxLng - minLng) || 1e-9, spanY = (maxLat - minLat) || 1e-9;
+  const k = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
+  const offX = (W - spanX * k) / 2, offY = (H - spanY * k) / 2;
+  const X = lng => offX + (lng - minLng) * k;
+  const Y = lat => H - (offY + (lat - minLat) * k);
+
+  svg.innerHTML = b.features.map(f => {
+    const pts = (f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates)
+                  .map(([lng, lat]) => X(lng).toFixed(1) + ',' + Y(lat).toFixed(1)).join(' ');
+    return f.geometry.type === 'Polygon'
+      ? `<polygon points="${pts}" fill="rgba(139,92,246,.16)" stroke="#7c3aed" stroke-width="1.6"/>`
+      : `<polyline points="${pts}" fill="none" stroke="#7c3aed" stroke-width="1.6"/>`;
+  }).join('');
+}
+
+async function loadBoundary() {
+  try {
+    const { data, error } = await _supabase
+      .from('shared_site_boundary').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    if (!data) { $('b-current').textContent = 'No boundary uploaded yet.'; return; }
+    $('b-current').innerHTML =
+      `Holding <b>${esc(data.source_name || 'an outline')}</b> (${esc(data.format || '?')}), ` +
+      `${data.point_count || 0} points, last changed ` +
+      `${esc(String(data.updated_at || '').slice(0, 10))}` +
+      `${data.updated_by ? ' by ' + esc(data.updated_by) : ''}.`;
+    if (data.geojson && data.geojson.features) {
+      drawShape({ features: data.geojson.features, bbox: data.bbox });
+      $('b-preview').classList.remove('hidden');
+      $('b-summary').innerHTML = 'The outline currently stored.';
+    }
+  } catch (e) {
+    $('b-current').innerHTML =
+      '<span style="color:#92400e">Could not read the stored boundary. ' +
+      'Run <b>shared/create_scan_system_setting.sql</b> if this is the first time.</span>';
+  }
+}
+
+async function saveBoundary() {
+  if (!pending) return;
+  const btn = $('b-save');
+  btn.disabled = true;
+  try {
+    const { error } = await _supabase.from('shared_site_boundary').upsert({
+      id: 1,
+      source_name: pending.name,
+      format:      pending.format,
+      geojson:     { type: 'FeatureCollection', features: pending.features },
+      point_count: pending.points,
+      bbox:        pending.bbox,
+      updated_at:  new Date().toISOString(),
+      updated_by:  userEmail || null
+    }, { onConflict: 'id' });
+    if (error) throw error;
+    pending = null;
+    $('b-file').value = '';
+    await loadBoundary();
+    alert('Boundary saved.\n\nNothing draws it yet — see the note under the upload.');
+  } catch (e) {
+    alert('Could not save the boundary.\n\n' + (e.message || e));
+    btn.disabled = false;
+  }
+}
+
+async function clearBoundary() {
+  if (!confirm('Remove the stored boundary?\n\nThe file itself is not kept — you would have to upload it again.')) return;
+  try {
+    const { error } = await _supabase.from('shared_site_boundary').delete().eq('id', 1);
+    if (error) throw error;
+    pending = null;
+    $('b-file').value = '';
+    $('b-save').disabled = true;
+    $('b-preview').classList.add('hidden');
+    await loadBoundary();
+  } catch (e) {
+    alert('Could not remove it.\n\n' + (e.message || e));
+  }
+}
+
+/* ══════════════ START ══════════════ */
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    const u = MJMAccess.user();
+    if (!u) { window.location.href = '../index.html'; return; }
+    userEmail = u.email || null;
+    if (!MJMAccess.canAccess('scan')) {
+      alert('You do not have access to the 555 FC Portal.');
+      window.location.href = '../index.html';
+      return;
+    }
+    /* System Setting changes what everybody else sees, so it asks for the
+       module's admin — the same gate the Manage page above it applies. */
+    if (!MJMAccess.isAdminOf('scan')) {
+      window.location.replace('https://scan.mjmnursery.com/?cb=' + Date.now());
+      return;
+    }
+
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+
+    /* Three independent reads. One failing — a table not yet created —
+       must not leave the other two sections blank, so each says its own
+       piece rather than one catch swallowing the page. */
+    loadLocations();
+    loadPortals();
+    loadBoundary();
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

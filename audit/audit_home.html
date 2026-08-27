@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
 
   <!-- Anti-flicker auth guard -->
-  <script src="audit_login_guard.js?v=20260824a"></script>
+  <script src="audit_login_guard.js?v=20260827a"></script>
   <script>MJMAuditLogin.requireSignIn();</script>
   <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
 
@@ -714,6 +714,50 @@
     @media (prefers-reduced-motion:reduce){
       .tl-item.overdue .tl-ico{animation:none}
     }
+    /* The pinned maintenance row. Held apart from the rows under it so
+       "first in the list" is not mistaken for "happens to be first
+       today". A rule, not a gap, because a gap alone reads as a
+       rendering accident. */
+    .tl-item.tl-pinned{padding-bottom:14px;margin-bottom:16px;
+                       border-bottom:1.5px dashed var(--fc-line,#e2e8f0)}
+    /* Overdue AND pinned: the whole card breathes, not just the icon.
+       This is the row that says somebody's work is ageing out while the
+       page is open, and it has to carry across a room. */
+    @keyframes tl-card-shine{
+      0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.42);
+              border-color:#dc2626}
+      50%    {box-shadow:0 0 18px 4px rgba(220,38,38,.14);
+              border-color:#f87171}
+    }
+    .tl-item.tl-pinned.overdue .tl-card{animation:tl-card-shine 2.1s ease-in-out infinite}
+    @media (prefers-reduced-motion:reduce){
+      .tl-item.tl-pinned.overdue .tl-card{animation:none;border-color:#dc2626}
+    }
+
+    /* Plots grouped by the job they are waiting on. */
+    .tl-wts{margin:8px 0 0 46px;display:flex;flex-direction:column;gap:2px}
+    .tl-wt-head{display:flex;align-items:center;gap:8px;width:100%;
+                padding:7px 10px;border:0;border-radius:9px;cursor:pointer;
+                background:transparent;font:inherit;text-align:left;
+                transition:background .15s}
+    .tl-wt-head:hover{background:rgba(0,0,0,.035)}
+    .tl-wt-caret{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;
+                 stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+                 color:#94a3b8;transform:rotate(-90deg);transition:transform .18s}
+    .tl-wt.open .tl-wt-caret{transform:rotate(0)}
+    .tl-wt-name{font-size:12px;font-weight:800;letter-spacing:.02em;color:#334155}
+    .tl-wt-count{padding:1px 8px;border-radius:999px;background:#eef2f7;color:#64748b;
+                 font-size:11px;font-weight:800}
+    /* Closed groups keep their header, so the auditor can still see that
+       manuring is waiting on twelve plots without unfolding it. */
+    .tl-wt-plots{display:none;flex-wrap:wrap;gap:6px;padding:2px 10px 8px 32px}
+    .tl-wt.open .tl-wt-plots{display:flex}
+    .tl-item.overdue .tl-wt-count{background:#fee2e2;color:#991b1b}
+    .tl-item.overdue .tl-wt-name{color:#7f1d1d}
+    /* Said quietly. It is a note about the data, not a warning to the
+       auditor, who can do nothing about it from here. */
+    .tl-wt-none{padding:8px 12px;font-size:11.5px;font-weight:600;line-height:1.5;
+                color:#94a3b8}
     /* Card head row: icon on the left, title + meta stacked on the
        right. Renamed away from .tl-head (which was already taken by
        the ANYTIME section heading and inherits tiny uppercase text). */
@@ -1443,6 +1487,21 @@ function loadAuditTodo(){
      how P & D has always behaved (it is looked at in the plot condition
      audit) and is now how any work type can be told to behave. */
   const _wtWinFor = wt => MJMAuditSettings.maintDays(wt);
+  /* Settings keys the work types in lower case; the records do not always
+     agree, and a stray "Manuring" would otherwise open a group of its own
+     beside "manuring". Grouping and labelling only — how long the auditor
+     has is still whatever _wtWinFor already decided, so nothing appears or
+     disappears from the list because of this. */
+  function _wtCanon(wt) {
+    const v = String(wt || '').trim().toLowerCase();
+    return (MJMAuditSettings.WORKTYPES || []).indexOf(v) !== -1 ? v : 'other';
+  }
+  /* The spellings audit_maintenance_index.html already uses, so the row an
+     auditor taps and the page it opens call the job the same thing. */
+  const WT_LABEL = {
+    manuring: 'Manuring',  weeding: 'Weeding',  interrow: 'Interrow Spray',
+    pd:       'P & D Spraying',                 other:    'Others'
+  };
   function _canonPlot(raw){
     const s = String(raw||'').trim().toUpperCase();
     const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
@@ -1496,7 +1555,7 @@ function loadAuditTodo(){
         if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
         const k = y + '-' + m + '-' + d;
         if (!buckets.has(k))
-          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map() });
+          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map(), items: [] });
         const bucket = buckets.get(k);
         bucket.nurseries.add(n);
         /* Same walk also collects WHICH plots are pending, per nursery,
@@ -1506,6 +1565,12 @@ function loadAuditTodo(){
            where the answer already is. */
         if (!bucket.plots.has(n)) bucket.plots.set(n, new Set());
         bucket.plots.get(n).add(plot);
+        /* The same walk also keeps WHICH work each plot is waiting on, and
+           the day it was done. The deadline alone cannot say either: two
+           plots share a deadline because their windows happen to end
+           together, not because the same job was done on them. Oldest case
+           first needs the work date, not the deadline. */
+        bucket.items.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
         diag.kept++;
         if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
       };
@@ -1636,7 +1701,8 @@ function loadAuditTodo(){
         start: mo.d,
         end:   mo.d,
         _maintNurseries: mo.nurseries,
-        _maintPlots: mo.plots
+        _maintPlots: mo.plots,
+        _maintItems: mo.items
       });
     });
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
@@ -1937,6 +2003,124 @@ function loadAuditTodo(){
     return `<div class="tl-plots">${circles}${toggle}</div>`;
   }
 
+  /* ── MAINTENANCE, BY THE JOB ──────────────────────────────────────
+     One strip of circles answers "how many plots", which is the wrong
+     question for maintenance: an auditor going out does manuring plots
+     together, then weeding plots together, because that is how the work
+     was done and how it is checked. So the row breaks into a group per
+     work type.
+
+     Oldest first, within a group and between them, by the day the work
+     was done rather than the deadline — the deadline is shared by
+     everything in the row, so sorting on it would leave the order to
+     chance. The plot waiting longest is the one at risk of ageing out.
+
+     A group can be folded away. Folded state is remembered per row while
+     the page is open, so a redraw does not undo it. Groups start open:
+     this list exists to be read, and something folded by default is
+     something nobody finds. */
+  const collapsedTypes = new Set();
+
+  /* Nothing to group is not nothing to say. An empty return leaves a gap
+     under the row that looks like a row with no work in it, which is the
+     one thing this row never means — it exists because work is pending.
+     So: fall back to the flat strip the other modules use, and if that is
+     empty too, say which of the two is missing. A silent gap is what made
+     this hard to diagnose the first time. */
+  function _maintTypesHtml(o, oy, om, pending){
+    /* `pending` is the nurseries a separate check thinks are unfinished.
+       Where it has an answer, use it. Where it does not, fall back to the
+       whole scope rather than to nothing: everything in this row was put
+       there by a walk that already dropped anything out of scope, so the
+       scope is the honest wider net. */
+    const scope = pending.length ? pending.map(x => x.nursery) : SCOPE_NURSERIES;
+    const inScope = new Set(scope);
+
+    let mine = (o._maintItems || []).filter(it => inScope.has(it.nursery));
+
+    /* Two lists come off the same walk: which plots are pending, and which
+       job each is waiting on. If the second is missing — an older cached
+       page, a record with no work type — the first is still worth drawing.
+       Better one group headed "Others" than a row with nothing under it. */
+    if (!mine.length && o._maintPlots) {
+      o._maintPlots.forEach((set, nur) => {
+        if (!inScope.has(nur)) return;
+        [...set].forEach(plot => mine.push({ nursery: nur, plot: plot, wt: 'other', on: '' }));
+      });
+    }
+
+    if (!mine.length) {
+      return `<div class="tl-wts"><div class="tl-wt-none">` +
+             `No pending plot came through for this deadline. Reload; if it stays, ` +
+             `the maintenance records behind this row could not be read.</div></div>`;
+    }
+
+    /* Canonicalised again here rather than trusted. The items are written
+       that way, but a group is not the place to find out otherwise: a
+       stray "Manuring" would open a second manuring group beside the
+       first, and an unrecognised type would put its own raw spelling on
+       screen as if it were a job the yard has a name for. */
+    const groups = new Map();
+    mine.forEach(it => {
+      const wt = _wtCanon(it.wt);
+      if (!groups.has(wt)) groups.set(wt, []);
+      groups.get(wt).push(it);
+    });
+
+    const rowKey = _plotKey(o, oy, om);
+    const label  = t(o.title);
+    const oldest = list => list.reduce((a, it) => (!a || it.on < a) ? it.on : a, null);
+
+    const blocks = [...groups.entries()]
+      .map(([wt, list]) => ({
+        wt,
+        list: list.slice().sort((a, b) =>
+          String(a.on || '').localeCompare(String(b.on || '')) ||
+          a.plot.localeCompare(b.plot)),
+        from: oldest(list)
+      }))
+      // The job somebody has been waiting longest on leads.
+      .sort((a, b) => String(a.from || '').localeCompare(String(b.from || '')))
+      .map(g => {
+        const key  = rowKey + '|' + g.wt;
+        const open = !collapsedTypes.has(key);
+        const name = WT_LABEL[g.wt] || WT_LABEL.other;
+        const circles = g.list.map(it => {
+          const nur = NURSERY_LABELS[it.nursery] || it.nursery;
+          return `<a class="tl-plot"
+                     href="${o.href}?nursery=${encodeURIComponent(it.nursery)}` +
+                 `&plot=${encodeURIComponent(it.plot)}&from=home"
+                     title="${nur} ${it.plot} — ${name}${it.on ? ', done ' + it.on : ''}"
+                     aria-label="${label} — ${name} — ${nur} ${it.plot}">${it.plot}</a>`;
+        }).join('');
+        return `<div class="tl-wt${open ? ' open' : ''}">
+          <button type="button" class="tl-wt-head" data-wtkey="${key}"
+                  aria-expanded="${open}"
+                  aria-label="${name} — ${fmtNum(g.list.length)} plots, ${
+                    open ? 'hide' : 'show'}">
+            <svg class="tl-wt-caret" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/></svg>
+            <span class="tl-wt-name">${name}</span>
+            <span class="tl-wt-count">${fmtNum(g.list.length)}</span>
+          </button>
+          <div class="tl-wt-plots">${circles}</div>
+        </div>`;
+      }).join('');
+
+    return `<div class="tl-wts">${blocks}</div>`;
+  }
+
+  /* Folding a work type. Same delegated-listener reasoning as below. */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.tl-wt-head');
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.wtkey;
+    if (collapsedTypes.has(key)) collapsedTypes.delete(key);
+    else collapsedTypes.add(key);
+    renderAll();
+  });
+
   /* One delegated listener rather than a handler per button: the
      timeline is rebuilt from scratch on every redraw, so anything bound
      to a button dies with it. */
@@ -1971,6 +2155,13 @@ function loadAuditTodo(){
        what the eye lands on. */
     const _ORDER = { overdue: 0, due: 1, soon: 2, upcoming: 3 };
     list.sort((a, b) => {
+      /* Maintenance first, ahead of even an overdue plot audit. It is the
+         only row whose work arrives on somebody else's schedule — a worker
+         finishes a job and the clock starts, so the backlog can appear
+         between one look at this page and the next. The other audits sit
+         on a calendar the auditor already knows. Among themselves the
+         maintenance rows still sort by how late they are. */
+      if ((a.mod === 'maint') !== (b.mod === 'maint')) return a.mod === 'maint' ? -1 : 1;
       const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
       const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
       return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
@@ -2005,10 +2196,22 @@ function loadAuditTodo(){
       /* Only live rows get circles. A row whose window has not opened
          renders greyed and does not navigate, so plot shortcuts into
          it would be links to a screen with nothing to record. */
-      const plotsHtml = live ? _plotsHtml(o, oy, om, pending) : '';
+      /* Maintenance is not gated on `live`. Every other row has to work out
+         whether its window is open and whether anything in it is still
+         owed. A maintenance row does not: it EXISTS because a deadline has
+         pending work on it — that is the only reason one is created — and
+         it arrives carrying the very plots that are pending. Asking a
+         second, separately-derived question ("is any nursery still not
+         done?") could only ever subtract from that, and when it came back
+         empty the row drew with nothing underneath: not "no work", which
+         it never means, but a silent gap. */
+      const plotsHtml = (o.mod === 'maint')
+        ? _maintTypesHtml(o, oy, om, pending)
+        : (live ? _plotsHtml(o, oy, om, pending) : '');
       const due = dueInfo(o, oy, om);
 
-      return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" style="--tone:${c.tone}">
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}${
+                 o.mod === 'maint' ? ' tl-pinned' : ''}" data-idx="${idx}" style="--tone:${c.tone}">
         ${openTag}
           <div class="tl-row-head">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>

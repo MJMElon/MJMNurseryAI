@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<script src="../shared/shared_worker_locations.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <!-- The register's own stylesheet, borrowed rather than copied. The screen
      moved; it did not get redrawn, and two copies of a stylesheet are two
@@ -38,7 +39,7 @@
 <div id="loading" class="max-w-[1200px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
 <div id="main" class="wrap hidden">
-  <a class="page-back" href="scan_admin.html">&larr; FC Portal Manage</a>
+  <a class="page-back" href="scan_admin.html">&larr; Worker Portal Manage</a>
 
 <section id="tab-workers" class="panel">
     <div class="bar">
@@ -140,7 +141,39 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 /* Sections the payroll is filed under. The first four match the nurseries;
    UNE and Driver exist only here. */
-const SECTIONS = [
+/* ── The sections a worker is filed under ──────────────────────────────
+   The nurseries among these are not written here any more. They come from
+   operation_nurseries — the same list Operation → Settings → Manage
+   Nurseries & Base Maps keeps — so a nursery created there turns up here
+   without anybody keying it a second time, and the two cannot disagree.
+
+   A nursery's CODE is its name with the spaces taken out: "UNN 1" files as
+   UNN1, and a new "UNN 3" as UNN3. That is a transcription, not a guess —
+   the nurseries are named as codes with a space in them. System Setting
+   shows the code beside every name so one named some other way is visible
+   there rather than discovered in a payroll listing later.
+
+   UNE and Driver are not nurseries and never were. They are kept here
+   because a worker still has to be filed under something.
+
+   The list below is what the page opens on, before the read lands. Losing
+   the nursery read must not leave the register with nowhere to file
+   anybody, so the seed is the six sections it has always had. */
+/* Which section sits in which location, and the four the register has
+   always filed people under, are in shared_worker_locations.js — read by
+   this page and by System Setting's Location card, so the Team Board's
+   headings and that card cannot drift apart.
+
+   The four are offered whatever operation_nurseries says. It holds three
+   today and the register files people under four: a section offered after
+   its nursery is gone is a section nobody picks, while a section missing
+   while people are still filed under it is a hole in the register. */
+const LOC = MJMWorkerLocations;
+const KEEP_NURSERIES = LOC.KEEP_NURSERIES;
+/* Estate is a location with one section; Driver is not a location at all.
+   Both come last, after the nurseries. */
+const FIXED_SECTIONS = [{ code:'UNE', name:'UNE' }].concat(LOC.NON_LOCATION);
+let SECTIONS = [
   { code:'PN',     name:'PN — Pre Nursery'     },
   { code:'BNN',    name:'BNN — Batu Niah'      },
   { code:'UNN1',   name:'UNN1 — Ulu Niah 1'    },
@@ -148,7 +181,68 @@ const SECTIONS = [
   { code:'UNE',    name:'UNE'                  },
   { code:'Driver', name:'Driver'               }
 ];
-const SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+let SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+
+const nurseryCode = n => LOC.code(n);
+
+function setSections(list) {
+  SECTIONS = list;
+  SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+}
+
+/* Read once, on the way in. A nursery that cannot be read leaves the seed
+   standing rather than emptying the register — the worst this page can do
+   is offer a section that no longer exists; the worst the alternative does
+   is hide every worker in it. */
+async function loadSections() {
+  let nurseries = [];
+  try {
+    const { data, error } = await _supabase
+      .from('operation_nurseries').select('name').order('name');
+    if (error) throw error;
+    nurseries = (data || [])
+      .map(n => ({ code: nurseryCode(n.name), name: String(n.name || '').trim() }))
+      .filter(n => n.code);
+  } catch (e) {
+    console.warn('Could not read the nursery list; keeping the built-in sections.', e);
+    return;                                   // seed stands
+  }
+  if (!nurseries.length) return;              // ditto: no nurseries, no change
+
+  const out = [], seen = new Set();
+  const add = (code, name) => {
+    if (!code || seen.has(code)) return;
+    seen.add(code);
+    out.push({ code, name });
+  };
+  /* A nursery whose name already IS its code reads "BNN — BNN" otherwise. */
+  const byCode = new Map();
+  nurseries.forEach(n => byCode.set(n.code, n.code === n.name ? n.code : n.code + ' — ' + n.name));
+
+  /* The four always-offered nurseries first, in the order the yard says
+     them, wearing the table's name where the table has one. Then whatever
+     else the table holds — the new ones, which is the point of reading it.
+     Then UNE and Driver, which are not nurseries and belong at the end. */
+  KEEP_NURSERIES.forEach(k => add(k.code, byCode.get(k.code) || k.name));
+  nurseries.forEach(n => add(n.code, byCode.get(n.code)));
+  FIXED_SECTIONS.forEach(f => add(f.code, f.name));
+  setSections(out);
+}
+
+/* Anything a worker row is already filed under that the list above does not
+   contain — a nursery since renamed or deleted, a code keyed before any of
+   this. Those workers exist and are somebody's problem, so they get their
+   section back rather than disappearing off the register. Called once the
+   workers are in hand. */
+function addOrphanSections() {
+  const have = new Set(SECTIONS.map(s => s.code));
+  const extra = [];
+  workers.forEach(w => {
+    const c = (w.section || '').trim();
+    if (c && !have.has(c)) { have.add(c); extra.push({ code: c, name: c + ' — not in the nursery list' }); }
+  });
+  if (extra.length) setSections(SECTIONS.concat(extra));
+}
 
 /* The roles a worker can hold. One list, offered in every section. */
 const ROLES = [
@@ -285,23 +379,35 @@ function renderWorkers() { renderWorkerBoard(); }
    them. A division is a heading over sections, not a third column — Main
    Nursery is the three nurseries seen together, and nothing in the database
    has to learn the word. */
-const DIVISIONS = [
-  { name: 'Pre Nursery',  sections: ['PN'] },
-  { name: 'Main Nursery', sections: ['BNN', 'UNN1', 'UNN2'] },
-  { name: 'Estate',       sections: ['UNE'] },
-  { name: 'Driver',       sections: ['Driver'] }
-];
+/* Pre Nursery, Main Nursery, Estate — the three places, straight from the
+   shared file — and then Driver, which is a section rather than a place and
+   still needs a column of its own on the board.
+
+   The locations RECOGNISE their sections rather than listing them, so a
+   UNN 3 created in Operation Settings joins the Main Nursery instead of
+   standing alone at the end under a heading of its own. */
+const DIVISIONS = LOC.LOCATIONS
+  .map(l => ({ name: l.name, match: l.match }))
+  .concat(LOC.NON_LOCATION.map(n => ({ name: n.name, sections: [n.code] })));
 
 function boardColumns() {
-  const known = new Set(SECTIONS.map(s => s.code));
+  const codes = SECTIONS.map(s => s.code);
+  const known = new Set(codes);
   const cols  = [];
   DIVISIONS.forEach(d => {
-    const secs = d.sections.filter(c => known.has(c));
+    /* A division either names its sections or recognises them. Recognising
+       is what lets a nursery nobody has heard of yet land in the right
+       place; naming is for the ones there will only ever be one of. */
+    const secs = d.match ? codes.filter(d.match) : d.sections.filter(c => known.has(c));
     if (secs.length) cols.push({ name: d.name, sections: secs });
   });
   const placed = new Set(cols.flatMap(d => d.sections));
+  /* Falls back to the code. The section list is built from the nursery
+     table now, so a heading is only as reliable as what came back from it —
+     and a division headed by nothing at all is worse than one headed by a
+     code somebody recognises. */
   SECTIONS.filter(s => !placed.has(s.code))
-          .forEach(s => cols.push({ name: s.name, sections: [s.code] }));
+          .forEach(s => cols.push({ name: s.name || s.code, sections: [s.code] }));
   return cols;
 }
 
@@ -677,7 +783,7 @@ async function removeWorker(id) {
     if (!u) { window.location.href = '../index.html'; return; }
     userEmail = u.email || '';
 
-    /* The same gate the tab had. Reached from FC Portal Manage now, but it is
+    /* The same gate the tab had. Reached from Worker Portal Manage now, but it is
        still the payroll register and still answers to that module's access. */
     if (!may('workers')) {
       alert('You do not have access to the Worker System.');
@@ -685,7 +791,9 @@ async function removeWorker(id) {
       return;
     }
 
+    await loadSections();
     await loadWorkers();
+    addOrphanSections();
     renderWorkers();
 
     $('loading').classList.add('hidden');

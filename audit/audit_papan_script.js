@@ -28,11 +28,10 @@ let batches=[], audits=[];
 // so a PN auditor never sees the three MN tabs, matching Maintenance Audit.
 function _scopeNurseriesPapan(){
   try {
-    var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
-    if (s === 'PN') return ['PN'];
-    if (s === 'MN') return ['BNN','UNN1','UNN2'];
+    if (window.MJMAuditLogin && MJMAuditLogin.scopeNurseries)
+      return MJMAuditLogin.scopeNurseries();
   } catch (e) {}
-  return ['PN','BNN','UNN1','UNN2'];
+  return ['PN','BNN','UNN1','UNN2'];       // no guard loaded → show all
 }
 const SCOPE_NURSERIES = _scopeNurseriesPapan();
 let activeNursery = SCOPE_NURSERIES[0] || 'PN';
@@ -1121,7 +1120,11 @@ function init(){
     const qs = new URLSearchParams(location.search);
     const hasPlot  = !!qs.get('plot');
     const isAdmin  = qs.get('admin') === '1';
-    const looksMissing = !hasPlot && !isAdmin;
+    /* ?from=manage is audit_admin.html sending somebody into the module
+       by name — they asked for the module, not for the To Do list. See
+       fromManage() in audit_login_guard.js. */
+    const fromMgmt = qs.get('from') === 'manage';
+    const looksMissing = !hasPlot && !isAdmin && !fromMgmt;
     if (looksMissing) { location.replace('audit_home.html'); return; }
   } catch (e) {}
 
