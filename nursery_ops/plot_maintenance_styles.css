@@ -175,9 +175,44 @@ td.check-td.ticked::after{content:"";position:absolute;left:50%;top:50%;width:6p
 td.check-td.modified::before{border-color:#f0b429;background:#fef3c7;}
 td.check-td.modified.ticked::before{border-color:#d97706;background:#d97706;}
 tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background:var(--green-light) !important;color:var(--green-text) !important;border-top:2px solid var(--green-mid);text-transform:uppercase;vertical-align:middle;white-space:normal;line-height:1.3;}
+/* Fixed layout, so the colgroup in the HTML decides the columns and the
+   content never does. Auto layout gave every nursery a different table —
+   UNN 2's longer chemical names squeezed the date column until the year
+   wrapped, BNN's did not — and two screens of the same thing that are not
+   the same shape cannot be read side by side.
+
+   min-width is what keeps that promise on a narrow screen: below it the
+   wrapper scrolls (.tbl-wrap is overflow-x:auto) rather than the columns
+   quietly collapsing back into whatever fits. */
+.rec-table{table-layout:fixed;width:100%;min-width:1373px;}
 .rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-bottom:2px solid var(--border-strong);white-space:nowrap;}
 .rec-table thead th.th-left{text-align:left;}
 .rec-table tbody td{padding:10px 14px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
+/* The date is one line, always. It is the column that gave the game away —
+   "07 Aug 2026" over two lines in one nursery and one in another — and the
+   fixed width above is chosen to hold it, so saying so here means a future
+   change to that width fails loudly (an overflow) instead of quietly
+   re-wrapping. Batch, Quantity and Audit are short and fixed-shape for the
+   same reason. */
+.rec-table tbody td:nth-child(1),
+.rec-table tbody td:nth-child(5),
+.rec-table tbody td:nth-child(6),
+.rec-table tbody td:nth-child(9){white-space:nowrap;}
+/* Work type and remark are free text and may run long: wrap them rather
+   than letting them spill over the column beside them. */
+.rec-table tbody td:nth-child(2),
+.rec-table tbody td:nth-child(8){overflow-wrap:anywhere;}
+/* A job worked over more than one day carries them all. The column is sized
+   for "01 & 02 Jul 2026" on one line; a rarer three-day job is allowed the
+   second line rather than being cut off, which is why this one opts back out
+   of the nowrap above.
+
+   Underlined with text-decoration rather than a border: a border-bottom is a
+   box, and a 1px box under one row's date made that row a pixel taller than
+   its neighbours. Rows of different heights for no visible reason is the
+   thing this table has just been straightened out of. */
+.rec-table tbody td .date-multi{white-space:normal;cursor:help;
+  text-decoration:underline dotted var(--green-mid);text-underline-offset:3px;}
 .rec-table tbody tr:last-child td{border-bottom:none;}
 .rec-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .rec-table tbody tr:hover td{background:var(--green-bg);}
@@ -335,6 +370,47 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 /* The grid already has the slab's border around it. */
 .sched-block-body .card{border:none;box-shadow:none;border-radius:0;}
 
+/* A schedule grid is 52 plots by up to eight columns of tick boxes, and
+   every pixel of row padding is another 52 of scrolling. Tighter than the
+   general table, and only inside the schedule blocks — the Work Record and
+   Worker Record tables are read, not scanned down, and keep their room. */
+.sched-block .sched-table tbody td{padding:3px 10px;font-size:12px;}
+.sched-block .sched-table td.plot-td{font-size:12.5px;padding:3px 10px 3px 14px;}
+.sched-block .sched-table td.check-td{padding:3px 6px;}
+.sched-block .sched-table td.check-td::before{width:17px;height:17px;border-width:1.5px;border-radius:4px;}
+.sched-block .sched-table td.check-td.ticked::after{width:5px;height:9px;border-width:0 2px 2px 0;}
+.sched-block .sched-table tr.jumlah-tr td{padding:5px 10px;font-size:11.5px;}
+
+/* ── When a round runs ────────────────────────────────────────────────────
+   The column title is the dates, and clicking it sets them. It has to read
+   as a title first and a button second — a header row of obvious buttons
+   would look like four things to press before it looked like a schedule. */
+.period-btn{font:inherit;font-size:13px;font-weight:700;letter-spacing:.5px;color:inherit;
+  background:transparent;border:none;border-bottom:1px dashed rgba(255,255,255,.45);
+  padding:1px 2px;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s;}
+.period-btn:hover{background:rgba(255,255,255,.14);border-bottom-color:#fff;}
+/* A round somebody has dated, marked so it is obvious which columns are
+   still on the default week. */
+.period-btn.period-set{border-bottom-style:solid;border-bottom-color:#a8e0c0;}
+.period-btn.period-set::after{content:"•";margin-left:5px;font-size:11px;color:#a8e0c0;}
+/* Weeding's header sits on the pale strip, not the dark one. */
+.p-th .period-btn{border-bottom-color:var(--border-strong);}
+.p-th .period-btn:hover{background:rgba(13,122,71,.09);border-bottom-color:var(--green);}
+
+.period-pop{position:absolute;z-index:200;min-width:236px;background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-md);box-shadow:0 18px 46px rgba(0,0,0,.22);
+  padding:14px;display:flex;flex-direction:column;gap:9px;}
+.period-pop-h{font-size:11px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--green-text);}
+.period-pop label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12px;font-weight:700;color:var(--text-muted);}
+.period-pop input{height:32px;padding:0 8px;font-family:inherit;font-size:13px;
+  border:1.5px solid var(--border);border-radius:var(--r-sm);background:#fff;color:var(--text-head);}
+.period-pop input:focus{outline:none;border-color:var(--green-mid);box-shadow:0 0 0 3px #eaf4ee;}
+.period-pop-f{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;
+  margin-top:3px;padding-top:10px;border-top:1px solid var(--border);}
+.period-pop-f .btn{font-size:11.5px;padding:6px 12px;}
+
 /* Big headline metric cards on the Work Record view */
 /* Fixed 4-up grid (not auto-fit) so the headline cards keep the SAME size and
    layout whichever sub-view is open - the analytics charts change the available
@@ -376,6 +452,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .rec-checked-badge{display:inline-block;font-size:13px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;
   color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:999px;padding:6px 14px;margin-right:6px;vertical-align:middle;}
 .chk-btn.chk-locked{cursor:not-allowed;opacity:.55;}
+
+/* ─── AUDIT VERDICT ───
+   The Auditor Portal's answer for this job, in that portal's own two
+   colours so the same verdict looks the same on both screens. Read-only:
+   deliberately not a button, because the audit is not conducted here. */
+.audit-pill{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.4px;
+  text-transform:uppercase;border-radius:999px;padding:5px 12px;white-space:nowrap;
+  vertical-align:middle;}
+.audit-ok {color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;}
+.audit-bad{color:#b91c1c;background:#fff1f1;border:1.5px solid #fecaca;}
+#recview-list .rec-table .audit-pill{font-size:11px;padding:4px 10px;}
 
 /* ─── DOSAGE CALC — larger type throughout ───
    !important is needed because much of this panel carries inline font-size. */
@@ -434,65 +521,85 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
            padding-top:13px; border-top:1px solid var(--border); }
 .set-empty { font-size:13.5px; color:var(--text-faint); padding:14px 0; line-height:1.7; }
 
-/* ── Plot capacity ────────────────────────────────────────────────────────
-   Its own nursery tabs, equal width, sitting on the top edge of the block. */
-.cap-tabs { display:flex; border-bottom:1.5px solid var(--border); background:#f7f9f8; }
-.cap-tab  { flex:1 1 0; min-width:0; padding:14px 8px; border:none; background:none; cursor:pointer;
-            font-family:inherit; font-size:13px; font-weight:900; letter-spacing:.07em;
-            text-transform:uppercase; color:var(--text-muted); border-bottom:3px solid transparent;
-            margin-bottom:-1.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cap-tab:hover { color:var(--green-text); background:#eef3f0; }
-.cap-tab.on    { color:var(--green-text); background:#fff; border-bottom-color:var(--green-mid); }
-
-/* The heading is centred over the whole block, so Edit is lifted out of the
-   flow rather than sharing the row and shoving it off centre. */
-/* Title, then the tabs. One heading over the block rather than one inside
-   whichever nursery happens to be open. */
-.cap-top, .lst-top { position:relative; padding:18px 18px 14px; }
-.cap-top .set-h, .lst-top .set-h { text-align:center; margin:0; }
-.cap-edit, .lst-edit { position:absolute; right:18px; top:14px; font-size:13px; }
-.lst-top  { padding:0 0 16px; }
-.lst-edit { right:0; top:-4px; }
+/* Title centred over its block, with Edit lifted out of the flow rather than
+   sharing the row and shoving the heading off centre. Used by the Plot
+   Capacity, Chemical List and Fertiliser blocks alike. */
+.lst-top  { position:relative; padding:0 0 16px; }
+.lst-top .set-h { text-align:center; margin:0; }
+.lst-edit { position:absolute; right:0; top:-4px; font-size:13px; }
 @media (max-width:560px) {
-  .cap-top, .lst-top { display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .cap-edit, .lst-edit { position:static; }
+  .lst-top  { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .lst-edit { position:static; }
 }
 /* Cancel and Save at the foot of the block they belong to. */
 .lst-foot { display:flex; align-items:center; justify-content:flex-end; gap:10px;
             margin-top:18px; padding-top:14px; border-top:1px solid var(--border); }
 .lst-foot .btn { font-size:13.5px; padding:9px 22px; }
-.cap-foot { display:flex; align-items:center; justify-content:flex-end; gap:10px;
-            flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
-.cap-foot .btn { font-size:13.5px; padding:9px 22px; }
 
-/* Ten plots down a column, then the next column to the right. grid-auto-flow
-   fills top-to-bottom before moving across, which is the order a plot list is
-   read in; auto-fill across would run left-to-right and put P01 beside P02. */
-/* Capped, not 1fr. Stretched to fill the card, two columns each ran 900px
-   wide and left the plot name at one end of the row and its number at the
-   other. A column is as wide as it needs to be read. */
-.cap-grid { display:grid; grid-auto-flow:column; grid-template-rows:repeat(10, auto);
-            grid-auto-columns:minmax(196px, 280px); justify-content:center;
-            gap:0 28px; overflow-x:auto; padding-bottom:2px; }
-.cap-row  { display:flex; align-items:center; justify-content:space-between; gap:10px;
-            padding:8px 2px; border-bottom:1px dotted var(--border); min-height:44px; }
-.cap-row-n{ font-size:15px; font-weight:800; color:var(--green-text); }
-.cap-row-v{ font-size:15px; font-weight:700; color:var(--text-head); font-variant-numeric:tabular-nums; }
-.cap-row-v.muted { color:var(--text-faint); font-weight:600; }
-.cap-row input { width:108px; height:36px; padding:0 10px; font-size:14px; font-family:inherit;
-                 text-align:right; border:1.5px solid var(--green-mid); border-radius:var(--r-sm);
-                 box-sizing:border-box; background:#fff; }
-.cap-row input:focus { outline:none; box-shadow:0 0 0 3px #dbeee3; }
-/* A tray plot also shows what its trays come to: that product, not the number
-   being typed, is what every dosage is worked out from. */
-.cap-row-d{ font-size:12px; font-weight:700; color:var(--green-mid); white-space:nowrap; }
+/* ── Plot capacity ────────────────────────────────────────────────────────
+   Built like the Chemical List below it, because it is the same kind of
+   thing: a short list of names against short numbers. Headed columns of
+   thin rows, all four nurseries side by side, no tabs.
 
-@media (max-width:640px) {
-  /* One column on a phone — ten rows of a six-column grid is a lot of
-     sideways scrolling to find one plot. */
-  .cap-grid { grid-auto-flow:row; grid-template-rows:none; grid-template-columns:1fr; }
-  .cap-tab  { font-size:11.5px; padding:12px 4px; letter-spacing:.03em; }
+   The rows are deliberately tighter than the chemical rows. A capacity row
+   holds a plot name and a number and nothing else, and there are 104 of
+   them across the four nurseries — every pixel of padding is four rows of
+   scrolling. */
+/* Nurseries wrap as whole groups, so a nursery's columns are never split
+   across two rows of the page. */
+.cap-cols { display:flex; flex-wrap:wrap; gap:18px 20px; align-items:flex-start; }
+.cap-nursery { display:flex; flex-direction:column; }
+.cap-nursery-cols { display:flex; gap:10px; align-items:flex-start; }
+.cap-col { width:186px; min-width:0; }
+
+/* The nursery name once over its columns, not once per column. */
+.cap-nursery-h { display:flex; align-items:center; justify-content:space-between; gap:8px;
+                 flex-wrap:wrap; background:var(--green-light); border:1.5px solid var(--green-mid);
+                 border-bottom:none; border-radius:var(--r-sm) var(--r-sm) 0 0; padding:6px 10px;
+                 margin-bottom:-1.5px; position:relative; z-index:1; }
+.cap-nursery-n { font-size:11.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+                 color:var(--green-text); }
+
+@media (max-width:520px) {
+  .cap-cols { display:block; }
+  .cap-nursery { margin-bottom:18px; }
+  .cap-nursery-cols { flex-direction:column; }
+  .cap-col { width:100%; }
 }
+
+.cap-head, .cap-row { display:grid; grid-template-columns:1fr 74px; gap:6px;
+                      align-items:center; }
+/* Pre nursery counts trays, and what they come to. Three columns, not two. */
+.cap-nursery-tray .cap-head, .cap-nursery-tray .cap-row { grid-template-columns:1fr 56px 58px; }
+.cap-head { padding:6px 9px; background:#f7f9f8; border:1.5px solid var(--border);
+            font-size:9.5px; font-weight:900; letter-spacing:.05em; text-transform:uppercase;
+            color:var(--text-muted); }
+.cap-head span:not(:first-child) { text-align:right; }
+.cap-row  { padding:3px 9px; border:1.5px solid var(--border); border-top:none; background:#fff;
+            min-height:0; }
+.cap-row:nth-child(even) { background:var(--bg-row-alt); }
+.cap-row:hover { background:#f2f8f4; }
+.cap-row-n{ font-size:12.5px; font-weight:800; color:var(--green-text); line-height:1.6; }
+.cap-row-v{ font-size:12.5px; font-weight:700; color:var(--text-head); text-align:right;
+            font-variant-numeric:tabular-nums; line-height:1.6; }
+.cap-row-v.muted { color:var(--text-faint); font-weight:600; }
+/* What a pre nursery plot's trays come to: that product, not the number
+   being typed, is what every dosage is worked out from. */
+.cap-row-d{ font-size:11px; font-weight:700; color:var(--green-mid); text-align:right;
+            font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cap-row input { width:100%; height:24px; padding:0 6px; font-size:12px; font-family:inherit;
+                 text-align:right; border:1.5px solid var(--green-mid); border-radius:4px;
+                 box-sizing:border-box; background:#fff; font-variant-numeric:tabular-nums; }
+.cap-row input:focus { outline:none; box-shadow:0 0 0 2px #dbeee3; }
+
+/* Seedlings per tray belongs to the one nursery that counts in trays, so it
+   sits beside that nursery's name rather than over the whole block. */
+.cap-tray { display:flex; align-items:center; gap:6px;
+            font-size:10.5px; font-weight:800; color:#78350f; }
+.cap-tray input { width:64px; height:24px; padding:0 6px; font-size:12px; font-family:inherit;
+                  text-align:right; border:1.5px solid var(--gold-border,#fcd34d); border-radius:4px;
+                  background:#fff; font-variant-numeric:tabular-nums; }
+.cap-tray input:disabled { background:#fdf8ec; color:#92400e; }
 
 /* ── Chemical and fertiliser lists ────────────────────────────────────────
    Rows of a table rather than cards: three or four short values a line, read

@@ -91,13 +91,33 @@
         const clean = {};
         for (const [k, v] of Object.entries(val)) if (VALID_LEVELS.has(v)) clean[k] = v;
         out[key] = clean;
-      } else if (/_actions$/.test(key)) {
+      } else if (/_actions$/.test(key) || /_areas$/.test(key)) {
+        /* `<module>_areas` is the same shape as `_actions` — a key per thing,
+           booleans inside — and has to be carried through for the same reason.
+           It was NOT, and that was a real bug: everything this function does
+           not name is dropped, so scan_areas was written by Setting, stored in
+           the database, and then never seen by canScanArea(), which silently
+           fell back to the old rule for everybody. The screen said one thing
+           and the system did another, which is the worst way for a permission
+           to be wrong — it looks set. */
         const clean = {};
         for (const [page, acts] of Object.entries(val)) {
           if (!acts || typeof acts !== 'object' || Array.isArray(acts)) continue;
           const one = {};
           for (const [a, v] of Object.entries(acts)) one[a] = !!v;
           clean[page] = one;
+        }
+        out[key] = clean;
+      } else if (/_nurseries$/.test(key)) {
+        /* `<module>_nurseries` / `<module>_area_nurseries` — a list of nursery
+           names per key, where ABSENT means all of them. Dropped for the same
+           reason and with the same effect: a person narrowed to one nursery
+           read as unrestricted to every office screen that asked. The phone
+           was never affected, because it reads the row straight out of
+           shared_profiles rather than through here. */
+        const clean = {};
+        for (const [k, list] of Object.entries(val)) {
+          if (Array.isArray(list)) clean[k] = list.filter((n) => typeof n === 'string');
         }
         out[key] = clean;
       }
@@ -365,6 +385,67 @@
   // as reviewed.
   function canVerifyOperation() { return canDoOperation('batch', 'verify'); }
 
+  /* ── The five doors of the 555 Worker Portal ─────────────────────────────
+   *
+   * The scan module used to be one thing you either had or did not. It is
+   * really five places a person can be sent, and they are not the same job:
+   *
+   *   manage   555 Worker Portal Manage — the back office on ai.mjmnursery.com
+   *   fc       555 FC Portal            — the Field Conductor's phone app
+   *   worker   555 Worker Portal        — the worker's phone app, PIN sign-in
+   *   workers  Worker System            — the payroll register of workers
+   *   setting  Setting                  — who may open what, this screen
+   *
+   * Written by scan/scan_user_access.html as permissions.scan_areas.<key>,
+   * and the nursery each is confined to as scan_area_nurseries.<key>.
+   *
+   * FAILS OPEN to whatever governed the door before this existed. Nobody has
+   * a scan_areas entry until an admin saves their row, and on that day every
+   * person in the company must still be able to open exactly what they could
+   * open yesterday. So an absent answer is not "no" — it is "nobody has been
+   * asked", and the old rule answers.
+   */
+  function canScanArea(area) {
+    const p = permissions();
+    const entry = p.scan_areas && p.scan_areas[area];
+    if (entry && entry.view !== undefined) return !!entry.view;
+
+    switch (area) {
+      case 'manage':  return isAdminOf('scan');
+      case 'fc':      return canAccess('scan');
+      // Nobody is assigned the worker portal until somebody says so: it is
+      // entered with a PIN, and an office account holding it meant nothing
+      // before this screen existed. Not a door to open by accident.
+      case 'worker':  return false;
+      case 'workers': return canDo('npayroll', 'workers', 'view');
+      case 'setting': return canManageUsers();
+      default:        return false;
+    }
+  }
+
+  /**
+   * Which nurseries this person may see in that area.
+   * An array means exactly those; null means all of them.
+   */
+  function scanAreaNurseries(area) {
+    const per = permissions().scan_area_nurseries;
+    return per && Array.isArray(per[area]) ? per[area] : null;
+  }
+
+  /**
+   * Where to send somebody who has just been refused the back office.
+   *
+   * Not the hub, and not a dead end: a Field Conductor who types the Manage
+   * URL wants the app, and a supervisor who holds only the worker portal
+   * wants that one. Returns null when they hold neither, and the caller can
+   * send them back where they came from.
+   */
+  function scanHome() {
+    if (canScanArea('fc')) return 'https://scan.mjmnursery.com/?cb=' + Date.now();
+    if (canScanArea('worker')) return 'https://scan.mjmnursery.com/?cb=' + Date.now() + '#/worker';
+    return null;
+  }
+
   /**
    * Redirect away from a module page if the user lacks access.
    * Call after MJMAccess.load(supa).
@@ -395,6 +476,9 @@
     canDo,
     canOpenPage,
     requireAction,
+    canScanArea,
+    scanAreaNurseries,
+    scanHome,
     guard
   };
 })(window);

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setting — 555 Worker Portal</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%238b5cf6%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2713%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EFC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family:'Outfit', system-ui, sans-serif; }
+  body { background:#faf5ff; margin:0; }
+
+  .title-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+               gap:12px; margin-bottom:22px; }
+  .page-title { justify-self:center; margin:0; font-size:19px; font-weight:900; color:#1e293b;
+                letter-spacing:.08em; text-transform:uppercase; text-align:center; }
+  .back-btn { justify-self:start; display:inline-flex; align-items:center; gap:8px;
+              padding:9px 16px; border-radius:999px;
+              background:white; border:1.5px solid #ede9fe; color:#6d28d9; text-decoration:none;
+              font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+              line-height:1; transition:all .15s; }
+  .back-btn:hover { background:#f5f3ff; border-color:#ddd6fe; }
+  @media (max-width:700px) {
+    .title-row { grid-template-columns:1fr; justify-items:center; gap:10px; }
+    .back-btn { justify-self:center; }
+  }
+
+  /* Wide cards rather than the square tiles on the page above. There are two
+     of them and they do different jobs — one is about people, one about the
+     system — so each gets a line saying which, and a square tile has no room
+     for it. Sized here and not only by Tailwind: the CDN is a third-party
+     script and these must not stack at 300px until it lands. */
+  .tools { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+  .tool { display:flex; align-items:flex-start; gap:14px; padding:20px;
+          background:white; border:1.5px solid #ede9fe; border-radius:20px;
+          text-decoration:none; transition:all .15s;
+          box-shadow:0 4px 16px rgba(139,92,246,.08); }
+  .tool:hover { border-color:#c4b5fd; transform:translateY(-2px);
+                box-shadow:0 10px 24px -6px rgba(139,92,246,.28); }
+  .tool-ico { width:46px; height:46px; flex-shrink:0; border-radius:14px;
+              display:grid; place-items:center; font-size:21px; background:#f5f3ff; }
+  .tool-name { font-size:12px; font-weight:900; color:#1e293b;
+               text-transform:uppercase; letter-spacing:.1em; }
+  .tool-sub  { margin-top:5px; font-size:11.5px; font-weight:500; line-height:1.5; color:#64748b; }
+</style>
+</head>
+<body>
+
+<script src="../shared/shared_ribbon.js"></script>
+<script src="../shared/shared_fc_brand.js" data-portal="Worker Portal" data-sub="Manage"></script>
+
+<div id="loading" class="max-w-[860px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
+
+<div id="main" class="max-w-[860px] mx-auto px-4 md:px-6 py-7 hidden">
+
+  <div class="title-row">
+    <a class="back-btn" href="scan_admin.html">&#8592; Back to Worker Portal Manage</a>
+    <h1 class="page-title">Setting</h1>
+    <span aria-hidden="true"></span>
+  </div>
+
+  <div class="tools">
+    <a class="tool" id="tool-users" href="scan_user_access.html">
+      <span class="tool-ico">👤</span>
+      <span>
+        <span class="tool-name">User Access</span>
+        <span class="tool-sub">Who may open this portal, and what each of them may do in it.</span>
+      </span>
+    </a>
+    <a class="tool" id="tool-system" href="scan_system_setting.html">
+      <span class="tool-ico">🛠️</span>
+      <span>
+        <span class="tool-name">System Setting</span>
+        <span class="tool-sub">Nurseries, what each portal offers, and the site boundary.</span>
+      </span>
+    </a>
+  </div>
+</div>
+
+<script>
+const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+const $ = (id) => document.getElementById(id);
+
+(async () => {
+  try {
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    if (!MJMAccess.canAccess('scan')) {
+      alert('You do not have access to the 555 FC Portal.');
+      window.location.href = '../index.html';
+      return;
+    }
+    /* Same gate the page above applies to the Setting tile. This is the back
+       office, and somebody who reached it by a typed URL or an old bookmark
+       goes where they were going anyway. */
+    if (!MJMAccess.isAdminOf('scan')) {
+      window.location.replace('https://scan.mjmnursery.com/?cb=' + Date.now());
+      return;
+    }
+
+    /* User Access writes other people's permissions, which the database
+       policy only lets a user-manager do — so it is not offered to anyone
+       else. System Setting is a module-admin thing and stays. */
+    if (!MJMAccess.canManageUsers()) $('tool-users').classList.add('hidden');
+
+    $('loading').classList.add('hidden');
+    $('main').classList.remove('hidden');
+  } catch (e) {
+    if (e && e.message === 'NO_OPS_ACCESS') return;
+    console.warn(e);
+    window.location.href = '../index.html';
+  }
+})();
+</script>
+</body>
+</html>

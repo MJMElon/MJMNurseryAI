@@ -154,6 +154,70 @@
     return ['PN', 'MN'];
   }
 
+  /* ── OPENED FROM THE MANAGE PAGE ──
+     A module page carries ?from=manage when audit_admin.html sent the
+     person into it. It is not a permission — it says where they came
+     from, and two things follow from that.
+
+     The first is that they asked for the module, not for the To Do
+     list. Three of the four modules bounce a visitor with no ?plot=
+     straight back to audit_home.html, on the reasoning that the
+     auditor's way in is a pending-plot chip and a bare plot grid is
+     redundant. That reasoning is the phone's. Somebody who pressed
+     "Plot Condition Audit" on the manage page asked for the module by
+     name and got the auditor portal instead.
+
+     The second is the nursery. The stored scope is a field auditor's
+     working set — one nursery at a time, flipped with the Switch pill
+     — and it is the right default for the phone. On the manage page it
+     is not: what is on screen there is both nurseries at once, side by
+     side, and stepping into a module from it should not silently drop
+     half of that because of a switch made on a phone last week. From
+     the manage page every nursery is in scope. */
+  function fromManage() {
+    try {
+      return new URLSearchParams(global.location.search).get('from') === 'manage';
+    } catch (e) { return false; }
+  }
+
+  /* The nursery tabs a module page should show, as the four module
+     scripts each used to work out for themselves — the same PN/MN
+     mapping written four times, under three different names. One copy
+     now, and it is where the manage-page override belongs. */
+  function scopeNurseries() {
+    if (fromManage()) return ['PN', 'BNN', 'UNN1', 'UNN2'];
+    var s = scope() || '';
+    if (s === 'PN') return ['PN'];
+    if (s === 'MN') return ['BNN', 'UNN1', 'UNN2'];
+    return ['PN', 'BNN', 'UNN1', 'UNN2'];      // scope unknown → show all
+  }
+
+  /* The way back, for a module page opened from Manage. All four carry
+     the same `.top-bar-back` anchor pointing at audit_home.html, which
+     is the right answer for an auditor and the wrong one here: it drops
+     an admin on the auditor portal, a page they did not come from and
+     have to navigate out of. Retargeted here rather than in each of the
+     four scripts, because the anchor is identical in all four. */
+  function retargetBack() {
+    if (!fromManage()) return;
+    var a = global.document && global.document.querySelector('.top-bar-back');
+    if (!a) return;
+    a.setAttribute('href', 'audit_admin.html');
+    a.setAttribute('title', 'Back to manage');
+    a.setAttribute('aria-label', 'Back to manage');
+    /* Plot Condition and Seedling Height put a goBack() on this anchor
+       that returns true so the href decides. Nothing to undo — but if a
+       page ever preventDefaults it, this keeps the destination honest. */
+    a.onclick = null;
+  }
+  if (global.document) {
+    if (global.document.readyState === 'loading') {
+      global.document.addEventListener('DOMContentLoaded', retargetBack);
+    } else {
+      retargetBack();
+    }
+  }
+
   global.MJMAuditLogin = {
     url: loginUrl,
     requireSignIn: requireSignIn,
@@ -163,6 +227,8 @@
     scope: scope,
     setScope: setScope,
     clearScope: clearScope,
-    allowedScopes: allowedScopes
+    allowedScopes: allowedScopes,
+    fromManage: fromManage,
+    scopeNurseries: scopeNurseries
   };
 })(window);

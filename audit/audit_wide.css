@@ -1,0 +1,142 @@
+/* ══════════════════════════════════════════════════════════════════
+   555 AUDITOR PORTAL — THE MODULE PAGES AT A DESK
+   ══════════════════════════════════════════════════════════════════
+   The four module pages — plot condition, seedling height, papan
+   tanda, maintenance — are the phone app. They are built for a thumb
+   in a nursery and everything about them is right for that: a 480px
+   column, a bottom tab bar, a thumb-sized FAB, a modal that rises
+   from the bottom edge as a sheet.
+
+   They are also what opens when somebody presses a card on
+   audit_admin.html, which is a desk page. There the same 480px column
+   sat as a narrow strip in the middle of a 1512px screen, with the
+   plot grid wrapping to six circles a row and the tab bar floating in
+   the empty middle.
+
+   So this file is the desk half, and NOTHING in it applies below
+   768px. Every rule is inside a min-width query: a phone in a nursery
+   loads this file and gets exactly the page it got before. That is
+   the whole discipline here — the field app is not being redesigned,
+   it is being given the width it already has on a screen that has it.
+
+   What the width is spent on is chosen per element, because a wider
+   column is not automatically better:
+
+     · the plot grids and record lists genuinely want it — more
+       plots visible without scrolling is the entire point
+     · the FORMS do not. A field entry form stretched to 1100px is a
+       row of inputs a metre apart with the label at the far left.
+       They stay at a readable measure and centre in the column.
+
+   Loaded after each module's own stylesheet, so these rules win on
+   equal specificity without !important.
+   ══════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 768px) {
+
+  /* ── THE COLUMN ──
+     1100 to match audit_admin.html's content column: stepping from the
+     manage page into a module should not change how wide the page is.
+     The hairline and shadow give the column an edge, which it needs
+     once there is ground either side of it. */
+  #app {
+    max-width: 1100px;
+    box-shadow: 0 0 0 1px var(--border), 0 2px 26px rgba(16, 40, 60, .07);
+  }
+
+  /* The tab bar is fixed and centres itself on the viewport at the
+     column's old width, so it has to be told the new one or it sits as
+     a 480px island under a 1100px page. Both centring styles in use
+     across the four (left:50%+translate, and left:0/right:0+margin
+     auto) keep working — only the cap changes. */
+  .bottom-tabs,
+  .nursery-bottom-tabs {
+    max-width: 1100px;
+  }
+
+  /* ── THE FAB ──
+     Anchored to the viewport's right edge on three of the four, and to
+     a hardcoded +160px from centre on the fourth (sized for the 480px
+     column). Both are wrong here: one flies to the far corner of the
+     screen, the other lands inside the column but in the wrong place.
+
+     max() puts it 16px inside the column's right edge once the column
+     is capped, and falls back to 16px from the viewport while the
+     window is still narrower than 1100 — one expression, correct at
+     every width, no second breakpoint. */
+  .fab {
+    right: max(16px, calc(50vw - 550px + 16px));
+    transform: none;
+  }
+  /* The plot module re-states transform on hover and active for its
+     scale, which would put the old offset back. `scale` is its own
+     property, so the two no longer fight. */
+  .fab:hover  { transform: none; scale: 1.06; }
+  .fab:active { transform: none; scale: .95; }
+
+  /* ── WHAT THE WIDTH IS FOR ──
+     Fixed cells rather than the phone's auto-fill 1fr, and the grid
+     centres what fits. Left as 1fr the eleven columns each stretched
+     to ~95px around a 52px circle, and 52 plots read as scattered
+     rather than as a block. */
+  .plot-grid {
+    grid-template-columns: repeat(auto-fill, 78px);
+    justify-content: center;
+    padding: 18px 14px;
+  }
+  .record-list { padding: 0 14px; }
+  .list-header { padding-left: 14px; padding-right: 14px; }
+
+  /* ── WHAT THE WIDTH IS NOT FOR ──
+     Forms and the single-record detail. Held to a readable measure and
+     centred, so the inputs stay the size a form's inputs should be.
+     Named individually rather than by a class because the four pages
+     label these views slightly differently — plot and maintenance have
+     #view-form, papan splits it into a batch form and an audit form,
+     and height adds the multi-entry sheet. */
+  #view-form,
+  #view-audit-form,
+  #view-batch-form,
+  #view-multi,
+  #view-detail {
+    max-width: 660px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* ── THE MODAL ──
+     A sheet that rises from the bottom edge is a phone gesture. With
+     room on every side it becomes what it actually is: a dialog, in
+     the middle, rounded all the way round. */
+  .modal-overlay { align-items: center; }
+  .modal-box {
+    border-radius: 20px;
+    max-width: 440px;
+    padding-bottom: 20px;
+  }
+}
+
+/* ── THE RECORD LISTS, TWO UP ──
+   A record row is a plot code, a date and a line of findings. Given the
+   full column it became a metre of rule with the text at the far left
+   and nothing after it, and six records filled a screen that had room
+   for twelve. Two columns put the text back at a readable length and
+   double what is visible at once.
+
+   Held back to 980 rather than sharing the 768 breakpoint: at tablet
+   width two columns are narrower than the phone's single one, which is
+   worse than a long row. The column gap only — the rows still space
+   themselves with .record-item's own margin-bottom, so nothing needs
+   to know it is in a grid. */
+@media (min-width: 980px) {
+  /* Only the lists in the two full-width views. #view-detail is capped
+     at 660 above and carries a .record-list of its own; two columns
+     inside that box would be 324px each, narrower than the phone. */
+  #view-list .record-list,
+  #view-plot .record-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+    align-items: start;
+  }
+}

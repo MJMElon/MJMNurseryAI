@@ -104,6 +104,20 @@ AS $$
       'maintenance', COALESCE((w.portal #> '{modules,maintenance}')::boolean, true),
       'settings',    COALESCE((w.portal #> '{modules,settings}')::boolean,    false)
     ),
+    -- Which FUNCTIONS inside a module: the schedule, the record form, and the
+    -- record form's own parts. Passed through as it was written rather than
+    -- spelt out key by key like the modules above — the app owns that list
+    -- (Barcode_Counter src/modules/maintenance/functions.js) and it grows, and
+    -- naming the keys here would mean a switch added there being silently
+    -- dropped on its way to the phone.
+    --
+    -- An empty object is the right answer for a worker nobody has set
+    -- switches for: absent means the app's documented default, which is the
+    -- ordinary form.
+    'actions', CASE
+      WHEN jsonb_typeof(w.portal -> 'actions') = 'object' THEN w.portal -> 'actions'
+      ELSE '{}'::jsonb
+    END,
     'boundary', jsonb_build_object(
       -- null = every nursery. An absent setting falls back to the nursery on
       -- the worker's own row; only a worker with no nursery at all sees the
@@ -176,6 +190,52 @@ END;
 $$;
 
 
+/* The company's master switches for the worker portal.
+ *
+ * Carried to the phone rather than read by it: a PIN sign-in is `anon`, and
+ * shared_portal_settings is deliberately not readable by anon — a straight
+ * grant would hand it the FC portal's row too, which is none of a worker's
+ * business. This runs inside worker_signin and worker_whoami, so the read
+ * happens as the owner and only the worker's own row comes back.
+ *
+ * Guarded twice, because the two files that make this system can be run in
+ * either order and neither should need the other to have gone first:
+ *
+ *   the TABLE may not exist   — create_scan_system_setting.sql not run yet
+ *   the COLUMN may not exist  — an older install of that file, before
+ *                               `actions` was added to it
+ *
+ * Either way the answer is an empty object, which vetoes nothing and is
+ * exactly how the portal behaved before any of this existed.
+ */
+CREATE OR REPLACE FUNCTION public.worker_company_switches()
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  nothing CONSTANT JSONB := jsonb_build_object('modules', '{}'::jsonb,
+                                               'actions', '{}'::jsonb);
+  out JSONB;
+BEGIN
+  IF to_regclass('public.shared_portal_settings') IS NULL THEN
+    RETURN nothing;
+  END IF;
+  -- through to_jsonb so a table without the `actions` column still answers
+  EXECUTE $q$
+    SELECT jsonb_build_object(
+             'modules', COALESCE(to_jsonb(s) -> 'modules', '{}'::jsonb),
+             'actions', COALESCE(to_jsonb(s) -> 'actions', '{}'::jsonb))
+      FROM shared_portal_settings s
+     WHERE s.portal = 'worker'
+  $q$ INTO out;
+  RETURN COALESCE(out, nothing);
+END;
+$fn$;
+
+
 -- What the phone is told about itself. Never includes the PIN.
 CREATE OR REPLACE FUNCTION public.worker_identity(w mjmnpayroll_workers, p_token UUID)
 RETURNS JSONB
@@ -194,6 +254,15 @@ AS $$
                  'role',      to_jsonb(w) -> 'role'
                ),
     'modules',  public.worker_portal(w) -> 'modules',
+    -- Which FUNCTIONS inside a module this worker gets — the schedule, the
+    -- record form, and the record form's own parts. The same switches, with
+    -- the same keys, that the office sets per Field Conductor on
+    -- ai.mjmnursery.com. Absent means the app's documented defaults, so a
+    -- worker nobody has touched still gets the ordinary form.
+    'actions',  public.worker_portal(w) -> 'actions',
+    /* The COMPANY's master switches for this portal — System Setting → Portal
+       View & Function. Off there beats on anywhere else. */
+    'company',  public.worker_company_switches(),
     'boundary', public.worker_portal(w) -> 'boundary'
   );
 $$;
@@ -309,8 +378,15 @@ BEGIN
   nur := b -> 'nurseries';
   plt := b -> 'plots';
 
+  -- Cast to the declared type rather than trusting the column to be it.
+  -- plpgsql compares the query's types to the RETURNS TABLE list exactly —
+  -- not "can this be converted", the same type — and raises "structure of
+  -- query does not match function result type" when they differ. A column
+  -- somebody once declared VARCHAR, or an INTEGER where this says NUMERIC,
+  -- then breaks the whole board rather than one field. The casts cost
+  -- nothing and make these functions independent of the table's spelling.
   RETURN QUERY
-    SELECT p.nursery_name, p.plot_name
+    SELECT p.nursery_name::TEXT, p.plot_name::TEXT
       FROM shared_plots p
      WHERE (jsonb_typeof(nur) <> 'array'
             OR public.worker_key(p.nursery_name) IN (
@@ -341,7 +417,7 @@ BEGIN
   END IF;
 
   RETURN QUERY EXECUTE $q$
-    SELECT v.plot_name, v.batch_name, v.qty
+    SELECT v.plot_name::TEXT, v.batch_name::TEXT, v.qty::NUMERIC
       FROM shared_plot_batch_balance v
       JOIN worker_plots($1) wp ON public.worker_key(wp.plot_name) = public.worker_key(v.plot_name)
      WHERE v.qty > 0
@@ -428,6 +504,32 @@ BEGIN
       USING NULLIF(btrim(COALESCE(p_payload ->> 'photo_urls', '')), ''), new_id;
   END IF;
 
+  -- The track walked while the job was done (shared/add_maint_field_gps.sql).
+  -- The app sends the keys whether or not it has a track, so an absent WALK
+  -- and an absent COLUMN are two different things and both are checked: a
+  -- worker whose GPS switch is off, or who never pressed start, records the
+  -- job exactly as before.
+  IF (p_payload ->> 'gps_lat') IS NOT NULL
+     AND (p_payload ->> 'gps_lng') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'nops_maint_field_records' AND column_name = 'gps_track') THEN
+    EXECUTE 'UPDATE nops_maint_field_records
+                SET gps_track = $1, gps_points = $2, gps_distance_m = $3,
+                    gps_started_at = $4, gps_ended_at = $5,
+                    gps_lat = $6, gps_lng = $7, gps_accuracy = $8
+              WHERE id = $9'
+      USING CASE WHEN jsonb_typeof(p_payload -> 'gps_track') = 'array'
+                 THEN p_payload -> 'gps_track' ELSE NULL END,
+            NULLIF(p_payload ->> 'gps_points', '')::int,
+            NULLIF(p_payload ->> 'gps_distance_m', '')::numeric,
+            NULLIF(p_payload ->> 'gps_started_at', '')::timestamptz,
+            NULLIF(p_payload ->> 'gps_ended_at', '')::timestamptz,
+            (p_payload ->> 'gps_lat')::numeric,
+            (p_payload ->> 'gps_lng')::numeric,
+            NULLIF(p_payload ->> 'gps_accuracy', '')::numeric,
+            new_id;
+  END IF;
+
   RETURN new_id;
 END;
 $$;
@@ -447,7 +549,8 @@ DECLARE w mjmnpayroll_workers;
 BEGIN
   w := public.worker_from_token(p_token);
   RETURN QUERY
-    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type, r.qty, r.remark
+    SELECT r.id::BIGINT, r.work_date, r.nursery_name::TEXT, r.plot_name::TEXT,
+           r.work_type::TEXT, r.qty::NUMERIC, r.remark::TEXT
       FROM nops_maint_field_records r
      WHERE r.reported_by = w.full_name
      ORDER BY r.work_date DESC, r.id DESC
@@ -463,6 +566,20 @@ ALTER TABLE nops_maint_field_records
   ADD COLUMN IF NOT EXISTS worked_by   TEXT,
   ADD COLUMN IF NOT EXISTS verified_by TEXT,
   ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+
+-- And the GPS track — shared/add_maint_field_gps.sql, repeated here for the
+-- same reason. It has to be here rather than later in the file: the function
+-- below names these columns, and a function that names a column which does
+-- not exist fails the first time somebody opens the board.
+ALTER TABLE nops_maint_field_records
+  ADD COLUMN IF NOT EXISTS gps_track      JSONB,
+  ADD COLUMN IF NOT EXISTS gps_points     INTEGER,
+  ADD COLUMN IF NOT EXISTS gps_distance_m NUMERIC,
+  ADD COLUMN IF NOT EXISTS gps_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS gps_ended_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS gps_lat        NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_lng        NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_accuracy   NUMERIC;
 
 
 -- ── 8b. What the maintenance board needs ────────────────────────────────
@@ -485,7 +602,9 @@ RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
                work_type TEXT, jenis TEXT, chemical TEXT, qty NUMERIC,
                remark TEXT, reported_by TEXT, batch_name TEXT,
                week_no INT, schedule_month TEXT,
-               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ)
+               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ,
+               gps_lat NUMERIC, gps_lng NUMERIC, gps_accuracy NUMERIC,
+               gps_points INT, gps_distance_m NUMERIC)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -494,16 +613,33 @@ BEGIN
   PERFORM public.worker_from_token(p_token);
 
   RETURN QUERY
-    SELECT r.id, r.work_date, r.nursery_name, r.plot_name, r.work_type,
-           r.jenis, r.chemical, r.qty, r.remark, r.reported_by,
-           r.batch_name, r.week_no, r.schedule_month,
+    -- Every column cast to what the RETURNS TABLE list above says. qty is
+    -- INTEGER on this table and week_no is SMALLINT, and plpgsql wants the
+    -- same type, not a convertible one — without the casts this raises
+    -- "structure of query does not match function result type" and the
+    -- worker's whole board goes red.
+    SELECT r.id::BIGINT, r.work_date, r.nursery_name::TEXT, r.plot_name::TEXT,
+           r.work_type::TEXT, r.jenis::TEXT, r.chemical::TEXT, r.qty::NUMERIC,
+           r.remark::TEXT, r.reported_by::TEXT,
+           r.batch_name::TEXT, r.week_no::INT, r.schedule_month::TEXT,
            -- Who the conductor credited the job to, when he keyed it for
            -- somebody whose phone was broken. NULL means reported_by did it.
-           r.worked_by,
+           r.worked_by::TEXT,
            -- So a worker can see their morning has been checked off. Read
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
-           r.verified_by, r.verified_at
+           r.verified_by::TEXT, r.verified_at,
+           -- Where the track started, and how far it went. For the people the
+           -- office has switched GPS on for; null everywhere else, and the
+           -- board simply does not draw the line.
+           --
+           -- The TRACK ITSELF is deliberately not here. This returns up to two
+           -- thousand records to a phone, and a thousand-point walk on each of
+           -- them is tens of megabytes down a nursery's signal to draw a list
+           -- that only ever shows "820 m". The summary is stored beside the
+           -- track exactly so this query does not have to carry it.
+           r.gps_lat::NUMERIC, r.gps_lng::NUMERIC, r.gps_accuracy::NUMERIC,
+           r.gps_points::INT, r.gps_distance_m::NUMERIC
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
@@ -537,7 +673,7 @@ BEGIN
   END IF;
 
   RETURN QUERY EXECUTE $q$
-    SELECT s.nursery, s.month, s.payload
+    SELECT s.nursery::TEXT, s.month::TEXT, s.payload::JSONB
       FROM nops_maint_state s
      WHERE EXISTS (
              SELECT 1 FROM public.worker_plots($1) wp
@@ -567,7 +703,8 @@ BEGIN
   END IF;
 
   RETURN QUERY
-    SELECT wk.id, wk.worker_no, wk.full_name, wk.nursery, wk.job_title,
+    SELECT wk.id::BIGINT, wk.worker_no::TEXT, wk.full_name::TEXT,
+           wk.nursery::TEXT, wk.job_title::TEXT,
            (wk.pin IS NOT NULL) AS has_pin,
            public.worker_portal(wk)
       FROM mjmnpayroll_workers wk
@@ -575,6 +712,70 @@ BEGIN
      ORDER BY wk.nursery NULLS LAST, wk.full_name;
 END;
 $$;
+
+
+/* The colleagues a worker may credit a job to.
+ *
+ * Different from worker_roster() above in every way that matters, which is
+ * why it is a second function rather than a flag on the first:
+ *
+ *   worker_roster        behind the Settings module, for handing out access.
+ *                        Every worker in the company, with their portal
+ *                        settings and whether they have a PIN.
+ *
+ *   worker_maint_roster  behind the Maintenance module's `workers` switch,
+ *                        for the tick list on a record form. NAMES ONLY, and
+ *                        only inside this worker's own boundary.
+ *
+ * It returns no PIN, no id anybody could act on, no portal settings — a name
+ * and the nursery it belongs to, which is all the tick list draws. Somebody
+ * who should not be handing out access must not get the roster screen's
+ * answer just because the tick list was switched on for them.
+ *
+ * The boundary is the same one every other function here uses, so a worker
+ * confined to BNN is offered BNN's crew and nobody else's.
+ *
+ * Whether it is OFFERED at all is a switch, in three places, and this
+ * function does not decide it: System Setting → Portal View & Function for
+ * the company, and the worker's own row in the Worker Portal's Settings.
+ * The app asks only when those say yes.
+ */
+CREATE OR REPLACE FUNCTION public.worker_maint_roster(p_token UUID)
+RETURNS TABLE (full_name TEXT, nursery TEXT, section TEXT,
+               role TEXT, job_title TEXT, maint_general BOOLEAN, active BOOLEAN)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE w mjmnpayroll_workers;
+BEGIN
+  w := public.worker_from_token(p_token);
+
+  IF NOT COALESCE((public.worker_portal(w) #> '{modules,maintenance}')::boolean, false) THEN
+    RAISE EXCEPTION 'the maintenance module is switched off for you' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+    SELECT wk.full_name::TEXT,
+           wk.nursery::TEXT,
+           (to_jsonb(wk) ->> 'section')::TEXT,
+           (to_jsonb(wk) ->> 'role')::TEXT,
+           wk.job_title::TEXT,
+           (to_jsonb(wk) ->> 'maint_general' = 'true')::BOOLEAN,
+           wk.active::BOOLEAN
+      FROM mjmnpayroll_workers wk
+     WHERE wk.active
+       -- Inside the boundary. Matched on letters and digits alone, because
+       -- shared_plots says "UNN 1" and the payroll register may say "UNN1";
+       -- comparing them as spelt finds BNN and nobody at all for UNN 1.
+       AND EXISTS (
+             SELECT 1 FROM public.worker_plots(p_token) wp
+              WHERE public.worker_key(wp.nursery_name)
+                    = public.worker_key(COALESCE(NULLIF(btrim(wk.nursery), ''),
+                                                 to_jsonb(wk) ->> 'section')))
+     ORDER BY wk.full_name;
+END;
+$fn$;
 
 
 CREATE OR REPLACE FUNCTION public.worker_set_portal(p_token UUID, p_worker_id BIGINT, p_portal JSONB)
@@ -631,6 +832,7 @@ GRANT EXECUTE ON FUNCTION public.worker_my_records(UUID, INT)            TO anon
 GRANT EXECUTE ON FUNCTION public.worker_maint_records(UUID, INT)         TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_schedules(UUID)                  TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_roster(UUID)                     TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_maint_roster(UUID)               TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_set_portal(UUID, BIGINT, JSONB)  TO anon, authenticated;
 
 -- The phone does not call Postgres, it calls PostgREST, which answers from a

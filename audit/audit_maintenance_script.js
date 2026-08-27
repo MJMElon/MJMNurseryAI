@@ -135,11 +135,10 @@ let activeFilter='All', activeView='list';
 const NURSERY_LABELS={PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
 function _scopeNurseries(){
   try {
-    var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
-    if (s === 'PN') return ['PN'];
-    if (s === 'MN') return ['BNN','UNN1','UNN2'];
+    if (window.MJMAuditLogin && MJMAuditLogin.scopeNurseries)
+      return MJMAuditLogin.scopeNurseries();
   } catch (e) {}
-  return ['PN','BNN','UNN1','UNN2'];        // scope unknown → show all
+  return ['PN','BNN','UNN1','UNN2'];        // no guard loaded → show all
 }
 const SCOPE_NURSERIES = _scopeNurseries();
 let activeNursery = SCOPE_NURSERIES[0] || 'PN';

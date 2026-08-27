@@ -1531,7 +1531,11 @@ function init(){
     const qs = new URLSearchParams(location.search);
     const hasPlot = !!qs.get('plot');
     const isAdm   = qs.get('admin') === '1';
-    if (!hasPlot && !isAdm) { location.replace('audit_home.html'); return; }
+    /* ?from=manage is audit_admin.html sending somebody into the module
+       by name — they asked for the module, not for the To Do list. See
+       fromManage() in audit_login_guard.js. */
+    const fromMgmt = qs.get('from') === 'manage';
+    if (!hasPlot && !isAdm && !fromMgmt) { location.replace('audit_home.html'); return; }
   } catch (e) {}
 
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());
@@ -1546,11 +1550,10 @@ function init(){
   // Nursery sees BNN/UNN1/UNN2. Matches plot audit + papan + maintenance.
   const _SCOPE = (function(){
     try {
-      var s = (window.MJMAuditLogin && MJMAuditLogin.scope && MJMAuditLogin.scope()) || '';
-      if (s === 'PN') return ['PN'];
-      if (s === 'MN') return ['BNN','UNN1','UNN2'];
+      if (window.MJMAuditLogin && MJMAuditLogin.scopeNurseries)
+        return MJMAuditLogin.scopeNurseries();
     } catch(e){}
-    return ['PN','BNN','UNN1','UNN2'];
+    return ['PN','BNN','UNN1','UNN2'];      // no guard loaded → show all
   })();
   // Hide out-of-scope tabs AND rewrite grid-template-columns so the
   // remaining ones stretch evenly across the row. Otherwise MN scope
