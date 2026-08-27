@@ -140,7 +140,29 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 /* Sections the payroll is filed under. The first four match the nurseries;
    UNE and Driver exist only here. */
-const SECTIONS = [
+/* ── The sections a worker is filed under ──────────────────────────────
+   The nurseries among these are not written here any more. They come from
+   operation_nurseries — the same list Operation → Settings → Manage
+   Nurseries & Base Maps keeps — so a nursery created there turns up here
+   without anybody keying it a second time, and the two cannot disagree.
+
+   A nursery's CODE is its name with the spaces taken out: "UNN 1" files as
+   UNN1, and a new "UNN 3" as UNN3. That is a transcription, not a guess —
+   the nurseries are named as codes with a space in them. System Setting
+   shows the code beside every name so one named some other way is visible
+   there rather than discovered in a payroll listing later.
+
+   UNE and Driver are not nurseries and never were. They are kept here
+   because a worker still has to be filed under something.
+
+   The list below is what the page opens on, before the read lands. Losing
+   the nursery read must not leave the register with nowhere to file
+   anybody, so the seed is the six sections it has always had. */
+const FIXED_SECTIONS = [
+  { code:'UNE',    name:'UNE'    },
+  { code:'Driver', name:'Driver' }
+];
+let SECTIONS = [
   { code:'PN',     name:'PN — Pre Nursery'     },
   { code:'BNN',    name:'BNN — Batu Niah'      },
   { code:'UNN1',   name:'UNN1 — Ulu Niah 1'    },
@@ -148,7 +170,60 @@ const SECTIONS = [
   { code:'UNE',    name:'UNE'                  },
   { code:'Driver', name:'Driver'               }
 ];
-const SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+let SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+
+const nurseryCode = n => String(n || '').replace(/\s+/g, '').toUpperCase();
+
+function setSections(list) {
+  SECTIONS = list;
+  SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
+}
+
+/* Read once, on the way in. A nursery that cannot be read leaves the seed
+   standing rather than emptying the register — the worst this page can do
+   is offer a section that no longer exists; the worst the alternative does
+   is hide every worker in it. */
+async function loadSections() {
+  let nurseries = [];
+  try {
+    const { data, error } = await _supabase
+      .from('operation_nurseries').select('name').order('name');
+    if (error) throw error;
+    nurseries = (data || [])
+      .map(n => ({ code: nurseryCode(n.name), name: String(n.name || '').trim() }))
+      .filter(n => n.code);
+  } catch (e) {
+    console.warn('Could not read the nursery list; keeping the built-in sections.', e);
+    return;                                   // seed stands
+  }
+  if (!nurseries.length) return;              // ditto: no nurseries, no change
+
+  const out = [], seen = new Set();
+  const add = (code, name) => {
+    if (!code || seen.has(code)) return;
+    seen.add(code);
+    out.push({ code, name });
+  };
+  /* A nursery whose name already IS its code reads "BNN — BNN" otherwise. */
+  nurseries.forEach(n => add(n.code, n.code === n.name ? n.code : n.code + ' — ' + n.name));
+  FIXED_SECTIONS.forEach(f => add(f.code, f.name));
+  setSections(out);
+}
+
+/* Anything a worker row is already filed under that the list above does not
+   contain — a nursery since renamed or deleted, a code keyed before any of
+   this. Those workers exist and are somebody's problem, so they get their
+   section back rather than disappearing off the register. Called once the
+   workers are in hand. */
+function addOrphanSections() {
+  const have = new Set(SECTIONS.map(s => s.code));
+  const extra = [];
+  workers.forEach(w => {
+    const c = (w.section || '').trim();
+    if (c && !have.has(c)) { have.add(c); extra.push({ code: c, name: c + ' — not in the nursery list' }); }
+  });
+  if (extra.length) setSections(SECTIONS.concat(extra));
+}
 
 /* The roles a worker can hold. One list, offered in every section. */
 const ROLES = [
@@ -287,21 +362,35 @@ function renderWorkers() { renderWorkerBoard(); }
    has to learn the word. */
 const DIVISIONS = [
   { name: 'Pre Nursery',  sections: ['PN'] },
-  { name: 'Main Nursery', sections: ['BNN', 'UNN1', 'UNN2'] },
+  /* Main Nursery is Batu Niah and the Ulu Niah nurseries. Matched rather
+     than listed, so a UNN 3 created in Operation Settings joins the two
+     already there instead of standing on its own at the end of the board
+     under a heading of its own — which is what an unplaced section gets,
+     and is right for a section nobody has decided about, but wrong for the
+     third of something. */
+  { name: 'Main Nursery', match: c => c === 'BNN' || /^UNN\d+$/.test(c) },
   { name: 'Estate',       sections: ['UNE'] },
   { name: 'Driver',       sections: ['Driver'] }
 ];
 
 function boardColumns() {
-  const known = new Set(SECTIONS.map(s => s.code));
+  const codes = SECTIONS.map(s => s.code);
+  const known = new Set(codes);
   const cols  = [];
   DIVISIONS.forEach(d => {
-    const secs = d.sections.filter(c => known.has(c));
+    /* A division either names its sections or recognises them. Recognising
+       is what lets a nursery nobody has heard of yet land in the right
+       place; naming is for the ones there will only ever be one of. */
+    const secs = d.match ? codes.filter(d.match) : d.sections.filter(c => known.has(c));
     if (secs.length) cols.push({ name: d.name, sections: secs });
   });
   const placed = new Set(cols.flatMap(d => d.sections));
+  /* Falls back to the code. The section list is built from the nursery
+     table now, so a heading is only as reliable as what came back from it —
+     and a division headed by nothing at all is worse than one headed by a
+     code somebody recognises. */
   SECTIONS.filter(s => !placed.has(s.code))
-          .forEach(s => cols.push({ name: s.name, sections: [s.code] }));
+          .forEach(s => cols.push({ name: s.name || s.code, sections: [s.code] }));
   return cols;
 }
 
@@ -685,7 +774,9 @@ async function removeWorker(id) {
       return;
     }
 
+    await loadSections();
     await loadWorkers();
+    addOrphanSections();
     renderWorkers();
 
     $('loading').classList.add('hidden');
