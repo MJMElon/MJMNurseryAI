@@ -547,7 +547,11 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    scrolling. */
 /* Nurseries wrap as whole groups, so a nursery's columns are never split
    across two rows of the page. */
-.cap-cols { display:flex; flex-wrap:wrap; gap:18px 20px; align-items:flex-start; }
+/* Centred, because how many nurseries there are is not fixed — three today,
+   four when one is added — and a row that packs from the left leaves a
+   different-sized gap on the right every time the list changes. */
+.cap-cols { display:flex; flex-wrap:wrap; justify-content:center;
+            gap:18px 20px; align-items:flex-start; }
 .cap-nursery { display:flex; flex-direction:column; }
 .cap-nursery-cols { display:flex; gap:10px; align-items:flex-start; }
 .cap-col { width:186px; min-width:0; }
