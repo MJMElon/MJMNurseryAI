@@ -471,11 +471,31 @@ async function loadAll(){
       audits:           audits.length
     });
     renderLists();
-    /* Arrived from a pending-plot circle on the portal — bring that
-       plot's task into view. Only here, in the loader: doing it in the
-       filter and tab handlers would yank the page back to it on every
-       tap for as long as the parameter stayed in the URL. */
-    MJMAuditDeepLink.reveal();
+    /* Arrived from a pending-plot circle on the portal — open that
+       plot's first pending task's audit form directly. Only here, in
+       the loader: doing it in the filter and tab handlers would yank
+       the page back to it on every tap. reveal() falls through as a
+       compatibility shim if the plot has no pending task any more. */
+    (function _deepPlot(){
+      try {
+        const p = MJMAuditDeepLink.plot();
+        if (!p) return;
+        /* Prefer a task on the currently-active nursery so tapping a
+           B01 chip while UNN1 is on-screen does not open an N-plot
+           audit; fall back to any nursery when nothing on the active
+           tab matches (rare — the chip should not have been offered
+           in that case, but a stale URL might name one). */
+        const canon = _canonicalPlot(p);
+        const cand = tasks.filter(t => _canonicalPlot(t.plot||'') === canon &&
+                                       !getAuditForTask(t.id));
+        const target = cand.find(t => t.nursery === activeNursery) || cand[0];
+        if (!target) { MJMAuditDeepLink.reveal(); return; }
+        openForm(target.id, false, null);
+      } catch (e) {
+        console.warn('[maint-audit] deep-link openForm failed:', e);
+        try { MJMAuditDeepLink.reveal(); } catch (_) {}
+      }
+    })();
     updateStats();
   }catch(e){
     showToast('⚠ Failed to load');console.error(e);

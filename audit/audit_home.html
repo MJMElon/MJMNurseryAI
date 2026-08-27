@@ -658,10 +658,18 @@
     .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
     .tl-plot:active{transform:scale(.94)}
     /* Overdue rows tint their circles too — an overdue plot is the one
-       thing on this screen that should catch the eye first. */
+       thing on this screen that should catch the eye first. The chip
+       itself pulses (same @keyframes tl-shine the icon uses) so a
+       backlog on maintenance shines the way overdue seedling audits
+       already do — the auditor sees the outstanding plot from a
+       glance, not a scroll. */
     .tl-item.overdue .tl-plot{border-color:#b91c1c;color:#b91c1c;
-                              background:#fef2f2}
+                              background:#fef2f2;
+                              animation:tl-shine 1.8s ease-in-out infinite}
     .tl-item.overdue .tl-plot:hover{background:#b91c1c;color:#fff}
+    @media (prefers-reduced-motion:reduce){
+      .tl-item.overdue .tl-plot{animation:none}
+    }
     /* Opens the rest of the strip. Shaped like the circles it stands in
        for, but filled with the row's tone rather than outlined in it, so
        it reads as the odd one out — it is not a plot. */
@@ -1468,6 +1476,14 @@ function loadAuditTodo(){
     const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
     return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
   }
+  /* One To Do row per work TYPE per deadline — Manuring, Weeding,
+     Interrow, Others each get their own coloured card with their own
+     plot chips. Tapping a chip deep-links straight into that plot's
+     audit form via ?plot= on the maintenance page. */
+  const MAINT_WT_LABEL = {
+    manuring:'Manuring', weeding:'Weeding', interrow:'Interrow Spraying',
+    other:'Others'
+  };
   async function loadMaintTimeline(){
     const diag = { fRows: 0, oRecs: 0, audited: 0, kept: 0, skippedPd: 0,
                    skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
@@ -1481,7 +1497,8 @@ function loadAuditTodo(){
       diag.fRows = (fRows||[]).length;
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
       diag.audited = audited.size;
-      const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
+      /* Key is workType|YYYY-MM-DD — one bucket per (work-type, deadline). */
+      const buckets = new Map();
       const push = (id, workDateISO, workType, plotRaw) => {
         if (_wtWinFor(workType) <= 0)              { diag.skippedPd++; return; }
         if (audited.has(String(id)))               { diag.skippedAudited++; return; }
@@ -1494,16 +1511,13 @@ function loadAuditTodo(){
         const n = plot ? _PLOT_NUR[plot] : null;
         if (!n)                                    { diag.skippedNoPlot++; return; }
         if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
-        const k = y + '-' + m + '-' + d;
+        const wt = String(workType||'other').toLowerCase();
+        const k  = wt + '|' + y + '-' + m + '-' + d;
         if (!buckets.has(k))
-          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map() });
+          buckets.set(k, { y, m, d, workType: wt,
+                           nurseries: new Set(), plots: new Map() });
         const bucket = buckets.get(k);
         bucket.nurseries.add(n);
-        /* Same walk also collects WHICH plots are pending, per nursery,
-           so the circles under a maintenance row come out of the pass
-           that already decided the row exists. Maintenance is the one
-           module audit_pending.js does not answer for, because this is
-           where the answer already is. */
         if (!bucket.plots.has(n)) bucket.plots.set(n, new Set());
         bucket.plots.get(n).add(plot);
         diag.kept++;
@@ -1518,12 +1532,11 @@ function loadAuditTodo(){
       MAINT_OCCURRENCES = Array.from(buckets.values());
       diag.buckets = MAINT_OCCURRENCES.length;
       /* Fallback: if the deadline-buckets came out empty but the raw
-         task tables have rows that the maintenance page would show
-         as pending, still surface a maintenance row on the To Do
+         task tables have rows the maintenance page would show as
+         pending, still surface a single maintenance row on the To Do
          list — tied to today so the auditor can tap through and see
-         what's there. Deadline windowing / plot mapping can fail
-         for a stray task without hiding the whole module from the
-         home page. */
+         what's there. The row falls into the "Others" type so it uses
+         the same coloured card the other work types do. */
       if (!MAINT_OCCURRENCES.length) {
         const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
         const fieldPending = (fRows||[]).some(r =>
@@ -1542,6 +1555,7 @@ function loadAuditTodo(){
             y: now.getFullYear(),
             m: now.getMonth(),
             d: now.getDate(),
+            workType: 'other',
             nurseries: new Set(SCOPE_NURSERIES),
             plots: new Map()
           }];
@@ -1625,18 +1639,21 @@ function loadAuditTodo(){
         round: withRound ? (i + 1) : 0
       }));
     }));
-    // Maintenance — one synthetic occurrence per deadline day this
-    // month. Each carries the set of nurseries with pending tasks so
-    // nurseryState can invert it into ✓ / pending chips.
+    // Maintenance — one row per work type per deadline day this month.
+    // Manuring / Weeding / Interrow / Others each get their own card
+    // with their own plot chips, matching how the auditor thinks about
+    // the day's work.
     MAINT_OCCURRENCES.filter(mo => mo.y === y && mo.m === m).forEach(mo => {
+      const label = MAINT_WT_LABEL[mo.workType] || 'Maintenance';
       out.push({
-        mod: 'maint',
-        title: 'home_maintenance',
-        href: 'audit_maintenance_index.html',
+        mod:   'maint',
+        title: label,                 // rendered as-is (not translated)
+        href:  'audit_maintenance_index.html',
         start: mo.d,
         end:   mo.d,
         _maintNurseries: mo.nurseries,
-        _maintPlots: mo.plots
+        _maintPlots:     mo.plots,
+        _maintWorkType:  mo.workType
       });
     });
     return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
