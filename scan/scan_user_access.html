@@ -63,6 +63,13 @@
          border:1.5px solid #e2e8f0; background:white; font-size:12px; font-weight:700; color:#334155;
          cursor:pointer; }
   .nur.sel { border-color:#a78bfa; background:#f5f3ff; color:#5b21b6; }
+  /* The parts of the record form, nested under Record work. Indented to line
+     up under its label rather than under its box, with a rule down the side:
+     six ticks in one flat column read as six unrelated things, and the five
+     under Record work are not — switching Record work off takes all five with
+     it. */
+  .act-kids { margin:8px 0 2px 28px; padding-left:12px; border-left:2px solid #ede9fe;
+              display:flex; flex-direction:column; gap:8px; }
   .nur input { accent-color:#7c3aed; cursor:pointer; }
   .hidden { display:none !important; }
 </style>
@@ -130,14 +137,50 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
 const PAGES = [
   { key:'barcode',     label:'Scan Barcode Counter' },
   { key:'do',          label:'Issue Collection DO' },
-  { key:'maintenance', label:'Schedule Maintenance Work',
-    /* Extra ticks under the nursery list. Workers record their own mornings
-       from the 555 Worker Portal, so signing one off is a separate act from
-       opening the page — a Field Conductor and his assistant do it, and
-       nobody else should. */
+  { key:'maintenance', label:'Maintenance',
+    /* What the page is actually made of, one switch at a time.
+
+       Maintenance is two jobs with a form between them — reading the office's
+       plan for the month, and recording a morning's work against it — and the
+       record form is five separate things, not all of which every nursery
+       wants keyed. So each is its own tick, and Record work carries its five
+       nested under it.
+
+       THE SAME LIST, WITH THE SAME KEYS AND THE SAME DEFAULTS, is offered in
+       the 555 Worker Portal's own Settings screen — see
+       src/modules/maintenance/functions.js in the Barcode_Counter repository.
+       Change one, change the other, or the two portals stop agreeing about
+       what a tick means.
+
+       `dflt` is what an ABSENT answer means, and it matters. Everything is on
+       by default so this screen takes nothing away from anybody: a Field
+       Conductor saved before these switches existed has no `batches` entry at
+       all, and reading that as off would empty his record form on the morning
+       of the deploy. GPS is the exception — it asks the phone for a location
+       and stores it against a person's name, which is not a thing to switch
+       on for the whole estate because a new version shipped.
+
+       Left without a `dflt`: record, verify and export, the three that were
+       here first. They keep the older rule — an absent answer on a page that
+       HAS been configured is a no — because changing what they mean would
+       change access already saved. */
     actions:[
+      { key:'schedule', label:'Schedule maintenance work', dflt:true,
+        desc:'This week’s outstanding plots and the month’s plan. Switched off, work can still be recorded — the plan simply is not on the phone' },
       { key:'record', label:'Record work',
-        desc:'Key in a job from the work sheet — what a Field Conductor does himself' },
+        desc:'Key in a job from the work sheet — what a Field Conductor does himself',
+        children:[
+          { key:'batches', label:'Batch selection', dflt:true,
+            desc:'Tick which batches standing in the plot were worked on; the quantity is their sum' },
+          { key:'workers', label:'Worker selection', dflt:true,
+            desc:'Credit the job to the workers who did it — a broken phone, a PIN that will not take' },
+          { key:'gps', label:'GPS track record', dflt:false,
+            desc:'Stamp the record with where the phone was. The phone asks the person’s permission the first time' },
+          { key:'photos', label:'Upload photo', dflt:true,
+            desc:'Up to three pictures of the work done' },
+          { key:'remark', label:'Remark', dflt:true,
+            desc:'A line of free text on the record' }
+        ] },
       { key:'verify', label:'Verify work done',
         desc:'Sign off a record a worker made, so the office can see it was checked' },
       { key:'export', label:'Download the month',
@@ -184,11 +227,29 @@ function pageOn(perms, key) {
    Field Conductor whose access was opened only to grant them the new Verify
    tick, which is a trap laid for whoever opens this screen next.
  
-   Once a page HAS been configured, an absent action is off. */
-function actionOn(perms, page, action) {
+   Once a page HAS been configured, an absent action is off.
+
+   …unless the action names its own default. The switches added under
+   Maintenance did not exist when most of these rows were saved, so an absent
+   answer there is not a decision anybody made — it is a question nobody was
+   asked. `dflt` is what to do about that, and it is the same answer the phone
+   gives (Barcode_Counter src/modules/maintenance/functions.js). Actions
+   without one are the three that were here first and keep the older rule
+   exactly, because changing what they mean would change saved access. */
+function actionOn(perms, page, action, dflt) {
   const acts = (perms.scan_actions || {})[page];
-  if (!acts) return true;
-  return !!acts[action];
+  if (!acts) return dflt === undefined ? true : !!dflt;
+  const v = acts[action];
+  if (v === undefined) return dflt === undefined ? false : !!dflt;
+  return !!v;
+}
+
+/* Every tick on a page — the ones nested under Record work as well — as one
+   flat list. Seeding and saving do not care about the nesting; only the
+   drawing does. */
+function flatActions(pg) {
+  return (pg.actions || []).reduce(
+    (all, ac) => all.concat([ac], ac.children || []), []);
 }
 
 // null means every nursery. The pre-per-page list still answers for a person
@@ -229,6 +290,28 @@ function panelHtml() {
     '</div>';
 }
 
+/* One tick, and whatever is nested under it. Recursive so Record work's five
+   are drawn by the same code as Record work itself — one row, one rule about
+   what a row looks like. Children are drawn but hidden while the parent is
+   off, rather than left out: switching Record work back on should put back
+   the answers that were there, not an empty space. */
+function actionRowHtml(pg, ac) {
+  const on = actionOn(draft, pg.key, ac.key, ac.dflt);
+  return `
+    <label class="flex items-start gap-2.5 cursor-pointer">
+      <input type="checkbox" class="chk mt-0.5" data-act="${pg.key}" data-actkey="${ac.key}"
+             ${on ? 'checked' : ''}>
+      <span class="min-w-0">
+        <span class="block text-[12.5px] font-black text-slate-700">${esc(ac.label)}</span>
+        <span class="block text-[11px] text-slate-400 leading-snug">${esc(ac.desc || '')}</span>
+      </span>
+    </label>
+    ${(ac.children && ac.children.length) ? `
+      <div class="act-kids ${on ? '' : 'hidden'}">
+        ${ac.children.map((k) => actionRowHtml(pg, k)).join('')}
+      </div>` : ''}`;
+}
+
 function pageBlockHtml(pg) {
   const on = pageOn(draft, pg.key);
   const list = pageNurseries(draft, pg.key);
@@ -244,16 +327,8 @@ function pageBlockHtml(pg) {
       ${(pg.actions && pg.actions.length) ? `
       <div class="mt-2.5 ${on ? '' : 'hidden'}">
         <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">What they may do</div>
-        <div class="space-y-1.5">
-          ${pg.actions.map((ac) => `
-            <label class="flex items-start gap-2.5 cursor-pointer">
-              <input type="checkbox" class="chk mt-0.5" data-act="${pg.key}" data-actkey="${ac.key}"
-                     ${actionOn(draft, pg.key, ac.key) ? 'checked' : ''}>
-              <span class="min-w-0">
-                <span class="block text-[12.5px] font-black text-slate-700">${esc(ac.label)}</span>
-                <span class="block text-[11px] text-slate-400 leading-snug">${esc(ac.desc || '')}</span>
-              </span>
-            </label>`).join('')}
+        <div class="space-y-2">
+          ${pg.actions.map((ac) => actionRowHtml(pg, ac)).join('')}
         </div>
       </div>` : ''}
 
@@ -306,8 +381,8 @@ function openRow(uid) {
        start where their access already is and saving changes only what was
        actually touched. */
     const seeded = { ...(acts || {}), view: acts ? !!acts.view : true };
-    (pg.actions || []).forEach((ac) => {
-      if (seeded[ac.key] === undefined) seeded[ac.key] = actionOn(draft, pg.key, ac.key);
+    flatActions(pg).forEach((ac) => {
+      if (seeded[ac.key] === undefined) seeded[ac.key] = actionOn(draft, pg.key, ac.key, ac.dflt);
     });
     draft.scan_actions[pg.key] = seeded;
   });

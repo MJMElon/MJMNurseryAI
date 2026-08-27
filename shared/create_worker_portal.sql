@@ -104,6 +104,20 @@ AS $$
       'maintenance', COALESCE((w.portal #> '{modules,maintenance}')::boolean, true),
       'settings',    COALESCE((w.portal #> '{modules,settings}')::boolean,    false)
     ),
+    -- Which FUNCTIONS inside a module: the schedule, the record form, and the
+    -- record form's own parts. Passed through as it was written rather than
+    -- spelt out key by key like the modules above — the app owns that list
+    -- (Barcode_Counter src/modules/maintenance/functions.js) and it grows, and
+    -- naming the keys here would mean a switch added there being silently
+    -- dropped on its way to the phone.
+    --
+    -- An empty object is the right answer for a worker nobody has set
+    -- switches for: absent means the app's documented default, which is the
+    -- ordinary form.
+    'actions', CASE
+      WHEN jsonb_typeof(w.portal -> 'actions') = 'object' THEN w.portal -> 'actions'
+      ELSE '{}'::jsonb
+    END,
     'boundary', jsonb_build_object(
       -- null = every nursery. An absent setting falls back to the nursery on
       -- the worker's own row; only a worker with no nursery at all sees the
@@ -194,6 +208,12 @@ AS $$
                  'role',      to_jsonb(w) -> 'role'
                ),
     'modules',  public.worker_portal(w) -> 'modules',
+    -- Which FUNCTIONS inside a module this worker gets — the schedule, the
+    -- record form, and the record form's own parts. The same switches, with
+    -- the same keys, that the office sets per Field Conductor on
+    -- ai.mjmnursery.com. Absent means the app's documented defaults, so a
+    -- worker nobody has touched still gets the ordinary form.
+    'actions',  public.worker_portal(w) -> 'actions',
     'boundary', public.worker_portal(w) -> 'boundary'
   );
 $$;
@@ -428,6 +448,24 @@ BEGIN
       USING NULLIF(btrim(COALESCE(p_payload ->> 'photo_urls', '')), ''), new_id;
   END IF;
 
+  -- Where the phone was (shared/add_maint_field_gps.sql). The app sends the
+  -- keys whether or not it has a fix, so an absent POSITION and an absent
+  -- COLUMN are two different things and both are checked: a worker whose GPS
+  -- switch is off, or who is under a shed roof with no sky, records the job
+  -- exactly as before.
+  IF (p_payload ->> 'gps_lat') IS NOT NULL
+     AND (p_payload ->> 'gps_lng') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'nops_maint_field_records' AND column_name = 'gps_lat') THEN
+    EXECUTE 'UPDATE nops_maint_field_records
+                SET gps_lat = $1, gps_lng = $2, gps_accuracy = $3
+              WHERE id = $4'
+      USING (p_payload ->> 'gps_lat')::numeric,
+            (p_payload ->> 'gps_lng')::numeric,
+            NULLIF(p_payload ->> 'gps_accuracy', '')::numeric,
+            new_id;
+  END IF;
+
   RETURN new_id;
 END;
 $$;
@@ -464,6 +502,15 @@ ALTER TABLE nops_maint_field_records
   ADD COLUMN IF NOT EXISTS verified_by TEXT,
   ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 
+-- And the GPS stamp — shared/add_maint_field_gps.sql, repeated here for the
+-- same reason. It has to be here rather than later in the file: the function
+-- below names these columns, and a function that names a column which does
+-- not exist fails the first time somebody opens the board.
+ALTER TABLE nops_maint_field_records
+  ADD COLUMN IF NOT EXISTS gps_lat      NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_lng      NUMERIC(9,6),
+  ADD COLUMN IF NOT EXISTS gps_accuracy NUMERIC;
+
 
 -- ── 8b. What the maintenance board needs ────────────────────────────────
 --
@@ -485,7 +532,8 @@ RETURNS TABLE (id BIGINT, work_date DATE, nursery_name TEXT, plot_name TEXT,
                work_type TEXT, jenis TEXT, chemical TEXT, qty NUMERIC,
                remark TEXT, reported_by TEXT, batch_name TEXT,
                week_no INT, schedule_month TEXT,
-               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ)
+               worked_by TEXT, verified_by TEXT, verified_at TIMESTAMPTZ,
+               gps_lat NUMERIC, gps_lng NUMERIC, gps_accuracy NUMERIC)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -503,7 +551,11 @@ BEGIN
            -- So a worker can see their morning has been checked off. Read
            -- only: verifying is the conductor's signature, and nobody signs
            -- for their own work.
-           r.verified_by, r.verified_at
+           r.verified_by, r.verified_at,
+           -- Where the phone was when the record was written, for the people
+           -- the office has switched GPS on for. Null everywhere else, and
+           -- the board simply does not draw the line.
+           r.gps_lat, r.gps_lng, r.gps_accuracy
       FROM nops_maint_field_records r
       JOIN public.worker_plots(p_token) wp
         ON public.worker_key(wp.plot_name) = public.worker_key(r.plot_name)
