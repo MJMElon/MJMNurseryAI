@@ -88,6 +88,12 @@
   .m-sub .sw { width:36px; height:21px; }
   .m-sub .sw::after { width:15px; height:15px; }
   .m-sub.on .sw::after { transform:translateX(15px); }
+  /* A switch that can be set but cannot yet be obeyed. Still settable — the
+     answer is kept and starts working the day the gap closes — but it says
+     so, rather than being quietly ignored on a phone in a plot. */
+  .m-warn { display:block; font-size:10px; font-weight:600; color:#b45309;
+            line-height:1.35; margin-top:2px; }
+  .m-cant.on .sw { background:#f59e0b; }
 
   .portal-col { flex:1; min-width:240px; }
   .portal-head { display:flex; align-items:center; gap:8px; padding:0 12px 8px;
@@ -185,6 +191,13 @@
         Worker Portal's own Settings per worker.
         <br><br>
         A phone already signed in picks a change up when it is next reopened.
+        <br><br>
+        <b>Upload photo in the Worker Portal</b> is the one switch here that is stored
+        but not yet acted on. A worker signs in with a PIN, which the storage bucket
+        does not accept uploads from, and the key their phone holds is public — so
+        simply opening the bucket to it would open it to anyone. It needs a way for a
+        worker to send a photo that does not leave storage writable by the world.
+        Everything else on this card is obeyed.
       </div>
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
@@ -328,11 +341,25 @@ const MAINT_FUNCTIONS = [
   { key:'schedule', name:'Schedule maintenance work' },
   { key:'record',   name:'Record work' },
   { key:'batches',  name:'— Batch selection' },
-  { key:'workers',  name:'— Worker selection', fcOnly:true },
+  { key:'workers',  name:'— Worker selection' },
   { key:'gps',      name:'— GPS track record' },
-  { key:'photos',   name:'— Upload photo', fcOnly:true },
+  { key:'photos',   name:'— Upload photo' },
   { key:'remark',   name:'— Remark' }
 ];
+
+/* One of them cannot be honoured in the Worker Portal, and saying so on the
+   switch is better than either hiding it — which decides for you — or leaving
+   it to be discovered on a phone in a plot.
+
+   A PIN sign-in is `anon`. The documents bucket takes uploads from
+   `authenticated` only, and the anon key is public, so opening that bucket to
+   anon would open it to anybody who reads the app bundle. It needs a way for
+   a worker to upload that does not hand the internet a writable bucket. */
+const CANNOT_YET = {
+  worker: {
+    photos: 'A PIN sign-in cannot upload to storage yet — see the note below.'
+  }
+};
 
 const PORTAL_MODULES = {
   fc: [
@@ -369,17 +396,24 @@ function drawPortals() {
 
       /* Drawn, but hidden while the module itself is off — switching the
          module back on should put the answers back rather than an empty
-         space. Two of them cannot be honoured in the Worker Portal whatever
-         this says: a PIN sign-in is `anon`, which has no upload path for a
-         photo and is never handed the roster. Left out of that column rather
-         than shown as a switch that does nothing. */
+         space.
+
+         The same list in both columns, deliberately. Which of them a worker
+         gets is the office's decision, not this file's, so nothing is left
+         out on the grounds that somebody probably would not want it. Where a
+         switch cannot yet be honoured it says so on the row and can still be
+         set — the answer is kept, and starts working the day the gap is
+         closed. */
       const fns = m.functions
-        .filter(f => !(p === 'worker' && f.fcOnly))
         .map(f => {
           const fon = ((portalFn[p][m.key] || {})[f.key]) !== false;
-          return `<label class="m-row m-sub ${fon ? 'on' : ''}"
-                         data-portal="${p}" data-key="${m.key}" data-fn="${f.key}">
-                    <span class="m-name">${esc(f.name)}</span>
+          const warn = (CANNOT_YET[p] || {})[f.key];
+          const cls = ['m-row', 'm-sub'].concat(fon ? ['on'] : [], warn ? ['m-cant'] : []).join(' ');
+          return `<label class="${cls}"
+                         data-portal="${p}" data-key="${m.key}" data-fn="${f.key}"
+                         ${warn ? `title="${esc(warn)}"` : ''}>
+                    <span class="m-name">${esc(f.name)}${
+                      warn ? `<span class="m-warn">${esc(warn)}</span>` : ''}</span>
                     <span class="m-key">${esc(f.key)}</span>
                     <input type="checkbox" ${fon ? 'checked' : ''}
                            onchange="toggleFunction('${p}','${m.key}','${f.key}',this.checked)">

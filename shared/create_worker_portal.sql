@@ -699,6 +699,70 @@ END;
 $$;
 
 
+/* The colleagues a worker may credit a job to.
+ *
+ * Different from worker_roster() above in every way that matters, which is
+ * why it is a second function rather than a flag on the first:
+ *
+ *   worker_roster        behind the Settings module, for handing out access.
+ *                        Every worker in the company, with their portal
+ *                        settings and whether they have a PIN.
+ *
+ *   worker_maint_roster  behind the Maintenance module's `workers` switch,
+ *                        for the tick list on a record form. NAMES ONLY, and
+ *                        only inside this worker's own boundary.
+ *
+ * It returns no PIN, no id anybody could act on, no portal settings — a name
+ * and the nursery it belongs to, which is all the tick list draws. Somebody
+ * who should not be handing out access must not get the roster screen's
+ * answer just because the tick list was switched on for them.
+ *
+ * The boundary is the same one every other function here uses, so a worker
+ * confined to BNN is offered BNN's crew and nobody else's.
+ *
+ * Whether it is OFFERED at all is a switch, in three places, and this
+ * function does not decide it: System Setting → Portal View & Function for
+ * the company, and the worker's own row in the Worker Portal's Settings.
+ * The app asks only when those say yes.
+ */
+CREATE OR REPLACE FUNCTION public.worker_maint_roster(p_token UUID)
+RETURNS TABLE (full_name TEXT, nursery TEXT, section TEXT,
+               role TEXT, job_title TEXT, maint_general BOOLEAN, active BOOLEAN)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE w mjmnpayroll_workers;
+BEGIN
+  w := public.worker_from_token(p_token);
+
+  IF NOT COALESCE((public.worker_portal(w) #> '{modules,maintenance}')::boolean, false) THEN
+    RAISE EXCEPTION 'the maintenance module is switched off for you' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+    SELECT wk.full_name,
+           wk.nursery,
+           to_jsonb(wk) ->> 'section',
+           to_jsonb(wk) ->> 'role',
+           wk.job_title,
+           to_jsonb(wk) ->> 'maint_general' = 'true',
+           wk.active
+      FROM mjmnpayroll_workers wk
+     WHERE wk.active
+       -- Inside the boundary. Matched on letters and digits alone, because
+       -- shared_plots says "UNN 1" and the payroll register may say "UNN1";
+       -- comparing them as spelt finds BNN and nobody at all for UNN 1.
+       AND EXISTS (
+             SELECT 1 FROM public.worker_plots(p_token) wp
+              WHERE public.worker_key(wp.nursery_name)
+                    = public.worker_key(COALESCE(NULLIF(btrim(wk.nursery), ''),
+                                                 to_jsonb(wk) ->> 'section')))
+     ORDER BY wk.full_name;
+END;
+$fn$;
+
+
 CREATE OR REPLACE FUNCTION public.worker_set_portal(p_token UUID, p_worker_id BIGINT, p_portal JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -753,6 +817,7 @@ GRANT EXECUTE ON FUNCTION public.worker_my_records(UUID, INT)            TO anon
 GRANT EXECUTE ON FUNCTION public.worker_maint_records(UUID, INT)         TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_schedules(UUID)                  TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_roster(UUID)                     TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_maint_roster(UUID)               TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_set_portal(UUID, BIGINT, JSONB)  TO anon, authenticated;
 
 -- The phone does not call Postgres, it calls PostgREST, which answers from a
