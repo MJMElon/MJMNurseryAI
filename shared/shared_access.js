@@ -91,13 +91,33 @@
         const clean = {};
         for (const [k, v] of Object.entries(val)) if (VALID_LEVELS.has(v)) clean[k] = v;
         out[key] = clean;
-      } else if (/_actions$/.test(key)) {
+      } else if (/_actions$/.test(key) || /_areas$/.test(key)) {
+        /* `<module>_areas` is the same shape as `_actions` — a key per thing,
+           booleans inside — and has to be carried through for the same reason.
+           It was NOT, and that was a real bug: everything this function does
+           not name is dropped, so scan_areas was written by Setting, stored in
+           the database, and then never seen by canScanArea(), which silently
+           fell back to the old rule for everybody. The screen said one thing
+           and the system did another, which is the worst way for a permission
+           to be wrong — it looks set. */
         const clean = {};
         for (const [page, acts] of Object.entries(val)) {
           if (!acts || typeof acts !== 'object' || Array.isArray(acts)) continue;
           const one = {};
           for (const [a, v] of Object.entries(acts)) one[a] = !!v;
           clean[page] = one;
+        }
+        out[key] = clean;
+      } else if (/_nurseries$/.test(key)) {
+        /* `<module>_nurseries` / `<module>_area_nurseries` — a list of nursery
+           names per key, where ABSENT means all of them. Dropped for the same
+           reason and with the same effect: a person narrowed to one nursery
+           read as unrestricted to every office screen that asked. The phone
+           was never affected, because it reads the row straight out of
+           shared_profiles rather than through here. */
+        const clean = {};
+        for (const [k, list] of Object.entries(val)) {
+          if (Array.isArray(list)) clean[k] = list.filter((n) => typeof n === 'string');
         }
         out[key] = clean;
       }

@@ -306,7 +306,13 @@ function areaOn(perms, key) {
   if (entry && entry.view !== undefined) return !!entry.view;
 
   const mods = perms.modules || {};
-  const lvl = String(mods.scan || '').toLowerCase();
+  /* Only the three levels shared_access.js will accept. Anything else is
+     dropped by its normalize() and reads as no module at all, so a row saying
+     "Admin" with a capital A has no scan module as far as every office page
+     is concerned — and this screen must say the same rather than showing a
+     tick for access that is not really there. */
+  const raw = String((mods.scan == null ? '' : mods.scan));
+  const lvl = ['admin', 'normal', 'none'].indexOf(raw) === -1 ? 'none' : raw;
   switch (key) {
     case 'manage':  return lvl === 'admin' || !!perms.manage_users;
     case 'fc':      return !!lvl && lvl !== 'none';
