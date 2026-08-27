@@ -1,5 +1,5 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER v34
+   MJM NURSERY AUDIT — SERVICE WORKER v37
    
    Strategy:
    - On install: cache ALL files immediately
@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-1798100000';
+const VER = 'mjm-1798900000';
 
 const ALL_FILES = [
   './audit_index.html',
@@ -28,6 +28,9 @@ const ALL_FILES = [
   './audit_maintenance_index.html',
   './audit_maintenance_styles.css',
   './audit_maintenance_script.js',
+  './audit_history.js',
+  './audit_theme.css',
+  './audit_wide.css',
   './audit_supabase.js',
   './audit_pending.js',
   './audit_settings.js',

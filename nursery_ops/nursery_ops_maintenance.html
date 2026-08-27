@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=50">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=54">
 </head>
 <body>
 
@@ -34,13 +34,13 @@
         <div class="top-ctrl" id="top-nursery-ctrl"><label data-i18n="top.nursery">Nursery</label>
           <select id="global-nursery" style="display:none;" onchange="onNurseryChange()">
             <option value="PN">PN</option><option value="BNN">BNN</option>
-            <option value="UNN1">UNN1</option><option value="UNN2">UNN2</option>
+            <option value="UNN1">UNN 1</option><option value="UNN2">UNN 2</option>
           </select>
           <div class="nursery-circles" id="nursery-circles">
             <button type="button" class="nursery-circle" data-n="PN"   onclick="pickNursery('PN')"   title="Pre Nursery">PN</button>
             <button type="button" class="nursery-circle" data-n="BNN"  onclick="pickNursery('BNN')"  title="Batu Niah Nursery">BNN</button>
-            <button type="button" class="nursery-circle" data-n="UNN1" onclick="pickNursery('UNN1')" title="Ulu Niah Nursery 1">UNN1</button>
-            <button type="button" class="nursery-circle" data-n="UNN2" onclick="pickNursery('UNN2')" title="Ulu Niah Nursery 2">UNN2</button>
+            <button type="button" class="nursery-circle" data-n="UNN1" onclick="pickNursery('UNN1')" title="Ulu Niah Nursery 1">UNN 1</button>
+            <button type="button" class="nursery-circle" data-n="UNN2" onclick="pickNursery('UNN2')" title="Ulu Niah Nursery 2">UNN 2</button>
           </div>
         </div>
       </div>
@@ -58,8 +58,7 @@
   <div class="page">
     <div class="tabs-bar">
       <button class="tab-btn active" onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
-      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Schedule</button>
-      <button class="tab-btn"        onclick="switchTab('calc',this)"     data-i18n="tab.calc">💊 Dosage Calc</button>
+      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
       <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">📋 Worker Record</button>
       <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
       <button class="tab-btn" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
@@ -94,16 +93,47 @@
         </div>
         <div class="card"><div class="tbl-wrap">
           <table class="rec-table">
+            <!-- The columns are PINNED here rather than left to the browser.
+
+                 With the default auto layout a table divides itself up by
+                 what happens to be in it, so the same page laid itself out
+                 differently for every nursery — UNN 2's longer chemical names
+                 squeezed the date column until "07 Aug 2026" wrapped onto two
+                 lines, while BNN's fitted on one. Same screen, same columns,
+                 different shape, and no way to compare one nursery with
+                 another at a glance.
+
+                 With table-layout:fixed (see the stylesheet) these widths are
+                 the whole answer and the content is never consulted, so every
+                 nursery draws identically. They are proportions, not pixels:
+                 spare width is shared out among them, so the table still
+                 fills a wide screen and still scrolls on a narrow one. -->
+            <colgroup>
+              <col style="width:158px;"><!-- Date     — fits "01 & 02 Jul 2026" unwrapped -->
+              <col style="width:185px;"><!-- Work Type -->
+              <col style="width:250px;"><!-- Chemical — the pill ellipsises past this -->
+              <col style="width:62px;" ><!-- Plot     -->
+              <col style="width:105px;"><!-- Batch    -->
+              <col style="width:105px;"><!-- Quantity -->
+              <col style="width:58px;" ><!-- Gaia     -->
+              <col style="width:125px;"><!-- Remark   -->
+              <col style="width:105px;"><!-- Audit    -->
+              <col style="width:220px;"><!-- Check / Edit / Del -->
+            </colgroup>
             <thead><tr>
-              <th class="th-left" style="min-width:95px;"  data-i18n="rec.tarikh">Tarikh</th>
-              <th class="th-left" style="min-width:190px;" data-i18n="rec.jenis">Jenis Kerja</th>
-              <th class="th-left" style="min-width:210px;" data-i18n="rec.racun">Racun / Chemical</th>
-              <th style="text-align:center;"               data-i18n="rec.plot">Plot</th>
-              <th style="text-align:center;min-width:115px;" data-i18n="rec.batch">Batch</th>
-              <th style="text-align:center;min-width:95px;"  data-i18n="rec.qty">Quantity</th>
-              <th style="text-align:center;min-width:60px;"  data-i18n="rec.gaia">Gaia</th>
-              <th class="th-left" style="min-width:110px;" data-i18n="rec.remark">Remark</th>
-              <th style="min-width:90px;"></th>
+              <th class="th-left"          data-i18n="rec.tarikh">Tarikh</th>
+              <th class="th-left"          data-i18n="rec.jenis">Jenis Kerja</th>
+              <th class="th-left"          data-i18n="rec.racun">Racun / Chemical</th>
+              <th style="text-align:center;" data-i18n="rec.plot">Plot</th>
+              <th style="text-align:center;" data-i18n="rec.batch">Batch</th>
+              <th style="text-align:center;" data-i18n="rec.qty">Quantity</th>
+              <th style="text-align:center;" data-i18n="rec.gaia">Gaia</th>
+              <th class="th-left"          data-i18n="rec.remark">Remark</th>
+              <!-- The Auditor Portal's verdict on this job. Read-only here:
+                   the audit is conducted there, this list only shows how it
+                   came out. -->
+              <th style="text-align:center;" data-i18n="rec.audit">Audit</th>
+              <th></th>
             </tr></thead>
             <tbody id="rec-body"></tbody>
           </table>
@@ -242,69 +272,6 @@
     </div>
 
     <!-- CHEMICAL CALCULATOR -->
-    <div id="tab-calc" class="tab-panel">
-      <div class="section-hdr">
-        <div><div class="page-hdr-title" id="calc-nursery-line"></div></div>
-        <div class="section-badge" data-i18n="badge.calc">💊 DOSAGE CALCULATOR</div>
-      </div>
-      <div class="card" style="padding:18px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.capacity">Nursery Plot Capacity (seedlings per plot — editable)</div>
-          <button class="btn" onclick="resetCalcCapacity()" style="font-size:11px" data-i18n="btn.reset">↺ Reset to Defaults</button>
-        </div>
-        <div id="calc-capacity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px"></div>
-      </div>
-
-      <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.chemHead">🧪 Chemical (Racun)</div>
-      <div class="card" style="padding:18px;margin-bottom:18px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
-          <div style="flex:1;min-width:220px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Chemical</label>
-            <select id="calc-chem" onchange="onCalcChemChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
-          </div>
-          <div style="width:120px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose</label>
-            <input id="calc-dose" type="number" min="0" step="0.5" oninput="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-          </div>
-          <div style="width:90px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Unit</label>
-            <select id="calc-unit" onchange="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-              <option value="gm">gm</option><option value="mL">mL</option>
-            </select>
-          </div>
-          <button class="btn" onclick="clearCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
-          <button class="btn" onclick="selectAllCalcPlots()" data-i18n="btn.selectAll">Select All</button>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="calc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
-        <div id="calc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
-      </div>
-
-      <div style="font-size:13px;font-weight:700;color:#a16207;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.fertHead">🌱 Fertilizer (Baja)</div>
-      <div class="card" style="padding:18px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
-          <div style="flex:1;min-width:220px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Fertilizer</label>
-            <select id="fcalc-fert" onchange="onFertCalcChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
-          </div>
-          <div style="width:120px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose (gm)</label>
-            <input id="fcalc-dose" type="number" min="0" step="0.5" oninput="renderFertCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-          </div>
-          <div style="width:140px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Bag Size</label>
-            <input id="fcalc-bag" type="text" readonly style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit;background:#f5f5f5">
-          </div>
-          <button class="btn" onclick="clearFertCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
-          <button class="btn" onclick="selectAllFertCalcPlots()" data-i18n="btn.selectAll">Select All</button>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="fcalc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
-        <div id="fcalc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
-      </div>
-    </div>
-
-    <!-- MONTHLY PAYROLL — Borang Tuntutan Gaji, one sub-tab per work type -->
     <div id="tab-payroll" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="payroll-nursery-line"></div></div>
       <div class="subtabs-bar">
@@ -557,7 +524,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=66"></script>
+<script src="plot_maintenance_script.js?v=71"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

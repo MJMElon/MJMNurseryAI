@@ -28,7 +28,7 @@
        any of it paints, so a non-admin never sees it flash. Which
        people may see which module card is coming as a setting on this
        page; until it exists every signed-in auditor sees all four. -->
-  <script src="audit_login_guard.js?v=20260824a"></script>
+  <script src="audit_login_guard.js?v=20260827a"></script>
   <script>
     MJMAuditLogin.requireSignIn();
     if (MJMAuditLogin.isAdmin())
@@ -431,7 +431,19 @@
          still owe work — so a second row of cards underneath it only
          repeated the same four destinations without saying anything
          about what was due. On a desktop there is no such list, so
-         this is where the four modules are reachable directly. -->
+         this is where the four modules are reachable directly.
+
+         Each link carries ?from=manage, which is what makes "directly"
+         true. Without it three of the four bounce straight back to
+         audit_home.html — they redirect a visitor who names no ?plot=,
+         on the reasoning that the auditor's way in is a pending-plot
+         chip. Pressing "Plot Condition Audit" here and landing on the
+         auditor portal is that reasoning meeting a desk. The same flag
+         also puts every nursery in scope for the page it opens, rather
+         than the one nursery the Switch pill was last left on: this
+         page shows PN and MN side by side, and stepping into a module
+         from it should not quietly drop half of that.
+         See fromManage() in audit_login_guard.js. -->
     <div class="section-row">
       <div class="section-head">Audit Modules</div>
       <button type="button" class="order-reset" id="order-reset" hidden
@@ -439,7 +451,7 @@
     </div>
     <div class="cards" id="module-cards" style="margin-bottom:26px">
 
-      <a class="fc-card" href="audit_plot_audit.html" data-mod="plot" draggable="false">
+      <a class="fc-card" href="audit_plot_audit.html?from=manage" data-mod="plot" draggable="false">
         <button type="button" class="fc-grip" tabindex="0"
                 aria-label="Reorder Plot Condition Audit — hold and drag, or use the arrow keys">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
@@ -455,7 +467,7 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_height_index.html" data-mod="height" draggable="false">
+      <a class="fc-card" href="audit_height_index.html?from=manage" data-mod="height" draggable="false">
         <button type="button" class="fc-grip" tabindex="0"
                 aria-label="Reorder Seedling Height Audit — hold and drag, or use the arrow keys">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
@@ -471,7 +483,7 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_papan_index.html" data-mod="papan" draggable="false">
+      <a class="fc-card" href="audit_papan_index.html?from=manage" data-mod="papan" draggable="false">
         <button type="button" class="fc-grip" tabindex="0"
                 aria-label="Reorder Papan Tanda Audit — hold and drag, or use the arrow keys">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
@@ -487,7 +499,7 @@
         </div>
       </a>
 
-      <a class="fc-card" href="audit_maintenance_index.html" data-mod="maint" draggable="false">
+      <a class="fc-card" href="audit_maintenance_index.html?from=manage" data-mod="maint" draggable="false">
         <button type="button" class="fc-grip" tabindex="0"
                 aria-label="Reorder Maintenance Audit — hold and drag, or use the arrow keys">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>

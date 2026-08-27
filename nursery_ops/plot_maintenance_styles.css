@@ -175,9 +175,44 @@ td.check-td.ticked::after{content:"";position:absolute;left:50%;top:50%;width:6p
 td.check-td.modified::before{border-color:#f0b429;background:#fef3c7;}
 td.check-td.modified.ticked::before{border-color:#d97706;background:#d97706;}
 tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background:var(--green-light) !important;color:var(--green-text) !important;border-top:2px solid var(--green-mid);text-transform:uppercase;vertical-align:middle;white-space:normal;line-height:1.3;}
+/* Fixed layout, so the colgroup in the HTML decides the columns and the
+   content never does. Auto layout gave every nursery a different table —
+   UNN 2's longer chemical names squeezed the date column until the year
+   wrapped, BNN's did not — and two screens of the same thing that are not
+   the same shape cannot be read side by side.
+
+   min-width is what keeps that promise on a narrow screen: below it the
+   wrapper scrolls (.tbl-wrap is overflow-x:auto) rather than the columns
+   quietly collapsing back into whatever fits. */
+.rec-table{table-layout:fixed;width:100%;min-width:1373px;}
 .rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-bottom:2px solid var(--border-strong);white-space:nowrap;}
 .rec-table thead th.th-left{text-align:left;}
 .rec-table tbody td{padding:10px 14px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
+/* The date is one line, always. It is the column that gave the game away —
+   "07 Aug 2026" over two lines in one nursery and one in another — and the
+   fixed width above is chosen to hold it, so saying so here means a future
+   change to that width fails loudly (an overflow) instead of quietly
+   re-wrapping. Batch, Quantity and Audit are short and fixed-shape for the
+   same reason. */
+.rec-table tbody td:nth-child(1),
+.rec-table tbody td:nth-child(5),
+.rec-table tbody td:nth-child(6),
+.rec-table tbody td:nth-child(9){white-space:nowrap;}
+/* Work type and remark are free text and may run long: wrap them rather
+   than letting them spill over the column beside them. */
+.rec-table tbody td:nth-child(2),
+.rec-table tbody td:nth-child(8){overflow-wrap:anywhere;}
+/* A job worked over more than one day carries them all. The column is sized
+   for "01 & 02 Jul 2026" on one line; a rarer three-day job is allowed the
+   second line rather than being cut off, which is why this one opts back out
+   of the nowrap above.
+
+   Underlined with text-decoration rather than a border: a border-bottom is a
+   box, and a 1px box under one row's date made that row a pixel taller than
+   its neighbours. Rows of different heights for no visible reason is the
+   thing this table has just been straightened out of. */
+.rec-table tbody td .date-multi{white-space:normal;cursor:help;
+  text-decoration:underline dotted var(--green-mid);text-underline-offset:3px;}
 .rec-table tbody tr:last-child td{border-bottom:none;}
 .rec-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .rec-table tbody tr:hover td{background:var(--green-bg);}
@@ -418,6 +453,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
   color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:999px;padding:6px 14px;margin-right:6px;vertical-align:middle;}
 .chk-btn.chk-locked{cursor:not-allowed;opacity:.55;}
 
+/* ─── AUDIT VERDICT ───
+   The Auditor Portal's answer for this job, in that portal's own two
+   colours so the same verdict looks the same on both screens. Read-only:
+   deliberately not a button, because the audit is not conducted here. */
+.audit-pill{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.4px;
+  text-transform:uppercase;border-radius:999px;padding:5px 12px;white-space:nowrap;
+  vertical-align:middle;}
+.audit-ok {color:#065f46;background:#ecfdf5;border:1.5px solid #a7f3d0;}
+.audit-bad{color:#b91c1c;background:#fff1f1;border:1.5px solid #fecaca;}
+#recview-list .rec-table .audit-pill{font-size:11px;padding:4px 10px;}
+
 /* ─── DOSAGE CALC — larger type throughout ───
    !important is needed because much of this panel carries inline font-size. */
 #tab-calc, #tab-calc div, #tab-calc label, #tab-calc span{ }
@@ -501,7 +547,11 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    scrolling. */
 /* Nurseries wrap as whole groups, so a nursery's columns are never split
    across two rows of the page. */
-.cap-cols { display:flex; flex-wrap:wrap; gap:18px 20px; align-items:flex-start; }
+/* Centred, because how many nurseries there are is not fixed — three today,
+   four when one is added — and a row that packs from the left leaves a
+   different-sized gap on the right every time the list changes. */
+.cap-cols { display:flex; flex-wrap:wrap; justify-content:center;
+            gap:18px 20px; align-items:flex-start; }
 .cap-nursery { display:flex; flex-direction:column; }
 .cap-nursery-cols { display:flex; gap:10px; align-items:flex-start; }
 .cap-col { width:186px; min-width:0; }

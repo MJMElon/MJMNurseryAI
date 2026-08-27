@@ -1,0 +1,585 @@
+/* ══════════════════════════════════════════════════════════════════
+   555 AUDITOR PORTAL — THE MODULE PAGES, IN THE MANAGE PAGE'S DESIGN
+   ══════════════════════════════════════════════════════════════════
+   The four module pages were drawn in the original audit palette: a
+   dark green top bar, a green-tinted ground (#f4f6f4 with green in
+   it), green-grey borders and text. audit_admin.html — the page the
+   modules are now opened from — is drawn in a different one: a slate
+   ground, white cards at 16px with a hairline and a whisper of
+   shadow, ink-blue text, and green kept for the things that are
+   actually green (the brand, the primary action, a done state).
+
+   Two designs one press apart. This file is the modules in the
+   manage page's, so the whole audit surface reads as one system.
+
+   HOW IT WORKS, AND WHY IT IS A STYLESHEET RATHER THAN FOUR REWRITES
+   -----------------------------------------------------------------
+   All four module stylesheets declare the same token set — --surface,
+   --border, --text1..4, --g50..900, --r-*. Most of the retheme is
+   therefore a :root override: change what the tokens mean and every
+   rule that references them follows, in all four files at once,
+   without touching a line of their markup or their scripts.
+
+   What tokens cannot reach is the chrome that hardcodes its colours —
+   the dark green top bar, the tab bar, the plot cells, the buttons.
+   Those are restated below, once each, for all four pages.
+
+   Nothing here is layout. The column width, the two-up record lists
+   and the desk-sized grid live in audit_wide.css behind a min-width
+   query; this file is colour, weight and shape, and it applies at
+   every width. Loaded before audit_wide.css so that file's desktop
+   layout still has the last word.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── THE TOKENS ──
+   audit_admin.html's palette, mapped onto the names the four module
+   stylesheets already use. The greens are deliberately NOT flattened
+   to grey: green is the audit app's colour and the manage page keeps
+   it too — for the brand, the primary button and the done states. It
+   is the GROUND that stops being green. */
+:root {
+  /* The manage page's ink and slate, in the module names. */
+  --surface: #f1f5f9;
+  --card:    #ffffff;
+  --white:   #ffffff;
+  --border:  #e6ecf2;
+  --border2: #dbe3ec;
+  --text1:   #16323f;
+  --text2:   #41586a;
+  --text3:   #5b7280;
+  --text4:   #94a7b4;
+
+  /* --g50 is the modules' "faint fill" — section strips, hover rows,
+     the inside of a plot icon. It was a green wash; on a slate ground
+     it becomes slate-50, or every panel keeps a green cast. --g100
+     stays green because it is used for genuinely-green states. */
+  --g50:  #f8fafc;
+
+  /* The manage page's green, so the two agree on which green. */
+  --g600: #22a34a;
+  --g500: #2f9c4f;
+  --g700: #1b6b32;
+
+  /* Cards at 16px like .fc-card; the softer, bluer shadows that go
+     with a slate ground rather than a green one. */
+  --r-md: 12px;
+  --r-lg: 16px;
+  --shadow-xs: 0 1px 3px rgba(16, 40, 60, .05);
+  --shadow-sm: 0 1px 3px rgba(16, 40, 60, .05);
+  --shadow-fab: 0 10px 26px -6px rgba(27, 107, 50, .5);
+}
+
+/* DM Sans is what every one of these files asks for in font-family and
+   what the manage page loads. The pages now load it too (see the head
+   of each), so this only pins the fallback chain to the same one. */
+html, body {
+  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--surface);
+  color: var(--text1);
+}
+
+/* ── THE TOP BAR ──
+   Was solid dark green with white-on-green controls. The manage page's
+   header is a white band with a hairline under it and ink text, and the
+   ribbon above it likewise — so this becomes the same band.
+
+   The module keeps its own identity in it: the title, the nursery it is
+   showing, the date, back, refresh. What is dropped is only the slab of
+   green. The icon chip keeps the colour, at the size the manage page
+   uses for a module icon — a pale green tile with a green glyph. */
+.top-bar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(16, 40, 60, .05);
+}
+.top-bar-title { color: var(--text1); font-weight: 800; letter-spacing: -.1px; }
+.top-bar-sub   { color: var(--text4); font-weight: 600; }
+
+.top-bar-icon      { background: #e8f5e9; border-radius: 10px; }
+.top-bar-icon svg  { stroke: #2d7a2d; }
+
+/* Back and refresh become the manage page's .hbtn pill shape: a pale
+   slate fill with a hairline, not a knocked-out white square. */
+.top-bar-back {
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.top-bar-back:hover     { background: #ecfdf5; border-color: #a7f3d0; }
+.top-bar-back svg       { stroke: var(--text3); }
+.top-bar-back:hover svg { stroke: #059669; }
+
+.top-bar-btn            { border-radius: 10px; }
+.top-bar-btn:hover      { background: #f4f7fa; }
+.top-bar-btn svg        { stroke: var(--text3); }
+.top-bar-btn:hover svg  { stroke: #059669; }
+
+/* ── SECTION HEADINGS ──
+   "Plot Condition Audit — PN" over the grid, "To Audit" over a list.
+   The manage page writes these as a small tracked all-caps label in
+   the palest ink, with the count opposite as a pill. Same here. */
+.list-heading,
+.form-section-head {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text3);
+}
+.list-count {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text2);
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+/* ── CARDS ──
+   Every list row and panel across the four modules, given .fc-card's
+   shape: white, 16px, a hairline, the same whisper of shadow, and the
+   same lift under a pointer. */
+.record-item,
+.task-card,
+.batch-card,
+.audit-item,
+.form-card,
+.stat-card,
+.summary-strip,
+.task-banner,
+.batch-banner,
+.detail-body {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 3px rgba(16, 40, 60, .05);
+}
+.record-item:hover,
+.task-card:hover,
+.batch-card:hover,
+.audit-item:hover {
+  border-color: var(--border2);
+  box-shadow: 0 10px 26px rgba(16, 40, 60, .10);
+  transform: translateY(-2px);
+}
+/* The plot module slid its rows sideways on hover; a lift is what the
+   manage page's cards do, and two different hovers on one surface is
+   one too many. */
+.record-item:active { transform: translateY(0) scale(.995); }
+
+.stat-value { color: var(--text1); font-weight: 900; }
+.stat-label { color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: .8px; }
+
+/* ── THE PLOT GRID ──
+   Fifty-two green rings on a green wash. On a slate ground, and in a
+   design whose unit is a white card, they become white tiles: same
+   footprint, so the corner badge and the done-tick still land where
+   they were positioned, but square-cornered-and-rounded rather than
+   circular, with a hairline instead of a 2px green ring.
+
+   Done keeps the green — that is the state worth colouring. */
+/* The card is the CELL, not the ring inside it. The plot's status
+   ("pending", a batch count) is a second line under the number, and
+   with the card drawn around only the number that line sat outside it
+   on the ground — a caption to a card rather than part of it. Drawing
+   the card around the whole cell puts the two lines back together,
+   which is what every card on the manage page does. */
+.plot-cell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 11px 6px 9px;
+  gap: 3px;
+  box-shadow: 0 1px 3px rgba(16, 40, 60, .05);
+  transition: box-shadow .18s, transform .18s, border-color .18s;
+}
+.plot-cell:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 8px 20px rgba(16, 40, 60, .12);
+  transform: translateY(-2px);
+}
+/* The ring becomes just the box the number and the done-tick sit in.
+   It keeps its height so .plot-tick (inset:0) and .plot-badge (pinned
+   to its top-right) still land where they were positioned. */
+.plot-icon {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  width: auto;
+  height: 34px;
+  align-self: stretch;
+}
+.plot-cell:hover .plot-icon { border: none; box-shadow: none; transform: none; }
+.plot-icon-num { color: var(--text1); font-weight: 800; font-size: 16px; }
+.plot-name     { color: var(--text3); font-weight: 600; font-size: 10.5px; }
+
+.plot-cell.done {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+.plot-cell.done .plot-icon {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.plot-cell.done .plot-icon-num { color: #14532d; position: relative; z-index: 1; }
+/* The done tick was drawn at 44px for a 52px circle. The icon box is
+   34px now, so it has to come down with it — and it sits behind the
+   plot code, which has to stay the readable thing on the card. */
+.plot-cell.done .plot-tick svg {
+  width: 28px;
+  height: 28px;
+  stroke: #86efac;
+  stroke-width: 3.5;
+}
+/* The badge's halo has to match whatever it now sits on — the card,
+   not the ground. */
+.plot-badge { border-color: var(--card); }
+.plot-cell.done .plot-badge { border-color: #f0fdf4; }
+
+/* ── BUTTONS ──
+   Primary takes the manage page's portal-button gradient; everything
+   secondary takes its pill. */
+.btn-save,
+.btn-audit-now,
+.btn-view-audit,
+.btn-view-task,
+.fab {
+  background: linear-gradient(135deg, #2f9c4f, #1b6b32);
+  border: none;
+  color: #fff;
+}
+.btn-save:hover,
+.btn-audit-now:hover,
+.btn-view-audit:hover,
+.btn-view-task:hover { filter: brightness(1.06); }
+.fab { box-shadow: 0 10px 26px -6px rgba(27, 107, 50, .5); }
+
+.btn-cancel,
+.btn-modal-cancel {
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn-cancel:hover,
+.btn-modal-cancel:hover { background: #eaeff5; }
+
+/* ── FORM CONTROLS ── */
+.input,
+select.input,
+textarea.input {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text1);
+}
+.input:focus,
+select.input:focus,
+textarea.input:focus {
+  background: var(--card);
+  border-color: var(--g600);
+  box-shadow: 0 0 0 3px rgba(34, 163, 74, .12);
+  outline: none;
+}
+.field-label { color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: .8px; font-size: 10px; }
+
+/* Tri-state choices (pass / issue / fail, and the maintenance result
+   row) as pills rather than square segments. */
+.tri-btn {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text2);
+  font-weight: 700;
+}
+
+/* ── THE BOTTOM TAB BAR ──
+   White with a hairline over it, the active tab marked in green. It
+   already worked this way; what changes is that its greys are the
+   manage page's and its rule is a hairline, not a shadow-heavy edge. */
+.bottom-tabs,
+.nursery-bottom-tabs {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -1px 3px rgba(16, 40, 60, .05);
+}
+.tab-item:hover,
+.nursery-tab-item:hover { background: #f8fafc; }
+.tab-item.active,
+.nursery-tab-item.active { background: #f0fdf4; }
+.tab-item.active::before,
+.nursery-tab-item.active::before { background: var(--g600); }
+.tab-icon svg { stroke: var(--text4); }
+.tab-item.active .tab-icon svg,
+.nursery-tab-item.active .tab-icon svg { stroke: var(--g700); }
+.tab-label { color: var(--text3); font-weight: 600; }
+.tab-item.active .tab-label,
+.nursery-tab-item.active .tab-label { color: var(--g700); font-weight: 800; }
+.tab-badge { background: var(--g600); }
+
+/* ── OVERLAYS AND STATES ── */
+.modal-box   { border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(16, 40, 60, .2); }
+.modal-title { color: var(--text1); font-weight: 800; }
+.modal-msg   { color: var(--text3); }
+.toast       { background: #0f2f1a; box-shadow: 0 10px 30px rgba(16, 40, 60, .25); }
+.loading-box { border-radius: var(--r-lg); box-shadow: 0 20px 50px rgba(16, 40, 60, .2); }
+.empty-state       { color: var(--text3); }
+.empty-state-icon  { background: #f4f7fa; }
+.empty-state-icon svg { stroke: var(--text4); }
+
+/* ── THE NARROW PHONE ──
+   The title is the only thing on the bar with slack, so it is the only
+   thing that gives. Same discipline as the manage page's own header:
+   the controls keep their size and the title truncates rather than
+   letting anything leave the screen. */
+@media (max-width: 380px) {
+  .top-bar { padding: 0 10px; gap: 8px; }
+  .top-bar-title { font-size: 13.5px; }
+  .top-bar-icon, .top-bar-back { width: 30px; height: 30px; }
+  .tab-label { font-size: 10px; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   COMPLETED RECORDS — the manage view's history list and its summary
+   ══════════════════════════════════════════════════════════════════
+   Rendered by audit_history.js, and only when the module was opened
+   from audit_admin.html. Written here rather than in that file so the
+   list is styled by the same tokens as everything else it sits under.
+   ══════════════════════════════════════════════════════════════════ */
+.hist-section { margin-top: 22px; }
+.hist-empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text4);
+}
+
+/* A row is a button, so it needs the button defaults knocked out before
+   .record-item's card styling reads correctly on it. */
+.hist-item {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.hist-body { flex: 1; min-width: 0; }
+.hist-top  { display: flex; align-items: baseline; gap: 10px; }
+.hist-plot { font-size: 13.5px; font-weight: 800; color: var(--text1); }
+.hist-date { font-size: 11px; font-weight: 700; color: var(--text4); margin-left: auto; white-space: nowrap; }
+.hist-sub  {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-chev {
+  width: 15px; height: 15px; flex-shrink: 0;
+  stroke: var(--text4); fill: none; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s;
+}
+.hist-item:hover .hist-chev { transform: translateX(3px); stroke: var(--g600); }
+
+/* ── THE SUMMARY ──
+   The module's own modal is a bottom sheet on a phone (audit_theme
+   leaves that alone) and a dialog on a desk. This one is a dialog at
+   every width: it is read, not confirmed, and a sheet that has to be
+   dismissed upward to read four values is the wrong shape for it. */
+#hist-modal { align-items: center; }
+.hist-modal-box {
+  border-radius: 18px;
+  max-width: 460px;
+  width: calc(100% - 32px);
+  padding: 18px 18px 16px;
+}
+.hist-modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.hist-modal-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text4);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.hist-close {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.hist-close:hover { background: #eaeff5; color: var(--text1); }
+
+/* auto-fit, so two values sit side by side and four make a block,
+   without a breakpoint naming either — the modules carry between two
+   and four summary fields each. */
+/* 140 rather than 120 so the common case lands square: at this box's
+   width that is two columns, which makes the four-field modules (plot
+   condition, seedling height) a 2x2 block instead of a row of three
+   with one hanging under it. */
+.hist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.hist-cell {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.hist-cell-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--text4);
+}
+.hist-cell-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text1);
+  margin-top: 3px;
+  word-break: break-word;
+}
+.hist-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text4);
+}
+
+/* ── THE HISTORY LIST IS ONE COLUMN ──
+   audit_wide.css makes `#view-list .record-list` two-up on a wide
+   screen, which is right for the pending lists it was written for —
+   short rows, scanned for a plot code. A completed record carries a
+   date on the right and a batch-and-auditor line under it, and two of
+   those side by side read as a table with no headings. One column,
+   full width, at every size.
+
+   Two ids, because one is not enough: the rule being overridden is
+   `#view-list .record-list` (1,1,0) and a bare `#hist-list` is (1,0,0),
+   which loses however late it is loaded. */
+#view-list #hist-list { display: block; }
+
+/* ── THE FILTER BAR ──
+   Sits between the section heading and the list. The nursery is not one
+   of these — that is the tab bar at the foot of the page, and a second
+   control for it would be two places to set one thing. */
+.hist-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 14px 12px;
+}
+.hist-filter { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hist-filter-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text4);
+  padding-left: 2px;
+}
+/* Narrower than a form input — these are a control strip, not a form,
+   and on a phone two of them plus Clear have to share one row. */
+/* select.hist-select, not .hist-select: the rule this has to sit on top
+   of is `select.input { background: #f8fafc }` — a shorthand, so it
+   resets background-image, and at (0,1,1) it beats a bare class however
+   much later it is written. Matching its specificity lets source order
+   decide, which is what puts the arrow back. */
+select.hist-select {
+  height: 38px;
+  width: auto;
+  min-width: 132px;
+  padding: 0 30px 0 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text3) 50%),
+    linear-gradient(135deg, var(--text3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 17px, calc(100% - 10px) 17px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.hist-clear {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.hist-clear:hover { background: #eaeff5; color: var(--text1); }
+
+@media (max-width: 420px) {
+  .hist-filters { gap: 8px; padding: 0 12px 10px; }
+  .hist-filter { flex: 1 1 0; min-width: 0; }
+  .hist-select { min-width: 0; width: 100%; }
+}
+
+/* ── PHOTOS IN THE RECORD SUMMARY ──
+   A row of thumbnails under the values, each one a link to the full
+   size. Only drawn when the record actually carries a photo, so a
+   summary without one is exactly as tall as it was. */
+.hist-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hist-shot {
+  display: block;
+  width: 78px;
+  height: 78px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  flex-shrink: 0;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.hist-shot:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 6px 16px rgba(16, 40, 60, .14);
+  transform: translateY(-1px);
+}
+.hist-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

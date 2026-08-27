@@ -1,102 +1,139 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   WHY IS THE PROJECT UNHEALTHY?
-   Run these one section at a time in the Supabase SQL Editor and read the
-   answers in order. Nothing here changes any data — it is all read-only.
+-- ════════════════════════════════════════════════════════════════════════
+-- WHY IS THE PROJECT UNHEALTHY?
+--
+-- Run this whole file in the Supabase SQL Editor. It reads and changes
+-- nothing, and it is safe to run while the project is struggling.
+--
+-- "Unhealthy" on the Supabase dashboard is a symptom, not a cause. It is
+-- almost always one of five things, and this asks all five at once so the
+-- answer is a line you can point at rather than a guess:
+--
+--   1. the disk is full or nearly
+--   2. connections are exhausted — usually something holding them open
+--   3. a query is running away
+--   4. something is blocked behind a lock
+--   5. the working set no longer fits in memory
+--
+-- ONE result set on purpose. The SQL Editor shows only the LAST statement's
+-- result, so a file of nine queries answers eight questions into the void.
+--
+-- Read the LOOK column first: ok, or a line beginning with >>> that needs
+-- attention.
+-- ════════════════════════════════════════════════════════════════════════
 
-   "Unhealthy" on the project card means the database or the API stopped
-   answering Supabase's health check. In practice it is nearly always one of
-   four things, and these sections check them in the order they are likely:
+WITH
 
-     1. the disk is full            → section 1 and 2
-     2. queries are pegging the CPU → section 3, 4 and 6
-     3. connections are exhausted   → section 5
-     4. the project was paused or is restarting
-        (nothing in SQL will show this — the dashboard will, and the SQL
-        Editor itself would not have run)
-═══════════════════════════════════════════════════════════════════════ */
+-- ── 1. Disk ─────────────────────────────────────────────────────────────
+-- A free project has 500 MB, small paid ones 8 GB. Past about 90% Supabase
+-- puts the project into read-only, which shows up as unhealthy.
+disk AS (
+  SELECT 1 AS ord, 'disk' AS area, 'database size' AS item,
+         pg_size_pretty(pg_database_size(current_database())) AS value,
+         CASE WHEN pg_database_size(current_database()) > 7.2 * 1024^3
+                THEN '>>> past 7.2 GB — check your plan''s limit, this is the usual cause'
+              WHEN pg_database_size(current_database()) > 450 * 1024^2
+                THEN 'ok unless you are on the free 500 MB plan, in which case this is the cause'
+              ELSE 'ok' END AS look
+),
 
+-- ── 2. Connections ──────────────────────────────────────────────────────
+-- Supabase's pooler has a fixed ceiling. "idle in transaction" is the one
+-- that actually kills a project: a client that opened a transaction and went
+-- away holds its connection AND its locks until something times it out.
+conns AS (
+  SELECT 2, 'connections', 'total open',
+         count(*)::text,
+         CASE WHEN count(*) > 55 THEN '>>> close to the pooler ceiling'
+              ELSE 'ok' END
+    FROM pg_stat_activity WHERE datname = current_database()
+  UNION ALL
+  SELECT 3, 'connections', 'active right now',
+         count(*) FILTER (WHERE state = 'active')::text, 'ok'
+    FROM pg_stat_activity WHERE datname = current_database()
+  UNION ALL
+  SELECT 4, 'connections', 'idle in transaction',
+         count(*) FILTER (WHERE state = 'idle in transaction')::text,
+         CASE WHEN count(*) FILTER (WHERE state = 'idle in transaction') > 2
+              THEN '>>> these hold locks and never let go — the usual killer'
+              ELSE 'ok' END
+    FROM pg_stat_activity WHERE datname = current_database()
+),
 
-/* ── 1. HOW BIG IS THE DATABASE ────────────────────────────────────────
-   Compare this against the disk size on the project's Settings page.
-   A database within ~10% of the disk is the single most common cause of
-   an unhealthy project: Postgres stops accepting writes and the health
-   check fails. */
-SELECT pg_size_pretty(pg_database_size(current_database())) AS database_size;
+-- ── 3. Anything running away ────────────────────────────────────────────
+long_q AS (
+  SELECT 5, 'queries', 'longest running',
+         COALESCE(
+           (SELECT to_char(max(now() - query_start), 'HH24:MI:SS')
+              FROM pg_stat_activity
+             WHERE datname = current_database() AND state = 'active'
+               AND query NOT ILIKE '%pg_stat_activity%'), 'none'),
+         CASE WHEN EXISTS (
+                SELECT 1 FROM pg_stat_activity
+                 WHERE datname = current_database() AND state = 'active'
+                   AND query NOT ILIKE '%pg_stat_activity%'
+                   AND now() - query_start > interval '60 seconds')
+              THEN '>>> something has been running over a minute — see the list below'
+              ELSE 'ok' END
+),
 
+-- ── 4. Blocked behind a lock ────────────────────────────────────────────
+blocked AS (
+  SELECT 6, 'locks', 'queries waiting',
+         count(*)::text,
+         CASE WHEN count(*) > 0
+              THEN '>>> something is stuck behind something else'
+              ELSE 'ok' END
+    FROM pg_stat_activity
+   WHERE datname = current_database() AND wait_event_type = 'Lock'
+),
 
-/* ── 2. WHICH TABLES ARE THE SIZE ──────────────────────────────────────
-   Includes indexes and dead rows. A table far bigger than its row count
-   suggests bloat that a VACUUM FULL would reclaim. */
-SELECT
-  relname                                              AS table_name,
-  to_char(n_live_tup, 'FM999,999,999')                 AS live_rows,
-  to_char(n_dead_tup, 'FM999,999,999')                 AS dead_rows,
-  pg_size_pretty(pg_total_relation_size(relid))        AS total_size,
-  pg_size_pretty(pg_indexes_size(relid))               AS index_size,
-  last_autovacuum
-FROM   pg_stat_user_tables
-ORDER  BY pg_total_relation_size(relid) DESC
-LIMIT  25;
+-- ── 5. Is it still reading from memory ──────────────────────────────────
+-- Below about 95% and the disk is being hit for ordinary reads, which on a
+-- small instance is what "slow, then unhealthy" looks like.
+cache AS (
+  SELECT 7, 'memory', 'cache hit ratio',
+         COALESCE(round(100.0 * sum(heap_blks_hit)
+                        / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0), 1)::text || '%', 'n/a'),
+         CASE WHEN 100.0 * sum(heap_blks_hit)
+                   / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0) < 95
+              THEN '>>> reads are going to disk — the working set no longer fits'
+              ELSE 'ok' END
+    FROM pg_statio_user_tables
+),
 
+-- ── 6. What is actually big ─────────────────────────────────────────────
+big AS (
+  SELECT 8, 'biggest tables', relname,
+         pg_size_pretty(pg_total_relation_size(relid)),
+         CASE WHEN n_dead_tup > GREATEST(n_live_tup, 1)
+              THEN '>>> more dead rows than live — needs a VACUUM'
+              ELSE 'ok' END
+    FROM pg_stat_user_tables
+   ORDER BY pg_total_relation_size(relid) DESC
+   LIMIT 6
+),
 
-/* ── 3. WHAT IS RUNNING RIGHT NOW ──────────────────────────────────────
-   Anything with a long duration and state 'active' is a query to look at.
-   idle_in_transaction rows are worse than they look: they hold locks and
-   stop autovacuum from reclaiming space. */
-SELECT
-  pid,
-  now() - query_start AS running_for,
-  state,
-  wait_event_type,
-  usename,
-  left(query, 160) AS query
-FROM   pg_stat_activity
-WHERE  datname = current_database()
-  AND  pid <> pg_backend_pid()
-ORDER  BY query_start NULLS LAST
-LIMIT  40;
+-- ── 7. And the two tables this month's work touched ─────────────────────
+-- Named rather than left to the size list, so their absence from it is
+-- itself an answer: if these are small, none of the recent changes is why.
+mine AS (
+  SELECT 9, 'recent work', t.relname,
+         pg_size_pretty(pg_total_relation_size(t.relid)) || ' · ' ||
+         t.n_live_tup::text || ' rows',
+         'for reference — was any of this the cause'
+    FROM pg_stat_user_tables t
+   WHERE t.relname IN ('nops_maint_field_records', 'mjmnpayroll_worker_sessions',
+                       'mjmnpayroll_worker_signin_fails', 'shared_portal_settings')
+)
 
-
-/* ── 4. IS IT SCANNING WHOLE TABLES ────────────────────────────────────
-   seq_scan is a full read of the table. A big table with a high seq_scan
-   count and a huge rows_read is what burns CPU on a small instance.
-   shared_inventory_logs is the one to watch: the movement report, the
-   batch report and the FC portal all read it in full. */
-SELECT
-  relname                                   AS table_name,
-  seq_scan,
-  to_char(seq_tup_read, 'FM999,999,999,999') AS rows_read_by_scans,
-  idx_scan,
-  n_live_tup                                AS live_rows
-FROM   pg_stat_user_tables
-WHERE  seq_scan > 0
-ORDER  BY seq_tup_read DESC
-LIMIT  20;
-
-
-/* ── 5. CONNECTIONS ────────────────────────────────────────────────────
-   If total is at or near max_connections the API cannot get a connection
-   and the health check fails even though the database itself is fine. */
-SELECT
-  (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_connections,
-  count(*)                                            AS total,
-  count(*) FILTER (WHERE state = 'active')            AS active,
-  count(*) FILTER (WHERE state = 'idle')              AS idle,
-  count(*) FILTER (WHERE state = 'idle in transaction') AS idle_in_transaction
-FROM   pg_stat_activity;
-
-
-/* ── 6. THE MOST EXPENSIVE QUERIES SINCE THE LAST RESTART ──────────────
-   Needs pg_stat_statements, which Supabase enables by default. If this
-   errors, skip it — sections 3 and 4 tell most of the same story.
-   total_time is the number that matters, not mean_time: a cheap query run
-   ten thousand times is what usually pegs a small instance. */
-SELECT
-  round(total_exec_time)::bigint  AS total_ms,
-  calls,
-  round(mean_exec_time)::bigint   AS mean_ms,
-  to_char(rows, 'FM999,999,999')  AS rows_returned,
-  left(query, 200)                AS query
-FROM   pg_stat_statements
-ORDER  BY total_exec_time DESC
-LIMIT  20;
+SELECT area AS "AREA", item AS "ITEM", value AS "VALUE", look AS "LOOK"
+  FROM (
+    SELECT * FROM disk
+    UNION ALL SELECT * FROM conns
+    UNION ALL SELECT * FROM long_q
+    UNION ALL SELECT * FROM blocked
+    UNION ALL SELECT * FROM cache
+    UNION ALL SELECT * FROM big
+    UNION ALL SELECT * FROM mine
+  ) all_checks
+ ORDER BY ord, item;

@@ -8,7 +8,10 @@
 
        555                 the exercise-book logotype, as on the login
        MJM Nursery
-       FC PORTAL <sub>     Manage, Setting, …
+       WORKER PORTAL <sub>   Manage, Setting, …
+
+   The portal name comes from data-portal and falls back to "FC Portal",
+   which is what this file said before it could be told.
 
    Only these pages. Every other module keeps the standard ribbon, so
    this is a per-page swap and not a change to what everybody loads.
@@ -17,7 +20,8 @@
 
        <div id="mjm-ribbon" data-logo="off" data-brand="" data-center=" "></div>
        <script src="../shared/shared_ribbon.js"></script>
-       <script src="../shared/shared_fc_brand.js" data-sub="Manage"></script>
+       <script src="../shared/shared_fc_brand.js"
+               data-portal="Worker Portal" data-sub="Manage"></script>
 
    data-center must be non-empty or the ribbon does not render a middle
    slot at all — a single space is enough, and it is that slot the mark
@@ -49,6 +53,10 @@
 (function () {
   var me = document.currentScript;
   var sub  = (me && me.dataset && me.dataset.sub)  || '';
+  /* Which portal's mark this is. Defaults to FC Portal, which is what every
+     page wore when this file only knew one name, so a page that does not say
+     is unchanged. The back office sets data-portal="Worker Portal". */
+  var portal = (me && me.dataset && me.dataset.portal) || 'FC Portal';
 
   function esc(v) {
     return String(v == null ? '' : v)
@@ -116,7 +124,7 @@
       '<div class="fcb">' +
         '<div class="fcb-555">555</div>' +
         '<div class="fcb-name">MJM Nursery</div>' +
-        '<div class="fcb-sub">' + 'FC Portal' + (sub ? ' ' + esc(sub) : '') + '</div>' +
+        '<div class="fcb-sub">' + esc(portal) + (sub ? ' ' + esc(sub) : '') + '</div>' +
       '</div>';
     return true;
   }

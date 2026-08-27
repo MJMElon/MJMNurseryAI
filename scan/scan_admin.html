@@ -15,29 +15,44 @@
   body { background:#faf5ff; margin:0; }
   .card { background:white; border:1px solid #ede9fe; border-radius:20px; box-shadow:0 4px 16px rgba(139,92,246,.08); }
 
-  /* The way through to the phone app. Deliberately the biggest thing on the
-     page: for most people this page is a doorway, not a destination. */
-  .portal-btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
-                padding:18px 22px; border-radius:18px; text-decoration:none;
+  /* The two ways through to the phone app. Deliberately the biggest thing on
+     the page: for most people this page is a doorway, not a destination.
+
+     Side by side rather than stacked. Two full-width bars one above the other
+     read as a list with an order to it — first this, then that — and these
+     are not steps. They are two doors, and a row says so. */
+  .portal-row { display:flex; gap:14px; }
+  .portal-btn { flex:1 1 0; min-width:0;
+                display:flex; flex-direction:column; align-items:center; justify-content:center;
+                gap:9px; padding:26px 18px; border-radius:22px; text-decoration:none;
                 background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:white;
-                font-weight:900; font-size:14px; letter-spacing:.1em; text-transform:uppercase;
+                font-weight:900; font-size:13.5px; letter-spacing:.09em; text-transform:uppercase;
+                text-align:center; line-height:1.35;
                 box-shadow:0 10px 26px -6px rgba(109,40,217,.5); transition:all .15s; }
-  .portal-btn:hover { transform:translateY(-1px); box-shadow:0 14px 30px -6px rgba(109,40,217,.55); }
-  /* The worker's door in the 555 wordmark's green. Two identical purple bars
+  .portal-btn:hover { transform:translateY(-2px); box-shadow:0 16px 32px -6px rgba(109,40,217,.55); }
+  /* The worker's door in the 555 wordmark's green. Two identical purple tiles
      would be one button somebody presses twice by mistake; the colour is what
      tells the two doors apart at arm's length. */
-  .portal-btn-worker { margin-top:12px;
-                       background:linear-gradient(135deg,#10b981,#047857);
+  .portal-btn-worker { background:linear-gradient(135deg,#10b981,#047857);
                        box-shadow:0 10px 26px -6px rgba(4,120,87,.45); }
-  .portal-btn-worker:hover { box-shadow:0 14px 30px -6px rgba(4,120,87,.5); }
+  .portal-btn-worker:hover { box-shadow:0 16px 32px -6px rgba(4,120,87,.5); }
+  /* The label wraps to two lines inside a narrow tile; the arrow rides with
+     the last word rather than dropping to a line of its own. */
+  .portal-btn .pb-label { display:inline; }
+  /* On a phone the row would give each door about 150px, which is not a door.
+     They stack there, and only there. */
+  @media (max-width:560px) { .portal-row { flex-direction:column; }
+                             .portal-btn { flex-direction:row; padding:18px 22px; } }
   .portal-note { margin:10px 2px 0; font-size:11.5px; font-weight:500; line-height:1.5;
                  color:#64748b; }
   /* Sized here, not only by a Tailwind class: the CDN is a third-party
      script, and a page whose icons are 300px until it lands is a broken page.
      Same reason the auditor's portal button pins its own. */
   .portal-btn svg { fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-  .portal-btn .pb-phone { width:20px; height:20px; flex-shrink:0; }
-  .portal-btn .pb-out   { width:15px; height:15px; opacity:.85; flex-shrink:0; }
+  .portal-btn .pb-phone { width:30px; height:30px; flex-shrink:0; }
+  .portal-btn .pb-out   { width:14px; height:14px; opacity:.85; flex-shrink:0;
+                          vertical-align:-1px; margin-left:6px; }
+  @media (max-width:560px) { .portal-btn .pb-phone { width:20px; height:20px; } }
 
   /* A square tile rather than a wide row: there is one of these, and a row
      stretched across the page reads as a list with an item missing. */
@@ -58,7 +73,7 @@
      that: every other module keeps the standard ribbon. -->
 <div id="mjm-ribbon" data-logo="off" data-brand="" data-center=" "></div>
 <script src="../shared/shared_ribbon.js"></script>
-<script src="../shared/shared_fc_brand.js" data-sub="Manage"></script>
+<script src="../shared/shared_fc_brand.js" data-portal="Worker Portal" data-sub="Manage"></script>
 
 <div id="loading" class="max-w-[860px] mx-auto px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Checking access…</div>
 
@@ -68,24 +83,29 @@
        signs in with the e-mail account every MJM system shares, the worker
        with the PIN on their row of the Payroll register. Kept the same size
        because neither is the lesser door — they are just different people. -->
-  <a class="portal-btn" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
-    <svg viewBox="0 0 24 24" class="pb-phone"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/></svg>
-    <span>Visit 555 FC Portal</span>
-    <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
-  </a>
+  <div class="portal-row">
+    <a class="portal-btn" id="portal-link" href="https://scan.mjmnursery.com" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" class="pb-phone"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/></svg>
+      <span class="pb-label">Visit 555 FC Portal<svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></span>
+    </a>
 
-  <a class="portal-btn portal-btn-worker" id="worker-portal-link"
-     href="https://scan.mjmnursery.com/#/worker" target="_blank" rel="noopener">
-    <svg viewBox="0 0 24 24" class="pb-phone"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>
-    <span>Visit 555 Worker Portal</span>
-    <svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
-  </a>
+    <a class="portal-btn portal-btn-worker" id="worker-portal-link"
+       href="https://scan.mjmnursery.com/#/worker" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" class="pb-phone"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>
+      <span class="pb-label">Visit 555 Worker Portal<svg viewBox="0 0 24 24" class="pb-out"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></span>
+    </a>
+  </div>
 
   <p class="portal-note">The FC Portal asks for an e-mail and password. The Worker Portal asks
-    only for a PIN — the one on the worker's row in Payroll → Worker System.</p>
+    only for a PIN — the one on the worker's row in Worker System, below.</p>
 
-  <div class="mt-6">
-    <a class="tool" id="tool-access" href="scan_user_access.html">
+  <!-- Two tiles now, so a row rather than a lone square. -->
+  <div class="mt-6 flex flex-wrap gap-3">
+    <a class="tool" id="tool-workers" href="scan_workers.html">
+      <span class="tool-ico bg-amber-100">👷</span>
+      <span class="tool-name">Worker System</span>
+    </a>
+    <a class="tool" id="tool-access" href="scan_setting.html">
       <span class="tool-ico bg-violet-100">⚙️</span>
       <span class="tool-name">Setting</span>
     </a>
@@ -119,13 +139,20 @@ $('worker-portal-link').addEventListener('click', (e) => {
       return;
     }
 
-    /* This is the back office, not the field. Anyone who is not an admin of
-       the module is sent where they were going anyway — the phone app — rather
-       than being shown a page of settings they cannot use. The module card on
-       the hub already routes them past it; this is for a typed URL or an old
-       bookmark. */
-    if (!MJMAccess.isAdminOf('scan')) {
-      window.location.replace('https://scan.mjmnursery.com/?cb=' + Date.now());
+    /* This is the back office, not the field. Anyone without it is sent where
+       they were going anyway — their own portal — rather than being shown a
+       page of settings they cannot use. The module card on the hub already
+       routes them past it; this is for a typed URL or an old bookmark.
+
+       WHICH portal is the point: a Field Conductor gets the FC Portal and a
+       supervisor who holds only the worker portal gets that one. Sending
+       everybody to the FC Portal, as this did, put the second kind in front
+       of a login for an app they do not use. Somebody holding neither goes
+       back to the hub instead of bouncing between two doors that are both
+       shut. */
+    if (!MJMAccess.canScanArea('manage')) {
+      const home = MJMAccess.scanHome();
+      window.location.replace(home || '../index.html');
       return;
     }
 
@@ -133,7 +160,14 @@ $('worker-portal-link').addEventListener('click', (e) => {
     // second copy in the header bar that has gone with it.
     // User Access writes other people's permissions, which the database policy
     // only lets a user-manager do — so it is not offered to anyone else.
-    if (!MJMAccess.canManageUsers()) $('tool-access').classList.add('hidden');
+    /* Each door on this page, by its own tick on Setting. Every one of them
+       falls back to the rule that governed it before that screen existed, so
+       nobody's access changed on the day the ticks arrived — see
+       canScanArea() in shared/shared_access.js. */
+    if (!MJMAccess.canScanArea('setting')) $('tool-access').classList.add('hidden');
+    if (!MJMAccess.canScanArea('workers')) $('tool-workers').classList.add('hidden');
+    if (!MJMAccess.canScanArea('fc')) $('portal-link').classList.add('hidden');
+    if (!MJMAccess.canScanArea('worker')) $('worker-portal-link').classList.add('hidden');
 
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');

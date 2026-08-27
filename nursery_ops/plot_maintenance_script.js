@@ -26,6 +26,19 @@ const NURSERY_LABELS = {
   UNN1: 'UNN 1 — Ulu Niah Nursery 1',
   UNN2: 'UNN 2 — Ulu Niah Nursery 2'
 };
+/* The code as it is WRITTEN, for the places that show it on its own — the
+   nursery circles across the top and the pill beside them. NURSERY_LABELS
+   already spells "UNN 1"; those spots were printing the stored code, so one
+   screen said UNN 1 and the next said UNN1 for the same nursery.
+
+   Display only. UNN1 without the space is what the column holds and what
+   every record, plot map and report is keyed by — nothing here changes
+   that, and nothing here may. */
+const NURSERY_SHORT = {
+  PN: 'PN', BNN: 'BNN', UNN1: 'UNN 1', UNN2: 'UNN 2'
+};
+const nurseryShort = n => NURSERY_SHORT[n] || n;
+
 /* Plain nursery name (no code prefix) for the big page header:
    "Batu Niah Nursery — Apr 2026". */
 const NURSERY_NAMES = {
@@ -324,6 +337,10 @@ const PAYROLL_TYPES = {
 let _payrollView = 'pd';
 let payrollData  = {};   // `${nursery}_${month}_${type}` → { recId: { worker: qty } }
 let _payrollSaveTimer = null;
+/* `${nursery}_${month}` → names the field credited that matched no column on
+   that sheet. Filled by applyFieldRecords, shown by renderPayroll. Not saved:
+   it is a fact about the last sync, not about the month. */
+let _fieldUnmatched = {};
 
 function payrollKey(n, m, type) { return `${n}_${m}_${type}`; }
 
@@ -391,8 +408,17 @@ function renderPayroll() {
     const known = new Set(wk);
     const gone = [...new Set(Object.values(store).flatMap(c =>
       Object.keys(c || {}).filter(name => c[name] && !known.has(name))))].sort();
-    off.style.display = gone.length ? 'block' : 'none';
-    off.textContent = gone.length ? `${t('pay.offRegister')} ${gone.join(', ')}` : '';
+    /* And the other direction: a name the FIELD credited that never found a
+       column, so there was no tick to lose in the first place. See
+       applyFieldRecords — it is a worker's share of a plot going missing, and
+       it belongs on the sheet the share was supposed to land on. */
+    const nofit = (_fieldUnmatched[`${n}_${m}`] || []).filter((x) => !known.has(x));
+    const lines = [];
+    if (gone.length)  lines.push(`${t('pay.offRegister')} ${gone.join(', ')}`);
+    if (nofit.length) lines.push(`${t('pay.fieldNoColumn')} ${nofit.join(', ')}`);
+    off.style.display = lines.length ? 'block' : 'none';
+    off.textContent = lines.join('\n');
+    off.style.whiteSpace = 'pre-line';
   }
 
   if (!wk.length) {
@@ -614,7 +640,7 @@ function downloadPayrollPDF() {
     doc.setFontSize(12);
     doc.text(t('pay.form').toUpperCase(), MID, y + 12, { align: 'center' });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-    doc.text(`${NURSERY_NAMES[n] || n} (${n})  ·  ${t('pay.month')} ${m}`, MID, y + 19, { align: 'center' });
+    doc.text(`${NURSERY_NAMES[n] || n} (${nurseryShort(n)})  ·  ${t('pay.month')} ${m}`, MID, y + 19, { align: 'center' });
     doc.setDrawColor(13, 122, 71); doc.setLineWidth(0.6);
     doc.line(MARGIN, y + 23, PW - MARGIN, y + 23);
     doc.setLineWidth(0.2);
@@ -899,7 +925,7 @@ async function unlockPieceRates() {
 }
 
 /* ── Workers (per nursery) ────────────────────────────────────────────────
-   Names come from the Worker System in the Nursery Payroll System, so one
+   Names come from the Worker System on the 555 Worker Portal's Manage page, so one
    register covers both modules: add, rename or deactivate somebody there and
    the tick sheets here follow, this month included. Only the general workers
    of that nursery are taken — a nursery's own section, minus the roles that
@@ -1027,7 +1053,7 @@ function refreshLinkedWorkers(force) {
 function removeWorker(name) {
   const n = getNursery();
   if (isLinked(n)) {
-    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System in the Nursery Payroll System.\n\n` +
+    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System on the 555 Worker Portal's Manage page.\n\n` +
           `Remove or deactivate the worker there instead.`);
     return;
   }
@@ -1165,13 +1191,14 @@ const I18N = {
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'sched.ticked':'ticked', 'sched.none':'not set yet',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
-    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Schedule', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
+    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Monthly Scheduled Work', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
-    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them in the Nursery Payroll System and they will appear here.',
-    'pay.linkedNote':'Worker names come from the Worker System in the Nursery Payroll System and follow any change made there.',
+    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them on the 555 Worker Portal\u2019s Manage page and they will appear here.',
+    'pay.linkedNote':'Worker names come from the Worker System on the 555 Worker Portal\u2019s Manage page and follow any change made there.',
     'pay.offRegister':'⚠ Ticked this month but no longer a general worker of this nursery on the register, so their capacity is not counted:',
+    'pay.fieldNoColumn':'⚠ The field credited work to these names and they have no column here, so their share of the plot is not counted. Check the spelling against the register, or that they are a general worker of this nursery:',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
     /* Salary claim form (PDF) */
@@ -1181,7 +1208,7 @@ const I18N = {
     'pay.grandTotal':'GRAND TOTAL',
     'pay.autoNote':'This worker record is automatically generated by the MJM Nursery AI system.',
     'btn.claimPdf':'⬇ Worker Record (PDF)',
-    'tab.calc':'💊 Dosage Calc',
+    
     'badge.pd':'PEST & DISEASE SPRAYING SCHEDULE', 'badge.manuring':'MANURING SCHEDULE',
     'badge.weeding':'WEEDING SCHEDULE', 'badge.interrow':'INTERROW SPRAYING SCHEDULE',
     'badge.calc':'💊 DOSAGE CALCULATOR',
@@ -1197,18 +1224,15 @@ const I18N = {
     'sum.maxRacun':'Max Chemical Used', 'sum.maxBaja':'Max Fertilizer Used',
     'sum.maxBond':'Max Bond Used', 'sum.maxActivator':'Max Activator Used',
     'sum.bags':'Bags Needed',
-    'calc.capacity':'Nursery Plot Capacity (seedlings per plot — editable)',
-    'calc.chemHead':'🧪 Chemical (Racun)', 'calc.fertHead':'🌱 Fertilizer (Baja)',
-    'calc.tickPlots':'Tick plots to include',
-    'calc.plotsSel':'Plots Selected', 'calc.noPlots':'No plots for this nursery.',
-    'calc.jumlahBibit':'Total Seedlings', 'calc.maxRacun':'Max Chemical Used',
-    'calc.maxBaja':'Max Fertilizer Used', 'calc.bags':'Bags Needed',
     'unit.bags':'bags', 'unit.each':'each',
     'pdf.title':'Download Schedule PDF', 'pdf.short.pd':'P&D SPRAYING', 'pdf.short.manuring':'MANURING',
     'pdf.short.weeding':'WEEDING', 'pdf.short.interrow':'INTERROW SPRAY', 'pdf.merumput':'Weeding in polybag',
     'pdf.include':'Include schedules', 'btn.cancel':'Cancel', 'btn.downloadPdf':'⬇ Download PDF',
     'rec.tarikh':'Date', 'rec.jenis':'Work Type', 'rec.racun':'Chemical',
     'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Quantity', 'rec.gaia':'Gaia', 'rec.remark':'Remark',
+    'rec.audit':'Audit', 'rec.auditOk':'Satisfied', 'rec.auditBad':'Unsatisfied',
+    'rec.auditOkTip':'The auditor checked this job and passed it',
+    'rec.auditBadTip':'The auditor checked this job and did not pass it',
     'rec.allJenis':'All Work Types', 'rec.allPlot':'All Plots', 'rec.filterDate':'Filter by date…',
     'rec.totalTasks':'Total Tasks', 'rec.gaiaDone':'Gaia Done', 'rec.gaiaPending':'Gaia Pending',
     'rec.donePct':'Done %', 'rec.none':'No records found.',
@@ -1249,13 +1273,14 @@ const I18N = {
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'sched.ticked':'ditanda', 'sched.none':'belum ditetapkan',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
-    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Jadual', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
+    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Kerja Berjadual Bulanan', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
     'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
-    'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di Sistem Penggajian Nurseri dan nama akan muncul di sini.',
-    'pay.linkedNote':'Nama pekerja diambil daripada Worker System di Sistem Penggajian Nurseri dan mengikut sebarang pindaan di sana.',
+    'pay.noWorkers':'Belum ada pekerja am untuk nurseri ini dalam daftar Worker System. Tambah di halaman Manage Portal 555 FC dan nama akan muncul di sini.',
+    'pay.linkedNote':'Nama pekerja diambil daripada Worker System di halaman Manage Portal 555 FC dan mengikut sebarang pindaan di sana.',
     'pay.offRegister':'⚠ Ditanda bulan ini tetapi bukan lagi pekerja am nurseri ini dalam daftar, jadi kapasiti mereka tidak dikira:',
+    'pay.fieldNoColumn':'⚠ Lapangan mengkreditkan kerja kepada nama ini tetapi tiada lajur di sini, jadi bahagian mereka tidak dikira. Semak ejaan dengan daftar, atau sama ada mereka pekerja am nurseri ini:',
     /* Borang tuntutan gaji (PDF) */
     'pay.no':'Bil.', 'pay.worker':'Nama Pekerja', 'pay.workersRange':'Pekerja', 'pay.ofTotal':'daripada',
     'pay.capBy':'KAPASITI KERJA DISIAPKAN (BIBIT)', 'pay.totalEarn':'Jumlah Pendapatan (RM)',
@@ -1265,7 +1290,7 @@ const I18N = {
     'btn.claimPdf':'⬇ Rekod Pekerja (PDF)',
     'pay.noRows':'Tiada rekod untuk nurseri dan bulan ini — tandakan jadual, kemudian Sync from Schedule.',
     'pay.tickHint':'Tandakan setiap pekerja yang membuat kerja. Kapasiti setiap pekerja = kapasiti plot ÷ bilangan tanda pada baris itu. Gaji dikira daripada rekod ini di Sistem Penggajian Nurseri.',
-    'tab.calc':'💊 Kira Dos',
+    
     'badge.pd':'JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA', 'badge.manuring':'JADUAL MEMBAJA',
     'badge.weeding':'JADUAL MERUMPUT', 'badge.interrow':'JADUAL MERACUN RUMPUT SECARA SELINGAN',
     'badge.calc':'💊 KALKULATOR DOS',
@@ -1281,18 +1306,15 @@ const I18N = {
     'sum.maxRacun':'Maksimal Racun Guna', 'sum.maxBaja':'Maksimal Baja Guna',
     'sum.maxBond':'Maksimal Bond Guna', 'sum.maxActivator':'Maksimal Activator Guna',
     'sum.bags':'Bag Diperlukan',
-    'calc.capacity':'Kapasiti Plot Semaian (bibit setiap plot — boleh ubah)',
-    'calc.chemHead':'🧪 Racun (Chemical)', 'calc.fertHead':'🌱 Baja (Fertilizer)',
-    'calc.tickPlots':'Tanda plot untuk disertakan',
-    'calc.plotsSel':'Plot Dipilih', 'calc.noPlots':'Tiada plot untuk tapak semaian ini.',
-    'calc.jumlahBibit':'Jumlah Bibit', 'calc.maxRacun':'Maksimal Racun Guna',
-    'calc.maxBaja':'Maksimal Baja Guna', 'calc.bags':'Bag Diperlukan',
     'unit.bags':'beg', 'unit.each':'setiap',
     'pdf.title':'Muat Turun Jadual PDF', 'pdf.short.pd':'RACUN P&D', 'pdf.short.manuring':'MEMBAJA',
     'pdf.short.weeding':'MERUMPUT', 'pdf.short.interrow':'RACUN SELINGAN', 'pdf.merumput':'Merumput dalam polibeg',
     'pdf.include':'Sertakan jadual', 'btn.cancel':'Batal', 'btn.downloadPdf':'⬇ Muat Turun PDF',
     'rec.tarikh':'Tarikh', 'rec.jenis':'Jenis Kerja', 'rec.racun':'Racun / Bahan',
     'rec.plot':'Plot', 'rec.batch':'Batch', 'rec.qty':'Kuantiti', 'rec.gaia':'Gaia', 'rec.remark':'Catatan',
+    'rec.audit':'Audit', 'rec.auditOk':'Memuaskan', 'rec.auditBad':'Tidak Memuaskan',
+    'rec.auditOkTip':'Juruaudit telah memeriksa kerja ini dan meluluskannya',
+    'rec.auditBadTip':'Juruaudit telah memeriksa kerja ini dan tidak meluluskannya',
     'rec.allJenis':'Semua Jenis Kerja', 'rec.allPlot':'Semua Plot', 'rec.filterDate':'Tapis ikut tarikh…',
     'rec.totalTasks':'Jumlah Tugasan', 'rec.gaiaDone':'Gaia Selesai', 'rec.gaiaPending':'Gaia Belum',
     'rec.donePct':'% Selesai', 'rec.none':'Tiada rekod dijumpai.',
@@ -1773,7 +1795,7 @@ function _syncMonthButtons() {
 }
 
 function onNurseryChange() {
-  document.getElementById('nursery-pill').textContent = getNursery();
+  document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
 syncNurseryCircles();
   renderAll();
   autoSyncRecords();
@@ -1802,18 +1824,23 @@ function renderAll() {
   if (chartView && chartView.classList.contains('active')) renderCharts();
   const payTab = document.getElementById('tab-payroll');
   if (payTab && payTab.classList.contains('active')) renderPayroll();
-  // Re-render calculator if its tab is active (clear ticks since plots may differ between nurseries)
-  const calcTab = document.getElementById('tab-calc');
-  if (calcTab && calcTab.classList.contains('active')) { calcTicked = {}; renderCalc(); }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   WHAT THE FIELD RECORDED
+   WHAT THE FIELD RECORDED — ONCE SOMEBODY HAS VERIFIED IT
    The FC Scan Portal's Maintenance module saves one row per job done into
    nops_maint_field_records — the date the work actually happened and the
    batches that were standing in the plot. Those are the two columns this
    page otherwise chases by phone, so they are read back here and written
    onto the matching work-record row.
+
+   VERIFIED ONES ONLY. Saving is a worker saying what they did; it is not
+   the nursery agreeing it happened. Until a Field Conductor presses Verify
+   on that record, it does not reach this list, does not fill in a date, does
+   not tick anybody on the Worker Record, and does not count towards the
+   month. Verifying is what links it — and unverifying unlinks it again,
+   through the same "the field record has gone" path that already handles a
+   deleted one.
 
    A field record finds its row by job + plot + the round the schedule asked
    for it in ("Round 2: ..." in the racun column is the second seven-day
@@ -1832,32 +1859,122 @@ const _FIELD_JENIS = {
   interrow: 'Meracun rumput secara selingan'
 };
 
+/* Every read here carries the same filter, in every fallback: a record that
+   nobody has verified is not this page's business. Putting it on the query
+   rather than filtering after means an unverified row never arrives, so no
+   later change to this file can forget it. */
+const _verifiedOnly = (q) => q.not('verified_at', 'is', null);
+
 async function loadFieldRecords() {
   if (!_supabase) return;
   try {
     // Paged: the field writes roughly one row per plot per job per week, so
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
-    let res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by')
+    let res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at'))
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
     // still recording the work itself, so fall back to reading what is there.
     if (res.error) {
-      res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty')
+      res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at'))
         .order('id', { ascending: true }));
       // Still no? Then this database predates the batch columns too.
       if (res.error && /column .* does not exist|schema cache/i.test(String(res.error.message || ''))) {
-        res = await _mvFetchAll(() => _supabase.from('nops_maint_field_records')
-          .select('id, work_date, plot_name, work_type, jenis')
+        res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
+          .select('id, work_date, plot_name, work_type, jenis, worked_by, reported_by, verified_at'))
           .order('id', { ascending: true }));
       }
     }
-    if (res.error) { console.warn('[maint] field records unavailable:', res.error.message); return; }
+    if (res.error) {
+      /* If verified_at is what is missing, this database predates
+         shared/add_maint_field_verify.sql and nothing here can tell a
+         verified record from an unverified one. Link NOTHING and say so —
+         linking everything would be this page quietly deciding that unchecked
+         work counts, which is the one thing the change was made to stop. */
+      if (/verified_at/i.test(String(res.error.message || ''))) {
+        console.warn('[maint] this database has no verified_at column on '
+          + 'nops_maint_field_records, so verified work cannot be told from '
+          + 'unverified. Nothing is linked. Run shared/add_maint_field_verify.sql.');
+        fieldRecords = [];
+        return;
+      }
+      console.warn('[maint] field records unavailable:', res.error.message);
+      return;
+    }
     fieldRecords = res.data || [];
   } catch (e) { console.warn('[maint] field records unavailable:', e); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WHAT THE AUDITOR SAID
+   The Auditor Portal's Maintenance module files one verdict per job into
+   audit_maintenance_audits — Satisfied or Unsatisfied, with the photo and
+   the remark that go with it. Only the verdict is read here: this list is
+   showing whether the work passed, not conducting the audit.
+
+   task_id is a STRING of whichever id the auditor's card was built from —
+   the field record's for a job the portal submitted, this page's own record
+   id for one keyed here. Both are looked up, in that order, because a job
+   can exist as both and the field record is the one the auditor sees.
+
+   A missing verdict is not a failure. Most rows have not been audited, and
+   the ones that never will be still render an em dash rather than a gap.
+══════════════════════════════════════════════════════════════ */
+let maintAudits = {};             // task_id (string) → 'Satisfactory' | 'Unsatisfactory' | …
+
+async function loadMaintAudits() {
+  if (!_supabase) return;
+  try {
+    const res = await _mvFetchAll(() => _supabase
+      .from('audit_maintenance_audits')
+      .select('id, task_id, result, date')
+      .order('id', { ascending: true }));
+    if (res.error) {
+      /* Almost always RLS: the audit tables are readable by staff only once
+         shared/migration_audit_rls_align.sql has been run, and before that
+         only by audit-module users. Say which, because a silently empty
+         column looks exactly like "nothing has been audited yet". */
+      console.warn('[maint] audit verdicts unavailable, so the Audit column '
+        + 'will stay empty:', res.error.message);
+      return;
+    }
+    const by = {};
+    (res.data || []).forEach((a) => {
+      const k = String(a.task_id == null ? '' : a.task_id);
+      if (!k) return;
+      /* Re-audited: the later verdict is the answer. Ordered by id above, so
+         this is simply the last one seen. */
+      by[k] = a.result || '';
+    });
+    maintAudits = by;
+  } catch (e) { console.warn('[maint] audit verdicts unavailable:', e); }
+}
+
+/* Satisfied / Unsatisfied and nothing else. The auditor's table can also
+   hold 'Not Done' and a row can be half-filled offline; neither is a verdict
+   on the work, so neither is shown as one. */
+function _auditCell(r) {
+  /* One row can be several field records — three workers on one job — and
+     the auditor files against each one. So every verdict on the group is
+     collected, and an Unsatisfied among them wins: a job somebody failed is
+     a failed job, and averaging it away is how a failure stops being seen. */
+  const ids = Array.isArray(r._fieldIds) && r._fieldIds.length ? r._fieldIds : [];
+  let found = ids.map((i) => maintAudits[String(i)]).filter(Boolean);
+  if (!found.length) found = [maintAudits[String(r.id)]].filter(Boolean);
+
+  const many = ids.length > 1
+    ? ` (${found.length} of ${ids.length} records audited)` : '';
+
+  if (found.includes('Unsatisfactory')) {
+    return `<span class="audit-pill audit-bad" title="${t('rec.auditBadTip')}${many}">${t('rec.auditBad')}</span>`;
+  }
+  if (found.includes('Satisfactory')) {
+    return `<span class="audit-pill audit-ok" title="${t('rec.auditOkTip')}${many}">${t('rec.auditOk')}</span>`;
+  }
+  return '<span style="color:var(--text-faint);">—</span>';
 }
 
 /* "Round 2: Daconil 50gm" → 2 */
@@ -1900,22 +2017,77 @@ function _isoMonthLabel(iso) {
 }
 const _fieldKey = (jenis, plot, week) => `${jenis}||${_mvPlotKey(plot)}||${week}`;
 
-/* The field's answer for each (job, plot, round) of one month. Where the same
-   job was saved twice the later one wins — the second save is a correction. */
+/* Who a field record credits the work to.
+
+   `worked_by` is the conductor keying a job for somebody whose phone was
+   broken; NULL means the person who reported it did it themselves. Both are
+   read, because a job three workers each saved from their own phone has
+   worked_by empty on all three, and crediting nobody for a morning three
+   people spent is worse than crediting the wrong person — it is silent. */
+function _fieldCredits(f) {
+  const raw = String(f.worked_by || '').trim() || String(f.reported_by || '').trim();
+  return raw.split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+/* Every field record for one (job, plot, round), summarised.
+
+   This used to keep ONE record per job and treat any second as a correction
+   of the first. That is wrong about how the work actually happens: three
+   workers on B1 Round 1 Manuring each save their own record, and they are
+   not corrections of one another, they are the same job. Two of them may
+   even be on different days — the crew ran out of light and finished it the
+   next morning — and both days are true.
+
+   So the group is kept whole and asked three questions:
+
+     dates    the distinct days it was worked, earliest first. One job done
+              by three people on 1 Jul is "01 Jul 2026". The same job spread
+              over the 1st and the 2nd is "01 & 02 Jul 2026", because the
+              schedule asked for one job and it took two mornings.
+     batches  every batch anybody ticked, each named once
+     workers  everybody credited, each counted once, however many records
+              their name appears on — three workers, three records, three
+              ticks on the Worker Record, not nine
+
+   qty stays latest-wins rather than becoming a sum. Three workers on one
+   job each report the batches THEY ticked, and on a job they did together
+   that is the same batch three times: adding them would treble the plot.
+   Which of "they split it" and "they shared it" is true is not something
+   this table can tell from the outside, and quantities here are piece-rate
+   money, so it keeps the answer it has always given. */
+function _summariseFieldGroup(list) {
+  const newest = list.reduce((best, f) => {
+    if (!best) return f;
+    const a = String(f.work_date || ''), b = String(best.work_date || '');
+    return (a > b || (a === b && (f.id || 0) > (best.id || 0))) ? f : best;
+  }, null);
+
+  const uniq = (xs) => [...new Set(xs.filter(Boolean))];
+
+  return {
+    list,
+    ids:     list.map((f) => f.id),
+    dates:   uniq(list.map((f) => f.work_date)).sort(),
+    batches: uniq(list.flatMap((f) => String(f.batch_name || '').split(',').map((x) => x.trim()))),
+    workers: uniq(list.flatMap(_fieldCredits)),
+    qty:     newest ? newest.qty : null,
+  };
+}
+
+/* The field's answer for each (job, plot, round) of one month. */
 function fieldRecordIndex(monthLbl) {
-  const idx = {};
+  const groups = {};
   fieldRecords.forEach(f => {
     const jenis = f.jenis || _FIELD_JENIS[f.work_type];
     if (!jenis) return;
     if ((f.schedule_month || _isoMonthLabel(f.work_date)) !== monthLbl) return;
     const week = f.week_no || _weekOfDate(f.work_date);
     if (!week) return;
-    const k = _fieldKey(jenis, f.plot_name, week), cur = idx[k];
-    const newer = !cur
-      || String(f.work_date || '') > String(cur.work_date || '')
-      || (String(f.work_date || '') === String(cur.work_date || '') && (f.id || 0) > (cur.id || 0));
-    if (newer) idx[k] = f;
+    const k = _fieldKey(jenis, f.plot_name, week);
+    (groups[k] || (groups[k] = [])).push(f);
   });
+  const idx = {};
+  Object.keys(groups).forEach((k) => { idx[k] = _summariseFieldGroup(groups[k]); });
   return idx;
 }
 
@@ -1935,7 +2107,7 @@ function applyFieldRecords(nursery, monthLbl) {
      conductor who corrects the sheet by hand keeps his correction, and a
      field record that is later deleted takes its own ticks with it and
      nobody else's. Ticks made on this page are 1, and stay 1. */
-  const syncTicks = (rec, field) => {
+  const syncTicks = (rec, group) => {
     const type = _PAYROLL_TYPE_BY_JENIS[rec.jenis];
     if (!type) return;
     const k = payrollKey(nursery, monthLbl, type);
@@ -1944,8 +2116,11 @@ function applyFieldRecords(nursery, monthLbl) {
     const byHand = Object.keys(cells).some((w) => cells[w] !== 'field');
     if (byHand) return;                       // somebody has answered already
 
-    const names = String((field && field.worked_by) || '')
-      .split(',').map((x) => x.trim()).filter(Boolean);
+    /* Everybody the whole group credits, not one record's worth. Three
+       workers who each saved their own record for the same job are three
+       ticks on one row, and a name on two of those records is still one
+       tick — _summariseFieldGroup has already made the list distinct. */
+    const names = (group && group.workers) || [];
 
     const next = {};
     names.forEach((n) => {
@@ -1964,33 +2139,52 @@ function applyFieldRecords(nursery, monthLbl) {
   records.forEach(r => {
     if (!plots.includes(r.plot) || r.checked) return;
     const week = _recRound(r.racun);
-    const f = week ? idx[_fieldKey(r.jenis, r.plot, week)] : null;
-    if (!f) {
-      // A cell this sync filled before whose field record has gone — deleted,
-      // or the month on screen has moved on. Put it back the way it was found
-      // rather than leaving another month's answer sitting in it.
+    const g = week ? idx[_fieldKey(r.jenis, r.plot, week)] : null;
+    if (!g) {
+      // A cell this sync filled before whose field records have gone —
+      // deleted, unverified again, or the month on screen has moved on. Put
+      // it back the way it was found rather than leaving another month's
+      // answer sitting in it.
       if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
       if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
       if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
+      delete r._fieldDates;
+      delete r._fieldIds;
       syncTicks(r, null);
       return;
     }
+    /* Which field records this row is showing, so the Audit column can find
+       their verdicts — the auditor files against a field record's id, not
+       this page's, and one job can be several records. Cleared above when the
+       link goes, so an unverified or deleted record cannot leave a verdict
+       pointing at nothing. */
+    r._fieldIds = g.ids.slice();
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
-      r.tarikh = f.work_date || '-';
+      /* tarikh stays ONE date — the earliest. Everything downstream reads it
+         as a date and would choke on a list: the month timeline, the Worker
+         Record, the filter box, the Auditor Portal's own copy of this row.
+         The days beyond the first ride alongside in _fieldDates, which only
+         the cell below looks at. */
+      r.tarikh = g.dates[0] || '-';
+      r._fieldDates = g.dates.slice();
       r._fromFieldDate = 1;
+    } else {
+      // Somebody keyed this date by hand. Their answer stands alone; showing
+      // the field's other days beside it would be this page arguing with them.
+      delete r._fieldDates;
     }
-    if (f.batch_name && (!r.batch || r._fromFieldBatch)) {
-      r.batch = f.batch_name;
+    if (g.batches.length && (!r.batch || r._fromFieldBatch)) {
+      r.batch = g.batches.join(', ');
       r._fromFieldBatch = 1;
     }
     // The field counted the batches it ticked, so the quantity is already
     // answered — leaving the cell to fall back to the linked figure asked the
     // batch report a question the record had already settled.
-    if (f.qty != null && f.qty !== '' && (r.qty == null || r._fromFieldQty)) {
-      r.qty = Number(f.qty);
+    if (g.qty != null && g.qty !== '' && (r.qty == null || r._fromFieldQty)) {
+      r.qty = Number(g.qty);
       r._fromFieldQty = 1;
     }
-    syncTicks(r, f);
+    syncTicks(r, g);
   });
 
   /* Save only the sheets that changed, and only if something did — this runs
@@ -1999,10 +2193,23 @@ function applyFieldRecords(nursery, monthLbl) {
   touched.forEach((type) => persistPayroll(nursery, monthLbl, type));
   if (touched.size) renderPayroll();
 
+  /* Somebody the field credited who has no column on this sheet.
+
+     This used to be a console warning and nothing else, which was tolerable
+     while the field only ever credited names a conductor had typed. It is not
+     any more: a worker recording their own morning IS the credit now, so a
+     name that does not match a column is that worker's share of the plot
+     going missing — quietly, from a piece-rate sheet, with the row still
+     looking complete. It gets said on the screen where the consequence is.
+
+     Usually a spelling that differs by more than punctuation, or somebody
+     whose register row is not a general worker of this nursery. */
+  _fieldUnmatched[`${nursery}_${monthLbl}`] = [...unmatched].sort();
   if (unmatched.size) {
     console.warn('[maint] the field credited work to names with no column on '
       + 'this nursery\'s Worker Record, so their capacity is not counted:',
       [...unmatched].join(', '));
+    try { renderPayroll(); } catch (_) {}
   }
 }
 
@@ -2107,7 +2314,6 @@ function switchTab(name, btn) {
   const panel = document.getElementById('tab-'+name);
   if (panel) panel.classList.add('active');
   if (name==='record') { renderRecords(); if (_recordView==='chart') renderCharts(); }
-  if (name==='calc')    renderCalc();
   // Re-read the register on the way in, so an amendment made in the payroll
   // module a moment ago is already reflected without reloading the page.
   /* Setting has its own nursery tabs and no month, so the two pickers in the
@@ -2252,218 +2458,20 @@ function syncNurseryCircles() {
     b.classList.toggle('active', b.dataset.n === cur));
 }
 
-/* ════════════════════════════
-   CHEMICAL USAGE CALCULATOR
-════════════════════════════ */
-let calcTicked = {}; // {plot: true}
-let calcChemName = '';
-let calcInited = false;
+/* The Chemical Usage Calculator and the Fertilizer Calculator were here.
 
-function initCalcChemDropdown() {
-  const sel = document.getElementById('calc-chem');
-  if (!sel) return;
-  /* Rebuilt whenever the list changes rather than once: the Setting page can
-     add a chemical while this tab is open, and a dropdown built once would
-     never show it. The chosen chemical is kept by NAME across the rebuild —
-     an index into a list that just changed length points at the wrong one. */
-  const was = sel.value;
-  const GROUPS = [['pest', 'Pest'], ['disease', 'Disease'], ['other', 'Other']];
-  sel.innerHTML = GROUPS.map(([kind, label]) => {
-    const opts = chemicals.filter(c => c.kind === kind)
-      .map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
-    return opts ? `<optgroup label="${label}">${opts}</optgroup>` : '';
-  }).join('');
-  if (was && chemByName(was)) sel.value = was;
-  calcInited = chemicals.length > 0;
-  onCalcChemChange();
-}
+   Both were removed once every schedule sheet grew the same arithmetic:
+   calcMaxChem() and calcFertUsage() are called from the P & D, Manuring and
+   Interrow sheets and from the PDF, against the plots actually ticked for
+   that week. A separate tab asking the same question about a hand-picked
+   set of plots was a third place to get an answer that the sheet already
+   gave, and the one place where the chemical and its dose could be chosen
+   without the schedule ever hearing about it.
 
-function onCalcChemChange() {
-  const sel = document.getElementById('calc-chem');
-  if (!sel) return;
-  calcChemName = sel.value;
-  const c = chemByName(calcChemName);
-  if (!c) { renderCalcResults(); return; }
-  document.getElementById('calc-dose').value = c.dose;
-  document.getElementById('calc-unit').value = c.unit || 'gm';
-  renderCalcResults();
-}
-
-function toggleCalcPlot(plot, el) {
-  calcTicked[plot] = !calcTicked[plot];
-  el.classList.toggle('ticked', calcTicked[plot]);
-  el.textContent = (calcTicked[plot] ? '☑ ' : '☐ ') + plot;
-  renderCalcResults();
-}
-
-function clearCalcTicks() {
-  calcTicked = {};
-  renderCalcPlots();
-  renderCalcResults();
-}
-
-function selectAllCalcPlots() {
-  const plots = NURSERY_PLOTS[getNursery()];
-  plots.forEach(p => calcTicked[p] = true);
-  renderCalcPlots();
-  renderCalcResults();
-}
-
-function renderCalcPlots() {
-  const grid = document.getElementById('calc-plot-grid');
-  if (!grid) return;
-  const plots = NURSERY_PLOTS[getNursery()];
-  grid.innerHTML = plots.map(p => {
-    const tk = !!calcTicked[p];
-    return `<button class="calc-plot-btn${tk ? ' ticked' : ''}" onclick="toggleCalcPlot('${p}',this)">${tk ? '☑' : '☐'} ${p}</button>`;
-  }).join('');
-}
-
-function renderCalcResults() {
-  const wrap = document.getElementById('calc-results');
-  if (!wrap) return;
-  const n = getNursery();
-  const plots = NURSERY_PLOTS[n];
-  const chem = chemByName(calcChemName);
-  const dose = +document.getElementById('calc-dose').value || 0;
-  const unit = document.getElementById('calc-unit').value || 'gm';
-  const tickedCount = plots.filter(p => calcTicked[p]).length;
-  const seedlings = sumSeedlings(n, plots, p => calcTicked[p]);
-  const maxUsage = calcMaxChem(seedlings, calcChemName || '', dose, unit);
-  wrap.innerHTML = `
-    <div class="calc-result-card"><div class="lbl">${t('calc.plotsSel')}</div><div class="val">${tickedCount}</div></div>
-    <div class="calc-result-card"><div class="lbl">${t('calc.jumlahBibit')}</div><div class="val">${seedlings ? seedlings.toLocaleString() : '—'}</div></div>
-    <div class="calc-result-card highlight"><div class="lbl">${t('calc.maxRacun')}</div><div class="val">${maxUsage}</div></div>
-  `;
-}
-
-function renderCalcCapacity() {
-  const grid = document.getElementById('calc-capacity-grid');
-  if (!grid) return;
-  const n = getNursery();
-  const plots = NURSERY_PLOTS[n];
-  if (!plots.length) { grid.innerHTML = `<div style="font-size:15px;color:#888">${t('calc.noPlots')}</div>`; return; }
-  grid.innerHTML = plots.map(p => `
-    <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #d4d8d4;border-radius:6px;padding:5px 8px">
-      <span style="font-size:12px;font-weight:700;color:#236023;min-width:38px">${p}</span>
-      <input type="number" min="0" step="1" value="${getPlotQty(n, p)}"
-        onchange="onCalcCapacityChange('${n}','${p}',this.value)"
-        style="flex:1;width:100%;min-width:0;height:28px;padding:0 6px;font-size:12px;border:1px solid #d4d8d4;border-radius:4px;font-family:inherit;text-align:right">
-    </div>
-  `).join('');
-}
-
-function onCalcCapacityChange(n, p, v) {
-  setPlotQty(n, p, v);
-  renderCalcResults();
-  renderFertCalcResults();
-  // Push the new capacity through to the schedule tables so their
-  // Jumlah Bibit / Max Racun / Max Baja calculations stay correct.
-  if (n === getNursery()) {
-    renderPD();
-    renderManuring();
-    renderInterrow();
-  }
-}
-
-function resetCalcCapacity() {
-  if (!confirm(`Reset all plot capacities for ${getNursery()} to default values?`)) return;
-  resetPlotQty(getNursery());
-  renderCalcCapacity();
-  renderCalcResults();
-  renderFertCalcResults();
-  renderPD();
-  renderManuring();
-  renderInterrow();
-}
-
-function renderCalc() {
-  const nLine = document.getElementById('calc-nursery-line');
-  if (nLine) nLine.textContent = `${NURSERY_LABELS[getNursery()]} — ${getMonth()}`;
-  renderCalcCapacity();
-  initCalcChemDropdown();
-  renderCalcPlots();
-  renderCalcResults();
-  initFertCalcDropdown();
-  renderFertCalcPlots();
-  renderFertCalcResults();
-}
-
-/* ─── Fertilizer Calculator ─── */
-let fertTicked = {};
-let fertCalcInited = false;
-
-function initFertCalcDropdown() {
-  const sel = document.getElementById('fcalc-fert');
-  if (!sel) return;
-  // Rebuilt on every load, keyed by name — see initCalcChemDropdown.
-  const was = sel.value;
-  sel.innerHTML = fertilisers.map(f =>
-    `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('');
-  if (was && fertByName(was)) sel.value = was;
-  fertCalcInited = fertilisers.length > 0;
-  onFertCalcChange();
-}
-
-function onFertCalcChange() {
-  const sel = document.getElementById('fcalc-fert');
-  if (!sel) return;
-  const f = fertByName(sel.value);
-  // Monthly manuring is what this calculator is used for; a fertiliser set
-  // up for transplanting only falls back to that rate rather than to blank.
-  document.getElementById('fcalc-dose').value = f ? fertDoseFor(sel.value, 'monthly') : '';
-  document.getElementById('fcalc-bag').value  = (f && f.bag_label) || '—';
-  renderFertCalcResults();
-}
-
-function toggleFertCalcPlot(plot, el) {
-  fertTicked[plot] = !fertTicked[plot];
-  el.classList.toggle('ticked', fertTicked[plot]);
-  el.textContent = (fertTicked[plot] ? '☑ ' : '☐ ') + plot;
-  renderFertCalcResults();
-}
-
-function clearFertCalcTicks() {
-  fertTicked = {};
-  renderFertCalcPlots();
-  renderFertCalcResults();
-}
-
-function selectAllFertCalcPlots() {
-  const plots = NURSERY_PLOTS[getNursery()];
-  plots.forEach(p => fertTicked[p] = true);
-  renderFertCalcPlots();
-  renderFertCalcResults();
-}
-
-function renderFertCalcPlots() {
-  const grid = document.getElementById('fcalc-plot-grid');
-  if (!grid) return;
-  const plots = NURSERY_PLOTS[getNursery()];
-  grid.innerHTML = plots.map(p => {
-    const tk = !!fertTicked[p];
-    return `<button class="calc-plot-btn${tk ? ' ticked' : ''}" onclick="toggleFertCalcPlot('${p}',this)">${tk ? '☑' : '☐'} ${p}</button>`;
-  }).join('');
-}
-
-function renderFertCalcResults() {
-  const wrap = document.getElementById('fcalc-results');
-  if (!wrap) return;
-  const n = getNursery();
-  const plots = NURSERY_PLOTS[n];
-  const sel = document.getElementById('fcalc-fert');
-  const fertName = sel?.value || '';
-  const dose = +document.getElementById('fcalc-dose').value || 0;
-  const tickedCount = plots.filter(p => fertTicked[p]).length;
-  const seedlings = sumSeedlings(n, plots, p => fertTicked[p]);
-  const usage = calcFertUsage(seedlings, fertName, dose);
-  wrap.innerHTML = `
-    <div class="calc-result-card"><div class="lbl">${t('calc.plotsSel')}</div><div class="val">${tickedCount}</div></div>
-    <div class="calc-result-card"><div class="lbl">${t('calc.jumlahBibit')}</div><div class="val">${seedlings ? seedlings.toLocaleString() : '—'}</div></div>
-    <div class="calc-result-card highlight"><div class="lbl">${t('calc.maxBaja')}</div><div class="val">${usage.kg}</div></div>
-    <div class="calc-result-card"><div class="lbl">${t('calc.bags')}</div><div class="val" style="font-size:16px">${usage.bags}</div></div>
-  `;
-}
+   The maths did NOT go with it — see calcMaxChem, calcFertUsage,
+   sumSeedlings, fmtUsage and coverageFor near the top of this file. Rates
+   come from the Setting tab (nops_maint_chemicals, nops_maint_fertilisers,
+   nops_maint_config), capacities from nops_maint_plot_qty. */
 
 /* ════════════════════════════
    SHARED TABLE HELPERS
@@ -3271,6 +3279,60 @@ function _tarikhDisplay(s) {
   return `${String(d.getUTCDate()).padStart(2, '0')} ${_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/* Several days for one job, written the way somebody would say them.
+
+   A job the crew did not finish in one morning is not two jobs, and the
+   schedule asked for it once — so it stays one row, carrying the days it
+   actually took. Written long, "01 Jul 2026, 02 Jul 2026" says the month and
+   the year twice for no reason and does not fit the column; the parts the
+   dates share are said once instead:
+
+     one day                01 Jul 2026
+     two, same month        01 & 02 Jul 2026
+     three, same month      01, 02 & 03 Jul 2026
+     spanning a month       30 Jun & 01 Jul 2026
+     spanning a year        31 Dec 2025 & 01 Jan 2026
+
+   Four or more is not worth reading across a table: the first day and a
+   count, with all of them on the hover. */
+function _datesDisplay(list) {
+  const ds = (list || []).map((s) => _mvParseDate(s)).filter((ms) => ms != null)
+    .sort((a, b) => a - b).map((ms) => new Date(ms));
+  if (!ds.length) return '-';
+  if (ds.length === 1) return _tarikhDisplay(list[0]);
+
+  const day   = (d) => String(d.getUTCDate()).padStart(2, '0');
+  const mon   = (d) => _MONTHS_SHORT[d.getUTCMonth()];
+  const year  = (d) => d.getUTCFullYear();
+  const join  = (parts) => (parts.length === 2
+    ? `${parts[0]} & ${parts[1]}`
+    : `${parts.slice(0, -1).join(', ')} & ${parts[parts.length - 1]}`);
+
+  if (ds.length > 3) {
+    const first = `${day(ds[0])} ${mon(ds[0])} ${year(ds[0])}`;
+    return `${first} +${ds.length - 1}`;
+  }
+
+  const sameYear  = ds.every((d) => year(d) === year(ds[0]));
+  const sameMonth = sameYear && ds.every((d) => mon(d) === mon(ds[0]));
+
+  if (sameMonth) return `${join(ds.map(day))} ${mon(ds[0])} ${year(ds[0])}`;
+  if (sameYear)  return `${join(ds.map((d) => `${day(d)} ${mon(d)}`))} ${year(ds[0])}`;
+  return join(ds.map((d) => `${day(d)} ${mon(d)} ${year(d)}`));
+}
+
+/* The date cell. One day reads exactly as it always has; more than one says
+   so, and says which on hover. */
+function _dateCell(r) {
+  const ds = Array.isArray(r._fieldDates) ? r._fieldDates : null;
+  if (!ds || ds.length < 2) return _tarikhDisplay(r.tarikh);
+  const all = ds.map((d) => _tarikhDisplay(d)).join(', ');
+  const tip = `Worked over ${ds.length} days: ${all}. The schedule asked for `
+            + 'this job once, so it stays one row.';
+  return `<span class="date-multi" title="${tip.replace(/"/g, '&quot;')}">`
+       + `${_datesDisplay(ds)}</span>`;
+}
+
 const _mvPlotKey    = PlotMovement.plotKey;
 const _mvBatchKey   = PlotMovement.batchKey;
 const _mvBatchList  = PlotMovement.batchList;
@@ -3311,7 +3373,14 @@ function renderRecords() {
     if (jF && r.jenis !== jF) return false;
     if (pF && r.plot !== pF) return false;
     // Match either the stored value or the "20 Apr 2026" form on screen.
-    if (dF && !`${r.tarikh||''} ${_tarikhDisplay(r.tarikh)}`.toLowerCase().includes(dF)) return false;
+    /* Every day the row carries, not just the first: a job worked on the
+       1st and the 2nd must be found by searching for either. */
+    if (dF) {
+      const days = Array.isArray(r._fieldDates) && r._fieldDates.length
+        ? r._fieldDates : [r.tarikh];
+      const hay = days.map((x) => `${x || ''} ${_tarikhDisplay(x)}`).join(' ').toLowerCase();
+      if (!hay.includes(dF)) return false;
+    }
     return true;
   });
 
@@ -3339,7 +3408,7 @@ function renderRecords() {
 
   const tbody = document.getElementById('rec-body');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
     return;
   }
 
@@ -3357,7 +3426,7 @@ function renderRecords() {
   sortedPlots.forEach(plot => {
     const recs = plotGroups[plot];
     html += `<tr class="plot-group-row">
-      <td colspan="9" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
+      <td colspan="10" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
         text-transform:uppercase;color:var(--green-text);background:var(--green-light);
         border-top:2px solid var(--green-mid);border-bottom:1px solid var(--green-mid);">
         📍 Plot ${plot}
@@ -3369,7 +3438,7 @@ function renderRecords() {
     </tr>`;
     recs.forEach(r => {
       html += `<tr>
-        <td style="font-weight:600;color:var(--green-text);">${_tarikhDisplay(r.tarikh)}</td>
+        <td style="font-weight:600;color:var(--green-text);">${_dateCell(r)}</td>
         <td>${jenisLabel(r.jenis)}</td>
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
@@ -3377,6 +3446,7 @@ function renderRecords() {
         <td style="text-align:center;font-weight:700;color:var(--text-head);">${_qtyCell(r)}</td>
         <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
+        <td style="text-align:center;">${_auditCell(r)}</td>
         <td style="white-space:nowrap;">
           ${r.checked
             ? `<span class="rec-checked-badge" title="Checked — locked for normal users">✓ Checked</span>` +
@@ -4200,7 +4270,7 @@ try {
   if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
 } catch (_) {}
 _syncMonthButtons();
-document.getElementById('nursery-pill').textContent = getNursery();
+document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
 syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
 applySchedFolds();  // whichever schedule blocks this person keeps folded
@@ -4238,6 +4308,8 @@ async function initDb() {
       // What the Field Conductors have already recorded — read alongside the
       // rest so the first paint of Work Record already carries their dates.
       loadFieldRecords(),
+      // And what the auditor made of them, for the Audit column.
+      loadMaintAudits(),
       // The Setting tab's own four lists, and the plot names they hang off.
       loadSharedPlots(),
       loadSettingLists()
@@ -4304,11 +4376,7 @@ async function initDb() {
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
   /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
-     and the calculators from both — none of which existed at first paint.
-     renderAll() redraws the sheets; the two calculators are rebuilt here
-     because they are only initialised on the way into their tab. */
-  try { initCalcChemDropdown(); } catch (_) {}
-  try { initFertCalcDropdown(); } catch (_) {}
+     neither of which existed at first paint. */
   renderAll();
   autoSyncRecords();
 
