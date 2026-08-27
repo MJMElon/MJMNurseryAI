@@ -31,7 +31,7 @@
 <!-- The module pages in audit_admin.html's design: colour, weight and
      shape, at every width. Before audit_wide.css so that file's
      desktop layout keeps the last word. -->
-<link rel="stylesheet" href="audit_theme.css?v=20260827c"/>
+<link rel="stylesheet" href="audit_theme.css?v=20260827d"/>
 <!-- The desk half of the module pages: everything in it is inside a
      min-width:768px query, so a phone in a nursery is untouched.
      Loaded last so it wins on equal specificity. -->
@@ -91,14 +91,11 @@
       </div>
       <div class="record-list" id="audit-list" style="padding:0 12px"></div>
 
-      <!-- Completion section - admin only -->
-      <div id="completion-section" style="display:none">
-        <div class="list-header" style="margin-top:8px">
-          <span class="list-heading" data-t="completion">✅ Completion</span>
-          <span class="list-count" id="completion-count">0 audited</span>
-        </div>
-        <div class="record-list" id="completion-list" style="padding:0 12px"></div>
-      </div>
+      <!-- The Completion section that used to sit here is gone. It listed
+           the plots already audited this round, which the Completed
+           Records list below now answers — with every month, a filter and
+           a summary, rather than one round's worth of cards. Two lists of
+           finished work on one page said the same thing twice. -->
     </div>
 
     <!-- Batch list -->
@@ -374,13 +371,13 @@
 <!-- ?plot= deep link: the portal's pending-plot circles link straight
      to a plot, and this is what lands on it. -->
 <script src="audit_deeplink.js?v=20260824a"></script>
-<script src="audit_papan_script.js?v=20260827a"></script>
+<script src="audit_papan_script.js?v=20260827b"></script>
 <!-- Completed records under the plot grid, and the summary that
      opens on a tap. Renders only when the page was opened from
      audit_admin.html (?from=manage); on the auditor portal it
      returns on its first line. After the module script, so
      #view-list and its tab bar are already built. -->
-<script src="audit_history.js?v=20260827b"></script>
+<script src="audit_history.js?v=20260827c"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

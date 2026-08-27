@@ -30,6 +30,17 @@
    PostgREST does not partially fail: ask for one column a table does
    not have and the whole query comes back 400 and the section renders
    empty. Adding a field here means checking the table first.
+
+   Which is what `photos` is. Each module names its photo columns
+   differently, and these were read off the payload each one actually
+   inserts rather than guessed:
+
+     audit_plot_audits         photo_url, photo_2_url
+     audit_height_records      photo_1_url, photo_2_url, photo_3_url
+     audit_papan_audits        photo_url
+     audit_maintenance_audits  photo_url
+
+   A module with no photo column would simply carry no `photos` key.
    ══════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -48,7 +59,9 @@
     'audit_plot_audit.html': {
       table: 'audit_plot_audits',
       key:   'audit_id',
-      cols:  'audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,auditor_name,date',
+      cols:  'audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,auditor_name,date,'
+           + 'photo_url,photo_2_url',
+      photos: ['photo_url', 'photo_2_url'],
       name:  'Plot Condition',
       sub:   function (r) { return 'Batch ' + (r.batch || '—'); },
       fields: [
@@ -61,7 +74,9 @@
     'audit_height_index.html': {
       table: 'audit_height_records',
       key:   'record_id',
-      cols:  'record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date',
+      cols:  'record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date,'
+           + 'photo_1_url,photo_2_url,photo_3_url',
+      photos: ['photo_1_url', 'photo_2_url', 'photo_3_url'],
       name:  'Seedling Height',
       sub:   function (r) {
         return 'Batch ' + (r.batch || '—') +
@@ -77,7 +92,9 @@
     'audit_papan_index.html': {
       table: 'audit_papan_audits',
       key:   'audit_id',
-      cols:  'audit_id,nursery,plot,batch_no,presence,info_correct,condition,auditor_name,date',
+      cols:  'audit_id,nursery,plot,batch_no,presence,info_correct,condition,auditor_name,date,'
+           + 'photo_url',
+      photos: ['photo_url'],
       name:  'Papan Tanda',
       sub:   function (r) { return 'Batch ' + (r.batch_no || '—'); },
       fields: [
@@ -89,7 +106,9 @@
     'audit_maintenance_index.html': {
       table: 'audit_maintenance_audits',
       key:   'audit_id',
-      cols:  'audit_id,nursery,plot,task_type,result,auditor_name,date',
+      cols:  'audit_id,nursery,plot,task_type,result,auditor_name,date,'
+           + 'photo_url',
+      photos: ['photo_url'],
       name:  'Maintenance',
       /* The only one of the four with a real work type on the record.
          The others store findings (pest / disease / leaf colour,
@@ -337,6 +356,28 @@
              '</div>';
     }).join('');
 
+    /* Photos, where the module records any and the record has them. A
+       record with no photo gets no strip at all rather than an empty
+       frame — most of these audits are keyed without one.
+
+       Each is a link as well as a thumbnail: the stored value is
+       whatever went into the column, a Supabase storage URL for a photo
+       uploaded online and a base64 data URL for one queued offline, and
+       both open. onerror hides a thumbnail whose file has gone rather
+       than leaving a broken-image icon in the summary. */
+    var shots = (CFG.photos || [])
+      .map(function (c) { return r[c]; })
+      .filter(function (v) { return v && String(v).trim(); });
+    var photoHtml = shots.length
+      ? '<div class="hist-shots">' + shots.map(function (u, i) {
+          return '<a class="hist-shot" href="' + esc(u) + '" target="_blank" rel="noopener" ' +
+                    'aria-label="Photo ' + (i + 1) + ' — open full size">' +
+                   '<img src="' + esc(u) + '" alt="Audit photo ' + (i + 1) + '" ' +
+                        'loading="lazy" onerror="this.closest(\'.hist-shot\').style.display=\'none\'"/>' +
+                 '</a>';
+        }).join('') + '</div>'
+      : '';
+
     box.innerHTML =
       '<div class="hist-modal-head">' +
         '<div>' +
@@ -347,6 +388,7 @@
                 'aria-label="Close">&times;</button>' +
       '</div>' +
       '<div class="hist-grid">' + body + '</div>' +
+      photoHtml +
       '<div class="hist-meta">' +
         '<span>' + esc(r.nursery || '—') + '</span>' +
         '<span>' + (r.auditor_name ? esc(r.auditor_name) : 'Auditor not recorded') + '</span>' +
@@ -376,13 +418,33 @@
        asking for trouble. Sorted here instead, and by `date` — the day
        the audit was made, which is what a history is read by, not the
        day the row happened to be written. */
-    sb.select(CFG.table, 'select=' + CFG.cols + '&limit=300')
-      .then(function (data) {
-        rows = (Array.isArray(data) ? data : []).slice().sort(function (a, b) {
-          return String(b.date || '').localeCompare(String(a.date || ''));
-        });
-        loaded = true;
-        render();
+    /* The photo columns are the one part of this SELECT that could not be
+       checked against the live schema — they were read off each module's
+       insert payload, which is good evidence and not proof. PostgREST
+       fails a query whole, so a column that turned out not to exist would
+       empty the section rather than merely drop the photos.
+
+       So: ask for them, and on any failure ask again without them. A
+       wrong guess costs the thumbnails and one extra request, not the
+       records. If the second attempt fails too the table really is
+       unreadable, and that is what the catch below reports. */
+    var withPhotos = 'select=' + CFG.cols + '&limit=300';
+    var noPhotos   = 'select=' + CFG.cols.split(',')
+                       .filter(function (c) { return !/^photo/.test(c.trim()); })
+                       .join(',') + '&limit=300';
+
+    var keep = function (data) {
+      rows = (Array.isArray(data) ? data : []).slice().sort(function (a, b) {
+        return String(b.date || '').localeCompare(String(a.date || ''));
+      });
+      loaded = true;
+      render();
+    };
+
+    sb.select(CFG.table, withPhotos)
+      .then(keep)
+      .catch(function () {
+        return sb.select(CFG.table, noPhotos).then(keep);
       })
       .catch(function () {
         loaded = true;
