@@ -754,6 +754,10 @@
     .tl-wt.open .tl-wt-plots{display:flex}
     .tl-item.overdue .tl-wt-count{background:#fee2e2;color:#991b1b}
     .tl-item.overdue .tl-wt-name{color:#7f1d1d}
+    /* Said quietly. It is a note about the data, not a warning to the
+       auditor, who can do nothing about it from here. */
+    .tl-wt-none{padding:8px 12px;font-size:11.5px;font-weight:600;line-height:1.5;
+                color:#94a3b8}
     /* Card head row: icon on the left, title + meta stacked on the
        right. Renamed away from .tl-head (which was already taken by
        the ANYTIME section heading and inherits tiny uppercase text). */
@@ -2017,12 +2021,24 @@ function loadAuditTodo(){
      something nobody finds. */
   const collapsedTypes = new Set();
 
+  /* Nothing to group is not nothing to say. An empty return leaves a gap
+     under the row that looks like a row with no work in it, which is the
+     one thing this row never means — it exists because work is pending.
+     So: fall back to the flat strip the other modules use, and if that is
+     empty too, say which of the two is missing. A silent gap is what made
+     this hard to diagnose the first time. */
   function _maintTypesHtml(o, oy, om, pending){
     const items = o._maintItems || [];
-    if (!items.length) return '';
+    const fallback = (why) => {
+      const flat = _plotsHtml(o, oy, om, pending);
+      return flat || `<div class="tl-wts"><div class="tl-wt-none">${why}</div></div>`;
+    };
+    if (!items.length)
+      return fallback('The plots are pending but the job each is waiting on did not come through. Reload; if it stays, the maintenance records are missing their work type.');
     const inScope = new Set(pending.map(x => x.nursery));
     const mine = items.filter(it => inScope.has(it.nursery));
-    if (!mine.length) return '';
+    if (!mine.length)
+      return fallback('Nothing pending in the nurseries on screen.');
 
     /* Canonicalised again here rather than trusted. The items are written
        that way, but a group is not the place to find out otherwise: a
