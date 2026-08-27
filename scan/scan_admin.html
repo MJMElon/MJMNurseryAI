@@ -82,9 +82,14 @@
   </a>
 
   <p class="portal-note">The FC Portal asks for an e-mail and password. The Worker Portal asks
-    only for a PIN — the one on the worker's row in Payroll → Worker System.</p>
+    only for a PIN — the one on the worker's row in Worker System, below.</p>
 
-  <div class="mt-6">
+  <!-- Two tiles now, so a row rather than a lone square. -->
+  <div class="mt-6 flex flex-wrap gap-3">
+    <a class="tool" id="tool-workers" href="scan_workers.html">
+      <span class="tool-ico bg-amber-100">👷</span>
+      <span class="tool-name">Worker System</span>
+    </a>
     <a class="tool" id="tool-access" href="scan_user_access.html">
       <span class="tool-ico bg-violet-100">⚙️</span>
       <span class="tool-name">Setting</span>
@@ -134,6 +139,15 @@ $('worker-portal-link').addEventListener('click', (e) => {
     // User Access writes other people's permissions, which the database policy
     // only lets a user-manager do — so it is not offered to anyone else.
     if (!MJMAccess.canManageUsers()) $('tool-access').classList.add('hidden');
+
+    /* The Worker System came here from the Payroll module and kept that
+       module's access with it — a move should not quietly hand the payroll
+       register to anybody who can open this page. Shown to whoever could
+       open the tab before, and to nobody else. */
+    const mayWorkers = (typeof MJMAccess.canDo === 'function')
+      ? MJMAccess.canDo('npayroll', 'workers', 'view')
+      : true;
+    if (!mayWorkers) $('tool-workers').classList.add('hidden');
 
     $('loading').classList.add('hidden');
     $('main').classList.remove('hidden');
