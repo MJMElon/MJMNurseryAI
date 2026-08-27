@@ -71,10 +71,10 @@ function resetPlotQty(n){
       .then(({ error }) => { if (error) console.warn('[maint] plot-qty reset failed:', error.message); });
   }
 }
-const COVERAGE_PER_PUMP = 800; // standard spray coverage (seedlings per pump)
-const CHEMICAL_COVERAGE = { // overrides for chemicals with different cover-per-pump
-  'Asir': 1, // per-seedling: capacity × dose / 1000
-};
+/* The fallback until nops_maint_config is read, and the number the whole
+   system has always sprayed to. The live figure is `pumpCoverage`, preset on
+   the Setting page; a chemical with a coverage of its own overrides both. */
+const COVERAGE_PER_PUMP = 800;
 
 function fmtUsage(totalAmount, unit, decimals = 2){
   // gm → kg, mL → L; default 2 decimals (no round-up)
@@ -83,25 +83,20 @@ function fmtUsage(totalAmount, unit, decimals = 2){
   const rounded = Math.round(big * factor) / factor;
   return rounded + (unit === 'gm' ? ' kg' : ' L');
 }
-/* Unit per chemical — used to auto-set mL/gm when a chemical is selected */
-const CHEMICAL_UNITS = {
-  // Pest
-  'Cyper':'mL','Destroy':'mL','Becker':'mL','Asir':'gm',
-  // Disease
-  'Antracol':'gm','Dithane':'gm','Thiram':'gm','Daconil':'gm','Manzate':'gm',
-  // Weedicide / sticker
-  'Widex':'gm','Sentry':'mL','Ally':'gm','Basta':'mL','Monex':'mL','Acosta':'mL',
-  'Bond':'mL','Activator':'mL',
-  // Fertilizer
-  'Sk Cote':'gm','Yaramila':'gm','Compound 55':'gm','Ajimino':'gm','ERP':'gm','Organic Matter':'gm',
-};
-function getUnitForChem(name){ return CHEMICAL_UNITS[name] || 'gm'; }
+/* Unit per chemical — used to auto-set mL/gm when one is selected. Reads
+   the list; a fertiliser answers too, since the manuring sheet asks the same
+   question of a fertiliser name. */
+function getUnitForChem(name){
+  const c = chemByName(name) || fertByName(name);
+  return (c && c.unit) || 'gm';
+}
 
 function calcMaxChem(seedlings, chemName, dose, unit, decimals = 2){
   if(!seedlings || !chemName || chemName === '—' || !dose) return '—';
-  // Formula: (plot capacity / coverage per pump) × dose per pump / 1000
-  const coverage = CHEMICAL_COVERAGE[chemName] || COVERAGE_PER_PUMP;
-  const totalUnits = (seedlings / coverage) * dose;
+  // Formula: (plot capacity / coverage per pump) × dose per pump / 1000.
+  // The chemical's own coverage when it has one, the preset when it does not
+  // — the same rule the Setting page shows.
+  const totalUnits = (seedlings / coverageFor(chemName)) * dose;
   return fmtUsage(totalUnits, unit, decimals);
 }
 function sumSeedlings(nursery, plots, ticked){
@@ -110,22 +105,73 @@ function sumSeedlings(nursery, plots, ticked){
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 /* Chemical option lists — only chemicals MJM Nursery uses. Names only; dose set separately. */
-const PD_SERANGGA_OPTIONS = ['Cyper','Destroy','Becker','Asir','—'];
-const PD_KULAT_OPTIONS    = ['Antracol','Dithane','Thiram','Daconil','Manzate','—'];
-const PD_STICKER_OPTIONS  = ['Bond','—'];
-const FERT_OPTIONS        = ['Sk Cote','Yaramila','Compound 55','Ajimino','ERP','Organic Matter','—'];
-/* Fertilizer catalog — dose per seedling and bag size for kg/bag calculation */
-const FERTILIZER_INFO = {
-  'Sk Cote':        { defaultDose:5,  bagSizeGm:25000,   bagLabel:'25 kg' },
-  'Yaramila':       { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Compound 55':    { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Ajimino':        { defaultDose:20, bagSizeGm:25000,   bagLabel:'25 kg' },
-  'ERP':            { defaultDose:20, bagSizeGm:50000,   bagLabel:'50 kg' },
-  'Organic Matter': { defaultDose:60, bagSizeGm:1000000, bagLabel:'1,000 kg' },
-};
+
+/* Loaded from nops_maint_chemicals / nops_maint_fertilisers / nops_maint_config
+   by loadSettingLists(). Declared here rather than beside the Setting tab at
+   the foot of the file because the calculators and the schedules read them,
+   and a `let` further down would leave those in the temporal dead zone. */
+let chemicals   = [];
+let fertilisers = [];
+let pumpCoverage = 800;   // COVERAGE_PER_PUMP; the preset overrides it
+
+/* Every one of these lists is typed in by a person, and every one of them is
+   printed straight back into innerHTML. A plot called B<img onerror=…> is
+   unlikely; a fertiliser name with an ampersand in it is not. Defined up
+   here because the schedule dropdowns below use it. */
+const esc = v => String(v == null ? '' : v)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/* ── One source for the chemicals and the fertilisers ──────────────────
+   These were two hardcoded catalogues — CHEMICAL_CATEGORIES and
+   FERTILIZER_INFO — which the Setting page could not edit and the
+   calculators read straight from. Both are gone. Everything now reads
+   `chemicals` and `fertilisers`, loaded from nops_maint_chemicals and
+   nops_maint_fertilisers, so a dose corrected on the Setting page is the
+   dose the calculator and the schedules use.
+
+   Every lookup below has to survive the arrays being empty. They are, until
+   the first read lands, and a page that throws before its data arrives is
+   worse than one that shows a blank dropdown for a moment. */
+const fertByName = n => fertilisers.find(f => f.name === n) || null;
+/* What one pump of this chemical covers: its own figure when it has one,
+   the preset when it does not. Same rule the Setting page shows, and the
+   only place the arithmetic lives now. */
+function coverageFor(name) {
+  const c = chemByName(name);
+  const own = c && c.coverage != null && c.coverage !== '' ? +c.coverage : 0;
+  return Math.max(1, own || +pumpCoverage || COVERAGE_PER_PUMP);
+}
+const chemByName = n => chemicals.find(c => c.name === n) || null;
+
+/* Names for a dropdown. The trailing '—' is how every one of these lists has
+   always offered "none"; it stays. */
+const chemNames = kind => chemicals.filter(c => c.kind === kind).map(c => c.name).concat('—');
+const taggedNames = tag => chemicals.filter(c => c.tag === tag).map(c => c.name).concat('—');
+/* With no usage, every fertiliser — which is what the calculator wants,
+   since it is asked about both kinds of work. With one, only the fertilisers
+   ticked for it: the Manuring sheet is monthly manuring, and offering a
+   transplanting-only fertiliser there is offering a rate that does not
+   exist. That is what the ticks are for. */
+const fertNames = usage => fertilisers
+  .filter(f => !usage || (usage === 'transplant' ? f.dose_transplant : f.dose_monthly) != null)
+  .map(f => f.name).concat('—');
+
+/* A fertiliser's dose for the work being done. Transplanting when that is
+   what is being planned, monthly otherwise, and whichever one is set when
+   only one is. */
+function fertDoseFor(name, usage) {
+  const f = fertByName(name);
+  if (!f) return 0;
+  const first = usage === 'transplant' ? f.dose_transplant : f.dose_monthly;
+  const other = usage === 'transplant' ? f.dose_monthly : f.dose_transplant;
+  return +(first != null ? first : other != null ? other : 0) || 0;
+}
+
 function calcFertUsage(seedlings, fertName, doseGm, decimals = 2){
   if (!seedlings || !fertName || fertName === '—' || !doseGm) return { kg:'—', bags:'—', totalGm:0 };
-  const info = FERTILIZER_INFO[fertName];
+  const f = fertByName(fertName);
+  const info = f && f.bag_size_gm ? { bagSizeGm: +f.bag_size_gm, bagLabel: f.bag_label || '' } : null;
   const totalGm = seedlings * doseGm;
   const totalKg = totalGm / 1000;
   const factor = Math.pow(10, decimals);
@@ -133,42 +179,6 @@ function calcFertUsage(seedlings, fertName, doseGm, decimals = 2){
   const bagsStr = info ? (Math.round((totalGm / info.bagSizeGm) * factor) / factor) + ' ' + t('unit.bags') + ' (' + info.bagLabel + ' ' + t('unit.each') + ')' : '—';
   return { kg: kgStr, bags: bagsStr, totalGm };
 }
-const INTERROW_CHEM_OPTIONS = ['Basta','Monex','Acosta'];
-
-/* Categorized chemical catalog with default dose per chemical — used by Chemical Calculator */
-const CHEMICAL_CATEGORIES = [
-  { group: 'Pest', chems: [
-    { name:'Cyper',   dose:60, unit:'mL' },
-    { name:'Destroy', dose:30, unit:'mL' },
-    { name:'Becker',  dose:20, unit:'mL' },
-    { name:'Asir',    dose:5,  unit:'gm' },
-  ]},
-  { group: 'Disease', chems: [
-    { name:'Antracol', dose:30, unit:'gm' },
-    { name:'Dithane',  dose:30, unit:'gm' },
-    { name:'Thiram',   dose:30, unit:'gm' },
-    { name:'Daconil',  dose:30, unit:'gm' },
-    { name:'Manzate',  dose:30, unit:'gm' },
-  ]},
-  { group: 'Weedicide : Contact', chems: [
-    { name:'Widex', dose:8, unit:'gm' },
-  ]},
-  { group: 'Weedicide : Systemic', chems: [
-    { name:'Sentry', dose:200, unit:'mL' },
-    { name:'Ally',   dose:3,   unit:'gm' },
-  ]},
-  { group: 'Weedicide : Contact + Systemic', chems: [
-    { name:'Basta',  dose:200, unit:'mL' },
-    { name:'Monex',  dose:200, unit:'mL' },
-    { name:'Acosta', dose:200, unit:'mL' },
-  ]},
-  { group: 'Sticker for fungicide', chems: [
-    { name:'Bond', dose:15, unit:'mL' },
-  ]},
-  { group: 'Sticker for weedicide', chems: [
-    { name:'Activator', dose:15, unit:'mL' },
-  ]},
-];
 
 /* ════════════════════════════
    DEFAULT CONFIGS
@@ -2245,44 +2255,37 @@ function syncNurseryCircles() {
 /* ════════════════════════════
    CHEMICAL USAGE CALCULATOR
 ════════════════════════════ */
-const CALC_CHEMICALS = (() => {
-  const out = [];
-  CHEMICAL_CATEGORIES.forEach(cat => {
-    cat.chems.forEach(c => {
-      out.push({ name: c.name, dose: c.dose, unit: c.unit, group: cat.group });
-    });
-  });
-  return out;
-})();
-
 let calcTicked = {}; // {plot: true}
-let calcChemIdx = 0;
+let calcChemName = '';
 let calcInited = false;
 
 function initCalcChemDropdown() {
   const sel = document.getElementById('calc-chem');
-  if (!sel || calcInited) return;
-  // Build with optgroups so chemicals are visually grouped by category — show NAME only
-  let html = '';
-  CALC_CHEMICALS.forEach((c, i) => { c._idx = i; });
-  CHEMICAL_CATEGORIES.forEach(cat => {
-    const options = CALC_CHEMICALS
-      .filter(c => c.group === cat.group)
-      .map(c => `<option value="${c._idx}">${c.name}</option>`).join('');
-    if (options) html += `<optgroup label="${cat.group}">${options}</optgroup>`;
-  });
-  sel.innerHTML = html;
-  calcInited = true;
+  if (!sel) return;
+  /* Rebuilt whenever the list changes rather than once: the Setting page can
+     add a chemical while this tab is open, and a dropdown built once would
+     never show it. The chosen chemical is kept by NAME across the rebuild —
+     an index into a list that just changed length points at the wrong one. */
+  const was = sel.value;
+  const GROUPS = [['pest', 'Pest'], ['disease', 'Disease'], ['other', 'Other']];
+  sel.innerHTML = GROUPS.map(([kind, label]) => {
+    const opts = chemicals.filter(c => c.kind === kind)
+      .map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    return opts ? `<optgroup label="${label}">${opts}</optgroup>` : '';
+  }).join('');
+  if (was && chemByName(was)) sel.value = was;
+  calcInited = chemicals.length > 0;
   onCalcChemChange();
 }
 
 function onCalcChemChange() {
   const sel = document.getElementById('calc-chem');
-  calcChemIdx = +sel.value;
-  const c = CALC_CHEMICALS[calcChemIdx];
-  if (!c) return;
+  if (!sel) return;
+  calcChemName = sel.value;
+  const c = chemByName(calcChemName);
+  if (!c) { renderCalcResults(); return; }
   document.getElementById('calc-dose').value = c.dose;
-  document.getElementById('calc-unit').value = c.unit;
+  document.getElementById('calc-unit').value = c.unit || 'gm';
   renderCalcResults();
 }
 
@@ -2321,12 +2324,12 @@ function renderCalcResults() {
   if (!wrap) return;
   const n = getNursery();
   const plots = NURSERY_PLOTS[n];
-  const chem = CALC_CHEMICALS[calcChemIdx];
+  const chem = chemByName(calcChemName);
   const dose = +document.getElementById('calc-dose').value || 0;
   const unit = document.getElementById('calc-unit').value || 'gm';
   const tickedCount = plots.filter(p => calcTicked[p]).length;
   const seedlings = sumSeedlings(n, plots, p => calcTicked[p]);
-  const maxUsage = calcMaxChem(seedlings, chem?.name || '', dose, unit);
+  const maxUsage = calcMaxChem(seedlings, calcChemName || '', dose, unit);
   wrap.innerHTML = `
     <div class="calc-result-card"><div class="lbl">${t('calc.plotsSel')}</div><div class="val">${tickedCount}</div></div>
     <div class="calc-result-card"><div class="lbl">${t('calc.jumlahBibit')}</div><div class="val">${seedlings ? seedlings.toLocaleString() : '—'}</div></div>
@@ -2392,21 +2395,24 @@ let fertCalcInited = false;
 
 function initFertCalcDropdown() {
   const sel = document.getElementById('fcalc-fert');
-  if (!sel || fertCalcInited) return;
-  const names = FERT_OPTIONS.filter(x => x !== '—');
-  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
-  fertCalcInited = true;
+  if (!sel) return;
+  // Rebuilt on every load, keyed by name — see initCalcChemDropdown.
+  const was = sel.value;
+  sel.innerHTML = fertilisers.map(f =>
+    `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('');
+  if (was && fertByName(was)) sel.value = was;
+  fertCalcInited = fertilisers.length > 0;
   onFertCalcChange();
 }
 
 function onFertCalcChange() {
   const sel = document.getElementById('fcalc-fert');
-  const name = sel.value;
-  const info = FERTILIZER_INFO[name];
-  if (info) {
-    document.getElementById('fcalc-dose').value = info.defaultDose;
-    document.getElementById('fcalc-bag').value = info.bagLabel;
-  }
+  if (!sel) return;
+  const f = fertByName(sel.value);
+  // Monthly manuring is what this calculator is used for; a fertiliser set
+  // up for transplanting only falls back to that rate rather than to blank.
+  document.getElementById('fcalc-dose').value = f ? fertDoseFor(sel.value, 'monthly') : '';
+  document.getElementById('fcalc-bag').value  = (f && f.bag_label) || '—';
   renderFertCalcResults();
 }
 
@@ -2502,14 +2508,14 @@ function renderPD() {
   h+='</tr><tr>';
   W.forEach(w=>{
     const c=cfg[w];
-    h+=`<th class="hdr-input-cell p-bg">${mkSel(PD_SERANGGA_OPTIONS,c.P,`updatePDChem('${w}','P',this.value)`)}${mkDose(c.P_dose,c.P_unit,`updatePDDose('${w}','P_dose',+this.value)`)}</th>`;
-    h+=`<th class="hdr-input-cell d-bg">${mkSel(PD_KULAT_OPTIONS,c.D,`updatePDChem('${w}','D',this.value)`)}${mkDose(c.D_dose,c.D_unit,`updatePDDose('${w}','D_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell p-bg">${mkSel(chemNames('pest'),c.P,`updatePDChem('${w}','P',this.value)`)}${mkDose(c.P_dose,c.P_unit,`updatePDDose('${w}','P_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell d-bg">${mkSel(chemNames('disease'),c.D,`updatePDChem('${w}','D',this.value)`)}${mkDose(c.D_dose,c.D_unit,`updatePDDose('${w}','D_dose',+this.value)`)}</th>`;
   });
   h+='</tr><tr>';
   W.forEach(w=>{
     const c=cfg[w];
-    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(PD_STICKER_OPTIONS,c.P_sticker,`updatePDChem('${w}','P_sticker',this.value)`)}${mkDose(c.P_sticker_dose,c.P_sticker_unit,`updatePDDose('${w}','P_sticker_dose',+this.value)`)}</th>`;
-    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(PD_STICKER_OPTIONS,c.D_sticker,`updatePDChem('${w}','D_sticker',this.value)`)}${mkDose(c.D_sticker_dose,c.D_sticker_unit,`updatePDDose('${w}','D_sticker_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(taggedNames('sticker'),c.P_sticker,`updatePDChem('${w}','P_sticker',this.value)`)}${mkDose(c.P_sticker_dose,c.P_sticker_unit,`updatePDDose('${w}','P_sticker_dose',+this.value)`)}</th>`;
+    h+=`<th class="hdr-input-cell sticker-bg">${mkSel(taggedNames('sticker'),c.D_sticker,`updatePDChem('${w}','D_sticker',this.value)`)}${mkDose(c.D_sticker_dose,c.D_sticker_unit,`updatePDDose('${w}','D_sticker_dose',+this.value)`)}</th>`;
   });
   h+='</tr></thead><tbody>';
 
@@ -2718,7 +2724,7 @@ function renderManuring() {
   h+='<tr>';
   cfg.forEach((round, ri) => {
     round.forEach((c, ci) => {
-      h+=`<th class="hdr-input-cell f-bg">${mkSel(FERT_OPTIONS,c.name,`updateManuringChem(${ri},${ci},this.value)`)}</th>`;
+      h+=`<th class="hdr-input-cell f-bg">${mkSel(fertNames('monthly'),c.name,`updateManuringChem(${ri},${ci},this.value)`)}</th>`;
     });
   });
   h+='</tr>';
@@ -2994,7 +3000,7 @@ function renderInterrow() {
   cfg.forEach((round, ri) => {
     round.forEach((c, ci) => {
       h+=`<th class="hdr-input-cell" style="background:#f0f9ff !important;">
-        ${mkSel(INTERROW_CHEM_OPTIONS,c.chem,`updateInterrowChem(${ri},${ci},this.value)`)}
+        ${mkSel(taggedNames('interrow'),c.chem,`updateInterrowChem(${ri},${ci},this.value)`)}
         ${mkDose(c.chem_dose,c.chem_unit,`updateInterrowDose(${ri},${ci},'chem_dose',+this.value)`)}
       </th>`;
     });
@@ -4297,6 +4303,12 @@ async function initDb() {
     });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
+  /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
+     and the calculators from both — none of which existed at first paint.
+     renderAll() redraws the sheets; the two calculators are rebuilt here
+     because they are only initialised on the way into their tab. */
+  try { initCalcChemDropdown(); } catch (_) {}
+  try { initFertCalcDropdown(); } catch (_) {}
   renderAll();
   autoSyncRecords();
 
@@ -4318,22 +4330,8 @@ initDb();
    See shared/migration_nops_maint_settings.sql for the tables.
 ═══════════════════════════════════════════════════════════════════════ */
 
-/* Every one of these lists is typed in by a person, and every one of them
-   is printed straight back into innerHTML. A plot called B<img onerror=…>
-   is unlikely; a fertiliser name with an ampersand in it is not. */
-/* A function declaration, not a const arrow: the schedule tables are drawn
-   by applyLang() near the foot of this file, which is above this line, and
-   a const in the temporal dead zone throws rather than being undefined. */
-function esc(v) {
-  return String(v == null ? '' : v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 let traySize   = {};    // { nursery: seedlings per tray }
 let plotTrays  = {};    // { nursery: { plot: trays } }
-let chemicals  = [];    // nops_maint_chemicals rows
-let fertilisers = [];   // nops_maint_fertilisers rows
 /* Stock Management's own list, kept apart from NURSERY_PLOTS.
 
    NURSERY_PLOTS is the hardcoded list the four schedules and the payroll
@@ -4688,8 +4686,7 @@ const CHEM_KINDS = ['pest', 'disease', 'other'];
    its own figure. Preset in nops_maint_config so it can be changed without a
    deploy; COVERAGE_PER_PUMP is the fallback until that row is read, and
    stays the number the rest of this file has always used. */
-let pumpCoverage = COVERAGE_PER_PUMP;
-let presetDraft  = null;
+let presetDraft = null;
 
 let chemEditing = false;
 let chemDraft   = null;    // [{ id?, kind, name, dose, unit, coverage, _new }]
@@ -4734,10 +4731,16 @@ function renderChemicals(kind) {
       (chemEditing ? ' chemical yet — add one below.' : ' chemical listed.') + '</div>';
     return;
   }
+  /* Only the Other list carries a tag. Pest and disease already have a
+     dropdown each on the P & D sheet; the ones in Other only appear on a
+     sheet if this says which. */
+  const tagged = kind === 'other';
+  const TAG_LABEL = { sticker: 'Sticker', interrow: 'Interrow' };
+
   box.innerHTML = rows.map((c, i) => {
     const per = perSeedling(c.dose, c.coverage);
     const val = per ? per + ' ' + esc(c.unit || 'gm') : '—';
-    return '<div class="lst-row">' + (chemEditing
+    return '<div class="lst-row' + (tagged ? ' other-row' : '') + '">' + (chemEditing
       ? '<input type="text" value="' + esc(c.name) + '" placeholder="Chemical name" ' +
           'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'name\', this.value)">' +
         // The unit rides with the number it belongs to. Without it a new
@@ -4756,6 +4759,14 @@ function renderChemicals(kind) {
           'title="Leave blank to follow the preset. 1 if the dose is already per seedling." ' +
           'oninput="onChemDraft(\'' + kind + '\',' + i + ',\'coverage\', this.value)">' +
         '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        (tagged
+          ? '<select class="lst-tagsel" title="Which schedule dropdown may offer this" ' +
+              'onchange="onChemDraft(\'' + kind + '\',' + i + ',\'tag\', this.value)">' +
+              '<option value=""' + (!c.tag ? ' selected' : '') + '>—</option>' +
+              '<option value="sticker"' + (c.tag === 'sticker' ? ' selected' : '') + '>Sticker</option>' +
+              '<option value="interrow"' + (c.tag === 'interrow' ? ' selected' : '') + '>Interrow</option>' +
+            '</select>'
+          : '') +
         '<button type="button" class="lst-x" title="Remove" aria-label="Remove" ' +
           'onclick="dropChemRow(\'' + kind + '\',' + i + ')">&#10005;</button>'
       : '<span class="lst-txt">' + esc(c.name) + '</span>' +
@@ -4763,6 +4774,8 @@ function renderChemicals(kind) {
         '<span class="lst-num' + (c.coverage == null || c.coverage === '' ? ' preset' : '') + '">' +
           coverageOf(c).toLocaleString() + '</span>' +
         '<span class="lst-calc' + (per ? '' : ' none') + '">' + val + '</span>' +
+        (tagged ? '<span class="lst-num' + (c.tag ? '' : ' muted') + '">' +
+                    (TAG_LABEL[c.tag] || '—') + '</span>' : '') +
         '<span></span>') +
     '</div>';
   }).join('');
@@ -4798,7 +4811,8 @@ function onPresetInput(val) {
 
 function startChemEdit() {
   chemDraft = chemicals.map(c => ({ id: c.id, kind: c.kind, name: c.name, dose: c.dose,
-                                    unit: c.unit || 'gm', coverage: c.coverage ?? null }));
+                                    unit: c.unit || 'gm', coverage: c.coverage ?? null,
+                                    tag: c.tag ?? null }));
   presetDraft = pumpCoverage;
   chemEditing = true;
   renderChemBoth();
@@ -4820,6 +4834,7 @@ function onChemDraft(kind, i, field, val) {
   if (!row) return;
   if (field === 'name') { row.name = val; return; }           // repaint would lose the caret
   if (field === 'unit') row.unit = val === 'mL' ? 'mL' : 'gm';
+  else if (field === 'tag') row.tag = val || null;
   // Blank is "follow the preset", which is why it is not coerced to a number.
   else if (field === 'coverage') row.coverage = val === '' ? null : Math.max(1, +val || 1);
   else row[field] = Math.max(0, +val || 0);
@@ -4837,7 +4852,8 @@ function addChemRow(kind) {
   if (!chemEditing) return;
   // No coverage of its own: a new chemical follows the preset until told
   // otherwise, which is true of nearly all of them.
-  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm', coverage: null, _new: true });
+  chemDraft.push({ kind: kind, name: '', dose: 0, unit: 'gm', coverage: null,
+                   tag: null, _new: true });
   renderChemicals(kind);
   const box = document.getElementById('chem-' + kind + '-list');
   const last = box && box.querySelector('.lst-row:last-child input[type=text]');
@@ -4874,7 +4890,8 @@ async function saveChemEdit() {
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
     const fresh = named.filter(c => !c.id).map(c => ({
       kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
-      coverage: c.coverage ?? null, updated_at: new Date().toISOString() }));
+      coverage: c.coverage ?? null, tag: c.tag ?? null,
+      updated_at: new Date().toISOString() }));
 
     let err = null;
     if (gone.length) {
@@ -4886,7 +4903,8 @@ async function saveChemEdit() {
       if (err) break;
       const { error } = await _supabase.from('nops_maint_chemicals').update({
         name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
-        updated_at: new Date().toISOString() }).eq('id', c.id).then(r => r, e => ({ error: e }));
+        tag: c.tag ?? null, updated_at: new Date().toISOString() })
+        .eq('id', c.id).then(r => r, e => ({ error: e }));
       err = error;
     }
     if (!err && fresh.length) {
