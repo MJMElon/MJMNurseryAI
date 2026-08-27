@@ -550,3 +550,36 @@ select.hist-select {
   .hist-filter { flex: 1 1 0; min-width: 0; }
   .hist-select { min-width: 0; width: 100%; }
 }
+
+/* ── PHOTOS IN THE RECORD SUMMARY ──
+   A row of thumbnails under the values, each one a link to the full
+   size. Only drawn when the record actually carries a photo, so a
+   summary without one is exactly as tall as it was. */
+.hist-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hist-shot {
+  display: block;
+  width: 78px;
+  height: 78px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  flex-shrink: 0;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.hist-shot:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 6px 16px rgba(16, 40, 60, .14);
+  transform: translateY(-1px);
+}
+.hist-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
