@@ -340,3 +340,137 @@ textarea.input:focus {
   .top-bar-icon, .top-bar-back { width: 30px; height: 30px; }
   .tab-label { font-size: 10px; }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   COMPLETED RECORDS — the manage view's history list and its summary
+   ══════════════════════════════════════════════════════════════════
+   Rendered by audit_history.js, and only when the module was opened
+   from audit_admin.html. Written here rather than in that file so the
+   list is styled by the same tokens as everything else it sits under.
+   ══════════════════════════════════════════════════════════════════ */
+.hist-section { margin-top: 22px; }
+.hist-empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text4);
+}
+
+/* A row is a button, so it needs the button defaults knocked out before
+   .record-item's card styling reads correctly on it. */
+.hist-item {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.hist-body { flex: 1; min-width: 0; }
+.hist-top  { display: flex; align-items: baseline; gap: 10px; }
+.hist-plot { font-size: 13.5px; font-weight: 800; color: var(--text1); }
+.hist-date { font-size: 11px; font-weight: 700; color: var(--text4); margin-left: auto; white-space: nowrap; }
+.hist-sub  {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-chev {
+  width: 15px; height: 15px; flex-shrink: 0;
+  stroke: var(--text4); fill: none; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s;
+}
+.hist-item:hover .hist-chev { transform: translateX(3px); stroke: var(--g600); }
+
+/* ── THE SUMMARY ──
+   The module's own modal is a bottom sheet on a phone (audit_theme
+   leaves that alone) and a dialog on a desk. This one is a dialog at
+   every width: it is read, not confirmed, and a sheet that has to be
+   dismissed upward to read four values is the wrong shape for it. */
+#hist-modal { align-items: center; }
+.hist-modal-box {
+  border-radius: 18px;
+  max-width: 460px;
+  width: calc(100% - 32px);
+  padding: 18px 18px 16px;
+}
+.hist-modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.hist-modal-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text4);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.hist-close {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  background: #f4f7fa;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.hist-close:hover { background: #eaeff5; color: var(--text1); }
+
+/* auto-fit, so two values sit side by side and four make a block,
+   without a breakpoint naming either — the modules carry between two
+   and four summary fields each. */
+/* 140 rather than 120 so the common case lands square: at this box's
+   width that is two columns, which makes the four-field modules (plot
+   condition, seedling height) a 2x2 block instead of a row of three
+   with one hanging under it. */
+.hist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.hist-cell {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.hist-cell-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--text4);
+}
+.hist-cell-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text1);
+  margin-top: 3px;
+  word-break: break-word;
+}
+.hist-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text4);
+}

@@ -31,7 +31,7 @@
 <!-- The module pages in audit_admin.html's design: colour, weight and
      shape, at every width. Before audit_wide.css so that file's
      desktop layout keeps the last word. -->
-<link rel="stylesheet" href="audit_theme.css?v=20260827a"/>
+<link rel="stylesheet" href="audit_theme.css?v=20260827b"/>
 <!-- The desk half of the module pages: everything in it is inside a
      min-width:768px query, so a phone in a nursery is untouched.
      Loaded last so it wins on equal specificity. -->
@@ -450,6 +450,12 @@
 <!-- Which batch ages are being audited — see Settings → System Setting. -->
 <script src="audit_settings.js?v=2"></script>
 <script src="audit_height_script.js?v=20260827a"></script>
+<!-- Completed records under the plot grid, and the summary that
+     opens on a tap. Renders only when the page was opened from
+     audit_admin.html (?from=manage); on the auditor portal it
+     returns on its first line. After the module script, so
+     #view-list and its tab bar are already built. -->
+<script src="audit_history.js?v=20260827a"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
