@@ -899,7 +899,7 @@ async function unlockPieceRates() {
 }
 
 /* ── Workers (per nursery) ────────────────────────────────────────────────
-   Names come from the Worker System on the 555 FC Portal's Manage page, so one
+   Names come from the Worker System on the 555 Worker Portal's Manage page, so one
    register covers both modules: add, rename or deactivate somebody there and
    the tick sheets here follow, this month included. Only the general workers
    of that nursery are taken — a nursery's own section, minus the roles that
@@ -1027,7 +1027,7 @@ function refreshLinkedWorkers(force) {
 function removeWorker(name) {
   const n = getNursery();
   if (isLinked(n)) {
-    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System on the 555 FC Portal's Manage page.\n\n` +
+    alert(`${NURSERY_NAMES[n]} takes its workers from the Worker System on the 555 Worker Portal's Manage page.\n\n` +
           `Remove or deactivate the worker there instead.`);
     return;
   }
@@ -1169,8 +1169,8 @@ const I18N = {
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
-    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them on the 555 FC Portal\u2019s Manage page and they will appear here.',
-    'pay.linkedNote':'Worker names come from the Worker System on the 555 FC Portal\u2019s Manage page and follow any change made there.',
+    'pay.noWorkers':'No general worker is on the Worker System register for this nursery yet. Add them on the 555 Worker Portal\u2019s Manage page and they will appear here.',
+    'pay.linkedNote':'Worker names come from the Worker System on the 555 Worker Portal\u2019s Manage page and follow any change made there.',
     'pay.offRegister':'⚠ Ticked this month but no longer a general worker of this nursery on the register, so their capacity is not counted:',
     'pay.noRows':'No records for this nursery and month yet — tick the schedule, then Sync from Schedule.',
     'pay.tickHint':'Tick each worker who did the job. Capacity per worker = plot capacity ÷ number of ticks on that row. Pay is worked out from this record in the Nursery Payroll System.',
