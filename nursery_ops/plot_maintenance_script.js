@@ -1872,19 +1872,19 @@ async function loadFieldRecords() {
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
     let res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, verified_at'))
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at'))
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
     // still recording the work itself, so fall back to reading what is there.
     if (res.error) {
       res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
-        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, verified_at'))
+        .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at'))
         .order('id', { ascending: true }));
       // Still no? Then this database predates the batch columns too.
       if (res.error && /column .* does not exist|schema cache/i.test(String(res.error.message || ''))) {
         res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
-          .select('id, work_date, plot_name, work_type, jenis, verified_at'))
+          .select('id, work_date, plot_name, work_type, jenis, worked_by, reported_by, verified_at'))
           .order('id', { ascending: true }));
       }
     }
@@ -1957,12 +1957,22 @@ async function loadMaintAudits() {
    hold 'Not Done' and a row can be half-filled offline; neither is a verdict
    on the work, so neither is shown as one. */
 function _auditCell(r) {
-  const v = maintAudits[String(r._fieldId)] || maintAudits[String(r.id)] || '';
-  if (v === 'Satisfactory') {
-    return `<span class="audit-pill audit-ok" title="${t('rec.auditOkTip')}">${t('rec.auditOk')}</span>`;
+  /* One row can be several field records — three workers on one job — and
+     the auditor files against each one. So every verdict on the group is
+     collected, and an Unsatisfied among them wins: a job somebody failed is
+     a failed job, and averaging it away is how a failure stops being seen. */
+  const ids = Array.isArray(r._fieldIds) && r._fieldIds.length ? r._fieldIds : [];
+  let found = ids.map((i) => maintAudits[String(i)]).filter(Boolean);
+  if (!found.length) found = [maintAudits[String(r.id)]].filter(Boolean);
+
+  const many = ids.length > 1
+    ? ` (${found.length} of ${ids.length} records audited)` : '';
+
+  if (found.includes('Unsatisfactory')) {
+    return `<span class="audit-pill audit-bad" title="${t('rec.auditBadTip')}${many}">${t('rec.auditBad')}</span>`;
   }
-  if (v === 'Unsatisfactory') {
-    return `<span class="audit-pill audit-bad" title="${t('rec.auditBadTip')}">${t('rec.auditBad')}</span>`;
+  if (found.includes('Satisfactory')) {
+    return `<span class="audit-pill audit-ok" title="${t('rec.auditOkTip')}${many}">${t('rec.auditOk')}</span>`;
   }
   return '<span style="color:var(--text-faint);">—</span>';
 }
@@ -2007,22 +2017,77 @@ function _isoMonthLabel(iso) {
 }
 const _fieldKey = (jenis, plot, week) => `${jenis}||${_mvPlotKey(plot)}||${week}`;
 
-/* The field's answer for each (job, plot, round) of one month. Where the same
-   job was saved twice the later one wins — the second save is a correction. */
+/* Who a field record credits the work to.
+
+   `worked_by` is the conductor keying a job for somebody whose phone was
+   broken; NULL means the person who reported it did it themselves. Both are
+   read, because a job three workers each saved from their own phone has
+   worked_by empty on all three, and crediting nobody for a morning three
+   people spent is worse than crediting the wrong person — it is silent. */
+function _fieldCredits(f) {
+  const raw = String(f.worked_by || '').trim() || String(f.reported_by || '').trim();
+  return raw.split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+/* Every field record for one (job, plot, round), summarised.
+
+   This used to keep ONE record per job and treat any second as a correction
+   of the first. That is wrong about how the work actually happens: three
+   workers on B1 Round 1 Manuring each save their own record, and they are
+   not corrections of one another, they are the same job. Two of them may
+   even be on different days — the crew ran out of light and finished it the
+   next morning — and both days are true.
+
+   So the group is kept whole and asked three questions:
+
+     dates    the distinct days it was worked, earliest first. One job done
+              by three people on 1 Jul is "01 Jul 2026". The same job spread
+              over the 1st and the 2nd is "01 & 02 Jul 2026", because the
+              schedule asked for one job and it took two mornings.
+     batches  every batch anybody ticked, each named once
+     workers  everybody credited, each counted once, however many records
+              their name appears on — three workers, three records, three
+              ticks on the Worker Record, not nine
+
+   qty stays latest-wins rather than becoming a sum. Three workers on one
+   job each report the batches THEY ticked, and on a job they did together
+   that is the same batch three times: adding them would treble the plot.
+   Which of "they split it" and "they shared it" is true is not something
+   this table can tell from the outside, and quantities here are piece-rate
+   money, so it keeps the answer it has always given. */
+function _summariseFieldGroup(list) {
+  const newest = list.reduce((best, f) => {
+    if (!best) return f;
+    const a = String(f.work_date || ''), b = String(best.work_date || '');
+    return (a > b || (a === b && (f.id || 0) > (best.id || 0))) ? f : best;
+  }, null);
+
+  const uniq = (xs) => [...new Set(xs.filter(Boolean))];
+
+  return {
+    list,
+    ids:     list.map((f) => f.id),
+    dates:   uniq(list.map((f) => f.work_date)).sort(),
+    batches: uniq(list.flatMap((f) => String(f.batch_name || '').split(',').map((x) => x.trim()))),
+    workers: uniq(list.flatMap(_fieldCredits)),
+    qty:     newest ? newest.qty : null,
+  };
+}
+
+/* The field's answer for each (job, plot, round) of one month. */
 function fieldRecordIndex(monthLbl) {
-  const idx = {};
+  const groups = {};
   fieldRecords.forEach(f => {
     const jenis = f.jenis || _FIELD_JENIS[f.work_type];
     if (!jenis) return;
     if ((f.schedule_month || _isoMonthLabel(f.work_date)) !== monthLbl) return;
     const week = f.week_no || _weekOfDate(f.work_date);
     if (!week) return;
-    const k = _fieldKey(jenis, f.plot_name, week), cur = idx[k];
-    const newer = !cur
-      || String(f.work_date || '') > String(cur.work_date || '')
-      || (String(f.work_date || '') === String(cur.work_date || '') && (f.id || 0) > (cur.id || 0));
-    if (newer) idx[k] = f;
+    const k = _fieldKey(jenis, f.plot_name, week);
+    (groups[k] || (groups[k] = [])).push(f);
   });
+  const idx = {};
+  Object.keys(groups).forEach((k) => { idx[k] = _summariseFieldGroup(groups[k]); });
   return idx;
 }
 
@@ -2042,7 +2107,7 @@ function applyFieldRecords(nursery, monthLbl) {
      conductor who corrects the sheet by hand keeps his correction, and a
      field record that is later deleted takes its own ticks with it and
      nobody else's. Ticks made on this page are 1, and stay 1. */
-  const syncTicks = (rec, field) => {
+  const syncTicks = (rec, group) => {
     const type = _PAYROLL_TYPE_BY_JENIS[rec.jenis];
     if (!type) return;
     const k = payrollKey(nursery, monthLbl, type);
@@ -2051,8 +2116,11 @@ function applyFieldRecords(nursery, monthLbl) {
     const byHand = Object.keys(cells).some((w) => cells[w] !== 'field');
     if (byHand) return;                       // somebody has answered already
 
-    const names = String((field && field.worked_by) || '')
-      .split(',').map((x) => x.trim()).filter(Boolean);
+    /* Everybody the whole group credits, not one record's worth. Three
+       workers who each saved their own record for the same job are three
+       ticks on one row, and a name on two of those records is still one
+       tick — _summariseFieldGroup has already made the list distinct. */
+    const names = (group && group.workers) || [];
 
     const next = {};
     names.forEach((n) => {
@@ -2071,40 +2139,52 @@ function applyFieldRecords(nursery, monthLbl) {
   records.forEach(r => {
     if (!plots.includes(r.plot) || r.checked) return;
     const week = _recRound(r.racun);
-    const f = week ? idx[_fieldKey(r.jenis, r.plot, week)] : null;
-    if (!f) {
-      // A cell this sync filled before whose field record has gone — deleted,
-      // or the month on screen has moved on. Put it back the way it was found
-      // rather than leaving another month's answer sitting in it.
+    const g = week ? idx[_fieldKey(r.jenis, r.plot, week)] : null;
+    if (!g) {
+      // A cell this sync filled before whose field records have gone —
+      // deleted, unverified again, or the month on screen has moved on. Put
+      // it back the way it was found rather than leaving another month's
+      // answer sitting in it.
       if (r._fromFieldDate)  { r.tarikh = '-'; delete r._fromFieldDate; }
       if (r._fromFieldBatch) { r.batch  = '';  delete r._fromFieldBatch; }
       if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
-      delete r._fieldId;
+      delete r._fieldDates;
+      delete r._fieldIds;
       syncTicks(r, null);
       return;
     }
-    /* Which field record this row is showing, so the Audit column can find
-       the auditor's verdict for it — the auditor files against the field
-       record's id, not this page's. Cleared above when the link goes, so an
-       unverified or deleted record does not leave a verdict pointing at
-       nothing. */
-    r._fieldId = f.id;
+    /* Which field records this row is showing, so the Audit column can find
+       their verdicts — the auditor files against a field record's id, not
+       this page's, and one job can be several records. Cleared above when the
+       link goes, so an unverified or deleted record cannot leave a verdict
+       pointing at nothing. */
+    r._fieldIds = g.ids.slice();
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
-      r.tarikh = f.work_date || '-';
+      /* tarikh stays ONE date — the earliest. Everything downstream reads it
+         as a date and would choke on a list: the month timeline, the Worker
+         Record, the filter box, the Auditor Portal's own copy of this row.
+         The days beyond the first ride alongside in _fieldDates, which only
+         the cell below looks at. */
+      r.tarikh = g.dates[0] || '-';
+      r._fieldDates = g.dates.slice();
       r._fromFieldDate = 1;
+    } else {
+      // Somebody keyed this date by hand. Their answer stands alone; showing
+      // the field's other days beside it would be this page arguing with them.
+      delete r._fieldDates;
     }
-    if (f.batch_name && (!r.batch || r._fromFieldBatch)) {
-      r.batch = f.batch_name;
+    if (g.batches.length && (!r.batch || r._fromFieldBatch)) {
+      r.batch = g.batches.join(', ');
       r._fromFieldBatch = 1;
     }
     // The field counted the batches it ticked, so the quantity is already
     // answered — leaving the cell to fall back to the linked figure asked the
     // batch report a question the record had already settled.
-    if (f.qty != null && f.qty !== '' && (r.qty == null || r._fromFieldQty)) {
-      r.qty = Number(f.qty);
+    if (g.qty != null && g.qty !== '' && (r.qty == null || r._fromFieldQty)) {
+      r.qty = Number(g.qty);
       r._fromFieldQty = 1;
     }
-    syncTicks(r, f);
+    syncTicks(r, g);
   });
 
   /* Save only the sheets that changed, and only if something did — this runs
@@ -3385,6 +3465,60 @@ function _tarikhDisplay(s) {
   return `${String(d.getUTCDate()).padStart(2, '0')} ${_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/* Several days for one job, written the way somebody would say them.
+
+   A job the crew did not finish in one morning is not two jobs, and the
+   schedule asked for it once — so it stays one row, carrying the days it
+   actually took. Written long, "01 Jul 2026, 02 Jul 2026" says the month and
+   the year twice for no reason and does not fit the column; the parts the
+   dates share are said once instead:
+
+     one day                01 Jul 2026
+     two, same month        01 & 02 Jul 2026
+     three, same month      01, 02 & 03 Jul 2026
+     spanning a month       30 Jun & 01 Jul 2026
+     spanning a year        31 Dec 2025 & 01 Jan 2026
+
+   Four or more is not worth reading across a table: the first day and a
+   count, with all of them on the hover. */
+function _datesDisplay(list) {
+  const ds = (list || []).map((s) => _mvParseDate(s)).filter((ms) => ms != null)
+    .sort((a, b) => a - b).map((ms) => new Date(ms));
+  if (!ds.length) return '-';
+  if (ds.length === 1) return _tarikhDisplay(list[0]);
+
+  const day   = (d) => String(d.getUTCDate()).padStart(2, '0');
+  const mon   = (d) => _MONTHS_SHORT[d.getUTCMonth()];
+  const year  = (d) => d.getUTCFullYear();
+  const join  = (parts) => (parts.length === 2
+    ? `${parts[0]} & ${parts[1]}`
+    : `${parts.slice(0, -1).join(', ')} & ${parts[parts.length - 1]}`);
+
+  if (ds.length > 3) {
+    const first = `${day(ds[0])} ${mon(ds[0])} ${year(ds[0])}`;
+    return `${first} +${ds.length - 1}`;
+  }
+
+  const sameYear  = ds.every((d) => year(d) === year(ds[0]));
+  const sameMonth = sameYear && ds.every((d) => mon(d) === mon(ds[0]));
+
+  if (sameMonth) return `${join(ds.map(day))} ${mon(ds[0])} ${year(ds[0])}`;
+  if (sameYear)  return `${join(ds.map((d) => `${day(d)} ${mon(d)}`))} ${year(ds[0])}`;
+  return join(ds.map((d) => `${day(d)} ${mon(d)} ${year(d)}`));
+}
+
+/* The date cell. One day reads exactly as it always has; more than one says
+   so, and says which on hover. */
+function _dateCell(r) {
+  const ds = Array.isArray(r._fieldDates) ? r._fieldDates : null;
+  if (!ds || ds.length < 2) return _tarikhDisplay(r.tarikh);
+  const all = ds.map((d) => _tarikhDisplay(d)).join(', ');
+  const tip = `Worked over ${ds.length} days: ${all}. The schedule asked for `
+            + 'this job once, so it stays one row.';
+  return `<span class="date-multi" title="${tip.replace(/"/g, '&quot;')}">`
+       + `${_datesDisplay(ds)}</span>`;
+}
+
 const _mvPlotKey    = PlotMovement.plotKey;
 const _mvBatchKey   = PlotMovement.batchKey;
 const _mvBatchList  = PlotMovement.batchList;
@@ -3425,7 +3559,14 @@ function renderRecords() {
     if (jF && r.jenis !== jF) return false;
     if (pF && r.plot !== pF) return false;
     // Match either the stored value or the "20 Apr 2026" form on screen.
-    if (dF && !`${r.tarikh||''} ${_tarikhDisplay(r.tarikh)}`.toLowerCase().includes(dF)) return false;
+    /* Every day the row carries, not just the first: a job worked on the
+       1st and the 2nd must be found by searching for either. */
+    if (dF) {
+      const days = Array.isArray(r._fieldDates) && r._fieldDates.length
+        ? r._fieldDates : [r.tarikh];
+      const hay = days.map((x) => `${x || ''} ${_tarikhDisplay(x)}`).join(' ').toLowerCase();
+      if (!hay.includes(dF)) return false;
+    }
     return true;
   });
 
@@ -3483,7 +3624,7 @@ function renderRecords() {
     </tr>`;
     recs.forEach(r => {
       html += `<tr>
-        <td style="font-weight:600;color:var(--green-text);">${_tarikhDisplay(r.tarikh)}</td>
+        <td style="font-weight:600;color:var(--green-text);">${_dateCell(r)}</td>
         <td>${jenisLabel(r.jenis)}</td>
         <td><span class="pill ${pillCls(r.jenis)}">${r.racun||'—'}</span></td>
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>

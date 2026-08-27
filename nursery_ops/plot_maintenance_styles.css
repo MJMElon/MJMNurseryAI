@@ -184,7 +184,7 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    min-width is what keeps that promise on a narrow screen: below it the
    wrapper scrolls (.tbl-wrap is overflow-x:auto) rather than the columns
    quietly collapsing back into whatever fits. */
-.rec-table{table-layout:fixed;width:100%;min-width:1325px;}
+.rec-table{table-layout:fixed;width:100%;min-width:1373px;}
 .rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-bottom:2px solid var(--border-strong);white-space:nowrap;}
 .rec-table thead th.th-left{text-align:left;}
 .rec-table tbody td{padding:10px 14px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
@@ -202,6 +202,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    than letting them spill over the column beside them. */
 .rec-table tbody td:nth-child(2),
 .rec-table tbody td:nth-child(8){overflow-wrap:anywhere;}
+/* A job worked over more than one day carries them all. The column is sized
+   for "01 & 02 Jul 2026" on one line; a rarer three-day job is allowed the
+   second line rather than being cut off, which is why this one opts back out
+   of the nowrap above.
+
+   Underlined with text-decoration rather than a border: a border-bottom is a
+   box, and a 1px box under one row's date made that row a pixel taller than
+   its neighbours. Rows of different heights for no visible reason is the
+   thing this table has just been straightened out of. */
+.rec-table tbody td .date-multi{white-space:normal;cursor:help;
+  text-decoration:underline dotted var(--green-mid);text-underline-offset:3px;}
 .rec-table tbody tr:last-child td{border-bottom:none;}
 .rec-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .rec-table tbody tr:hover td{background:var(--green-bg);}
