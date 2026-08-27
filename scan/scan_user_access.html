@@ -381,7 +381,20 @@ function openRow(uid) {
        start where their access already is and saving changes only what was
        actually touched. */
     const seeded = { ...(acts || {}), view: acts ? !!acts.view : true };
+    /* Seed the OLD actions — record, verify, export — because canScan reads a
+       page all-or-nothing: once an entry exists, anything not named in it is
+       off, so leaving them out of a saved row takes them away.
+
+       The newer switches, the ones carrying a `dflt`, are deliberately NOT
+       seeded. They have their own per-key default in the app, so an absent one
+       means "nobody has decided about this person" — and that is exactly what
+       System Setting's company-wide switch acts on. Writing today's default in
+       here would turn every person the admin merely LOOKED at into somebody
+       with an explicit answer, and the company switch would then reach fewer
+       people every time this screen was opened. An explicit value is written
+       the moment somebody actually ticks one. */
     flatActions(pg).forEach((ac) => {
+      if (ac.dflt !== undefined) return;
       if (seeded[ac.key] === undefined) seeded[ac.key] = actionOn(draft, pg.key, ac.key, ac.dflt);
     });
     draft.scan_actions[pg.key] = seeded;
