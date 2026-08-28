@@ -1581,10 +1581,19 @@ function loadAuditTodo(){
         || null;
   }
 
+  /* "07-08-2026" → "2026-08-07". The office module used to store tarikh
+     DD-MM-YYYY only; a later redesign of Nursery Ops → Work Maintenance
+     started writing it already in YYYY-MM-DD, and this copy was never
+     told. Every office maintenance record failed to parse silently —
+     not a wrong date, an EMPTY one — which push() then read as
+     "no date" and dropped, no error anywhere. Kept in step with the
+     other copy in audit_maintenance_script.js; change one, change both. */
   function _tarikhToISO(t){
     if (!t || t === '-' || t === '—') return '';
-    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
-    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+    const s = String(t).trim();
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + m[2] + '-' + m[1];
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
   }
   /* One To Do row per deadline day — the card body splits the plot chips
      into per-work-type groups (Manuring / Weeding / Interrow / P&D /
