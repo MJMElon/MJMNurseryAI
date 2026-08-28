@@ -665,19 +665,20 @@
              transition:background .14s,color .14s,transform .14s}
     .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
     .tl-plot:active{transform:scale(.94)}
-    /* Overdue MAINTENANCE chips shine — an overdue maintenance plot is
+    /* Overdue MAINTENANCE chips read red — an overdue maintenance plot is
        the one thing on the To Do list that should catch the eye first,
        because worker maintenance is scheduled by someone else and the
        auditor needs to notice it without scrolling. Scoped by
        [data-mod="maint"] so seedling / plot / papan overdue rows keep
-       their existing look. */
+       their existing look.
+
+       Colour carries that on its own now — the pulse used to run on
+       every plot chip in the row at once, which on a row of twenty was
+       twenty things pulsing together rather than one thing catching the
+       eye. The icon still pulses (below); that is the one signal now. */
     .tl-item.overdue[data-mod="maint"] .tl-plot{
-      border-color:#b91c1c;color:#b91c1c;background:#fef2f2;
-      animation:tl-shine 1.8s ease-in-out infinite}
+      border-color:#b91c1c;color:#b91c1c;background:#fef2f2}
     .tl-item.overdue[data-mod="maint"] .tl-plot:hover{background:#b91c1c;color:#fff}
-    @media (prefers-reduced-motion:reduce){
-      .tl-item.overdue[data-mod="maint"] .tl-plot{animation:none}
-    }
     /* Opens the rest of the strip. Shaped like the circles it stands in
        for, but filled with the row's tone rather than outlined in it, so
        it reads as the odd one out — it is not a plot. */
@@ -736,19 +737,13 @@
        rendering accident. */
     .tl-item.tl-pinned{padding-bottom:14px;margin-bottom:16px;
                        border-bottom:1.5px dashed var(--fc-line,#e2e8f0)}
-    /* Overdue AND pinned: the whole card breathes, not just the icon.
-       This is the row that says somebody's work is ageing out while the
-       page is open, and it has to carry across a room. */
-    @keyframes tl-card-shine{
-      0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.42);
-              border-color:#dc2626}
-      50%    {box-shadow:0 0 18px 4px rgba(220,38,38,.14);
-              border-color:#f87171}
-    }
-    .tl-item.tl-pinned.overdue .tl-card{animation:tl-card-shine 2.1s ease-in-out infinite}
-    @media (prefers-reduced-motion:reduce){
-      .tl-item.tl-pinned.overdue .tl-card{animation:none;border-color:#dc2626}
-    }
+    /* Overdue AND pinned: the card's own red border, no longer an
+       animated glow of its own. The whole card used to breathe too, on
+       top of the icon's pulse — the two together read as one soft pink
+       halo bleeding past the card's edges rather than as one clear
+       signal. The icon carries the pulse now; this just marks the
+       border, plainly and without moving. */
+    .tl-item.tl-pinned.overdue .tl-card{border-color:#dc2626}
 
     /* Plots grouped by the job they are waiting on. */
     .tl-wts{margin:8px 0 0 46px;display:flex;flex-direction:column;gap:2px}
