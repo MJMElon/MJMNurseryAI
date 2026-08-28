@@ -77,6 +77,12 @@
   /* Holds the indent for a stage that shares the colour above it, so the
      names line up in one column whether or not the row carries a swatch. */
   .pm-sw-none { border-color:transparent; background:none; }
+  /* The bar stretches to the group's height, so every stage under it is
+     visibly the same colour. */
+  .pm-lg-grp { display:flex; gap:9px; align-items:stretch; margin-bottom:7px; }
+  .pm-lg-bar { width:13px; border-radius:5px; border:2px solid; flex:0 0 auto; }
+  .pm-lg-names { min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; }
+  .pm-lg-name { font-size:11.5px; font-weight:800; color:#334155; line-height:1.25; }
   @media(max-width:767px){
     .pm-body { flex-direction:column; height:auto !important; }
     .pm-mapcol { height:52vh; min-height:320px; }
@@ -244,17 +250,19 @@
          long name rather than three separate answers. They get a line each,
          and only the first of a group carries the swatch — the colour is
          said once and the rows under it sit beneath it. */
-      const row = (fill, stroke, label, swatch) =>
-        '<div class="pm-lg-row">' +
-        (swatch
-          ? '<span class="pm-sw" style="background:' + fill + ';border-color:' + stroke + '"></span>'
-          : '<span class="pm-sw pm-sw-none"></span>') +
-        '<span>' + esc(label) + '</span></div>';
+      /* One BAR per colour, running the full height of the stages that share
+         it, and the stage names stacked beside it. A single small square on
+         the first row left the others looking as if they had no colour at
+         all — which is the one thing a key exists to say. */
       box.innerHTML =
         '<p class="pm-lg-cap">' + esc(o.legendTitle || 'Status') + '</p>' +
         legend.map((e) => {
           const names = (e.stages && e.stages.length) ? e.stages : [e.label];
-          return names.map((n, i) => row(e.fill, e.stroke, n, i === 0)).join('');
+          return '<div class="pm-lg-grp">' +
+            '<span class="pm-lg-bar" style="background:' + e.fill + ';border-color:' + e.stroke + '"></span>' +
+            '<div class="pm-lg-names">' +
+              names.map((n) => '<div class="pm-lg-name">' + esc(n) + '</div>').join('') +
+            '</div></div>';
         }).join('');
     })();
     const elImg = q('.pm-image'), elSvg = q('.pm-svg'), elLabels = q('.pm-labels');

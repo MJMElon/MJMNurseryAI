@@ -101,11 +101,14 @@
      It keeps its height and the panel scrolls instead. */
   .pv-map { position:relative; background:#0f172a; overflow:hidden;
             flex:none; height:clamp(260px, 44vh, 420px); }
-  .pv-frame { position:absolute; inset:0; overflow:hidden; }
+  .pv-frame { position:absolute; inset:0; overflow:hidden;
+              display:flex; align-items:center; justify-content:center; padding:8px; }
+  .pv-inner { position:relative; display:inline-block; max-width:100%; max-height:100%; }
   /* The photo is positioned and scaled so the plot's own bounding box fills
      the frame — a crop, done with CSS, so no second image is needed and the
      polygon percentages stay the percentages the database holds. */
-  .pv-img { position:absolute; transform-origin:top left; user-select:none; -webkit-user-drag:none; }
+  .pv-img { display:block; max-width:100%; max-height:100%; width:auto; height:auto;
+            object-fit:contain; user-select:none; -webkit-user-drag:none; }
   .pv-svg { position:absolute; inset:0; width:100%; height:100%; }
   .pv-tags { position:absolute; inset:0; pointer-events:none; }
   .pv-shape { cursor:pointer; transition:fill-opacity .15s; }
@@ -247,10 +250,17 @@
          the other half only. This plot keeps its colour; the rest go grey
          but keep their names, so the map still reads as the nursery. -->
     <div class="pv-map" id="pv-map">
-      <div class="pv-frame" id="pv-frame">
-        <img class="pv-img" id="pv-img" alt="">
-        <svg class="pv-svg" id="pv-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
-        <div class="pv-tags" id="pv-tags"></div>
+      <div class="pv-frame">
+        <!-- The wrapper shrinks to the PHOTO, and the overlay is pinned to
+             the wrapper — so the polygons sit on the image whatever shape it
+             is. Stretching the photo to the frame instead, as this did, left
+             the boundaries in the right place on a squashed nursery. Same
+             structure the page's own map uses. -->
+        <div class="pv-inner">
+          <img class="pv-img" id="pv-img" alt="">
+          <svg class="pv-svg" id="pv-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+          <div class="pv-tags" id="pv-tags"></div>
+        </div>
       </div>
       <div class="pv-none" id="pv-none">No map uploaded for this nursery.</div>
     </div>
@@ -507,13 +517,10 @@ function drawPv() {
     return;
   }
 
-  /* The whole photo, unscaled — the map here is the same map as the page's,
-     so the SVG keeps its 0–100 space and the image simply fills the frame. */
-  const img = $('pv-img');
-  img.src = nur.map_image_url;
-  img.style.width = '100%'; img.style.height = '100%';
-  img.style.left = '0'; img.style.top = '0';
-  $('pv-svg').setAttribute('viewBox', '0 0 100 100');
+  /* The photo at its own aspect; CSS sizes it and the overlay follows. The
+     SVG keeps its 0–100 space because the polygons are percentages OF THE
+     PHOTO, and the wrapper is the photo. */
+  $('pv-img').src = nur.map_image_url;
 
   const shapes = [], tags = [];
   all.forEach((u) => {
