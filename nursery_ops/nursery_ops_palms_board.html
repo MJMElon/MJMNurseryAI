@@ -194,16 +194,19 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <div id="hidden-bar" class="hidden px-4 py-3 border-t border-slate-100 bg-slate-50/60">
-      <div class="flex flex-wrap items-center gap-2">
+    <div id="hidden-bar" class="hidden border-t border-slate-100 bg-slate-50/60">
+      <button id="hidden-toggle" class="w-full flex items-center gap-2 px-4 py-2.5 cursor-pointer bg-transparent border-none text-left">
+        <span id="hidden-caret" class="text-slate-400 font-black text-[11px] leading-none">▸</span>
         <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hidden plots</span>
         <span id="hidden-count" class="text-[11px] font-bold text-slate-400"></span>
-        <div id="hidden-list" class="flex flex-wrap gap-2 ml-auto"></div>
+      </button>
+      <div id="hidden-body" class="hidden px-4 pb-3">
+        <div id="hidden-list" class="flex flex-wrap gap-2"></div>
+        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">
+          Not on the map, not in the table above, and not offered to the Field Conductor. Everything
+          else about them is untouched — restore one and it comes straight back.
+        </p>
       </div>
-      <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">
-        Not on the map, not in the table above, and not offered to the Field Conductor. Everything
-        else about them is untouched — restore one and it comes straight back.
-      </p>
     </div>
 
     <div id="empty" class="hidden px-6 py-14 text-center">
@@ -612,6 +615,17 @@ function renderHidden() {
     '<button class="hid-back" data-unhide="' + esc(p.plot_name) + '">Restore</button></span>').join('');
 }
 
+/* Shut by default. It is a list of things deliberately put out of the way,
+   so it should not be the last thing on a screen about what IS there. The
+   count stays on the closed tab, because "are there any" is the question
+   worth answering without a click. */
+let HID_OPEN = false;
+$('hidden-toggle').addEventListener('click', () => {
+  HID_OPEN = !HID_OPEN;
+  $('hidden-body').classList.toggle('hidden', !HID_OPEN);
+  $('hidden-caret').textContent = HID_OPEN ? '▾' : '▸';
+});
+
 $('hidden-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-unhide]');
   if (!b) return;
@@ -716,8 +730,11 @@ function statusCell(unitKey, ln) {
   /* Two stages running at once cannot be shown in one dropdown honestly, so
      that plot keeps plain text and stays the field app's to change. */
   if (cur.length > 1) {
-    return '<td>' + esc(ln.status) +
-           '<div class="text-[10px] font-bold text-slate-400 mt-1">two at once — change in the app</div></td>';
+    /* Plain text, and the reason in the tooltip rather than a second line.
+       Two stages at once is rare and the note was costing every OTHER row
+       nothing while making this one twice as tall. */
+    return '<td title="Two stages are running at once here — change it in the field app">' +
+           esc(ln.status) + '</td>';
   }
   const opts = MJMPalms.ACTIVITIES.map((a) =>
     '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
