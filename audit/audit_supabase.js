@@ -274,17 +274,49 @@ async function sbFetch(path, options = {}) {
   return text ? JSON.parse(text) : [];
 }
 
+/* ── TABLES/VIEWS THAT DON'T HAVE created_at ──
+   select() below used to try `order=created_at.desc` on every single call
+   and only fall back after PostgREST rejected it — a full failed round
+   trip, every time, forever, for any table that will never have that
+   column. shared_plot_batch_balance is a VIEW aggregating the inventory
+   ledger; there is no single "created_at" a balance row could have, so
+   this was never going to stop failing. It is read on audit_height_script
+   .js, audit_pending.js and audit_script.js — most audit page loads hit
+   it more than once.
+
+   Learned once per table, then skipped for the rest of the session AND
+   remembered in localStorage so the NEXT page load doesn't pay for the
+   failed request either. Preseeded with the ones already proven bad, so
+   the very first deploy after this fix benefits immediately rather than
+   re-learning them one failed request at a time. */
+const _NO_CREATED_AT_KEY = 'mjm_sb_no_created_at';
+const _noCreatedAt = (function () {
+  const seed = ['shared_plot_batch_balance'];
+  try {
+    const stored = JSON.parse(localStorage.getItem(_NO_CREATED_AT_KEY) || '[]');
+    return new Set([...seed, ...stored]);
+  } catch (e) { return new Set(seed); }
+})();
+function _rememberNoCreatedAt(table) {
+  _noCreatedAt.add(table);
+  try { localStorage.setItem(_NO_CREATED_AT_KEY, JSON.stringify([..._noCreatedAt])); }
+  catch (e) {}
+}
+
 const sb = {
   async select(table, query = '') {
+    if (_noCreatedAt.has(table)) return sbFetch(`${table}?${query}`);
     try {
       return await sbFetch(`${table}?${query}&order=created_at.desc`);
     } catch (e) {
       /* Some audit tables were made by hand and have no created_at. PostgREST
          rejects the whole read with a 400 on the order clause, which reaches
          the screen as an empty list — indistinguishable from "no records".
-         Read it unordered instead. */
+         Read it unordered instead, and remember so this table never pays
+         for the failed attempt again. */
       if (/created_at/.test(e.message) && /42703|does not exist/i.test(e.message)) {
         console.warn('[sb] no created_at on', table, '— reading unordered');
+        _rememberNoCreatedAt(table);
         return await sbFetch(`${table}?${query}`);
       }
       throw e;
