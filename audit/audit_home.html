@@ -731,20 +731,6 @@
     @media (prefers-reduced-motion:reduce){
       .tl-item.overdue .tl-ico{animation:none}
     }
-    /* The pinned maintenance row. Held apart from the rows under it so
-       "first in the list" is not mistaken for "happens to be first
-       today". A rule, not a gap, because a gap alone reads as a
-       rendering accident. */
-    .tl-item.tl-pinned{padding-bottom:14px;margin-bottom:16px;
-                       border-bottom:1.5px dashed var(--fc-line,#e2e8f0)}
-    /* Overdue AND pinned: the card's own red border, no longer an
-       animated glow of its own. The whole card used to breathe too, on
-       top of the icon's pulse — the two together read as one soft pink
-       halo bleeding past the card's edges rather than as one clear
-       signal. The icon carries the pulse now; this just marks the
-       border, plainly and without moving. */
-    .tl-item.tl-pinned.overdue .tl-card{border-color:#dc2626}
-
     /* Plots grouped by the job they are waiting on. */
     .tl-wts{margin:8px 0 0 46px;display:flex;flex-direction:column;gap:2px}
     .tl-wt-head{display:flex;align-items:center;gap:8px;width:100%;
@@ -2452,13 +2438,14 @@ function loadAuditTodo(){
        N days", so this is the same day, just comparable. */
     const _dueTime = (o, oy, om) => new Date(oy, om, o.end).getTime();
     list.sort((a, b) => {
-      /* Maintenance first, ahead of even an overdue plot audit. It is the
-         only row whose work arrives on somebody else's schedule — a worker
-         finishes a job and the clock starts, so the backlog can appear
-         between one look at this page and the next. The other audits sit
-         on a calendar the auditor already knows. Among themselves the
-         maintenance rows still sort by how late they are. */
-      if ((a.mod === 'maint') !== (b.mod === 'maint')) return a.mod === 'maint' ? -1 : 1;
+      /* Maintenance used to sit above every other module regardless of
+         how overdue it was — reasoned as "somebody else's schedule, not
+         the auditor's own calendar". Removed: longest-overdue-first is
+         meant to apply across the whole list, and a rule that pinned one
+         module above it defeated that for exactly the case where it
+         mattered most — a three-week-old Seedling Height backlog sitting
+         under a maintenance row overdue by a single day. Every module
+         now interleaves purely on how overdue it is. */
       const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
       const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
       if (ka !== kb) return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
@@ -2517,8 +2504,7 @@ function loadAuditTodo(){
         : (live ? _plotsHtml(o, oy, om, pending) : '');
       const due = dueInfo(o, oy, om);
 
-      return `<div class="tl-item ${k==='overdue'?'overdue':''}${
-                 o.mod === 'maint' ? ' tl-pinned' : ''}" data-idx="${idx}" data-mod="${o.mod}" style="--tone:${c.tone}">
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" data-mod="${o.mod}" style="--tone:${c.tone}">
         ${openTag}
           <div class="tl-row-head">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
