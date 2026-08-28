@@ -39,7 +39,11 @@
      nearly-touching text; a column heading that sits ON its column is read as
      part of it. */
   .bd-divs th { padding: 16px 10px 12px; }
-  .bd-secs th { padding: 0 10px 18px; }
+  /* The code sits in the MIDDLE of its row, not pinned to the top of it.
+     All the padding was under the chip, which left it hard against the
+     location heading above and floating over a gap below — a label looking
+     for the row it belongs to. Even padding puts it where it is looked for. */
+  .bd-secs th { padding: 12px 10px 12px; vertical-align: middle; }
 
   /* Names down the column, one per line, rather than wrapped across it.
      Side by side, two short names sat on one line and a long one took two,
