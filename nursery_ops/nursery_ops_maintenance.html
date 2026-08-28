@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=55">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=56">
 </head>
 <body>
 
@@ -198,17 +198,16 @@
       <div class="section-hdr">
         <div><div class="page-hdr-title" id="sched-nursery-line"></div></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn schedule-edit-ctrl" onclick="openAddPlotRow()" style="font-size:11px;padding:5px 14px;" title="Add a blank row and key in the plot name">➕ Add Row</button>
-          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
+          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveAllSchedules()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
           <button class="btn-pdf" onclick="openPdfModal()" style="font-size:11px;padding:6px 14px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
         </div>
       </div>
 
       <!-- ── SUMMARY ────────────────────────────────────────────────
            Every nursery, every week, the four works. A tick means that work
-           is set on at least one plot that week; the arrow opens the plots
-           underneath and the pencil opens the week for editing. The four
-           sheets further down are still there for bulk work. -->
+           is set on at least one plot that week; the arrow opens every plot
+           underneath, ticked or not, and the pencil opens that work's whole
+           month for editing. Two nurseries to a row. -->
       <div class="card" style="padding:18px;margin-bottom:18px;">
         <div class="lst-top">
           <div class="set-h">This Month at a Glance</div>
@@ -219,67 +218,6 @@
       <!-- Shown when this month's sheet was carried forward from an earlier one. -->
       <div id="carry-notice" style="display:none;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:var(--r-md);
            padding:10px 14px;margin-bottom:14px;font-size:12px;font-weight:600;color:#78350f;"></div>
-
-      <!-- Jump chips. Four stacked grids is a long page; these do what the
-           sub-tabs did for reaching one — without hiding the other three. -->
-      <div class="sched-jump">
-        <button type="button" onclick="jumpToSched('pd')"       data-i18n="tab.pd">P &amp; D — Racun</button>
-        <button type="button" onclick="jumpToSched('manuring')" data-i18n="tab.manuring">Manuring</button>
-        <button type="button" onclick="jumpToSched('weeding')"  data-i18n="tab.weeding">Weeding</button>
-        <button type="button" onclick="jumpToSched('interrow')" data-i18n="tab.interrow">Interrow Spray</button>
-      </div>
-
-      <!-- P&D -->
-      <section class="sched-block" id="sched-pd">
-        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('pd')" aria-expanded="true" aria-controls="sched-body-pd">
-          <span class="sched-caret" aria-hidden="true">▾</span>
-          <span class="sched-name" data-i18n="tab.pd">P &amp; D — Racun</span>
-          <span class="section-badge" data-i18n="badge.pd">JADUAL PENYEMBURAN RACUN KULAT DAN SERANGGA</span>
-          <span class="sched-count" id="sched-count-pd"></span>
-        </button>
-        <div class="sched-block-body" id="sched-body-pd">
-          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="pd-table"></table></div></div>
-        </div>
-      </section>
-
-      <!-- MANURING -->
-      <section class="sched-block" id="sched-manuring">
-        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('manuring')" aria-expanded="true" aria-controls="sched-body-manuring">
-          <span class="sched-caret" aria-hidden="true">▾</span>
-          <span class="sched-name" data-i18n="tab.manuring">Manuring</span>
-          <span class="section-badge" data-i18n="badge.manuring">JADUAL MANURING</span>
-          <span class="sched-count" id="sched-count-manuring"></span>
-        </button>
-        <div class="sched-block-body" id="sched-body-manuring">
-          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="manuring-table"></table></div></div>
-        </div>
-      </section>
-
-      <!-- WEEDING -->
-      <section class="sched-block" id="sched-weeding">
-        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('weeding')" aria-expanded="true" aria-controls="sched-body-weeding">
-          <span class="sched-caret" aria-hidden="true">▾</span>
-          <span class="sched-name" data-i18n="tab.weeding">Weeding</span>
-          <span class="section-badge" data-i18n="badge.weeding">JADUAL WEEDING</span>
-          <span class="sched-count" id="sched-count-weeding"></span>
-        </button>
-        <div class="sched-block-body" id="sched-body-weeding">
-          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="weeding-table"></table></div></div>
-        </div>
-      </section>
-
-      <!-- INTERROW SPRAY -->
-      <section class="sched-block" id="sched-interrow">
-        <button type="button" class="sched-block-hdr" onclick="toggleSchedBlock('interrow')" aria-expanded="true" aria-controls="sched-body-interrow">
-          <span class="sched-caret" aria-hidden="true">▾</span>
-          <span class="sched-name" data-i18n="tab.interrow">Interrow Spray</span>
-          <span class="section-badge" data-i18n="badge.interrow">JADUAL INTERROW SPRAY</span>
-          <span class="sched-count" id="sched-count-interrow"></span>
-        </button>
-        <div class="sched-block-body" id="sched-body-interrow">
-          <div class="card"><div class="tbl-wrap"><table class="sched-table" id="interrow-table"></table></div></div>
-        </div>
-      </section>
 
     </div>
 
@@ -455,17 +393,17 @@
 
 <!-- ═══ ONE WORK, ONE WEEK ═══ -->
 <div class="modal-overlay" id="we-modal">
-  <div class="modal" style="max-width:760px;">
+  <div class="modal" style="width:1180px;max-width:96vw;">
     <div class="modal-top">
       <div>
         <div class="modal-title" id="we-title">Work</div>
         <div id="we-sub" style="font-size:12px;font-weight:600;color:var(--text-muted);margin-top:2px;"></div>
       </div>
-      <button class="modal-close" onclick="closeWorkEditor()">&times;</button>
+      <button class="modal-close" onclick="cancelWorkEditor()">&times;</button>
     </div>
     <div class="modal-body" id="we-body"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeWorkEditor()">Close</button>
+      <button class="btn" onclick="cancelWorkEditor()">Cancel</button>
       <button class="btn btn-primary" onclick="saveWorkEditor()">Save</button>
     </div>
   </div>
@@ -565,7 +503,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=72"></script>
+<script src="plot_maintenance_script.js?v=73"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
