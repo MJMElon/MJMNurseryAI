@@ -720,6 +720,17 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    scrolling to compare them, which is the one thing this table is for. Below
    1100px they go back to one — two tables of five week columns in half a
    laptop's width is not a summary, it is a squeeze. */
+/* ‹ Monthly Work Schedule : Aug 26 › — the title IS the stepper, so the two
+   arrows sit against the thing they change rather than somewhere else on the
+   bar. */
+.sched-month{display:flex;align-items:center;gap:10px;}
+.sched-step{display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;font-family:var(--font);font-size:20px;font-weight:700;
+  line-height:1;color:var(--green-text);background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer;
+  transition:background .13s,border-color .13s;}
+.sched-step:hover{background:#eaf7f0;border-color:var(--green);}
+
 #sched-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:16px;align-items:start;}
 @media (max-width:1100px){ #sched-summary{grid-template-columns:1fr;} }
@@ -774,30 +785,32 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 
 .ss-row.is-open td{border-bottom-color:transparent;background:#f7fbf9;}
 
-/* EVERY plot, ticked or not, in blocks of ten flowing right. It used to list
-   only what was set, which made the panel a different shape every time and
-   gave no way to see a plot had been MISSED — the thing you open it to check.
-   The week columns are numbered rather than dated; the dates are two rows up
-   and repeating them here would cost the width the plot names need. */
+/* EVERY plot, ticked or not, in ONE table — plots down, weeks across. It
+   listed only what was set, which made the panel a different shape every time
+   and gave no way to see a plot had been MISSED. The week columns are
+   numbered; the dates are two rows up in the summary's own header, and
+   repeating them here would cost the width the plot names need. */
 .ss-detail td{padding:10px 13px 14px;background:#f7fbf9;
   border-bottom:1px solid #eaf1ed;vertical-align:top;text-align:left;}
-/* align-items:flex-start, or a block of four plots stretches to the height of
-   a block of ten and its rows drift apart — the ragged shape this panel was
-   rebuilt to get rid of. */
-.xp-wrap{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px 26px;}
-.xp-table{width:auto;border-collapse:collapse;}
-.xp-table thead th{font-size:9.5px;font-weight:800;letter-spacing:.5px;
-  color:var(--text-muted);text-transform:uppercase;padding:0 5px 5px;
-  border-bottom:1px solid var(--border);text-align:center;}
+.xp-wrap{max-height:420px;overflow:auto;}
+.xp-table{width:100%;border-collapse:collapse;}
+.xp-table thead th{position:sticky;top:0;z-index:1;background:#f7fbf9;
+  font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);
+  text-transform:uppercase;padding:0 6px 6px;border-bottom:1px solid var(--border);
+  text-align:center;}
 .xp-table th.xp-plot{text-align:left;padding-left:0;}
-.xp-table tbody td{padding:2px 5px;font-size:11.5px;text-align:center;
+.xp-table tbody td{padding:3px 6px;font-size:12px;text-align:center;
   line-height:1.5;border:none;}
 .xp-table td.xp-plot{text-align:left;padding-left:0;font-weight:700;
   color:var(--text-head);white-space:nowrap;}
 .xp-on{color:var(--green);font-weight:800;}
 /* An empty cell needs a mark of its own or the row reads as ragged; a faint
    dot says "asked and not set" where blank says only "nothing here". */
-.xp-off::after{content:"·";color:var(--border-strong);}
+.xp-off::after{content:"\00b7";color:var(--border-strong);}
+/* A plot with nothing set anywhere this month is the one worth spotting. */
+.xp-blank td.xp-plot{color:var(--text-muted);font-weight:600;}
+.xp-tot{font-size:11px;font-weight:800;color:var(--green-text);width:1%;
+  padding-left:10px;}
 .ss-none{color:var(--border-strong);font-size:13px;}
 
 

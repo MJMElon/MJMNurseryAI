@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=56">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=57">
 </head>
 <body>
 
@@ -196,7 +196,13 @@
     <div id="tab-schedule" class="tab-panel">
       <!-- Everything you can do to the month, said once. -->
       <div class="section-hdr">
-        <div><div class="page-hdr-title" id="sched-nursery-line"></div></div>
+        <div class="sched-month">
+          <button type="button" class="sched-step" onclick="stepSchedMonth(-1)"
+            title="The month before">&#8249;</button>
+          <div class="page-hdr-title" id="sched-month-label"></div>
+          <button type="button" class="sched-step" onclick="stepSchedMonth(1)"
+            title="The month after — set it in advance">&#8250;</button>
+        </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary schedule-edit-ctrl" onclick="saveAllSchedules()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
           <button class="btn-pdf" onclick="openPdfModal()" style="font-size:11px;padding:6px 14px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
@@ -417,6 +423,8 @@
   <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
   <input type="date" id="wp-to" class="set-in" style="width:150px;">
   <button class="btn" style="font-size:12px;" onclick="closeWeekPicker()">Cancel</button>
+  <button class="btn btn-danger" id="wp-remove" style="font-size:12px;" onclick="removeSummaryWeek()"
+    title="Remove this week — its days join the week beside it">Remove</button>
   <button class="btn btn-primary" style="font-size:12px;" onclick="saveWeekPick()">Set</button>
 </div>
 
@@ -503,7 +511,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=73"></script>
+<script src="plot_maintenance_script.js?v=74"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
