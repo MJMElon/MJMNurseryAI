@@ -24,7 +24,7 @@
 --   worker_maint_records(token, limit)     → every record in the boundary
 --   worker_schedules(token)                → the office plan for those nurseries
 --   worker_maint_roster(token)             → the colleagues a job may be credited to
---   worker_site_boundary(token)            → the company outline, for the GPS map
+--   worker_site_boundary(token)            → the outlines for this worker's nurseries
 --   worker_roster(token)                   → Settings: every worker, no PINs
 --   worker_set_portal(token, id, portal)   → Settings: save one worker's access
 --
@@ -780,23 +780,28 @@ END;
 $fn$;
 
 
-/* The company's site outline, for the GPS track map.
+/* The site outlines this worker's ground is drawn from, for the GPS track map.
  *
  * shared_site_boundary is readable by `authenticated` and a worker is `anon`,
  * so this is the door — the same shape as everything else here: the token is
  * turned back into a worker first, and only then is anything read.
  *
- * There is no boundary check on the boundary itself, and that is deliberate.
- * It is ONE outline for the whole company, drawn behind the map so somebody
- * walking a plot can see where the estate ends. It is not a list of anything,
- * it names nobody, and half of it would be a worse answer than all of it —
- * an outline clipped to a nursery is a shape that says the estate stops
- * somewhere it does not.
+ * ONE ROW PER NURSERY. The nurseries are separate sites with a file each, and
+ * a single shape drawn round all three would be a shape round nothing.
  *
- * Returns NULL when nothing has been uploaded, or when the table does not
- * exist yet on this database — running create_scan_system_setting.sql is not
- * a precondition for having a working portal, and a map with no line on it is
- * not an error.
+ * So this DOES respect the boundary, unlike most of what a map shows: a
+ * worker confined to BNN gets BNN's outline and not the other two. Not for
+ * secrecy — an estate outline is not a secret — but because drawing three
+ * nurseries behind one walked path is three-quarters noise on a phone screen
+ * in a plot, and the wrong one is worse than none.
+ *
+ * A boundary of null nurseries means every nursery, which is what an
+ * unconfigured worker has, and they get every outline.
+ *
+ * Returns a JSONB ARRAY, empty when nothing matches. Never null and never an
+ * error: the table may not exist yet on this database, no file may have been
+ * uploaded for this worker's nursery, and both mean the same thing to a map,
+ * which is to draw no line.
  */
 CREATE OR REPLACE FUNCTION public.worker_site_boundary(p_token UUID)
 RETURNS JSONB
@@ -805,25 +810,38 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $fn$
-DECLARE out JSONB;
+DECLARE
+  w   mjmnpayroll_workers;
+  nur JSONB;
+  out JSONB;
 BEGIN
-  PERFORM public.worker_from_token(p_token);
+  w   := public.worker_from_token(p_token);
+  nur := public.worker_portal(w) #> '{boundary,nurseries}';
 
   IF to_regclass('public.shared_site_boundary') IS NULL THEN
-    RETURN NULL;
+    RETURN '[]'::jsonb;
   END IF;
 
-  /* Dynamic because the column list is only known to exist if the table does,
-     and a function body naming a column of a table that is not there fails to
-     create rather than returning null. */
+  /* Dynamic because a function body naming a column of a table that is not
+     there fails to CREATE rather than returning nothing — and `nursery` is a
+     column this file did not add and cannot assume. */
   EXECUTE $q$
-    SELECT to_jsonb(b) - 'id' - 'updated_by'
+    SELECT COALESCE(jsonb_agg(to_jsonb(b) - 'id' - 'updated_by'), '[]'::jsonb)
       FROM shared_site_boundary b
-     WHERE b.id = 1
-       AND b.geojson IS NOT NULL
-  $q$ INTO out;
+     WHERE b.geojson IS NOT NULL
+       AND (
+             -- Filed under no nursery at all: an outline uploaded before the
+             -- table was split by nursery, which meant the whole company. It
+             -- keeps meaning that, so everybody gets it until the office
+             -- removes it.
+             COALESCE(btrim(b.nursery), '') = ''
+             -- A boundary of null nurseries is every nursery.
+             OR jsonb_typeof($1) <> 'array'
+             OR public.worker_key(b.nursery) IN (
+                  SELECT public.worker_key(x) FROM jsonb_array_elements_text($1) AS x))
+  $q$ INTO out USING nur;
 
-  RETURN out;
+  RETURN COALESCE(out, '[]'::jsonb);
 END;
 $fn$;
 
