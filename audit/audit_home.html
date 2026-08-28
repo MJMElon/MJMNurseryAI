@@ -2462,16 +2462,15 @@ function loadAuditTodo(){
       const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
       const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
       if (ka !== kb) return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
-      /* Within the overdue group, the row that went overdue most
-         recently leads — the newest backlog item, not the oldest one.
-         A window that closed 22 days ago has already been sitting
-         there for three weeks; one that closed yesterday is the thing
-         that just changed since the auditor last looked. Latest
-         deadline first, so "22 days overdue" now sits under "1 day
-         overdue" instead of above it. */
+      /* Within the overdue group, the row that has been overdue the
+         LONGEST leads — the oldest backlog item, not the newest one.
+         The eye lands on "22 days overdue" first, because that is the
+         one that has been sitting there the longest and is the most
+         urgent to clear; a 1-day-overdue row can wait one row further
+         down. Earliest deadline first. */
       if (ka === 'overdue')
-        return _dueTime(b, b.fromY ?? viewY, b.fromM ?? viewM)
-             - _dueTime(a, a.fromY ?? viewY, a.fromM ?? viewM);
+        return _dueTime(a, a.fromY ?? viewY, a.fromM ?? viewM)
+             - _dueTime(b, b.fromY ?? viewY, b.fromM ?? viewM);
       return 0;   // other statuses: ties keep occurrence order (stable sort)
     });
 
