@@ -28,6 +28,45 @@
                font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
                color:#7c3aed; text-decoration:none; }
   .page-back:hover { color:#5b21b6; }
+
+  /* ── The board's own spacing and stacking ──────────────────────────────
+     Overrides rather than edits to npayroll_styles.css: that sheet is the
+     payroll dashboard's, borrowed by this page, and the payroll's own tables
+     have no reason to move because this board wanted room. */
+
+  /* Air under the location headings, and under the section codes below them.
+     The two heading rows and the first row of names were three lines of
+     nearly-touching text; a column heading that sits ON its column is read as
+     part of it. */
+  .bd-divs th { padding: 16px 10px 12px; }
+  .bd-secs th { padding: 0 10px 18px; }
+
+  /* Names down the column, one per line, rather than wrapped across it.
+     Side by side, two short names sat on one line and a long one took two,
+     so no row of the board lined up with any other and counting a nursery's
+     workers meant reading rather than looking. One per line makes the length
+     of the list the answer. */
+  .bd-cell-in { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 5px; }
+  .bd-cell-in .wchip,
+  .bd-cell-in .wchip-add { display: block; width: 100%; text-align: left; }
+  /* A name too long for its column is cut with an ellipsis rather than
+     wrapped: the row heights stay level, and the whole name is on the hover
+     and one click away on their record. */
+  .bd-cell-in .wchip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Waiting to be allocated ── */
+  .pend-wrap { padding: 14px 16px; margin-bottom: 14px;
+               border-left: 4px solid #f59e0b; background: #fffbeb; }
+  .pend-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .pend-title { font-size: 12px; font-weight: 900; letter-spacing: .1em;
+                text-transform: uppercase; color: #92400e; }
+  .pend-count { display: inline-block; padding: 1px 9px; border-radius: 999px;
+                font-size: 11px; font-weight: 800; color: #92400e;
+                background: #fde68a; }
+  .pend-why { font-size: 11.5px; font-weight: 600; color: #a16207; }
+  /* Across, not down: this is a queue to be emptied, not a column to be
+     compared with another. */
+  .pend-list { display: flex; flex-wrap: wrap; gap: 6px; }
 </style>
 </head>
 <body>
@@ -45,8 +84,6 @@
     <div class="bar">
       <div>
         <div class="bar-title">Worker System</div>
-        <div class="bar-sub">Everybody on the payroll, filed under their section and their role.
-          Click a name to open their record.</div>
       </div>
       <div class="bar-actions">
         <label class="chk"><input type="checkbox" id="w-show-inactive" onchange="renderWorkers()"> Show inactive</label>
@@ -112,6 +149,11 @@
       <div class="frow"><label>Remark</label><textarea id="wf-remark" rows="2"></textarea></div>
     </div>
     <div class="modal-foot">
+      <!-- Only on an existing worker, and only for somebody allowed to move
+           people about. Left of the others and away from Save, because it is
+           the one button here that cannot be undone. -->
+      <button class="btn btn-danger hidden" id="wf-remove" onclick="removeWorkerFromForm()">Remove Worker</button>
+      <span style="flex:1"></span>
       <button class="btn" onclick="closeModal('worker-modal')">Cancel</button>
       <button class="btn btn-primary" id="wf-save" onclick="saveWorker()">Save Worker</button>
     </div>
@@ -477,6 +519,34 @@ function renderWorkerBoard() {
                   <span class="bd-role-count">${total}</span></th>${cells}</tr>`;
   }).join('');
 
+  /* ── Waiting to be allocated ──────────────────────────────────────────
+     Somebody on the register filed under no section at all. A worker who has
+     just signed up is nowhere on the ground yet, and the board has a column
+     for every place but none for "not anywhere" — so until this, they were on
+     the register and on no screen, which is the worst of both.
+
+     They sit above the board and drag out of it into any cell, which is the
+     same gesture that files anybody. Nothing drops back IN: a section is
+     information, and clearing one to park somebody here would throw it away.
+     Marking them Inactive on their own record is the way to shelve a worker. */
+  const pending = shown.filter(w => !String(w.section || '').trim());
+  const pendingHtml = pending.length ? `
+    <div class="card pend-wrap">
+      <div class="pend-head">
+        <span class="pend-title">Waiting to be allocated</span>
+        <span class="pend-count">${pending.length}</span>
+        <span class="pend-why">Signed up, but not filed under a nursery yet${
+          canEdit ? ' — drag a name into a column below' : ''}.</span>
+      </div>
+      <div class="pend-list">${pending.map(w => `
+        <span class="wchip ${w.active === false ? 'wchip-off' : ''}"
+              ${canEdit ? 'draggable="true"' : ''}
+              ondragstart="boardDragStart(event, ${w.id})" ondragend="boardDragEnd(event)"
+              onclick="openWorker(${w.id})"
+              title="${esc(w.full_name)}${w.role ? ' - ' + esc(w.role) : ''}"
+              >${esc(w.full_name)}</span>`).join('')}</div>
+    </div>` : '';
+
   const hiddenNote = (workers.some(w => w.active === false) && !$('w-show-inactive').checked)
     ? ' Inactive workers are hidden - tick Show inactive to see them.' : '';
 
@@ -491,7 +561,8 @@ function renderWorkerBoard() {
   const note = (canEdit ? '' : 'You can look, but moving a worker needs the Workers permission.')
              + hiddenNote;
   box.innerHTML =
-    `<div class="card bd-wrap"><table class="bd"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    `${pendingHtml}
+     <div class="card bd-wrap"><table class="bd"><thead>${head}</thead><tbody>${body}</tbody></table></div>
      ${note.trim() ? `<p class="foot-note">${note.trim()}</p>` : ''}`;
 }
 
@@ -689,6 +760,12 @@ function openWorker(id, section, role) {
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
   $('wf-maint').checked = w ? onMaintSheet(w) : true;
   onWorkerRoleChange();
+  /* Remove is for a worker who is already on the register — there is nothing
+     to remove from a form that has not saved anybody yet. The permission is
+     asked again here although openWorker refused entry without it above:
+     the button is the thing that deletes, and a button that deletes should
+     not rely on somebody else having checked. */
+  $('wf-remove').classList.toggle('hidden', !w || !may('workers', 'manage'));
   $('worker-modal').classList.add('open');
   $('wf-name').focus();
 }
@@ -773,11 +850,22 @@ async function saveWorker() {
   } finally { $('wf-save').disabled = false; }
 }
 
+/* The Remove button on the form. removeWorker() below does the asking, the
+   deleting and the reloading; this only says who, and shuts the form if
+   something actually happened — a refused permission or a database that said
+   no leaves it open, because there is still a record there to work on. */
+async function removeWorkerFromForm() {
+  if (!editWorkerId) return;
+  if (await removeWorker(editWorkerId)) closeModal('worker-modal');
+}
+
+/* Answers whether the register changed, so a caller can tell "done" from
+   "they said no" without guessing at the worker list afterwards. */
 async function removeWorker(id) {
   const w = workers.find(x => x.id === id);
-  if (!w) return;
+  if (!w) return false;
   if (!mayDo('workers', 'remove',
-      'You do not have permission to remove a worker. Ask an admin to grant it in User Access.')) return;
+      'You do not have permission to remove a worker. Ask an admin to grant it in User Access.')) return false;
   // Deleting takes their pay entries with it, so offer the safe option first.
   const ok = confirm(`Remove ${w.full_name}?\n\nOK = delete permanently (their work entries go too).\n` +
                      `Cancel = keep the record and mark them Inactive.`);
@@ -785,10 +873,11 @@ async function removeWorker(id) {
     ? _supabase.from('mjmnpayroll_workers').delete().eq('id', id)
     : _supabase.from('mjmnpayroll_workers').update({ active: false, updated_by: userEmail || null }).eq('id', id);
   const { error } = await q;
-  if (error) { alert('Could not update: ' + error.message); return; }
+  if (error) { alert('Could not update: ' + error.message); return false; }
   await loadWorkers();
   resolveMaintWorkers();
   renderWorkers();
+  return true;
 }
 
 
