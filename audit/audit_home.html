@@ -2448,11 +2448,14 @@ function loadAuditTodo(){
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
     /* Sort so overdue rides at the top, then due, then soon, then
-       upcoming. Ties keep their occurrence order (JS Array.sort is
-       stable per spec). Overdue-first is the whole point of a
-       backlog banner: what should already have been done should be
-       what the eye lands on. */
+       upcoming. Overdue-first is the whole point of a backlog banner:
+       what should already have been done should be what the eye lands
+       on. */
     const _ORDER = { overdue: 0, due: 1, soon: 2, upcoming: 3 };
+    /* The row's deadline as a real timestamp, for ordering within one
+       status — dueInfo() computes the same date to print "overdue by
+       N days", so this is the same day, just comparable. */
+    const _dueTime = (o, oy, om) => new Date(oy, om, o.end).getTime();
     list.sort((a, b) => {
       /* Maintenance first, ahead of even an overdue plot audit. It is the
          only row whose work arrives on somebody else's schedule — a worker
@@ -2463,7 +2466,18 @@ function loadAuditTodo(){
       if ((a.mod === 'maint') !== (b.mod === 'maint')) return a.mod === 'maint' ? -1 : 1;
       const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
       const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
-      return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+      if (ka !== kb) return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+      /* Within the overdue group, the row that went overdue most
+         recently leads — the newest backlog item, not the oldest one.
+         A window that closed 22 days ago has already been sitting
+         there for three weeks; one that closed yesterday is the thing
+         that just changed since the auditor last looked. Latest
+         deadline first, so "22 days overdue" now sits under "1 day
+         overdue" instead of above it. */
+      if (ka === 'overdue')
+        return _dueTime(b, b.fromY ?? viewY, b.fromM ?? viewM)
+             - _dueTime(a, a.fromY ?? viewY, a.fromM ?? viewM);
+      return 0;   // other statuses: ties keep occurrence order (stable sort)
     });
 
     let html = list.map((o, idx) => {
