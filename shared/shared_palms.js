@@ -77,8 +77,18 @@
       color: r.color || null,
       stageId: r.id,
     }));
-    FIRST_ACT = ACTIVITIES[0].n;
-    LAST_ACT = ACTIVITIES[ACTIVITIES.length - 1].n;
+    /* A ROUND runs Saringan Anak Bibit → Pengambilan. Anchored by NAME, not
+       by first-and-last position: the office can extend the list, and a
+       nursery that adds a stage AFTER Pengambilan (Up-keep, say) would
+       otherwise move the finishing post onto it — rounds would stop closing
+       and every measurement built on them would quietly go empty. Position
+       is the fallback for a list that names neither. */
+    const byName = (want, fallback) => {
+      const hit = ACTIVITIES.find((a) => String(a.name).trim().toLowerCase() === want);
+      return hit ? hit.n : fallback;
+    };
+    FIRST_ACT = byName('saringan anak bibit', ACTIVITIES[0].n);
+    LAST_ACT = byName('pengambilan', ACTIVITIES[ACTIVITIES.length - 1].n);
     if (global.MJMPalms) {
       global.MJMPalms.ACTIVITIES = ACTIVITIES;
       global.MJMPalms.FIRST_ACT = FIRST_ACT;
@@ -294,6 +304,57 @@
           by: e.by || null,
         };
       });
+  }
+
+  /* ---------- rounds ----------
+     A round is one intake worked from Saringan Anak Bibit through to
+     Pengambilan. cyclesOf already cuts the log that way; this is the reading
+     of a FINISHED one: how long it actually took against how long the stages
+     in it are meant to take.
+
+     Only complete rounds. A round still running has no span to judge — its
+     last stage has not finished — and dating it "today" would make an
+     unfinished round look measured, which is the same mistake plotHistory
+     avoids for a single stage. */
+  function lastRound(logs, key) {
+    const cycles = cyclesOf(logs[key] || []);
+    for (let i = cycles.length - 1; i >= 0; i--) {
+      const es = cycles[i].entries;
+      if (!es.length) continue;
+      const closed = es.find((e) => e.actN === LAST_ACT && e.end);
+      if (!closed) continue;                       // still running
+      const start = es.reduce((m, e) => (!m || e.start < m ? e.start : m), '');
+      const done = closed.end;
+      if (!start || !done) continue;
+      const actual = diffDays(start, done);
+      /* Judged against the stages the round ACTUALLY went through, not
+         against every stage on the office list. A round that skipped a stage
+         was never going to take that stage's days, and counting them makes a
+         plot look fast for work it never did. */
+      const ideal = es.reduce((sum, e) => {
+        const act = actByN(e.actN);
+        const d = act && act.days != null ? act.days : e.ideal;
+        return sum + (d == null ? 0 : Number(d));
+      }, 0);
+      return {
+        key: key,
+        started: start,
+        finished: done,
+        actual: actual,
+        ideal: ideal,
+        // Positive is days OVER, negative is days ahead. One number, and the
+        // sign carries the meaning.
+        variance: ideal ? actual - ideal : null,
+        stages: es.length,
+      };
+    }
+    return null;
+  }
+
+  /** Every unit's last complete round, for the plots a nursery holds. */
+  function roundResults(logs, nursery) {
+    return unitsOf(logs, nursery)
+      .map((k) => ({ key: k, label: keyLabel(k), round: lastRound(logs, k) }));
   }
 
   /** Every unit with anything logged, narrowed to a nursery.
@@ -513,6 +574,8 @@
     plotHistory: plotHistory,
     openActivities: openActivities,
     cyclesOf: cyclesOf,
+    lastRound: lastRound,
+    roundResults: roundResults,
     activityStats: activityStats,
     perActivityStats: perActivityStats,
     perUnitActivityStats: perUnitActivityStats,

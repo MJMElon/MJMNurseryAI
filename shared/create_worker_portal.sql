@@ -23,6 +23,8 @@
 --   worker_my_records(token, limit)        → this worker's own recent jobs
 --   worker_maint_records(token, limit)     → every record in the boundary
 --   worker_schedules(token)                → the office plan for those nurseries
+--   worker_maint_roster(token)             → the colleagues a job may be credited to
+--   worker_site_boundary(token)            → the company outline, for the GPS map
 --   worker_roster(token)                   → Settings: every worker, no PINs
 --   worker_set_portal(token, id, portal)   → Settings: save one worker's access
 --
@@ -778,6 +780,54 @@ END;
 $fn$;
 
 
+/* The company's site outline, for the GPS track map.
+ *
+ * shared_site_boundary is readable by `authenticated` and a worker is `anon`,
+ * so this is the door — the same shape as everything else here: the token is
+ * turned back into a worker first, and only then is anything read.
+ *
+ * There is no boundary check on the boundary itself, and that is deliberate.
+ * It is ONE outline for the whole company, drawn behind the map so somebody
+ * walking a plot can see where the estate ends. It is not a list of anything,
+ * it names nobody, and half of it would be a worse answer than all of it —
+ * an outline clipped to a nursery is a shape that says the estate stops
+ * somewhere it does not.
+ *
+ * Returns NULL when nothing has been uploaded, or when the table does not
+ * exist yet on this database — running create_scan_system_setting.sql is not
+ * a precondition for having a working portal, and a map with no line on it is
+ * not an error.
+ */
+CREATE OR REPLACE FUNCTION public.worker_site_boundary(p_token UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE out JSONB;
+BEGIN
+  PERFORM public.worker_from_token(p_token);
+
+  IF to_regclass('public.shared_site_boundary') IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  /* Dynamic because the column list is only known to exist if the table does,
+     and a function body naming a column of a table that is not there fails to
+     create rather than returning null. */
+  EXECUTE $q$
+    SELECT to_jsonb(b) - 'id' - 'updated_by'
+      FROM shared_site_boundary b
+     WHERE b.id = 1
+       AND b.geojson IS NOT NULL
+  $q$ INTO out;
+
+  RETURN out;
+END;
+$fn$;
+
+
 CREATE OR REPLACE FUNCTION public.worker_set_portal(p_token UUID, p_worker_id BIGINT, p_portal JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -833,6 +883,7 @@ GRANT EXECUTE ON FUNCTION public.worker_maint_records(UUID, INT)         TO anon
 GRANT EXECUTE ON FUNCTION public.worker_schedules(UUID)                  TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_roster(UUID)                     TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_maint_roster(UUID)               TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_site_boundary(UUID)             TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.worker_set_portal(UUID, BIGINT, JSONB)  TO anon, authenticated;
 
 -- The phone does not call Postgres, it calls PostgREST, which answers from a
