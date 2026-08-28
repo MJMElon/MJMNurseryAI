@@ -46,9 +46,12 @@ const JENIS_TO_WORKTYPE = {
   'Membaja':                              'manuring'
 };
 
-/* "07-08-2026" → "2026-08-07". The office module stores tarikh
-   DD-MM-YYYY (or "-" for a not-yet-checked row). Returns '' when the
-   value isn't a real date so the caller can drop the record. */
+/* "07-08-2026" → "2026-08-07". The office module used to store tarikh
+   DD-MM-YYYY only; the ISO fallback below covers the later Nursery Ops
+   redesign that writes it as YYYY-MM-DD directly. Returns '' when the
+   value isn't a real date (or is "-", not yet checked) so the caller
+   can drop the record. Kept in step with the copy in audit_home.html —
+   change one, change both. */
 function _tarikhToISO(t){
   if (!t || t === '-' || t === '—') return '';
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
