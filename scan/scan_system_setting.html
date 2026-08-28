@@ -198,13 +198,13 @@
            that a tick is stored and not yet obeyed — and it says it on the
            row itself as well as here. -->
       <div class="note note-warn" style="margin-top:14px;">
-        <b>Switching off is always obeyed.</b> A few switches have nothing behind their ON
-        yet, and their row says which. <b>Scan, Delivery Order, PALMS and Culling
-        Calculator</b> are not built for a worker's phone — leaving them on shows a worker
-        nothing today, and switches them on the day one is. <b>Upload photo</b> is stored
-        and not yet acted on: a worker signs in with a PIN, which the storage bucket does
-        not take uploads from, and the key their phone holds is public, so opening the
-        bucket to it would open it to anyone.
+        <b>Switching off is always obeyed.</b> The switches shown in amber are the ones
+        with nothing behind their ON yet. In the Worker Portal, <b>Scan, Delivery Order,
+        PALMS</b> and <b>Culling Calculator</b> are not built for a worker's phone — on
+        shows a worker nothing today, and switches them on the day one is built.
+        <b>Upload photo</b> is stored and not yet acted on: a worker signs in with a PIN,
+        which the storage bucket does not take uploads from, and the key their phone holds
+        is public, so opening the bucket to it would open it to anyone.
       </div>
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
@@ -504,16 +504,16 @@ function drawPortals() {
         </label></td>`;
     };
 
-    const owner = r.kind === 'fn' ? r.module : r.key;
-    const warnAny = ['fc', 'worker'].some(
-      (p) => (CANNOT_YET[p] || {})[r.key] && portalHas(p, owner));
-    const note = warnAny ? (CANNOT_YET.worker || {})[r.key] : '';
+    /* The caveat is not written across the row any more — five lines of red
+       under five names is a wall of text on a screen that is meant to be read
+       across, not down. The switch still carries it: amber rather than
+       purple, and the sentence on hover. The note under the table says which
+       ones and why, once. */
 
     return `<tr class="${r.kind === 'fn' ? 'pt-sub' : 'pt-mod'}">
       <td class="pt-fn">
         <span class="pt-name">${esc(r.name)}</span>
         <span class="pt-key">${esc(r.key)}</span>
-        ${note ? `<span class="m-warn">${esc(note)}</span>` : ''}
       </td>
       ${cell('fc')}${cell('worker')}
     </tr>`;
