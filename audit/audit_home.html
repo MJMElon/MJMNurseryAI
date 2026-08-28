@@ -665,19 +665,20 @@
              transition:background .14s,color .14s,transform .14s}
     .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
     .tl-plot:active{transform:scale(.94)}
-    /* Overdue MAINTENANCE chips shine — an overdue maintenance plot is
+    /* Overdue MAINTENANCE chips read red — an overdue maintenance plot is
        the one thing on the To Do list that should catch the eye first,
        because worker maintenance is scheduled by someone else and the
        auditor needs to notice it without scrolling. Scoped by
        [data-mod="maint"] so seedling / plot / papan overdue rows keep
-       their existing look. */
+       their existing look.
+
+       Colour carries that on its own now — the pulse used to run on
+       every plot chip in the row at once, which on a row of twenty was
+       twenty things pulsing together rather than one thing catching the
+       eye. The icon still pulses (below); that is the one signal now. */
     .tl-item.overdue[data-mod="maint"] .tl-plot{
-      border-color:#b91c1c;color:#b91c1c;background:#fef2f2;
-      animation:tl-shine 1.8s ease-in-out infinite}
+      border-color:#b91c1c;color:#b91c1c;background:#fef2f2}
     .tl-item.overdue[data-mod="maint"] .tl-plot:hover{background:#b91c1c;color:#fff}
-    @media (prefers-reduced-motion:reduce){
-      .tl-item.overdue[data-mod="maint"] .tl-plot{animation:none}
-    }
     /* Opens the rest of the strip. Shaped like the circles it stands in
        for, but filled with the row's tone rather than outlined in it, so
        it reads as the odd one out — it is not a plot. */
@@ -730,26 +731,6 @@
     @media (prefers-reduced-motion:reduce){
       .tl-item.overdue .tl-ico{animation:none}
     }
-    /* The pinned maintenance row. Held apart from the rows under it so
-       "first in the list" is not mistaken for "happens to be first
-       today". A rule, not a gap, because a gap alone reads as a
-       rendering accident. */
-    .tl-item.tl-pinned{padding-bottom:14px;margin-bottom:16px;
-                       border-bottom:1.5px dashed var(--fc-line,#e2e8f0)}
-    /* Overdue AND pinned: the whole card breathes, not just the icon.
-       This is the row that says somebody's work is ageing out while the
-       page is open, and it has to carry across a room. */
-    @keyframes tl-card-shine{
-      0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.42);
-              border-color:#dc2626}
-      50%    {box-shadow:0 0 18px 4px rgba(220,38,38,.14);
-              border-color:#f87171}
-    }
-    .tl-item.tl-pinned.overdue .tl-card{animation:tl-card-shine 2.1s ease-in-out infinite}
-    @media (prefers-reduced-motion:reduce){
-      .tl-item.tl-pinned.overdue .tl-card{animation:none;border-color:#dc2626}
-    }
-
     /* Plots grouped by the job they are waiting on. */
     .tl-wts{margin:8px 0 0 46px;display:flex;flex-direction:column;gap:2px}
     .tl-wt-head{display:flex;align-items:center;gap:8px;width:100%;
@@ -1581,10 +1562,19 @@ function loadAuditTodo(){
         || null;
   }
 
+  /* "07-08-2026" → "2026-08-07". The office module used to store tarikh
+     DD-MM-YYYY only; a later redesign of Nursery Ops → Work Maintenance
+     started writing it already in YYYY-MM-DD, and this copy was never
+     told. Every office maintenance record failed to parse silently —
+     not a wrong date, an EMPTY one — which push() then read as
+     "no date" and dropped, no error anywhere. Kept in step with the
+     other copy in audit_maintenance_script.js; change one, change both. */
   function _tarikhToISO(t){
     if (!t || t === '-' || t === '—') return '';
-    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
-    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+    const s = String(t).trim();
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + m[2] + '-' + m[1];
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
   }
   /* One To Do row per deadline day — the card body splits the plot chips
      into per-work-type groups (Manuring / Weeding / Interrow / P&D /
@@ -2439,22 +2429,36 @@ function loadAuditTodo(){
                            active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
 
     /* Sort so overdue rides at the top, then due, then soon, then
-       upcoming. Ties keep their occurrence order (JS Array.sort is
-       stable per spec). Overdue-first is the whole point of a
-       backlog banner: what should already have been done should be
-       what the eye lands on. */
+       upcoming. Overdue-first is the whole point of a backlog banner:
+       what should already have been done should be what the eye lands
+       on. */
     const _ORDER = { overdue: 0, due: 1, soon: 2, upcoming: 3 };
+    /* The row's deadline as a real timestamp, for ordering within one
+       status — dueInfo() computes the same date to print "overdue by
+       N days", so this is the same day, just comparable. */
+    const _dueTime = (o, oy, om) => new Date(oy, om, o.end).getTime();
     list.sort((a, b) => {
-      /* Maintenance first, ahead of even an overdue plot audit. It is the
-         only row whose work arrives on somebody else's schedule — a worker
-         finishes a job and the clock starts, so the backlog can appear
-         between one look at this page and the next. The other audits sit
-         on a calendar the auditor already knows. Among themselves the
-         maintenance rows still sort by how late they are. */
-      if ((a.mod === 'maint') !== (b.mod === 'maint')) return a.mod === 'maint' ? -1 : 1;
+      /* Maintenance used to sit above every other module regardless of
+         how overdue it was — reasoned as "somebody else's schedule, not
+         the auditor's own calendar". Removed: longest-overdue-first is
+         meant to apply across the whole list, and a rule that pinned one
+         module above it defeated that for exactly the case where it
+         mattered most — a three-week-old Seedling Height backlog sitting
+         under a maintenance row overdue by a single day. Every module
+         now interleaves purely on how overdue it is. */
       const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
       const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
-      return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+      if (ka !== kb) return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+      /* Within the overdue group, the row that has been overdue the
+         LONGEST leads — the oldest backlog item, not the newest one.
+         The eye lands on "22 days overdue" first, because that is the
+         one that has been sitting there the longest and is the most
+         urgent to clear; a 1-day-overdue row can wait one row further
+         down. Earliest deadline first. */
+      if (ka === 'overdue')
+        return _dueTime(a, a.fromY ?? viewY, a.fromM ?? viewM)
+             - _dueTime(b, b.fromY ?? viewY, b.fromM ?? viewM);
+      return 0;   // other statuses: ties keep occurrence order (stable sort)
     });
 
     let html = list.map((o, idx) => {
@@ -2500,8 +2504,7 @@ function loadAuditTodo(){
         : (live ? _plotsHtml(o, oy, om, pending) : '');
       const due = dueInfo(o, oy, om);
 
-      return `<div class="tl-item ${k==='overdue'?'overdue':''}${
-                 o.mod === 'maint' ? ' tl-pinned' : ''}" data-idx="${idx}" data-mod="${o.mod}" style="--tone:${c.tone}">
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" data-mod="${o.mod}" style="--tone:${c.tone}">
         ${openTag}
           <div class="tl-row-head">
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>

@@ -322,7 +322,10 @@
      and printing it again two lines below was the same string twice. */
   .s-case-t { font-size:14.5px; font-weight:800; color:#0f172a; line-height:1.35; }
   .s-case-who { font-size:11.5px; font-weight:700; color:#475569; margin-top:3px; }
-  .s-case-by { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:1px; }
+  /* Room to breathe above "Created by" — it used to sit almost flush
+     against the last detail row (1px), reading as one more row of the
+     grid rather than the signature at the foot of it. */
+  .s-case-by { font-size:10.5px; font-weight:600; color:#a3adbb; margin-top:10px; }
   .s-case-by b { font-weight:800; color:#8792a3; }
   .s-case-g { margin-top:9px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
               font-size:11.5px; }

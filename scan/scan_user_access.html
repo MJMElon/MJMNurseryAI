@@ -331,17 +331,19 @@ function areaNurseries(perms, key) {
  * answers ahead of that for anyone never re-saved.
  */
 function pageNurseries(perms, key) {
-  const per = perms.scan_nurseries || {};
-  if (Array.isArray(per[key])) return per[key];
+  /* The portal's own list, and nothing narrower. There is no per-module list
+     to read any more — the screen that set one is gone — so a row saved with
+     one before that is simply passed over rather than migrated: it is not
+     read, it costs nothing where it sits, and the next Save drops it.
+     
+     `key` is kept in the signature because the callers name the page they are
+     asking about, and a function that stops taking the argument reads as
+     though every page must get the same answer for some deeper reason than
+     "that is what the office decided". */
   const area = areaNurseries(perms, 'fc');
   if (area) return area;
   if (Array.isArray(perms.plot_status_nurseries)) return perms.plot_status_nurseries;
   return null;
-}
-
-/** True when the page has no list of its own and is simply following the portal. */
-function pageFollowsPortal(perms, key) {
-  return !Array.isArray((perms.scan_nurseries || {})[key]);
 }
 
 /* ---- the list ---- */
@@ -436,12 +438,21 @@ function actionRowHtml(pg, ac) {
       </div>` : ''}`;
 }
 
+/* One nursery list per portal, and none per module.
+   
+   Every module used to carry its own row of nursery chips — "Same as portal"
+   and then the portal's own nurseries, to narrow one module further than the
+   rest. Nobody narrowed one. What it produced instead was the same question
+   asked five times down a screen where the answer at the top already decided
+   it, and five chances to leave a module pointing at a nursery the portal no
+   longer holds.
+   
+   The nurseries ticked on the portal now govern everything inside it: which
+   nursery is selected is which nursery's data a module shows. A row already
+   saved with its own list is not read any more — pageNurseries falls through
+   to the portal's — so nothing has to be cleaned up before this reads right. */
 function pageBlockHtml(pg) {
   const on = pageOn(draft, pg.key);
-  const follows = pageFollowsPortal(draft, pg.key);
-  const chosen = new Set(follows ? [] : pageNurseries(draft, pg.key) || []);
-  // Only what the portal itself holds — a page cannot reach past it.
-  const offer = areaNurseries(draft, 'fc') || nurseries;
   return `
     <div class="page-block ${on ? 'on' : ''}">
       <label class="flex items-center gap-3 cursor-pointer">
@@ -457,24 +468,6 @@ function pageBlockHtml(pg) {
         </div>
       </div>` : ''}
 
-      ${/* A page may narrow the portal's nurseries but never widen them, so
-            only the portal's own are offered here. Following the portal is
-            the normal state and the first chip; picking nurseries makes this
-            page an exception to it. */''}
-      <div class="mt-2.5 ${on ? '' : 'hidden'}" data-nur-for="${pg.key}">
-        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nurseries</div>
-        <div class="flex flex-wrap gap-2">
-          <label class="nur ${follows ? 'sel' : ''}">
-            <input type="checkbox" data-nsame="${pg.key}" ${follows ? 'checked' : ''}> Same as portal
-          </label>
-          ${offer.map((n) => `
-            <label class="nur ${!follows && chosen.has(n) ? 'sel' : ''}">
-              <input type="checkbox" data-npage="${pg.key}" data-nname="${esc(n)}"
-                     ${!follows && chosen.has(n) ? 'checked' : ''}>
-              ${esc(n)}
-            </label>`).join('')}
-        </div>
-      </div>
     </div>`;
 }
 
@@ -605,25 +598,11 @@ document.addEventListener('change', (e) => {
       draft.scan_area_nurseries[key] = [...document.querySelectorAll('[data-narea="' + key + '"]')]
         .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
     }
-    /* A page cannot reach past the portal it is in. Narrowing the portal
-       therefore narrows every page inside it, here and now — leaving a page
-       naming a nursery the portal no longer holds would be a setting that
-       reads one way and behaves another. */
-    if (key === 'fc') {
-      const held = new Set(draft.scan_area_nurseries[key] || []);
-      PAGES.forEach((pg) => {
-        const list = draft.scan_nurseries[pg.key];
-        if (!Array.isArray(list)) return;
-        const kept = list.filter((n) => held.has(n));
-        if (kept.length) draft.scan_nurseries[pg.key] = kept;
-        else delete draft.scan_nurseries[pg.key];   // back to following the portal
-      });
-    }
-    return render();
-  }
-  if (t.dataset.nsame) {
-    // Following the portal IS the absence of a page list.
-    delete draft.scan_nurseries[t.dataset.nsame];
+    /* Any per-module list left over from when modules had their own nurseries
+       is dropped as soon as the portal's list is touched. Nothing reads it —
+       every module follows the portal now — and a stale list sitting in the
+       row is a thing somebody reads later and believes. */
+    if (key === 'fc') PAGES.forEach((pg) => { delete draft.scan_nurseries[pg.key]; });
     return render();
   }
 
@@ -637,27 +616,6 @@ document.addEventListener('change', (e) => {
     const acts = draft.scan_actions[t.dataset.act] || {};
     acts[t.dataset.actkey] = t.checked;
     draft.scan_actions[t.dataset.act] = acts;
-    return render();
-  }
-  if (t.dataset.npage) {
-    const key = t.dataset.npage;
-
-    /* Coming off "Same as portal" by picking a nursery: that nursery becomes
-       the whole selection there and then, rather than making somebody first
-       untick the follow and then untick the ones they do not want. Under the
-       follow every box renders unticked, so that click is always a tick. */
-    if (!Array.isArray(draft.scan_nurseries[key])) {
-      draft.scan_nurseries[key] = [t.dataset.nname];
-      return render();
-    }
-
-    const picked = [...document.querySelectorAll('[data-npage="' + key + '"]')]
-      .filter((cb) => cb.checked).map((cb) => cb.dataset.nname);
-    // Unticking the last one is not "no nurseries at all" — an empty list
-    // would leave the page open and every plot hidden, which reads as broken.
-    // It means they have stopped making this page an exception.
-    if (picked.length) draft.scan_nurseries[key] = picked;
-    else delete draft.scan_nurseries[key];
     return render();
   }
   if (t.id === 'q') render();
