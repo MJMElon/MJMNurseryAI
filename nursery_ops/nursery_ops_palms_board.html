@@ -101,29 +101,37 @@
      It keeps its height and the panel scrolls instead. */
   .pv-map { position:relative; background:#0f172a; overflow:hidden;
             flex:none; height:clamp(260px, 44vh, 420px); }
-  .pv-frame { position:absolute; inset:0; overflow:hidden; }
+  .pv-frame { position:absolute; inset:0; overflow:hidden;
+              display:flex; align-items:center; justify-content:center; padding:8px; }
+  .pv-inner { position:relative; display:inline-block; max-width:100%; max-height:100%; }
   /* The photo is positioned and scaled so the plot's own bounding box fills
      the frame — a crop, done with CSS, so no second image is needed and the
      polygon percentages stay the percentages the database holds. */
-  .pv-img { position:absolute; transform-origin:top left; user-select:none; -webkit-user-drag:none; }
+  .pv-img { display:block; max-width:100%; max-height:100%; width:auto; height:auto;
+            object-fit:contain; user-select:none; -webkit-user-drag:none; }
   .pv-svg { position:absolute; inset:0; width:100%; height:100%; }
   .pv-tags { position:absolute; inset:0; pointer-events:none; }
   .pv-shape { cursor:pointer; transition:fill-opacity .15s; }
   .pv-shape:hover { fill-opacity:.85; }
+  .pv-tag.dim { background:rgba(255,255,255,.72); color:#64748b; font-weight:800;
+                box-shadow:0 1px 4px rgba(0,0,0,.18); }
   .pv-tag { position:absolute; transform:translate(-50%,-50%); font-size:11px; font-weight:900;
             background:rgba(255,255,255,.94); color:#0f172a; padding:2px 8px; border-radius:7px;
             white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-  .pv-strip { position:absolute; left:0; right:0; bottom:0; padding:11px 14px;
-              background:linear-gradient(to top, rgba(15,23,42,.93), rgba(15,23,42,.72) 70%, transparent);
-              color:white; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; }
-  .pv-s-name { font-size:14px; font-weight:900; }
-  .pv-s-k { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.12em; color:#94a3b8; }
-  .pv-s-v { font-size:12px; font-weight:800; color:#e2e8f0; }
-  .pv-s-late { color:#fda4af; }
-  .pv-none { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
-             color:#94a3b8; font-size:12px; font-weight:800; text-align:center; padding:20px; }
-  /* One line per boundary, all of them, no clicking. */
-  .pv-strip { max-height:44%; overflow-y:auto; }
+  .pv-round { padding:12px 18px 16px; overflow-y:auto; }
+  .pv-round-h { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .pv-round-t { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#94a3b8; }
+  .pv-round-s { font-size:11px; font-weight:800; color:#64748b; }
+  .pv-step { display:flex; align-items:baseline; gap:10px; padding:5px 0; font-size:12.5px; }
+  .pv-step + .pv-step { border-top:1px solid #f1f5f9; }
+  .pv-step-n { width:22px; height:22px; border-radius:999px; background:#f0fdfa; border:1.5px solid #99f6e4;
+               color:#0f766e; font-weight:900; font-size:10px; display:flex; align-items:center;
+               justify-content:center; flex:none; align-self:center; }
+  .pv-step-name { font-weight:900; color:#1e293b; flex:1 1 auto; min-width:0; }
+  .pv-step-d { color:#64748b; font-weight:700; font-size:11.5px; white-space:nowrap; }
+  .pv-step.now .pv-step-name { color:#0f766e; }
+  .pv-over { color:#e11d48; font-weight:900; }
+  .pv-ahead { color:#059669; font-weight:900; }
   .pv-line { display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 12px; padding:5px 0; }
   .pv-line + .pv-line { border-top:1px solid rgba(255,255,255,.13); }
   .pv-sw { width:11px; height:11px; border-radius:3px; border:1.5px solid rgba(255,255,255,.5); flex:none;
@@ -138,8 +146,14 @@
              padding:4px 24px; border-radius:999px; border:1.5px solid #e2e8f0; background:white;
              color:#0f172a; font-weight:900; font-size:11.5px; line-height:1.4; cursor:pointer; outline:none;
              text-align:center; text-align-last:center; text-overflow:ellipsis;
-             background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%2394a3b8' d='M5 6L0 0h10z'/></svg>");
+             background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%23475569' d='M5 6L0 0h10z'/></svg>");
              background-repeat:no-repeat; background-position:right 10px center; background-size:9px; }
+  /* An inline background colour would paint OVER the arrow, since both are
+     the background shorthand's business. The arrow is re-stated here at a
+     higher specificity so a tinted pill keeps it. */
+  .st-pick[style] { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%23475569' d='M5 6L0 0h10z'/></svg>") !important;
+                    background-repeat:no-repeat !important; background-position:right 10px center !important;
+                    background-size:9px !important; }
   .st-pick:hover { border-color:#99f6e4; background-color:#f0fdfa; }
   .st-pick:focus { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.15); }
   /* The options themselves are drawn by the OS and cannot be centred, so
@@ -221,31 +235,37 @@
 </div>
 
   <div id="pv-modal" class="modal-bg hidden">
-  <div class="modal-card" style="max-width:860px">
+  <div class="modal-card" style="max-width:920px">
     <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div class="flex items-baseline gap-2.5 min-w-0">
-        <span id="pv-nursery" class="text-base font-black text-teal-600 uppercase tracking-widest">—</span>
-        <span class="text-slate-300 font-black text-lg">·</span>
-        <span id="pv-title" class="text-2xl font-black text-slate-800 truncate">—</span>
+      <div class="text-2xl font-black text-slate-800 truncate">
+        <span id="pv-title">—</span><span class="text-slate-300"> : </span><span class="text-teal-700">Status</span>
       </div>
       <button id="pv-hide" class="ml-auto px-4 py-2 rounded-xl bg-white border-[1.5px] border-rose-200 hover:bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Hide plot</button>
       <button id="pv-edit" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest cursor-pointer hidden">Edit boundary</button>
-      <span id="pv-note" class="ml-auto text-[11px] font-bold text-slate-400 hidden">Admins can redraw this</span>
       <button id="pv-close" class="text-slate-400 hover:text-slate-700 text-2xl font-black leading-none">&times;</button>
     </div>
 
-    <!-- The plot's own map, zoomed to it. Its areas are clickable; the one
-         picked reports itself in the strip across the bottom of the photo,
-         so nothing has to sit under the map. -->
+    <!-- The whole nursery, not a crop of the plot. Where a plot SITS is half
+         of what somebody opens this for, and a close-up of one shape answers
+         the other half only. This plot keeps its colour; the rest go grey
+         but keep their names, so the map still reads as the nursery. -->
     <div class="pv-map" id="pv-map">
-      <div class="pv-frame" id="pv-frame">
-        <img class="pv-img" id="pv-img" alt="">
-        <svg class="pv-svg" id="pv-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
-        <div class="pv-tags" id="pv-tags"></div>
+      <div class="pv-frame">
+        <!-- The wrapper shrinks to the PHOTO, and the overlay is pinned to
+             the wrapper — so the polygons sit on the image whatever shape it
+             is. Stretching the photo to the frame instead, as this did, left
+             the boundaries in the right place on a squashed nursery. Same
+             structure the page's own map uses. -->
+        <div class="pv-inner">
+          <img class="pv-img" id="pv-img" alt="">
+          <svg class="pv-svg" id="pv-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+          <div class="pv-tags" id="pv-tags"></div>
+        </div>
       </div>
-      <div class="pv-strip" id="pv-strip"></div>
-      <div class="pv-none" id="pv-none">No boundary drawn for this plot yet.</div>
+      <div class="pv-none" id="pv-none">No map uploaded for this nursery.</div>
     </div>
+
+    <div class="pv-round" id="pv-round"></div>
   </div>
 </div>
 
@@ -477,112 +497,123 @@ function pvPoly(u) {
 function openPlot(unit) {
   const plot = MJMPalms.plotOf(unit);
   PV_PLOT = plot;
-  $('pv-nursery').textContent = MJMPalms.nurseryOfPlot(plot) || '—';
   $('pv-title').textContent = plot;
   $('pv-edit').classList.toggle('hidden', !CAN_DRAW);
   $('pv-hide').classList.toggle('hidden', !CAN_DRAW);
-  $('pv-note').classList.toggle('hidden', CAN_DRAW);
   $('pv-modal').dataset.plot = plot;
   $('pv-modal').classList.remove('hidden');
   drawPv();
 }
 
 function drawPv() {
-  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u));
   const nur = (MAP.nurseries() || []).find((n) => n.name === MAP.active());
+  const all = (MAP ? MAP.units() : []).filter((u) => pvPoly(u));
 
-  $('pv-none').style.display = units.length && nur && nur.map_image_url ? 'none' : 'flex';
-  if (!units.length || !nur || !nur.map_image_url) {
-    $('pv-svg').innerHTML = ''; $('pv-tags').innerHTML = ''; $('pv-strip').innerHTML = '';
+  $('pv-none').style.display = nur && nur.map_image_url ? 'none' : 'flex';
+  if (!nur || !nur.map_image_url) {
+    $('pv-svg').innerHTML = ''; $('pv-tags').innerHTML = '';
     $('pv-img').removeAttribute('src');
+    drawPvRound();
     return;
   }
 
-  /* Bounding box of everything this plot owns, with a margin so the plot is
-     not jammed against the edge. Clamped to the photo. */
-  let x0 = 100, y0 = 100, x1 = 0, y1 = 0;
-  units.forEach((u) => pvPoly(u).forEach((p) => {
-    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
-    x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
-  }));
-  const pad = Math.max(2, Math.max(x1 - x0, y1 - y0) * 0.22);
-  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
-  x1 = Math.min(100, x1 + pad); y1 = Math.min(100, y1 + pad);
-  const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
-
-  /* The frame shows the box; the photo is blown up by 100/box and slid so
-     the box's top-left lands on the frame's. Percent units throughout, so
-     this holds at any panel size. */
-  const img = $('pv-img');
-  img.src = nur.map_image_url;
-  img.style.width = (100 / w * 100) + '%';
-  img.style.height = (100 / h * 100) + '%';
-  img.style.left = (-x0 / w * 100) + '%';
-  img.style.top = (-y0 / h * 100) + '%';
-  // The SVG covers the frame, so its 0–100 space is the BOX, not the photo.
-  $('pv-svg').setAttribute('viewBox', x0 + ' ' + y0 + ' ' + w + ' ' + h);
+  /* The photo at its own aspect; CSS sizes it and the overlay follows. The
+     SVG keeps its 0–100 space because the polygons are percentages OF THE
+     PHOTO, and the wrapper is the photo. */
+  $('pv-img').src = nur.map_image_url;
 
   const shapes = [], tags = [];
-  units.forEach((u) => {
+  all.forEach((u) => {
     const pts = pvPoly(u);
-    const st = mapStatusOf(u.key) || {};
-    const entry = pvEntry(u.key);
-    const late = st.tone === 'over';
+    const mine = u.plot === PV_PLOT;
+    const st = mine ? (mapStatusOf(u.key) || {}) : {};
+    const entry = mine ? pvEntry(u.key) : null;
+    const late = mine && st.tone === 'over';
     shapes.push(
       '<polygon points="' + pts.map((p) => p.x + ',' + p.y).join(' ') + '" ' +
-      'fill="' + (entry ? entry.fill : 'rgba(148,163,184,.35)') + '" ' +
-      'fill-opacity="0.72" ' +
-      /* Selected is a WHITE ring, not a thicker one in its own colour: the
-         late ring is near-black, and near-black on a dark photograph is no
-         ring at all — the area I had just clicked looked like the one I had
-         not. Being late still reads, from the strip below and from the main
-         map's outline. */
-      'stroke="' + (late ? '#111827' : (entry ? entry.stroke : '#ffffff')) + '" ' +
-      /* Stroke width is in the viewBox's units, and the box is `w` wide, not
-         100 — so a width meant for the full map has to be scaled DOWN by
-         w/100 to look the same thickness here, not up. */
-      'stroke-width="' + (0.6 * (w / 100)) + '" ' +
-      'class="pv-shape" data-pv-unit="' + esc(u.key) + '"/>');
+      'fill="' + (entry ? entry.fill : 'rgba(148,163,184,.22)') + '" ' +
+      'stroke="' + (late ? '#111827' : (entry ? entry.stroke : 'rgba(148,163,184,.55)')) + '" ' +
+      'stroke-width="' + (mine ? 0.7 : 0.3) + '" class="pv-shape"/>');
     const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length;
     const cy = pts.reduce((t, p) => t + p.y, 0) / pts.length;
-    tags.push('<div class="pv-tag" style="left:' + ((cx - x0) / w * 100) + '%; top:' +
-      ((cy - y0) / h * 100) + '%">' + esc(u.label) + '</div>');
+    // Every plot keeps its name — a nursery with only one plot labelled is
+    // not a map of the nursery, it is a diagram of that plot.
+    tags.push('<div class="pv-tag' + (mine ? '' : ' dim') + '" style="left:' + cx + '%; top:' + cy + '%">' +
+      esc(u.label) + '</div>');
   });
   $('pv-svg').innerHTML = shapes.join('');
   $('pv-tags').innerHTML = tags.join('');
-  drawPvStrip();
+  drawPvRound();
 }
 
-/* Every boundary's own line, all of them, always. Clicking to find out what
-   a shape is was a step for nothing when a plot has one or two of them —
-   and with two, the comparison IS the answer. */
-function drawPvStrip() {
-  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u));
-  const areas = AREAS[PV_PLOT] || [];
-  if (!units.length) { $('pv-strip').innerHTML = ''; return; }
+/* This round's status updates.
 
-  $('pv-strip').innerHTML = units.map((u) => {
-    const ln = lineForPlot(u.key);
-    const area = u.area ? areas.find((a) => a.area_key === u.area) : null;
-    const entry = pvEntry(u.key);
-    const bits = [];
-    bits.push(['Batch', area ? (area.batch_name || 'none pinned') : '—', false]);
-    if (ln && ln.state !== 'none') {
-      bits.push(['Status', ln.status || '—', false]);
-      bits.push(['Due', MJMPalms.prettyD(ln.due), false]);
-      bits.push([ln.left < 0 ? 'Overdue' : 'Days left',
-                 (ln.left < 0 ? -ln.left : ln.left) + 'd', ln.left < 0]);
-    } else {
-      bits.push(['Status', 'Nothing running', false]);
-    }
-    return '<div class="pv-line">' +
-      '<span class="pv-sw" style="background:' + esc(entry ? entry.stroke : '#94a3b8') + '"></span>' +
-      '<span class="pv-s-name">' + esc(u.label) + '</span>' +
-      bits.map((x) =>
-        '<span><span class="pv-s-k">' + esc(x[0]) + '</span> ' +
-        '<span class="pv-s-v' + (x[2] ? ' pv-s-late' : '') + '">' + esc(x[1]) + '</span></span>'
-      ).join('') +
+   A ROUND is one intake: Saringan Anak Bibit through to Pengambilan. What is
+   shown is the round the plot is IN — every stage it has been through since
+   this round opened, newest first, with what each cost against its ideal. A
+   plot part-way through its first round has a short list; that is the honest
+   picture, not an empty one. */
+function drawPvRound() {
+  const units = pvUnits(PV_PLOT).filter((u) => pvPoly(u) || LOGS[u.key]);
+  const box = $('pv-round');
+  if (!units.length) { box.innerHTML = ''; return; }
+
+  box.innerHTML = units.map((u) => {
+    const log = LOGS[u.key] || [];
+    const cycles = MJMPalms.cyclesOf(log);
+    const cur = cycles.length ? cycles[cycles.length - 1] : null;
+    /* A round is cut at Saringan Anak Bibit, so a log that begins part-way
+       through one — every plot loaded from an audit snapshot, for instance —
+       has no cycle at all. Those stages still happened, so they are shown,
+       with the caption saying the round's beginning is not in the log rather
+       than the screen saying "nothing recorded" over real work. */
+    const partial = !cur && log.length > 0;
+    const es = (cur ? cur.entries : (partial ? log.slice() : [])).slice().reverse();
+    const done = MJMPalms.lastRound(LOGS, u.key);
+
+    const head =
+      '<div class="pv-round-h">' +
+        '<span class="pv-round-t">' + esc(units.length > 1 ? u.label + ' — this round' : 'This round') + '</span>' +
+        (partial ? '<span class="pv-round-s">round started before the log</span>' : '') +
+        (done
+          ? '<span class="pv-round-s">last complete round ' + done.actual + 'd against ' + done.ideal + 'd' +
+            (done.variance == null ? ''
+              : ' · <span class="' + (done.variance > 0 ? 'pv-over' : 'pv-ahead') + '">' +
+                Math.abs(done.variance) + 'd ' + (done.variance > 0 ? 'over' : 'ahead') + '</span>') +
+            '</span>'
+          : '') +
       '</div>';
+
+    if (!es.length) {
+      return head + '<div class="pv-round-s">Nothing recorded for this plot yet.</div>';
+    }
+
+    return head + es.map((e) => {
+      const act = MJMPalms.actByN(e.actN);
+      const ideal = e.ideal == null ? (act && act.days) : e.ideal;
+      let right;
+      if (!e.end) {
+        const due = MJMPalms.addDays(e.start, ideal == null ? 0 : ideal);
+        const left = MJMPalms.diffDays(MJMPalms.todayStr(), due);
+        right = 'since ' + MJMPalms.prettyD(e.start) + ' · ' +
+          (left < 0 ? '<span class="pv-over">' + (-left) + 'd over</span>'
+                    : '<span class="pv-ahead">' + left + 'd left</span>');
+      } else {
+        const took = MJMPalms.diffDays(e.start, e.end);
+        const v = ideal == null ? null : took - Number(ideal);
+        right = MJMPalms.prettyD(e.end) + ' · ' + took + 'd' +
+          (v == null ? ''
+            : (v > 0 ? ' · <span class="pv-over">' + v + 'd over</span>'
+              : v < 0 ? ' · <span class="pv-ahead">' + (-v) + 'd ahead</span>'
+              : ' · on time'));
+      }
+      return '<div class="pv-step' + (e.end ? '' : ' now') + '">' +
+        '<span class="pv-step-n">' + e.actN + '</span>' +
+        '<span class="pv-step-name">' + esc(act ? act.name : 'Stage ' + e.actN) +
+          (e.by ? ' <span class="pv-round-s">· ' + esc(e.by) + '</span>' : '') + '</span>' +
+        '<span class="pv-step-d">' + right + '</span>' +
+        '</div>';
+    }).join('');
   }).join('');
 }
 
@@ -738,7 +769,16 @@ function statusCell(unitKey, ln) {
   }
   const opts = MJMPalms.ACTIVITIES.map((a) =>
     '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
-  return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' + (curN == null ? '' : curN) + '">' +
+  /* The control IS the colour patch. A separate swatch beside it would be a
+     second thing to look at saying what the first already could, so the
+     whole pill carries the stage's fill and its border — the row reads as
+     that colour at a glance, the same way the polygon does. */
+  const entry = pvEntry(unitKey);
+  const tint = entry
+    ? ' style="background:' + esc(entry.fill) + ';border-color:' + esc(entry.stroke) + '"'
+    : '';
+  return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' +
+    (curN == null ? '' : curN) + '"' + tint + '>' +
     (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
     opts + '</select></td>';
 }

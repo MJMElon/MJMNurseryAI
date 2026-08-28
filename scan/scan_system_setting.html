@@ -212,9 +212,10 @@
       <span class="card-ico">🗺️</span>
       <span>
         <span class="card-name">Boundary</span>
-        <div class="card-sub">Upload a KML or GPX outline of this company’s site. It shows on
-          every map — for operators and admins — behind the recorded paths. After a device
-          syncs it once, the boundary stays available on that device offline.</div>
+        <div class="card-sub">Upload a KML or GPX outline of this company’s site. It is drawn
+          behind the path on the GPS track map, for workers and Field Conductors alike, so
+          somebody walking a plot can see where the estate ends. After a device has opened
+          that map once with signal, the outline stays on it offline.</div>
       </span>
     </div>
     <div class="card-body">
@@ -234,10 +235,15 @@
              role="img" aria-label="Outline of the uploaded boundary"></svg>
       </div>
 
-      <div class="note note-warn" style="margin-top:14px;">
-        <b>Draft — stored, not yet drawn.</b> The outline is parsed and kept, and you can see
-        it above, but no map reads it yet. Which maps draw it, and how a device keeps it
-        offline, is still to be decided.
+      <div class="note note-ok" style="margin-top:14px;">
+        <b>Drawn on the GPS track map.</b> Anybody recording a walked track — a worker in the
+        555 Worker Portal, a Field Conductor in the FC Portal — sees this outline behind
+        their path, in yellow. It is a line and not a shaded area, so it never hides the beds
+        underneath it, and it cannot be tapped by mistake while walking.
+        <br><br>
+        A phone keeps the last outline it read, so once a device has opened the map with
+        signal it draws the boundary in a plot with none. Removing the boundary here takes it
+        off those phones the next time each one has signal.
       </div>
     </div>
   </div>

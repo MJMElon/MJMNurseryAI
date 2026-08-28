@@ -30,6 +30,16 @@
   th { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#64748b;
        padding:11px 14px; text-align:left; background:#f8fafc; white-space:nowrap; }
   td { padding:10px 14px; font-size:13px; color:#334155; border-top:1px solid #f1f5f9; }
+  .rr-col { min-width:0; }
+  .rr-h { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#0f766e;
+          padding-bottom:6px; border-bottom:1.5px solid #ccfbf1; margin-bottom:2px; }
+  .rr-row { display:flex; align-items:baseline; gap:10px; padding:5px 2px; border-top:1px solid #f8fafc; }
+  .rr-row:first-of-type { border-top:none; }
+  .rr-plot { font-weight:900; color:#1e293b; font-size:12.5px; flex:1 1 auto; min-width:0; }
+  .rr-v { font-weight:900; font-size:12.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .rr-over { color:#e11d48; }
+  .rr-ahead { color:#059669; }
+  .rr-none { color:#cbd5e1; font-weight:800; }
   .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:900; }
   .muted { color:#cbd5e1; font-weight:900; }
 
@@ -70,6 +80,14 @@
        further down answer "what does this work cost in general"; this one
        answers "what happened to THIS plot", which is the question asked when
        somebody is chasing a specific one. -->
+  <div class="card p-5 md:p-6 mb-5">
+    <h1 class="text-base font-black text-slate-800 uppercase tracking-widest mb-4">
+      Result for Last Complete Rounds
+    </h1>
+    <div id="rr-wrap" class="grid gap-5 md:grid-cols-3"></div>
+    <div id="rr-empty" class="hidden text-[12px] font-bold text-slate-400 text-center py-8"></div>
+  </div>
+
   <div class="card overflow-hidden mb-5">
     <div class="p-5 pb-3 flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -270,6 +288,51 @@ function renderUnits() {
     '</tr>').join('');
 }
 
+/* ── Result for Last Complete Rounds ──────────────────────────────────────
+   One column per nursery, one row per plot, and the figure is the plot's
+   LAST FINISHED round measured against what its stages are meant to take.
+
+   A round is Saringan Anak Bibit through to Pengambilan. Only a finished one
+   is here — a round still running has no span to judge, and dating it today
+   would make unfinished work look measured. A plot that has not closed a
+   round shows a dash, which is a real answer: nothing has gone round yet
+   that this can be read off. */
+const RR_NURSERIES = ['BNN', 'UNN1', 'UNN2'];
+
+function renderRounds() {
+  const scope = Array.isArray(SCOPE) ? SCOPE : (SCOPE === 'all' ? RR_NURSERIES : [SCOPE]);
+  const cols = RR_NURSERIES.filter((n) => scope.indexOf(n) !== -1);
+
+  const html = cols.map((n) => {
+    const rows = MJMPalms.roundResults(LOGS, n)
+      .sort((a, b) => {
+        const A = String(a.key), B = String(b.key);
+        const pa = A.replace(/[0-9#].*$/, ''), pb = B.replace(/[0-9#].*$/, '');
+        return pa.localeCompare(pb)
+            || (parseInt(A.replace(/\D/g, ''), 10) || 0) - (parseInt(B.replace(/\D/g, ''), 10) || 0)
+            || A.localeCompare(B);
+      });
+    if (!rows.length) return '';
+    return '<div class="rr-col"><div class="rr-h">' + esc(n) + '</div>' +
+      rows.map((r) => {
+        let v = '<span class="rr-v rr-none">—</span>';
+        if (r.round && r.round.variance != null) {
+          const d = r.round.variance;
+          v = d > 0 ? '<span class="rr-v rr-over">' + d + 'd over</span>'
+            : d < 0 ? '<span class="rr-v rr-ahead">' + (-d) + 'd ahead</span>'
+            : '<span class="rr-v">on time</span>';
+        }
+        return '<div class="rr-row"><span class="rr-plot">' + esc(r.label) + '</span>' + v + '</div>';
+      }).join('') + '</div>';
+  }).join('');
+
+  $('rr-wrap').innerHTML = html;
+  const none = !html;
+  $('rr-empty').classList.toggle('hidden', !none);
+  $('rr-wrap').classList.toggle('hidden', none);
+  if (none) $('rr-empty').textContent = 'No plots with a log in this nursery.';
+}
+
 /* ── One plot's stage record ───────────────────────────────────────────
    Variance is one signed number rather than two columns: positive is days
    OVER the ideal, negative is days ahead of it. The sign is the finding, so
@@ -322,7 +385,7 @@ function renderPlotRecord() {
   }).join('');
 }
 
-function renderAll() { renderPlotRecord(); renderSpan(); renderRuns(); renderActs(); renderUnits(); }
+function renderAll() { renderRounds(); renderPlotRecord(); renderSpan(); renderRuns(); renderActs(); renderUnits(); }
 
 function fillMonths() {
   const months = MJMPalms.monthsWithData(LOGS, SCOPE);

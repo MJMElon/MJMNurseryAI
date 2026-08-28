@@ -339,9 +339,12 @@
   .s-shot svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:currentColor;
                 stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
   .s-shot-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
-  /* Sits under the photo control inside the one section, so it makes its
-     own gap rather than relying on a heading above it. */
-  .s-remark { margin-top:11px; }
+  /* Each half of the section says what it is. Lighter than the section
+     heading above them, so "Solve Case Details" still reads as the roof
+     and these two as what is under it. */
+  .s-lab { font-size:10.5px; font-weight:800; color:#64748b; letter-spacing:.04em;
+           margin-bottom:7px; }
+  .s-lab-2 { margin-top:13px; }
   .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
             display:block; border:1.5px solid #ede9fe; }
   .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
@@ -530,6 +533,8 @@
            controls was the page reading itself out loud. -->
       <div class="m-sec" id="s-details">
         <div class="m-sec-h">Solve Case Details</div>
+
+        <div class="s-lab">Close case photo</div>
         <!-- A bare file input renders as the browser's grey "Choose file",
              which on a phone says nothing about the camera it opens. The
              real input is hidden and this label drives it. -->
@@ -541,8 +546,8 @@
         </label>
         <input id="s-photo" class="s-shot-file" type="file" accept="image/*">
         <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
-        <textarea id="s-remark" class="inp s-remark" rows="3"
-                  placeholder="What was done" aria-label="Solve case remark"></textarea>
+        <div class="s-lab s-lab-2">Close case remark</div>
+        <textarea id="s-remark" class="inp" rows="3"></textarea>
       </div>
 
       <div id="s-err" class="s-err hidden"></div>
@@ -1190,19 +1195,26 @@ function closeSolve() { $('solve-scrim').classList.add('hidden'); solving = null
    Reading the description raw instead would print "Plot balance: 1,240
    (30+28+30)" as part of somebody's remark. */
 function caseBlockHtml(c) {
-  const bits = detailRows(c);
+  /* Who it belongs to leads the labelled rows rather than floating above
+     them unlabelled. It used to read "HQ · Elon MJM", which is a role and
+     a person with nothing saying so; now it is a row like the others,
+     under the heading that names it. */
+  const bits = [['Assigned to', tierOf(queueOf(c)) +
+                 (c.assignee_name ? ', ' + c.assignee_name : ', no PIC yet')]];
+  detailRows(c).forEach(r => bits.push(r));
   if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
 
   return `<div class="s-case-t">${esc(c.title || '')}</div>` +
-    `<div class="s-case-who">${esc(tierOf(queueOf(c)))}${
-       c.assignee_name ? ' · ' + esc(c.assignee_name) : ' · no PIC yet'}</div>` +
+    `<div class="s-case-g">` +
+      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
+    `</div>` +
+    /* Who raised it, and when, at the foot of the block. It is the
+       provenance of the case rather than a fact about the work, so it
+       reads last — the way a signature does. */
     `<div class="s-case-by">Created by <b>${
        c.raised_by ? esc(withTier(c.raised_by, c.raised_by_id)) : 'unknown'}</b>${
        c.created_at ? ' · ' + esc(new Date(c.created_at).toLocaleDateString(
-         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>` +
-    `<div class="s-case-g">` +
-      bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
-    `</div>`;
+         'en-MY', { day:'numeric', month:'short', year:'numeric' })) : ''}</div>`;
 }
 
 /* Reading a case. Everything the row shows, plus the picture and — where
