@@ -1612,6 +1612,22 @@ function loadAuditTodo(){
         if (n && p && _NUR_CODES.indexOf(n) !== -1) _CUSTOM_PLOT_NUR[p] = n;
       });
       diag.customPlots = Object.keys(_CUSTOM_PLOT_NUR).length;
+      /* The full custom-plot map, not just its size — this is a targeted
+         override that runs BEFORE the fixed B/U/N/P ranges (see
+         _nurseryFor), so a stray or wrong entry here for a plot that
+         is ALREADY inside a fixed range (B01, say) silently redirects
+         it to another nursery's scope with no error anywhere. */
+      diag.customPlotMap = Object.assign({}, _CUSTOM_PLOT_NUR);
+      /* Direct proof of what B01 (BNN's own plot) resolves to right now,
+         independent of any record — the fixed range alone says BNN, so
+         anything else here means a custom-plot override is the cause. */
+      diag.b01Check = {
+        canon: _canonPlot('B1'),
+        fixedRange: _PLOT_NUR['B01'],
+        customOverride: _CUSTOM_PLOT_NUR['B01'] || null,
+        resolvesTo: _nurseryFor('B01', undefined)
+      };
+      diag.scopeNurseries = SCOPE_NURSERIES.slice();
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
       diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
@@ -1657,6 +1673,25 @@ function loadAuditTodo(){
       (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
       const officeRecs = (oRows && oRows[0] && Array.isArray(oRows[0].records)) ? oRows[0].records : [];
       diag.oRecs = officeRecs.length;
+      /* Office records naming a B/U/N/P-range plot, resolved the same way
+         push() resolves them — this is where a manuring/weeding record on
+         a plot like B01 shows its real jenis spelling, its real tarikh
+         format, and exactly which nursery it resolves to before any
+         filter runs. Capped at 8 so the box stays short. */
+      diag.officeMaintSample = officeRecs
+        .filter(rec => rec && rec.plot && JENIS_TO_WT[rec.jenis] &&
+                       JENIS_TO_WT[rec.jenis] !== 'pd')
+        .slice(0, 8)
+        .map(rec => {
+          const plot = _canonPlot(rec.plot);
+          return {
+            id: rec.id, tarikh: rec.tarikh, jenis: rec.jenis, plot: rec.plot,
+            _canonPlot: plot,
+            _tarikhToISO: _tarikhToISO(rec.tarikh),
+            _mappedWorkType: JENIS_TO_WT[rec.jenis],
+            _nurseryFor: _nurseryFor(plot, undefined)
+          };
+        });
       officeRecs.forEach(rec => {
         push(rec.id, _tarikhToISO(rec.tarikh), JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
       });
