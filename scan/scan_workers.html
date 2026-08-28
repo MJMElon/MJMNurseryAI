@@ -140,7 +140,7 @@ const $  = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 /* Sections the payroll is filed under. The first four match the nurseries;
-   UNE and Driver exist only here. */
+   UNE exists only here. */
 /* ── The sections a worker is filed under ──────────────────────────────
    The nurseries among these are not written here any more. They come from
    operation_nurseries — the same list Operation → Settings → Manage
@@ -153,12 +153,12 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
    shows the code beside every name so one named some other way is visible
    there rather than discovered in a payroll listing later.
 
-   UNE and Driver are not nurseries and never were. They are kept here
-   because a worker still has to be filed under something.
+   UNE is not a nursery and never was. It is kept here because a worker
+   still has to be filed under something.
 
    The list below is what the page opens on, before the read lands. Losing
    the nursery read must not leave the register with nowhere to file
-   anybody, so the seed is the six sections it has always had. */
+   anybody, so the seed is the five sections that are places. */
 /* Which section sits in which location, and the four the register has
    always filed people under, are in shared_worker_locations.js — read by
    this page and by System Setting's Location card, so the Team Board's
@@ -170,16 +170,26 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
    while people are still filed under it is a hole in the register. */
 const LOC = MJMWorkerLocations;
 const KEEP_NURSERIES = LOC.KEEP_NURSERIES;
-/* Estate is a location with one section; Driver is not a location at all.
-   Both come last, after the nurseries. */
-const FIXED_SECTIONS = [{ code:'UNE', name:'UNE' }].concat(LOC.NON_LOCATION);
+/* Estate is a location with one section, and it comes last, after the
+   nurseries.
+
+   Driver is no longer offered. It was a section without a place — drivers
+   belong to no nursery — and the column stood empty on a board that is about
+   where people work. It is still a ROLE, which is what it always described;
+   a driver is filed under the nursery he drives for and appears in that
+   column's Other row.
+
+   Nobody is lost by this. addOrphanSections() below gives any section a
+   worker is actually filed under its column back, labelled as not in the
+   nursery list, so a row still saying Driver keeps that person visible until
+   somebody moves them. */
+const FIXED_SECTIONS = [{ code:'UNE', name:'UNE' }];
 let SECTIONS = [
-  { code:'PN',     name:'PN — Pre Nursery'     },
-  { code:'BNN',    name:'BNN — Batu Niah'      },
-  { code:'UNN1',   name:'UNN1 — Ulu Niah 1'    },
-  { code:'UNN2',   name:'UNN2 — Ulu Niah 2'    },
-  { code:'UNE',    name:'UNE'                  },
-  { code:'Driver', name:'Driver'               }
+  { code:'PN',   name:'PN — Pre Nursery'  },
+  { code:'BNN',  name:'BNN — Batu Niah'   },
+  { code:'UNN1', name:'UNN1 — Ulu Niah 1' },
+  { code:'UNN2', name:'UNN2 — Ulu Niah 2' },
+  { code:'UNE',  name:'UNE'               }
 ];
 let SECTION_NAME = Object.fromEntries(SECTIONS.map(s => [s.code, s.name]));
 
@@ -222,7 +232,7 @@ async function loadSections() {
   /* The four always-offered nurseries first, in the order the yard says
      them, wearing the table's name where the table has one. Then whatever
      else the table holds — the new ones, which is the point of reading it.
-     Then UNE and Driver, which are not nurseries and belong at the end. */
+     Then UNE, which is not a nursery and belongs at the end. */
   KEEP_NURSERIES.forEach(k => add(k.code, byCode.get(k.code) || k.name));
   nurseries.forEach(n => add(n.code, byCode.get(n.code)));
   FIXED_SECTIONS.forEach(f => add(f.code, f.name));
@@ -262,8 +272,8 @@ const MAINT_ROLE       = /^general\s*worker$|pekerja am|buruh am/i;
    text or blank. */
 const NON_GENERAL_ROLE = /driver|pemandu|conductor|kondektor|konduktor|supervisor|penyelia|mandor|mandur|kepala|kerani|clerk|admin|manager|pengurus|executive|eksekutif|mekanik|mechanic|technician|juruteknik|security|pengawal|jaga|foreman|operator|storekeeper|storeman/i;
 
-/* The four sections that ARE nurseries. UNE and Driver are sections here and
-   have no Work Maintenance sheet, so nobody in them gets a column on one. */
+/* The four sections that ARE nurseries. UNE is a section here and has no
+   Work Maintenance sheet, so nobody in it gets a column on one. */
 const MAINT_NURSERIES = ['PN', 'BNN', 'UNN1', 'UNN2'];
 
 const roleOf = w => String(w.role || w.job_title || '').trim();
@@ -380,15 +390,13 @@ function renderWorkers() { renderWorkerBoard(); }
    Nursery is the three nurseries seen together, and nothing in the database
    has to learn the word. */
 /* Pre Nursery, Main Nursery, Estate — the three places, straight from the
-   shared file — and then Driver, which is a section rather than a place and
-   still needs a column of its own on the board.
+   shared file, and nothing else. Every column on this board is somewhere on
+   the ground.
 
    The locations RECOGNISE their sections rather than listing them, so a
    UNN 3 created in Operation Settings joins the Main Nursery instead of
    standing alone at the end under a heading of its own. */
-const DIVISIONS = LOC.LOCATIONS
-  .map(l => ({ name: l.name, match: l.match }))
-  .concat(LOC.NON_LOCATION.map(n => ({ name: n.name, sections: [n.code] })));
+const DIVISIONS = LOC.LOCATIONS.map(l => ({ name: l.name, match: l.match }));
 
 function boardColumns() {
   const codes = SECTIONS.map(s => s.code);
@@ -472,11 +480,19 @@ function renderWorkerBoard() {
   const hiddenNote = (workers.some(w => w.active === false) && !$('w-show-inactive').checked)
     ? ' Inactive workers are hidden - tick Show inactive to see them.' : '';
 
+  /* The instructions that used to sit under the board are gone — the two
+     things they explained (drag to move, click to open) are what anybody
+     tries first, and a paragraph read once on the first visit is furniture
+     on every visit after it.
+
+     What is NOT obvious still gets said: that this person may not move
+     anybody, and that somebody on the register is being hidden from them.
+     Neither can be worked out by looking. */
+  const note = (canEdit ? '' : 'You can look, but moving a worker needs the Workers permission.')
+             + hiddenNote;
   box.innerHTML =
     `<div class="card bd-wrap"><table class="bd"><thead>${head}</thead><tbody>${body}</tbody></table></div>
-     <p class="foot-note">${canEdit
-       ? 'Drag a name into another box to move them. Dropped in a new row it changes their role; in a new column, their section. Click a name to open their record.'
-       : 'You can look, but moving a worker needs the Workers permission.'}${hiddenNote}</p>`;
+     ${note.trim() ? `<p class="foot-note">${note.trim()}</p>` : ''}`;
 }
 
 /* -- Moving a name ------------------------------------------------------
@@ -686,7 +702,7 @@ function onWorkerRoleChange() {
   const row = $('wf-maint-row');
   const sec = $('wf-section').value;
   const nursery = MAINT_NURSERIES.includes(sec);
-  row.classList.toggle('hidden', !nursery);        // UNE and Driver have no sheet
+  row.classList.toggle('hidden', !nursery);        // UNE has no sheet
   if (!nursery) return;
   if (!_maintExplicit) {
     const named = nurseryNamesRole(sec);
