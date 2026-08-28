@@ -197,15 +197,9 @@
            everybody. What is left is the one thing the table cannot say —
            that a tick is stored and not yet obeyed — and it says it on the
            row itself as well as here. -->
-      <div class="note note-warn" style="margin-top:14px;">
-        <b>Switching off is always obeyed.</b> The switches shown in amber are the ones
-        with nothing behind their ON yet. In the Worker Portal, <b>Scan, Delivery Order,
-        PALMS</b> and <b>Culling Calculator</b> are not built for a worker's phone — on
-        shows a worker nothing today, and switches them on the day one is built.
-        <b>Upload photo</b> is stored and not yet acted on: a worker signs in with a PIN,
-        which the storage bucket does not take uploads from, and the key their phone holds
-        is public, so opening the bucket to it would open it to anyone.
-      </div>
+      <!-- No paragraph here. An amber switch is one with nothing behind its ON
+           yet, and hovering it says which and why — that is the whole of what
+           used to be written out underneath. -->
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
         <span id="m-status" class="muted"></span>
@@ -389,7 +383,7 @@ const MAINT_FUNCTIONS = [
    it, rather than appearing on every worker's phone unannounced. */
 const CANNOT_YET = {
   worker: {
-    photos:  'A PIN sign-in cannot upload to storage yet — see the note below.',
+    photos:  'Stored, not yet acted on. A worker signs in with a PIN, and the storage bucket does not take uploads from a PIN sign-in.',
     scan:    'No Scan screen on a worker phone yet — off is obeyed, on waits for one.',
     do:      'No Delivery Order screen on a worker phone yet — off is obeyed, on waits for one.',
     palms:   'No PALMS screen on a worker phone yet — off is obeyed, on waits for one.',
