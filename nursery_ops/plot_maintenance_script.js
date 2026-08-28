@@ -1823,6 +1823,31 @@ function okMonthWheel() {
   closeMonthWheel();
   if (_wheelTarget !== 'pdf') { renderAll(); autoSyncRecords(); }
 }
+/* ‹ › on the Schedule tab. It drives the same hidden #global-month the wheel
+   writes, so everything downstream — getState, persistState, the PDF — keys
+   off the month it lands on with no idea it was reached a different way.
+
+   Which is the whole answer to "does next month get stored separately":
+   nops_maint_state is keyed (nursery, month), so it always was. Stepping
+   forward to a month with nothing saved shows the last month that HAS a
+   schedule, copied — carryForwardFrom() — and nothing is written until you
+   tick something, so looking at next month does not create next month. */
+function stepSchedMonth(d) {
+  const el = document.getElementById('global-month');
+  if (!el) return;
+  const mm = /^(\d{4})-(\d{2})$/.exec(el.value || '');
+  if (!mm) return;
+  let y = +mm[1], i = +mm[2] - 1 + d;
+  y += Math.floor(i / 12);
+  i = ((i % 12) + 12) % 12;
+  if (y < WHEEL_YEAR_MIN || y > WHEEL_YEAR_MAX) return;
+  el.value = `${y}-${String(i + 1).padStart(2, '0')}`;
+  _syncMonthButtons();
+  try { localStorage.setItem('mjm_maint_month', getMonth()); } catch (_) {}
+  renderAll();
+  autoSyncRecords();
+}
+
 function _syncMonthButtons() {
   const g = document.getElementById('global-month'), gb = document.getElementById('global-month-btn');
   if (g && gb) gb.textContent = (monthInputToLabel(g.value) || 'Select month') + ' \u25BE';
@@ -1851,7 +1876,7 @@ function renderAll() {
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   /* The Schedule tab shows every nursery at once, so its header names the
      month instead: "Monthly Work Schedule : Aug 26". */
-  const schedHdr = document.getElementById('sched-nursery-line');
+  const schedHdr = document.getElementById('sched-month-label');
   if (schedHdr) schedHdr.textContent = 'Monthly Work Schedule : ' + shortMonth(m);
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
   renderSchedCounts();
@@ -5429,34 +5454,35 @@ function summaryTable(it, m) {
 }
 
 /* ── What "expand" shows ───────────────────────────────────────────────
-   EVERY plot, not only the ticked ones. It used to list just what was set,
-   which made the panel a different shape every time and gave no way to see
-   that a plot had been MISSED — the thing you actually open it to check.
-   A plot with nothing set is still a row; its weeks are simply empty.
+   Plots down, weeks across, one table — EVERY plot, not only the ticked
+   ones. It listed just what was set, which made the panel a different shape
+   every time and gave no way to see that a plot had been MISSED, which is
+   the thing you open it to check. A plot with nothing set is still a row;
+   its weeks are simply empty.
 
-   Ten plots to a block, blocks flowing right, so 14 plots and 52 plots are
-   the same shape at different widths. */
-const EXPAND_ROWS = 10;
-
+   One run rather than blocks of ten flowing right: the blocks repeated the
+   week header beside itself, and two "PLOT 1 2 3 4 5" headers side by side
+   read as ten weeks at a glance. One column of plots cannot be misread, and
+   the panel is a table, which is what it always was pretending to be. */
 function expandedPlots(n, kind, m) {
   const weeks = weeksOf(n, m);
   const plots = NURSERY_PLOTS[n] || [];
   if (!plots.length) return '<div class="ss-none">No plots in this nursery.</div>';
 
   const set = weeks.map((_, k) => new Set(plotsInWeek(kind, k, n, m)));
-  const blocks = [];
-  for (let i = 0; i < plots.length; i += EXPAND_ROWS) {
-    const chunk = plots.slice(i, i + EXPAND_ROWS);
-    const head = '<tr><th class="xp-plot">Plot</th>' +
-      weeks.map((w, k) => `<th title="${ordinalDay(w.from)} \u2013 ${ordinalDay(w.to)}">${k + 1}</th>`).join('') +
-      '</tr>';
-    const body = chunk.map(pl => '<tr><td class="xp-plot">' + esc(pl) + '</td>' +
-      weeks.map((_, k) => set[k].has(pl)
-        ? '<td class="xp-on">&#10003;</td>' : '<td class="xp-off"></td>').join('') +
-      '</tr>').join('');
-    blocks.push(`<table class="xp-table"><thead>${head}</thead><tbody>${body}</tbody></table>`);
-  }
-  return '<div class="xp-wrap">' + blocks.join('') + '</div>';
+  const head = '<tr><th class="xp-plot">Plot</th>' +
+    weeks.map((w, k) =>
+      `<th title="${ordinalDay(w.from)} \u2013 ${ordinalDay(w.to)}">Wk ${k + 1}</th>`).join('') +
+    '<th class="xp-tot">Set</th></tr>';
+  const body = plots.map(pl => {
+    const hits = weeks.map((_, k) => set[k].has(pl));
+    const nOn = hits.filter(Boolean).length;
+    return `<tr class="${nOn ? '' : 'xp-blank'}"><td class="xp-plot">${esc(pl)}</td>` +
+      hits.map(on => on ? '<td class="xp-on">&#10003;</td>' : '<td class="xp-off"></td>').join('') +
+      `<td class="xp-tot">${nOn || ''}</td></tr>`;
+  }).join('');
+  return `<div class="xp-wrap"><table class="xp-table">
+    <thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
 function toggleSummaryRow(n, kind) {
@@ -5516,6 +5542,8 @@ function openWeekPicker(n, k, ev) {
   pop.querySelector('#wp-from').min = pop.querySelector('#wp-to').min = `${iso}-01`;
   pop.querySelector('#wp-from').max = pop.querySelector('#wp-to').max =
     `${iso}-${String(days).padStart(2, '0')}`;
+  const rm = pop.querySelector('#wp-remove');
+  if (rm) rm.style.display = weeksOf(n, m).length > 1 ? '' : 'none';
   const r = ev.target.getBoundingClientRect();
   pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 250)) + 'px';
   pop.style.top  = (r.bottom + window.scrollY + 6) + 'px';
@@ -5526,6 +5554,35 @@ function closeWeekPicker() {
   const pop = document.getElementById('week-pick');
   if (pop) pop.classList.add('hidden');
   _weekPick = null;
+}
+
+/* Removing a week gives its days to the week beside it rather than leaving a
+   hole in the month. A hole is not cosmetic: weekOfRound() places a round in
+   the week containing its start day, and a round whose day belongs to no week
+   any more falls back to the first one — so deleting the 15th–21st column
+   would silently move that round to the 1st. The neighbour swallowing the
+   days keeps every round where it was. */
+function removeSummaryWeek() {
+  if (!_weekPick || !canEditSchedule) return;
+  const { n, k } = _weekPick;
+  const m = getMonth();
+  const weeks = ensureWeeks(n, m);
+  if (weeks.length < 2) {
+    alert('A month needs at least one week. Change its dates instead of removing it.');
+    return;
+  }
+  const gone = weeks[k];
+  const into = k > 0 ? k - 1 : 1;
+  const keep = weeks[into];
+  const merged = { from: Math.min(+keep.from, +gone.from), to: Math.max(+keep.to, +gone.to) };
+  if (!confirm(`Remove ${ordinalDay(gone.from)}–${ordinalDay(gone.to)}?\n\n` +
+               `Its days join ${ordinalDay(keep.from)}–${ordinalDay(keep.to)}, which becomes ` +
+               `${ordinalDay(merged.from)}–${ordinalDay(merged.to)}. Nothing ticked is lost.`)) return;
+  weeks[into] = merged;
+  weeks.splice(k, 1);
+  persistStateSoon(n, m);
+  closeWeekPicker();
+  renderSchedSummary();
 }
 
 function saveWeekPick() {
