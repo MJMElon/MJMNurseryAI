@@ -198,10 +198,13 @@
            that a tick is stored and not yet obeyed — and it says it on the
            row itself as well as here. -->
       <div class="note note-warn" style="margin-top:14px;">
-        <b>Upload photo in the Worker Portal</b> is stored but not yet acted on. A worker
-        signs in with a PIN, which the storage bucket does not take uploads from, and the
-        key their phone holds is public — so opening the bucket to it would open it to
-        anyone. Everything else here is obeyed.
+        <b>Switching off is always obeyed.</b> A few switches have nothing behind their ON
+        yet, and their row says which. <b>Scan, Delivery Order, PALMS and Culling
+        Calculator</b> are not built for a worker's phone — leaving them on shows a worker
+        nothing today, and switches them on the day one is. <b>Upload photo</b> is stored
+        and not yet acted on: a worker signs in with a PIN, which the storage bucket does
+        not take uploads from, and the key their phone holds is public, so opening the
+        bucket to it would open it to anyone.
       </div>
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
@@ -365,17 +368,32 @@ const MAINT_FUNCTIONS = [
   { key:'remark',   name:'— Remark' }
 ];
 
-/* One of them cannot be honoured in the Worker Portal, and saying so on the
-   switch is better than either hiding it — which decides for you — or leaving
+/* Switches whose ON is not yet worth anything, and saying so on the switch
+   itself is better than either hiding it — which decides for you — or leaving
    it to be discovered on a phone in a plot.
 
-   A PIN sign-in is `anon`. The documents bucket takes uploads from
-   `authenticated` only, and the anon key is public, so opening that bucket to
-   anon would open it to anybody who reads the app bundle. It needs a way for
-   a worker to upload that does not hand the internet a writable bucket. */
+   They are not dead switches. OFF is obeyed in every one of these cases: the
+   Worker Portal shows a module only when this column says it may, so switching
+   one off here closes it and keeps it closed. It is ON that has nothing behind
+   it yet, and the row says which.
+
+   Upload photo: a PIN sign-in is `anon`. The documents bucket takes uploads
+   from `authenticated` only, and the anon key is public, so opening that
+   bucket to anon would open it to anybody who reads the app bundle. It needs a
+   way for a worker to upload that does not hand the internet a writable
+   bucket.
+
+   Scan / Delivery Order / PALMS / Culling: the Worker Portal has no such
+   screen built yet. The switch is here because the decision is yours to record
+   — and the day one of them is built it arrives already set the way you set
+   it, rather than appearing on every worker's phone unannounced. */
 const CANNOT_YET = {
   worker: {
-    photos: 'A PIN sign-in cannot upload to storage yet — see the note below.'
+    photos:  'A PIN sign-in cannot upload to storage yet — see the note below.',
+    scan:    'No Scan screen on a worker phone yet — off is obeyed, on waits for one.',
+    do:      'No Delivery Order screen on a worker phone yet — off is obeyed, on waits for one.',
+    palms:   'No PALMS screen on a worker phone yet — off is obeyed, on waits for one.',
+    culling: 'No Culling Calculator on a worker phone yet — off is obeyed, on waits for one.'
   }
 };
 
@@ -396,8 +414,18 @@ const PORTAL_MODULES = {
     { key:'palms',       name:'PALMS' },
     { key:'culling',     name:'Culling Calculator' }
   ],
+  /* Every module the company has, not only the two the Worker Portal draws
+     today. Whether a worker sees a module is decided here and nowhere else, so
+     the column has to be able to say no to all of them — a module missing from
+     this list would be one nobody could switch off, which is the opposite of
+     what the column is for. The four with no worker screen yet carry a line on
+     their row saying so; see CANNOT_YET. */
   worker: [
+    { key:'scan',        name:'Scan' },
+    { key:'do',          name:'Delivery Order' },
     { key:'maintenance', name:'Maintenance', functions: MAINT_FUNCTIONS },
+    { key:'palms',       name:'PALMS' },
+    { key:'culling',     name:'Culling Calculator' },
     { key:'settings',    name:'Settings' }
   ]
 };
@@ -453,7 +481,10 @@ function drawPortals() {
          now for when the module goes back on, which is exactly how it behaved
          when these were hidden under a module heading. */
       const moduleOff = r.kind === 'fn' && portalOn[portal][r.module] === false;
-      const warn = r.kind === 'fn' ? (CANNOT_YET[portal] || {})[r.key] : '';
+      /* Modules as well as functions: the Worker Portal's Scan switch is a
+         real switch with nothing yet behind its ON, and that belongs on the
+         switch rather than in a paragraph somebody scrolls past. */
+      const warn = (CANNOT_YET[portal] || {})[r.key];
       const cls = ['pt-cell'].concat(
         on ? ['on'] : [],
         moduleOff ? ['pt-dim'] : [],
@@ -473,8 +504,9 @@ function drawPortals() {
         </label></td>`;
     };
 
-    const warnAny = r.kind === 'fn'
-      && ['fc', 'worker'].some((p) => (CANNOT_YET[p] || {})[r.key] && portalHas(p, r.module));
+    const owner = r.kind === 'fn' ? r.module : r.key;
+    const warnAny = ['fc', 'worker'].some(
+      (p) => (CANNOT_YET[p] || {})[r.key] && portalHas(p, owner));
     const note = warnAny ? (CANNOT_YET.worker || {})[r.key] : '';
 
     return `<tr class="${r.kind === 'fn' ? 'pt-sub' : 'pt-mod'}">
