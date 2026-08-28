@@ -547,7 +547,11 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    scrolling. */
 /* Nurseries wrap as whole groups, so a nursery's columns are never split
    across two rows of the page. */
-.cap-cols { display:flex; flex-wrap:wrap; gap:18px 20px; align-items:flex-start; }
+/* Centred, because how many nurseries there are is not fixed — three today,
+   four when one is added — and a row that packs from the left leaves a
+   different-sized gap on the right every time the list changes. */
+.cap-cols { display:flex; flex-wrap:wrap; justify-content:center;
+            gap:18px 20px; align-items:flex-start; }
 .cap-nursery { display:flex; flex-direction:column; }
 .cap-nursery-cols { display:flex; gap:10px; align-items:flex-start; }
 .cap-col { width:186px; min-width:0; }
@@ -700,3 +704,133 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
   .fert-row { grid-template-columns:1fr 84px 34px; }
   .lst-row > .lst-tick { grid-column:span 1; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MONTHLY SCHEDULED WORK — THIS MONTH AT A GLANCE
+
+   One table per nursery: weeks across, the four works down, a tick where
+   that work is set on at least one plot. The arrow drops the plot names in
+   underneath; the pencil opens that work's week on its own.
+
+   The table is deliberately NOT the schedule grids' dark-header style. This
+   is a reading surface — you come to it to find out whether something is
+   set, not to set it — so it stays pale and the ticks carry the weight.
+   ══════════════════════════════════════════════════════════════ */
+.ss-wrap{border:1.5px solid var(--border);border-radius:var(--r-md);
+  background:var(--bg-white);margin-bottom:16px;overflow:hidden;}
+.ss-wrap:last-child{margin-bottom:0;}
+
+.ss-head{display:flex;align-items:center;gap:12px;padding:11px 16px;
+  background:#f2f7f4;border-bottom:1.5px solid var(--border);}
+.ss-name{flex:1;font-size:15px;font-weight:800;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--green-text);}
+.ss-addweek{font-family:var(--font);font-size:12px;font-weight:700;
+  color:var(--green-text);background:var(--bg-white);border:1.5px solid var(--green-mid);
+  border-radius:var(--r-sm);padding:5px 12px;cursor:pointer;white-space:nowrap;
+  transition:background .13s,border-color .13s;}
+.ss-addweek:hover{background:#eaf7f0;border-color:var(--green);}
+
+.ss-table{width:100%;border-collapse:collapse;}
+.ss-table thead th{background:var(--bg-white);color:var(--text-muted);font-weight:800;
+  font-size:12px;letter-spacing:.8px;text-transform:uppercase;padding:11px 12px;
+  border-bottom:2px solid var(--border-strong);text-align:center;white-space:nowrap;}
+/* .period-btn is written for the dark schedule headers; on this pale one it
+   needs the underline it can actually be seen against. */
+.ss-table thead th .period-btn{border-bottom-color:var(--border-strong);
+  font-size:12.5px;color:var(--text-head);}
+.ss-table thead th .period-btn:hover{background:rgba(13,122,71,.09);
+  border-bottom-color:var(--green);}
+
+.ss-table tbody td{padding:10px 12px;border-bottom:1px solid #eaf1ed;
+  text-align:center;vertical-align:middle;font-size:14px;color:var(--text-body);}
+.ss-table tbody tr:last-child td{border-bottom:none;}
+
+/* The work's name is the row's label, so it reads left and heavier than the
+   cells it is labelling. */
+th.ss-work,td.ss-work{text-align:left;font-size:14px;font-weight:800;
+  color:var(--text-head);white-space:nowrap;min-width:150px;}
+th.ss-act,td.ss-act{width:1%;white-space:nowrap;}
+
+.ss-cell{color:var(--border-strong);font-size:15px;}
+.ss-cell.on{background:#f0faf5;}
+.ss-tick{display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
+  font-size:14px;font-weight:800;line-height:1;}
+
+.ss-btn{display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--font);font-size:13px;line-height:1;color:var(--text-muted);
+  background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-sm);
+  width:30px;height:30px;cursor:pointer;transition:all .13s;vertical-align:middle;}
+.ss-btn+.ss-btn{margin-left:6px;}
+.ss-btn:hover{border-color:var(--green);color:var(--green);background:#eaf7f0;}
+.ss-btn-edit{color:var(--green-text);border-color:var(--green-mid);}
+
+.ss-row.is-open td{border-bottom-color:transparent;background:#f7fbf9;}
+
+/* The plots behind a tick. A row of chips rather than a list, because the
+   question it answers is "which ones", not "how many". */
+.ss-detail td{padding:2px 10px 12px;background:#f7fbf9;
+  border-bottom:1px solid #eaf1ed;vertical-align:top;}
+.ss-plot{display:inline-block;margin:2px 3px;padding:3px 8px;font-size:12px;
+  font-weight:700;color:var(--green-text);background:#e6f5ec;
+  border:1px solid var(--green-mid);border-radius:20px;}
+.ss-none{color:var(--border-strong);font-size:13px;}
+
+
+/* ── The Edit popup: one work, one week ────────────────────────────────
+   Every plot in the nursery with the ticks that round holds, and above them
+   what it is being sprayed or fed with. Same questions as the sheet, about
+   one column of it. */
+.we-round{margin-bottom:18px;}
+.we-round:last-child{margin-bottom:0;}
+
+.we-cfg{background:#f2f7f4;border:1.5px solid var(--border);border-radius:var(--r-md);
+  padding:10px 12px;margin-bottom:12px;}
+/* One field to a line, and the labels in a column of their own so PEST and
+   DISEASE STICKER line their controls up rather than staggering them. */
+.we-cfg-row{display:grid;grid-template-columns:118px minmax(0,1fr) 78px 34px;
+  align-items:center;gap:10px;padding:4px 0;}
+.we-cfg-l{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--text-muted);}
+.we-cfg-u{font-size:12px;font-weight:700;color:var(--text-muted);}
+.we-cfg-none{font-size:13px;font-weight:700;color:var(--border-strong);}
+.we-sel{width:100%;height:34px;padding:0 8px;font-family:var(--font);font-size:13px;font-weight:600;
+  color:var(--text-head);background:var(--bg-white);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);cursor:pointer;min-width:120px;}
+.we-sel:focus{outline:none;border-color:var(--green);}
+.we-num{height:34px;width:100%;padding:0 8px;font-family:var(--font);font-size:13px;
+  font-weight:600;color:var(--text-head);background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-sm);}
+.we-num:focus{outline:none;border-color:var(--green);}
+
+.we-table{width:100%;border-collapse:collapse;}
+.we-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:800;font-size:11px;
+  letter-spacing:.8px;text-transform:uppercase;padding:8px 10px;
+  border-bottom:2px solid var(--border-strong);text-align:center;}
+.we-table tbody td{padding:6px 10px;border-bottom:1px solid #eaf1ed;text-align:center;}
+.we-table tbody tr:last-child td{border-bottom:none;}
+th.we-plot,td.we-plot{text-align:left;font-size:13px;font-weight:700;
+  color:var(--text-head);white-space:nowrap;}
+
+.we-all{display:block;margin:4px auto 0;font-family:var(--font);font-size:10px;
+  font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--green-text);
+  background:var(--bg-white);border:1px solid var(--green-mid);border-radius:20px;
+  padding:2px 9px;cursor:pointer;}
+.we-all:hover{background:#eaf7f0;}
+
+.we-tick{width:28px;height:28px;border-radius:var(--r-sm);border:1.5px solid var(--border);
+  background:var(--bg-white);color:transparent;font-size:14px;font-weight:800;line-height:1;
+  cursor:pointer;transition:all .12s;}
+.we-tick:hover{border-color:var(--green);}
+.we-tick.on{background:var(--green);border-color:var(--green);color:#fff;}
+
+/* A nursery with 52 plots makes a very tall list, and .modal scrolls as ONE
+   piece — which would carry Save off the bottom of a screen that has just
+   asked somebody to tick 52 things. The plot list scrolls; the title and the
+   Save button stay where they are. */
+#we-modal .modal{display:flex;flex-direction:column;overflow:hidden;}
+#we-modal .modal-top,#we-modal .modal-footer{flex:0 0 auto;}
+#we-modal .modal-body{flex:1 1 auto;overflow-y:auto;min-height:0;}
+/* Two columns across a 760px modal leaves the ticks stranded in acres of
+   space; the plot name only needs the width of a plot name. */
+th.we-plot,td.we-plot{width:34%;}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=53">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=55">
 </head>
 <body>
 
@@ -58,8 +58,7 @@
   <div class="page">
     <div class="tabs-bar">
       <button class="tab-btn active" onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
-      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Schedule</button>
-      <button class="tab-btn"        onclick="switchTab('calc',this)"     data-i18n="tab.calc">💊 Dosage Calc</button>
+      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
       <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">📋 Worker Record</button>
       <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
       <button class="tab-btn" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
@@ -205,6 +204,18 @@
         </div>
       </div>
 
+      <!-- ── SUMMARY ────────────────────────────────────────────────
+           Every nursery, every week, the four works. A tick means that work
+           is set on at least one plot that week; the arrow opens the plots
+           underneath and the pencil opens the week for editing. The four
+           sheets further down are still there for bulk work. -->
+      <div class="card" style="padding:18px;margin-bottom:18px;">
+        <div class="lst-top">
+          <div class="set-h">This Month at a Glance</div>
+        </div>
+        <div id="sched-summary"></div>
+      </div>
+
       <!-- Shown when this month's sheet was carried forward from an earlier one. -->
       <div id="carry-notice" style="display:none;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:var(--r-md);
            padding:10px 14px;margin-bottom:14px;font-size:12px;font-weight:600;color:#78350f;"></div>
@@ -273,69 +284,6 @@
     </div>
 
     <!-- CHEMICAL CALCULATOR -->
-    <div id="tab-calc" class="tab-panel">
-      <div class="section-hdr">
-        <div><div class="page-hdr-title" id="calc-nursery-line"></div></div>
-        <div class="section-badge" data-i18n="badge.calc">💊 DOSAGE CALCULATOR</div>
-      </div>
-      <div class="card" style="padding:18px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.capacity">Nursery Plot Capacity (seedlings per plot — editable)</div>
-          <button class="btn" onclick="resetCalcCapacity()" style="font-size:11px" data-i18n="btn.reset">↺ Reset to Defaults</button>
-        </div>
-        <div id="calc-capacity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px"></div>
-      </div>
-
-      <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.chemHead">🧪 Chemical (Racun)</div>
-      <div class="card" style="padding:18px;margin-bottom:18px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
-          <div style="flex:1;min-width:220px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Chemical</label>
-            <select id="calc-chem" onchange="onCalcChemChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
-          </div>
-          <div style="width:120px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose</label>
-            <input id="calc-dose" type="number" min="0" step="0.5" oninput="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-          </div>
-          <div style="width:90px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Unit</label>
-            <select id="calc-unit" onchange="renderCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-              <option value="gm">gm</option><option value="mL">mL</option>
-            </select>
-          </div>
-          <button class="btn" onclick="clearCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
-          <button class="btn" onclick="selectAllCalcPlots()" data-i18n="btn.selectAll">Select All</button>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="calc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
-        <div id="calc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
-      </div>
-
-      <div style="font-size:13px;font-weight:700;color:#a16207;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px" data-i18n="calc.fertHead">🌱 Fertilizer (Baja)</div>
-      <div class="card" style="padding:18px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end">
-          <div style="flex:1;min-width:220px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Fertilizer</label>
-            <select id="fcalc-fert" onchange="onFertCalcChange()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit"></select>
-          </div>
-          <div style="width:120px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Dose (gm)</label>
-            <input id="fcalc-dose" type="number" min="0" step="0.5" oninput="renderFertCalcResults()" style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit">
-          </div>
-          <div style="width:140px">
-            <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Bag Size</label>
-            <input id="fcalc-bag" type="text" readonly style="width:100%;height:38px;padding:0 10px;border:1px solid #d4d8d4;border-radius:6px;font-family:inherit;background:#f5f5f5">
-          </div>
-          <button class="btn" onclick="clearFertCalcTicks()" data-i18n="btn.clearAll">Clear All</button>
-          <button class="btn" onclick="selectAllFertCalcPlots()" data-i18n="btn.selectAll">Select All</button>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px" data-i18n="calc.tickPlots">Tick plots to include</div>
-        <div id="fcalc-plot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px;margin-bottom:18px"></div>
-        <div id="fcalc-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
-      </div>
-    </div>
-
-    <!-- MONTHLY PAYROLL — Borang Tuntutan Gaji, one sub-tab per work type -->
     <div id="tab-payroll" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="payroll-nursery-line"></div></div>
       <div class="subtabs-bar">
@@ -505,6 +453,35 @@
   </div></footer>
 </div>
 
+<!-- ═══ ONE WORK, ONE WEEK ═══ -->
+<div class="modal-overlay" id="we-modal">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-top">
+      <div>
+        <div class="modal-title" id="we-title">Work</div>
+        <div id="we-sub" style="font-size:12px;font-weight:600;color:var(--text-muted);margin-top:2px;"></div>
+      </div>
+      <button class="modal-close" onclick="closeWorkEditor()">&times;</button>
+    </div>
+    <div class="modal-body" id="we-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeWorkEditor()">Close</button>
+      <button class="btn btn-primary" onclick="saveWorkEditor()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- The week's dates, over the column header that opened them. -->
+<div id="week-pick" class="hidden" style="position:absolute;z-index:90;background:#fff;
+     border:1.5px solid var(--border);border-radius:var(--r-md);box-shadow:0 12px 30px rgba(0,0,0,.16);
+     padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input type="date" id="wp-from" class="set-in" style="width:150px;">
+  <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
+  <input type="date" id="wp-to" class="set-in" style="width:150px;">
+  <button class="btn" style="font-size:12px;" onclick="closeWeekPicker()">Cancel</button>
+  <button class="btn btn-primary" style="font-size:12px;" onclick="saveWeekPick()">Set</button>
+</div>
+
 <!-- ═══ ADD/EDIT RECORD MODAL ═══ -->
 <div class="modal-overlay" id="rec-modal">
   <div class="modal">
@@ -588,7 +565,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=71"></script>
+<script src="plot_maintenance_script.js?v=72"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
