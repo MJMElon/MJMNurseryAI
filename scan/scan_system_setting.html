@@ -212,13 +212,20 @@
       <span class="card-ico">🗺️</span>
       <span>
         <span class="card-name">Boundary</span>
-        <div class="card-sub">Upload a KML or GPX outline of this company’s site. It is drawn
-          behind the path on the GPS track map, for workers and Field Conductors alike, so
-          somebody walking a plot can see where the estate ends. After a device has opened
-          that map once with signal, the outline stays on it offline.</div>
+        <div class="card-sub">A KML or GPX outline for each nursery, uploaded one at a time.
+          It is drawn behind the path on the GPS track map, so somebody walking a plot can
+          see where their nursery ends — a worker sees the nurseries inside their own
+          boundary, a Field Conductor sees them all. After a device has opened that map once
+          with signal, the outlines stay on it offline.</div>
       </span>
     </div>
     <div class="card-body">
+      <!-- One outline per nursery, because the nurseries are not one site and
+           there is a separate file for each. The chip says at a glance which
+           of them the office is holding a file for; everything under it is
+           about the one that is picked. -->
+      <div id="b-tabs" class="flex flex-wrap items-center gap-2" style="margin-bottom:14px;"></div>
+
       <div id="b-current" class="muted" style="margin-bottom:14px;">Reading…</div>
 
       <div class="flex flex-wrap items-center gap-3">
@@ -237,13 +244,14 @@
 
       <div class="note note-ok" style="margin-top:14px;">
         <b>Drawn on the GPS track map.</b> Anybody recording a walked track — a worker in the
-        555 Worker Portal, a Field Conductor in the FC Portal — sees this outline behind
-        their path, in yellow. It is a line and not a shaded area, so it never hides the beds
+        555 Worker Portal, a Field Conductor in the FC Portal — sees the outline behind their
+        path, in yellow. It is a line and not a shaded area, so it never hides the beds
         underneath it, and it cannot be tapped by mistake while walking.
         <br><br>
-        A phone keeps the last outline it read, so once a device has opened the map with
-        signal it draws the boundary in a plot with none. Removing the boundary here takes it
-        off those phones the next time each one has signal.
+        A phone keeps the last outlines it read, so once a device has opened the map with
+        signal it draws them in a plot with none. Removing one here takes it off those phones
+        the next time each has signal. A nursery with no file uploaded simply draws no line,
+        which is not an error.
       </div>
     </div>
   </div>
@@ -633,26 +641,111 @@ function drawShape(b) {
   }).join('');
 }
 
+/* The nurseries that get their own outline.
+ *
+ * Three, because there are three files: the nurseries are separate sites and
+ * one shape drawn round all of them would be a shape round nothing. PN is not
+ * here — it has no file of its own, so a worker filed under PN draws no line.
+ * If that changes, adding it is one entry in this list and an upload; nothing
+ * else in this file or on the phone knows the list by heart. */
+const B_NURSERIES = [
+  { code: 'BNN',  label: 'BNN' },
+  { code: 'UNN1', label: 'UNN 1' },
+  { code: 'UNN2', label: 'UNN 2' }
+];
+
+let bNursery = B_NURSERIES[0].code;   // which one the panel is showing
+let bRows = {};                       // code → the row held for it, if any
+
+/* The three, plus a fourth only when the database is still holding the
+   single company-wide outline from before this panel was split by nursery.
+   It is shown so it can be looked at and removed; there is no way to upload a
+   new one under it, because "the whole company" is not a thing this panel
+   offers any more. */
+function bTabList() {
+  const list = B_NURSERIES.slice();
+  if (bRows['']) list.push({ code: '', label: 'All nurseries (older upload)' });
+  return list;
+}
+
+function bRenderTabs() {
+  $('b-tabs').innerHTML = bTabList().map(n => {
+    const has = !!bRows[n.code];
+    const on  = n.code === bNursery;
+    return `<button type="button" class="btn${on ? '' : ' btn-ghost'}"
+              style="${on ? '' : 'opacity:.85;'}"
+              onclick="pickBoundaryNursery('${n.code}')">
+              ${esc(n.label)} <span style="opacity:.7;font-weight:600;">${has ? '✓' : '—'}</span>
+            </button>`;
+  }).join('');
+}
+
+function pickBoundaryNursery(code) {
+  if (code === bNursery) return;
+  bNursery = code;
+  /* A file chosen for one nursery must not be saved against another. Anything
+     picked and not yet saved is dropped on the way out. */
+  pending = null;
+  $('b-file').value = '';
+  $('b-save').disabled = true;
+  bShow();
+}
+
+const bLabel = (code) =>
+  (bTabList().find(n => n.code === code) || { label: code || 'All nurseries' }).label;
+
+function bShow() {
+  bRenderTabs();
+  const data = bRows[bNursery];
+  const pre = $('b-preview');
+  /* Nothing to upload against the older whole-company row — it is here to be
+     seen and removed, and the three nurseries are where a file goes now. */
+  const legacy = bNursery === '';
+  $('b-file').disabled = legacy;
+  if (legacy) { $('b-save').disabled = true; }
+  if (!data) {
+    $('b-current').innerHTML = `No outline uploaded for <b>${esc(bLabel(bNursery))}</b> yet.`;
+    pre.classList.add('hidden');
+    return;
+  }
+  $('b-current').innerHTML =
+    `<b>${esc(bLabel(bNursery))}</b> — holding <b>${esc(data.source_name || 'an outline')}</b> ` +
+    `(${esc(data.format || '?')}), ${data.point_count || 0} points, last changed ` +
+    `${esc(String(data.updated_at || '').slice(0, 10))}` +
+    `${data.updated_by ? ' by ' + esc(data.updated_by) : ''}.`;
+  if (data.geojson && data.geojson.features) {
+    drawShape({ features: data.geojson.features, bbox: data.bbox });
+    pre.classList.remove('hidden');
+    $('b-summary').innerHTML = legacy
+      ? 'Uploaded before this panel was split by nursery, so every worker sees it. '
+      + 'Upload the three nursery files, check they look right, then remove this one.'
+      : `The outline stored for ${esc(bLabel(bNursery))}.`;
+  } else {
+    pre.classList.add('hidden');
+  }
+}
+
 async function loadBoundary() {
   try {
-    const { data, error } = await _supabase
-      .from('shared_site_boundary').select('*').eq('id', 1).maybeSingle();
+    const { data, error } = await _supabase.from('shared_site_boundary').select('*');
     if (error) throw error;
-    if (!data) { $('b-current').textContent = 'No boundary uploaded yet.'; return; }
-    $('b-current').innerHTML =
-      `Holding <b>${esc(data.source_name || 'an outline')}</b> (${esc(data.format || '?')}), ` +
-      `${data.point_count || 0} points, last changed ` +
-      `${esc(String(data.updated_at || '').slice(0, 10))}` +
-      `${data.updated_by ? ' by ' + esc(data.updated_by) : ''}.`;
-    if (data.geojson && data.geojson.features) {
-      drawShape({ features: data.geojson.features, bbox: data.bbox });
-      $('b-preview').classList.remove('hidden');
-      $('b-summary').innerHTML = 'The outline currently stored.';
-    }
+    bRows = {};
+    /* Matched on letters and digits alone — the same rule worker_key() uses in
+       the database — because "UNN 1" and "UNN1" are one nursery to everybody
+       except a string comparison. */
+    const key = (x) => String(x == null ? '' : x).replace(/[^a-z0-9]/gi, '').toUpperCase();
+    (data || []).forEach(row => {
+      if (!key(row.nursery)) { bRows[''] = row; return; }   // the older, whole-company one
+      const hit = B_NURSERIES.find(n => key(n.code) === key(row.nursery));
+      if (hit) bRows[hit.code] = row;
+    });
+    if (!bTabList().some(n => n.code === bNursery)) bNursery = B_NURSERIES[0].code;
+    bShow();
   } catch (e) {
     $('b-current').innerHTML =
-      '<span style="color:#92400e">Could not read the stored boundary. ' +
-      'Run <b>shared/create_scan_system_setting.sql</b> if this is the first time.</span>';
+      '<span style="color:#92400e">Could not read the stored boundaries. ' +
+      'Run <b>shared/RUN_ME_boundary_per_nursery.sql</b> if this is the first time.</span>';
+    $('b-tabs').innerHTML = '';
   }
 }
 
@@ -662,7 +755,7 @@ async function saveBoundary() {
   btn.disabled = true;
   try {
     const { error } = await _supabase.from('shared_site_boundary').upsert({
-      id: 1,
+      nursery:     bNursery,
       source_name: pending.name,
       format:      pending.format,
       geojson:     { type: 'FeatureCollection', features: pending.features },
@@ -670,12 +763,14 @@ async function saveBoundary() {
       bbox:        pending.bbox,
       updated_at:  new Date().toISOString(),
       updated_by:  userEmail || null
-    }, { onConflict: 'id' });
+    }, { onConflict: 'nursery' });
     if (error) throw error;
+    const saved = bLabel(bNursery);
     pending = null;
     $('b-file').value = '';
     await loadBoundary();
-    alert('Boundary saved.\n\nNothing draws it yet — see the note under the upload.');
+    alert(saved + ' boundary saved.\n\nIt is drawn on the GPS track map. Each phone picks '
+        + 'it up the next time it opens that map with signal, and keeps it from then on.');
   } catch (e) {
     alert('Could not save the boundary.\n\n' + (e.message || e));
     btn.disabled = false;
@@ -683,9 +778,14 @@ async function saveBoundary() {
 }
 
 async function clearBoundary() {
-  if (!confirm('Remove the stored boundary?\n\nThe file itself is not kept — you would have to upload it again.')) return;
+  if (!bRows[bNursery]) { alert('There is nothing stored for ' + bLabel(bNursery) + '.'); return; }
+  if (!confirm('Remove the outline stored for ' + bLabel(bNursery)
+             + '?\n\nOnly that one. The file itself is not kept — you would have to upload '
+             + 'it again.')) return;
   try {
-    const { error } = await _supabase.from('shared_site_boundary').delete().eq('id', 1);
+    const { error } = await _supabase.from('shared_site_boundary')
+      .delete().eq('nursery', bNursery);
+    if (!error && bNursery === '') bNursery = B_NURSERIES[0].code;
     if (error) throw error;
     pending = null;
     $('b-file').value = '';
