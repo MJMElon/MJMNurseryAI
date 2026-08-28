@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=54">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=55">
 </head>
 <body>
 
@@ -202,6 +202,18 @@
           <button class="btn btn-primary schedule-edit-ctrl" onclick="saveSchedule()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
           <button class="btn-pdf" onclick="openPdfModal()" style="font-size:11px;padding:6px 14px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
         </div>
+      </div>
+
+      <!-- ── SUMMARY ────────────────────────────────────────────────
+           Every nursery, every week, the four works. A tick means that work
+           is set on at least one plot that week; the arrow opens the plots
+           underneath and the pencil opens the week for editing. The four
+           sheets further down are still there for bulk work. -->
+      <div class="card" style="padding:18px;margin-bottom:18px;">
+        <div class="lst-top">
+          <div class="set-h">This Month at a Glance</div>
+        </div>
+        <div id="sched-summary"></div>
       </div>
 
       <!-- Shown when this month's sheet was carried forward from an earlier one. -->
@@ -441,6 +453,35 @@
   </div></footer>
 </div>
 
+<!-- ═══ ONE WORK, ONE WEEK ═══ -->
+<div class="modal-overlay" id="we-modal">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-top">
+      <div>
+        <div class="modal-title" id="we-title">Work</div>
+        <div id="we-sub" style="font-size:12px;font-weight:600;color:var(--text-muted);margin-top:2px;"></div>
+      </div>
+      <button class="modal-close" onclick="closeWorkEditor()">&times;</button>
+    </div>
+    <div class="modal-body" id="we-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeWorkEditor()">Close</button>
+      <button class="btn btn-primary" onclick="saveWorkEditor()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- The week's dates, over the column header that opened them. -->
+<div id="week-pick" class="hidden" style="position:absolute;z-index:90;background:#fff;
+     border:1.5px solid var(--border);border-radius:var(--r-md);box-shadow:0 12px 30px rgba(0,0,0,.16);
+     padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input type="date" id="wp-from" class="set-in" style="width:150px;">
+  <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
+  <input type="date" id="wp-to" class="set-in" style="width:150px;">
+  <button class="btn" style="font-size:12px;" onclick="closeWeekPicker()">Cancel</button>
+  <button class="btn btn-primary" style="font-size:12px;" onclick="saveWeekPick()">Set</button>
+</div>
+
 <!-- ═══ ADD/EDIT RECORD MODAL ═══ -->
 <div class="modal-overlay" id="rec-modal">
   <div class="modal">
@@ -524,7 +565,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=71"></script>
+<script src="plot_maintenance_script.js?v=72"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

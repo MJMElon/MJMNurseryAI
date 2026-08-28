@@ -74,6 +74,9 @@
   .pm-lg-row { display:flex; align-items:flex-start; gap:8px; padding:3.5px 0;
                font-size:11px; font-weight:700; color:#475569; line-height:1.25; }
   .pm-sw { width:14px; height:14px; border-radius:4px; border:2px solid; flex:0 0 auto; margin-top:1px; }
+  /* Holds the indent for a stage that shares the colour above it, so the
+     names line up in one column whether or not the row carries a swatch. */
+  .pm-sw-none { border-color:transparent; background:none; }
   @media(max-width:767px){
     .pm-body { flex-direction:column; height:auto !important; }
     .pm-mapcol { height:52vh; min-height:320px; }
@@ -236,16 +239,23 @@
       const box = q('.pm-legend');
       if (!box) return;
       if (!legend) { box.style.display = 'none'; return; }
-      const row = (fill, stroke, label, dashed) =>
-        '<div class="pm-lg-row"><span class="pm-sw" style="background:' + fill +
-        ';border-color:' + stroke + (dashed ? ';border-style:dashed' : '') + '"></span>' +
+      /* One row per STAGE, not per colour. Stages that share a colour used to
+         be crushed onto one line joined by " · ", which reads as a single
+         long name rather than three separate answers. They get a line each,
+         and only the first of a group carries the swatch — the colour is
+         said once and the rows under it sit beneath it. */
+      const row = (fill, stroke, label, swatch) =>
+        '<div class="pm-lg-row">' +
+        (swatch
+          ? '<span class="pm-sw" style="background:' + fill + ';border-color:' + stroke + '"></span>'
+          : '<span class="pm-sw pm-sw-none"></span>') +
         '<span>' + esc(label) + '</span></div>';
       box.innerHTML =
         '<p class="pm-lg-cap">' + esc(o.legendTitle || 'Status') + '</p>' +
-        legend.map((e) => row(e.fill, e.stroke, e.label)).join('') +
-        '<p class="pm-lg-cap mt">Also</p>' +
-        row('transparent', LATE_STROKE, 'Over its time') +
-        row(TONES.none.fill, TONES.none.stroke, 'Nothing recorded');
+        legend.map((e) => {
+          const names = (e.stages && e.stages.length) ? e.stages : [e.label];
+          return names.map((n, i) => row(e.fill, e.stroke, n, i === 0)).join('');
+        }).join('');
     })();
     const elImg = q('.pm-image'), elSvg = q('.pm-svg'), elLabels = q('.pm-labels');
     const elNone = q('.pm-nomap'), elLvl = q('.pm-zlvl');
