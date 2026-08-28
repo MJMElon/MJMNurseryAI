@@ -166,6 +166,19 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background
 .photo-req-note{font-size:11px;color:var(--text4);text-align:center;margin-top:8px}
 .photo-req-note.error{color:var(--danger-text);font-weight:500}
 
+/* BATCH QUEUE — carousel position + dot strip. Only shown while
+   stepping through a Main Nursery plot's pending batches in one run
+   (see bq / _bqRenderHeader in audit_height_script.js). */
+.bq-header{display:flex;flex-direction:column;align-items:center;gap:8px;
+           padding:12px 12px 4px}
+.bq-pos{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--g700);
+        text-transform:uppercase}
+.bq-dots{display:flex;gap:6px}
+.bq-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);
+        transition:background .15s,transform .15s}
+.bq-dot.done{background:var(--g500)}
+.bq-dot.current{background:var(--g800);transform:scale(1.35)}
+
 /* FORM ACTIONS */
 .form-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 12px}
 .btn{height:44px;border-radius:var(--r-md);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;border:none;transition:all .15s}
