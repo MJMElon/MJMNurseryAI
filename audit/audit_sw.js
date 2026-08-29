@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-1800600000';
+const VER = 'mjm-1800800000';
 
 const ALL_FILES = [
   './audit_index.html',
@@ -41,6 +41,17 @@ const ALL_FILES = [
   './audit_manifest.json',
   './audit_icon-192.png',
   './audit_icon-512.png',
+  /* Referenced by audit_home.html, audit_admin.html, audit_nursery_select
+     .html and audit_report.html but never listed here — the runtime
+     cache-first handler below only picked them up AFTER a first
+     successful online fetch of the page that uses them, so a page
+     precached at install time could still lose its ribbon or its
+     keyboard-focus/motion overlay on a later offline visit if that
+     particular page was never opened online first. */
+  './audit_ribbon.css',
+  './audit_ribbon.js',
+  './audit_a11y.css',
+  './audit_system_setting.js',
 ];
 
 /* ── INSTALL: cache everything ── */
