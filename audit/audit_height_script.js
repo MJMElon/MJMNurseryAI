@@ -400,11 +400,16 @@ function renderList(){
    bottom; ascending batch number within each band. Whole row is the
    tap target (opens the form pre-linked to that batch). */
 /* PN opens the per-plot form directly (batches are chips inside it).
-   MN opens the batch list — each MN plot carries several batches
-   with distinct ages, each with its own record. */
+   MN skips the "here are your batches" list too — a plot icon (this
+   grid's own tiles, and the deep-link chip from the home To Do list)
+   now goes straight into the carousel for whatever is still pending.
+   The list still exists — _openBatchQueue falls back to it when
+   nothing is pending, and Edit/Delete on a finished record still
+   opens it via openPlotDetail directly — it is just no longer a step
+   between tapping the plot and entering data. */
 function openPlot(plot){
   if(activeTab==='PN') openMultiBatchForm(plot);
-  else                 openPlotDetail(plot);
+  else                 _openBatchQueue(plot, null);
 }
 window.openPlot=openPlot;
 
@@ -1191,9 +1196,14 @@ function _pendingBatchesOnPlot(plot){
    not stomp the queue state openAddForm() itself clears. */
 function _openBatchQueue(plot, startBatch){
   const items=_pendingBatchesOnPlot(plot);
-  if(!items.length) return;      // nothing pending — shouldn't happen, row was clickable
-  let startIdx=items.findIndex(b=>b.batch===startBatch);
+  // Nothing pending — everything on this plot is already done, marked
+  // Not Required, or there are no batches on file at all. There is no
+  // queue to run; show the list instead, so the auditor sees why
+  // (finished plot, or the "Audit without a batch" empty state).
+  if(!items.length){ openPlotDetail(plot); return; }
+  let startIdx=startBatch!=null ? items.findIndex(b=>b.batch===startBatch) : -1;
   if(startIdx<0) startIdx=0;
+  window._lastOpenedPlot=plot;
   openAddForm();
   bq={plot, items, idx:startIdx, data:new Array(items.length)};
   _bqLoadStep();

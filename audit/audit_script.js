@@ -425,7 +425,7 @@ function renderList(){
     return `
       <button class="plot-cell ${allDone ? 'done' : ''}"
               data-plot="${p}"
-              onclick="${onePlot ? 'openPlotAudit' : 'openPlotDetail'}('${p}')"
+              onclick="openPlot('${p}')"
               aria-label="Plot ${p} — ${
                 required.length
                   ? (allDone ? t('all_audited') : pending + ' ' + t('pending_word'))
@@ -440,6 +440,20 @@ function renderList(){
       </button>`;
   }).join('');
 }
+
+/* PN opens the per-plot form directly. MN skips the "here are your
+   batches" list too — a plot icon (this grid's own tiles, and the
+   deep-link chip from the home To Do list) now goes straight into
+   the carousel for whatever is still pending. The list still exists
+   — _openBatchQueue falls back to it when nothing is pending, and
+   Edit/Delete on a finished record still opens it via openPlotDetail
+   directly — it is just no longer a step between tapping the plot
+   and entering data. */
+function openPlot(plot){
+  if(byPlot()) openPlotAudit(plot);
+  else         _openBatchQueue(plot, null);
+}
+window.openPlot=openPlot;
 
 /* --- PLOT DETAIL VIEW ---
    One plot's batches as a list, each row → open the audit form with
@@ -636,9 +650,14 @@ function _pendingBatchesOnPlot(plot){
    not stomp the queue state openAddForm() itself clears. */
 function _openBatchQueue(plot, startBatch){
   const items=_pendingBatchesOnPlot(plot);
-  if(!items.length) return;      // nothing pending — shouldn't happen, row was clickable
-  let startIdx=items.findIndex(b=>b.batch===startBatch);
+  // Nothing pending — everything on this plot is already done, marked
+  // Not Required, or there are no batches on file at all. There is no
+  // queue to run; show the list instead, so the auditor sees why
+  // (finished plot, or the "Audit without a batch" empty state).
+  if(!items.length){ openPlotDetail(plot); return; }
+  let startIdx=startBatch!=null ? items.findIndex(b=>b.batch===startBatch) : -1;
   if(startIdx<0) startIdx=0;
+  window._lastOpenedPlot=plot;
   openAddForm();
   bq={plot, items, idx:startIdx, data:new Array(items.length)};
   _bqLoadStep();
@@ -1232,13 +1251,14 @@ function init(){
       back.setAttribute('aria-label', 'Choose another nursery');
     }
   }
-  /* ?plot=<code> on top of ?nursery= opens that plot's batch list
-     straight away — the portal's pending-plot circles link here, and
-     landing on the grid would make the auditor find in fifty-two icons
+  /* ?plot=<code> on top of ?nursery= opens that plot directly — routes
+     via openPlot so PN lands on its per-plot form and MN lands straight
+     in the batch-queue carousel, the same way a plot-tile tap does.
+     Landing on the grid would make the auditor find in fifty-two icons
      the plot they just tapped. After loadRecords(), because the detail
      is built from the records it fetches. */
   loadRecords().then(() => {
-    MJMAuditDeepLink.openPlot(NURSERY_PLOTS[activeTab] || [], openPlotDetail);
+    MJMAuditDeepLink.openPlot(NURSERY_PLOTS[activeTab] || [], openPlot);
   });
 }
 document.addEventListener('DOMContentLoaded',init);
