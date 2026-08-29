@@ -10,6 +10,11 @@
        scan/scan_workers.html        the Team Board's column headings
        scan/scan_system_setting.html the Location card
 
+   There used to be a NON_LOCATION here holding Driver — a section that was
+   not a place. It is gone: the Team Board is about where people work, and a
+   driver belongs to the nursery he drives for. Driver survives as a ROLE,
+   which is what it always described.
+
    Both read it from here now. A nursery added in Operation → Settings turns
    up under the right heading on both without either being edited.
 
@@ -33,11 +38,6 @@
       match: function (c) { return c === 'BNN' || /^UNN\d+$/.test(c); } },
     { key: 'estate', name: 'Estate',       match: function (c) { return c === 'UNE'; } }
   ];
-
-  /* Not a place. Drivers are filed apart from any nursery, so they are a
-     section without a location — offered on the register, absent from a
-     card that is about where things are. */
-  var NON_LOCATION = [{ code: 'Driver', name: 'Driver' }];
 
   /* The nursery sections the register has always used. operation_nurseries
      does not necessarily carry all of them, and a section missing while
@@ -77,7 +77,6 @@
     locationOf: locationOf,
     group: group,
     LOCATIONS: LOCATIONS,
-    NON_LOCATION: NON_LOCATION,
     KEEP_NURSERIES: KEEP_NURSERIES
   };
 })(window);

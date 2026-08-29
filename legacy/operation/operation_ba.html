@@ -324,6 +324,29 @@
         const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Scanned papers used to be saved as base64 data URLs straight into
+        // the table — multi-MB rows whose reads/writes OOM-crashed the
+        // database. Files go to the public `documents` bucket instead; the
+        // column stores only the URL. Never fall back to returning the data
+        // URL. Same helper lives in the current (non-legacy) pages.
+        async function mjmUploadDoDocToStorage(folder, refNo, dataUrl) {
+            try {
+                if (!dataUrl) return null;
+                if (!dataUrl.startsWith('data:')) return dataUrl; // already a URL
+                const blob = await (await fetch(dataUrl)).blob();
+                const ext = blob.type === 'application/pdf' ? 'pdf' : ((blob.type.split('/')[1] || '').replace(/[^a-z0-9]/gi, '') || 'bin');
+                const safeRef = String(refNo || 'unknown').replace(/[^A-Za-z0-9_-]/g, '_');
+                const path = `${folder}/${safeRef}-${Date.now()}.${ext}`;
+                const { error } = await _supabase.storage.from('documents').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true });
+                if (error) throw error;
+                const { data } = _supabase.storage.from('documents').getPublicUrl(path);
+                return (data && data.publicUrl) || null;
+            } catch (e) {
+                console.warn('Document upload to Storage failed — record saves without document:', e);
+                return null;
+            }
+        }
         
         let globalALs = []; 
         let globalDOs = []; 
@@ -761,6 +784,10 @@
             if(btn) { btn.innerText = 'SAVING...'; btn.disabled = true; }
 
             try {
+                // Upload the BA document ONCE; every matched DO row stores the
+                // same small URL instead of the full base64.
+                const baDocUrl = await mjmUploadDoDocToStorage('ba-docs', newNum || newName, currentMngBaImage);
+
                 await _supabase.from('shared_do_records').update({ ba_number: null, ba_raw_name: null, ba_raw_qty: null, ba_image_url: null, status: 'Delivered' }).or(`ba_number.eq."${originalKey}",ba_raw_name.eq."${originalKey}"`);
 
                 // Cross-check: re-query DB for the typed DO numbers before
@@ -773,7 +800,7 @@
                 for(let num of newDos) {
                     const match = findMatchingDO(num, globalDOs);
                     if(match) {
-                        await _supabase.from('shared_do_records').update({ ba_number: newNum === '' ? null : newNum, ba_raw_name: newName, ba_raw_qty: newQty, ba_image_url: currentMngBaImage, status: newStatus }).eq('id', match.id);
+                        await _supabase.from('shared_do_records').update({ ba_number: newNum === '' ? null : newNum, ba_raw_name: newName, ba_raw_qty: newQty, ba_image_url: baDocUrl, status: newStatus }).eq('id', match.id);
                     } else {
                         missingDOs.push(num);
                     }
@@ -782,7 +809,7 @@
                 if(missingDOs.length > 0) {
                     if(confirm(`⚠️ The DO numbers (${missingDOs.join(', ')}) were not found in the database. Create empty DO records to link this BA?`)) {
                         for(let missingNum of missingDOs) {
-                            await _supabase.from('shared_do_records').insert([{ do_number: missingNum, ba_number: newNum === '' ? null : newNum, ba_raw_name: newName, ba_raw_qty: newQty, ba_image_url: currentMngBaImage, status: 'Unverified' }]);
+                            await _supabase.from('shared_do_records').insert([{ do_number: missingNum, ba_number: newNum === '' ? null : newNum, ba_raw_name: newName, ba_raw_qty: newQty, ba_image_url: baDocUrl, status: 'Unverified' }]);
                         }
                     } else {
                         alert("Save aborted. Please check your DO numbers.");
@@ -922,7 +949,7 @@
             for (let row of rows) {
                 if(row.innerHTML.includes('Scanning') || row.innerHTML.includes('Failed')) continue; 
                 
-                const rId = row.id; const baNum = document.getElementById(`num_${rId}`).value.trim(); const baName = document.getElementById(`name_${rId}`).value.trim() || 'Unknown'; const baQty = parseInt(document.getElementById(`qty_${rId}`).value) || 0; const baImage = window.extractedBulkBAs[rId].base64 || null;
+                const rId = row.id; const baNum = document.getElementById(`num_${rId}`).value.trim(); const baName = document.getElementById(`name_${rId}`).value.trim() || 'Unknown'; const baQty = parseInt(document.getElementById(`qty_${rId}`).value) || 0; const baImage = await mjmUploadDoDocToStorage('ba-docs', baNum || baName, window.extractedBulkBAs[rId].base64 || null);
                 const typedDosStr = document.getElementById(`dos_${rId}`).value; const typedDos = typedDosStr.split(',').map(s=>s.trim()).filter(s=>s);
 
                 // CROSS-CHECK pass before deciding to create empty DOs:

@@ -59,46 +59,60 @@
     .l-name { width:auto; padding-top:0; }
   }
 
-  /* A switch per module. Big enough to hit on a tablet, and the label is
-     part of the target — a 20px box is a miss waiting to happen. */
-  .m-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px;
-           cursor:pointer; transition:background .15s; }
-  .m-row:hover { background:#faf5ff; }
-  .m-name { flex:1; font-size:13px; font-weight:700; color:#334155; }
-  .m-key  { font-size:10.5px; font-weight:700; color:#cbd5e1; letter-spacing:.06em; }
+  /* One size of switch, everywhere. Big enough to hit on a tablet, and the
+     whole cell is the target — a 20px box is a miss waiting to happen. */
   .sw { position:relative; width:42px; height:24px; flex-shrink:0; border-radius:999px;
         background:#e2e8f0; transition:background .18s; }
   .sw::after { content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
                border-radius:50%; background:white; box-shadow:0 1px 3px rgba(0,0,0,.2);
                transition:transform .18s; }
-  .m-row.on .sw { background:#8b5cf6; }
-  .m-row.on .sw::after { transform:translateX(18px); }
-  .m-row input { position:absolute; opacity:0; width:0; height:0; }
   /* Keyboard focus has to be visible or the switch is mouse-only. */
-  .m-row input:focus-visible + .sw { box-shadow:0 0 0 3px rgba(139,92,246,.35); }
 
-  /* The functions inside a module, indented under it with a rule down the
-     side. A flat column of thirteen switches reads as thirteen unrelated
-     things, and the ones under Maintenance are not — switching Maintenance
-     off takes every one of them with it. */
-  .m-kids { margin:2px 0 8px 14px; padding-left:10px; border-left:2px solid #ede9fe; }
-  .m-kids.hidden { display:none; }
-  .m-sub { padding:7px 12px; }
-  .m-sub .m-name { font-size:12px; font-weight:600; color:#64748b; }
-  .m-sub .sw { width:36px; height:21px; }
-  .m-sub .sw::after { width:15px; height:15px; }
-  .m-sub.on .sw::after { transform:translateX(15px); }
   /* A switch that can be set but cannot yet be obeyed. Still settable — the
      answer is kept and starts working the day the gap closes — but it says
      so, rather than being quietly ignored on a phone in a plot. */
   .m-warn { display:block; font-size:10px; font-weight:600; color:#b45309;
             line-height:1.35; margin-top:2px; }
-  .m-cant.on .sw { background:#f59e0b; }
 
-  .portal-col { flex:1; min-width:240px; }
-  .portal-head { display:flex; align-items:center; gap:8px; padding:0 12px 8px;
-                 font-size:11px; font-weight:900; letter-spacing:.1em;
-                 text-transform:uppercase; color:#6d28d9; }
+  /* ── The portal table ──
+     One row per thing, a column per portal. Reading across a line is what
+     answers "does the worker get what the conductor gets"; two lists side by
+     side made it a memory test. */
+  .pt-wrap { overflow-x:auto; }
+  .pt { width:100%; border-collapse:separate; border-spacing:0; min-width:520px; }
+  .pt thead th { position:sticky; top:0; background:white; z-index:1;
+                 padding:0 12px 10px; font-size:11px; font-weight:900;
+                 letter-spacing:.1em; text-transform:uppercase; color:#6d28d9;
+                 border-bottom:2px solid #ede9fe; white-space:nowrap; }
+  .pt thead th.pt-fn { text-align:left; }
+  .pt th.pt-p, .pt td.pt-p { text-align:center; width:170px; }
+  .pt td { padding:0; border-bottom:1px solid #f5f3ff; vertical-align:middle; }
+  .pt tbody tr:hover td { background:#faf5ff; }
+  .pt td.pt-fn { padding:10px 12px; }
+  .pt-name { display:block; font-size:13px; font-weight:700; color:#334155; }
+  .pt-key  { display:block; font-size:10.5px; font-weight:700; color:#cbd5e1;
+             letter-spacing:.06em; margin-top:1px; }
+  /* A function reads as belonging to the module above it — indented, lighter,
+     with the module's rule down the left of the name cell. */
+  .pt-sub td.pt-fn { padding-left:26px; box-shadow:inset 3px 0 0 #ede9fe; }
+  .pt-sub .pt-name { font-size:12px; font-weight:600; color:#64748b; }
+  /* Nothing to switch: this portal does not have that module at all, which is
+     not the same as having it and switching it off. */
+  .pt-none { color:#e2e8f0; font-weight:800; }
+
+  /* Every switch the same size, module and function alike. They are the same
+     kind of answer and a smaller one reads as a lesser one. */
+  .pt-cell { display:inline-flex; align-items:center; justify-content:center;
+             padding:9px 12px; border-radius:12px; cursor:pointer; }
+  .pt-cell:hover { background:#f5f3ff; }
+  .pt-cell input { position:absolute; opacity:0; width:0; height:0; }
+  .pt-cell input:focus-visible + .sw { box-shadow:0 0 0 3px rgba(139,92,246,.35); }
+  .pt-cell.on .sw { background:#8b5cf6; }
+  .pt-cell.on .sw::after { transform:translateX(18px); }
+  /* The module above it is off, so this does nothing until it goes back on.
+     Still settable — the answer is kept — but it should not look live. */
+  .pt-dim { opacity:.4; }
+  .pt-cell.m-cant.on .sw { background:#f59e0b; }
 
   .btn { padding:10px 20px; border:0; border-radius:12px; cursor:pointer;
          background:#7c3aed; color:white; font-family:inherit;
@@ -139,20 +153,14 @@
       <span class="card-ico">📍</span>
       <span>
         <span class="card-name">Location</span>
-        <div class="card-sub">Where the company works: Pre Nursery, Main Nursery, Estate.
-          The Main Nursery is more than one nursery, and those come from Operation →
-          Settings → Manage Nurseries &amp; Base Maps — so a nursery added there appears
-          here, and in the Worker System, without anybody keying it twice.</div>
       </span>
     </div>
     <div class="card-body">
       <div id="n-list"></div>
-      <div class="note note-info" style="margin-top:14px;">
-        The <b>code</b> is the nursery's name with the spaces taken out — “UNN 1” files as
-        <b>UNN1</b>. It is what every worker row, tick sheet and payroll listing is stored
-        under, so renaming a nursery in Operation Settings changes the code its workers
-        are filed by. Rename with that in mind.
-      </div>
+      <!-- The note that used to sit here explained what a code is and that
+           renaming a nursery in Operation Settings changes it. The button
+           below leads to the only screen where that can happen, and the
+           warning belongs on the rename, not on a card that only lists. -->
       <div style="margin-top:12px;">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block;"
            href="../operation/operation_settings.html">Manage Main Nursery nurseries →</a>
@@ -166,39 +174,32 @@
       <span class="card-ico">🎛️</span>
       <span>
         <span class="card-name">Portal View &amp; Function</span>
-        <div class="card-sub">What each portal offers at all. A module switched off here is
-          gone for everybody, whatever their own permission says; switched on, it still
-          takes a permission to use. Off beats on — that is the point of the switch.</div>
       </span>
     </div>
     <div class="card-body">
-      <div class="flex flex-wrap gap-5">
-        <div class="portal-col">
-          <div class="portal-head"><span>📱</span><span>555 FC Portal</span></div>
-          <div id="m-fc"></div>
-        </div>
-        <div class="portal-col">
-          <div class="portal-head"><span>👷</span><span>555 Worker Portal</span></div>
-          <div id="m-worker"></div>
-        </div>
+      <!-- One row per thing, both portals side by side, so "does the worker
+           get what the conductor gets" is read across a line instead of held
+           in the head between two lists. -->
+      <div class="pt-wrap">
+        <table class="pt">
+          <thead>
+            <tr>
+              <th class="pt-fn">Function</th>
+              <th class="pt-p"><span>📱</span> 555 FC Portal</th>
+              <th class="pt-p"><span>👷</span> 555 Worker Portal</th>
+            </tr>
+          </thead>
+          <tbody id="m-body"></tbody>
+        </table>
       </div>
-      <div class="note" style="margin-top:14px;">
-        <b>Off beats on.</b> Both portals read these on the way in — the FC Portal from
-        this table, the Worker Portal with the PIN sign-in, since a worker's phone cannot
-        read it directly. Switching something off here closes it for everybody, whatever
-        their own permission says. Switching it back on does not grant it: who may then
-        use it is still <a href="scan_user_access.html">Setting</a> per person, and the
-        Worker Portal's own Settings per worker.
-        <br><br>
-        A phone already signed in picks a change up when it is next reopened.
-        <br><br>
-        <b>Upload photo in the Worker Portal</b> is the one switch here that is stored
-        but not yet acted on. A worker signs in with a PIN, which the storage bucket
-        does not accept uploads from, and the key their phone holds is public — so
-        simply opening the bucket to it would open it to anyone. It needs a way for a
-        worker to send a photo that does not leave storage writable by the world.
-        Everything else on this card is obeyed.
-      </div>
+      <!-- The paragraphs that used to sit here explained the rule the table
+           now shows: a switch per portal per function, off closing it for
+           everybody. What is left is the one thing the table cannot say —
+           that a tick is stored and not yet obeyed — and it says it on the
+           row itself as well as here. -->
+      <!-- No paragraph here. An amber switch is one with nothing behind its ON
+           yet, and hovering it says which and why — that is the whole of what
+           used to be written out underneath. -->
       <div class="flex items-center gap-3" style="margin-top:14px;">
         <button class="btn" id="m-save" onclick="savePortals()">Save switches</button>
         <span id="m-status" class="muted"></span>
@@ -361,34 +362,94 @@ const MAINT_FUNCTIONS = [
   { key:'remark',   name:'— Remark' }
 ];
 
-/* One of them cannot be honoured in the Worker Portal, and saying so on the
-   switch is better than either hiding it — which decides for you — or leaving
+/* Switches whose ON is not yet worth anything, and saying so on the switch
+   itself is better than either hiding it — which decides for you — or leaving
    it to be discovered on a phone in a plot.
 
-   A PIN sign-in is `anon`. The documents bucket takes uploads from
-   `authenticated` only, and the anon key is public, so opening that bucket to
-   anon would open it to anybody who reads the app bundle. It needs a way for
-   a worker to upload that does not hand the internet a writable bucket. */
+   They are not dead switches. OFF is obeyed in every one of these cases: the
+   Worker Portal shows a module only when this column says it may, so switching
+   one off here closes it and keeps it closed. It is ON that has nothing behind
+   it yet, and the row says which.
+
+   Upload photo: a PIN sign-in is `anon`. The documents bucket takes uploads
+   from `authenticated` only, and the anon key is public, so opening that
+   bucket to anon would open it to anybody who reads the app bundle. It needs a
+   way for a worker to upload that does not hand the internet a writable
+   bucket.
+
+   Scan / Delivery Order / PALMS / Culling: the Worker Portal has no such
+   screen built yet. The switch is here because the decision is yours to record
+   — and the day one of them is built it arrives already set the way you set
+   it, rather than appearing on every worker's phone unannounced. */
 const CANNOT_YET = {
   worker: {
-    photos: 'A PIN sign-in cannot upload to storage yet — see the note below.'
+    photos:  'Stored, not yet acted on. A worker signs in with a PIN, and the storage bucket does not take uploads from a PIN sign-in.',
+    scan:    'No Scan screen on a worker phone yet — off is obeyed, on waits for one.',
+    do:      'No Delivery Order screen on a worker phone yet — off is obeyed, on waits for one.',
+    palms:   'No PALMS screen on a worker phone yet — off is obeyed, on waits for one.',
+    culling: 'No Culling Calculator on a worker phone yet — off is obeyed, on waits for one.'
   }
 };
 
+/* Dashboard is not here any more.
+   
+   It is the FC Portal's HOME SCREEN — the page of cards a Field Conductor
+   lands on after signing in — and every card on it is already shown or hidden
+   by that module's own switch. There is nothing left for a Dashboard switch
+   to close: switching it off would either do nothing, which is what it did,
+   or leave somebody signed in with nowhere to land, which is not a setting
+   anybody wants. The app's hiddenModules() was written for it and is called
+   by nothing, which is how it went unnoticed. */
 const PORTAL_MODULES = {
   fc: [
-    { key:'dashboard',   name:'Dashboard' },
     { key:'scan',        name:'Scan' },
     { key:'do',          name:'Delivery Order' },
     { key:'maintenance', name:'Maintenance', functions: MAINT_FUNCTIONS },
     { key:'palms',       name:'PALMS' },
     { key:'culling',     name:'Culling Calculator' }
   ],
+  /* Every module the company has, not only the two the Worker Portal draws
+     today. Whether a worker sees a module is decided here and nowhere else, so
+     the column has to be able to say no to all of them — a module missing from
+     this list would be one nobody could switch off, which is the opposite of
+     what the column is for. The four with no worker screen yet carry a line on
+     their row saying so; see CANNOT_YET. */
   worker: [
+    { key:'scan',        name:'Scan' },
+    { key:'do',          name:'Delivery Order' },
     { key:'maintenance', name:'Maintenance', functions: MAINT_FUNCTIONS },
+    { key:'palms',       name:'PALMS' },
+    { key:'culling',     name:'Culling Calculator' },
     { key:'settings',    name:'Settings' }
   ]
 };
+
+/* The table's rows: everything either portal offers, in the FC Portal's own
+   order, with anything only the Worker Portal has after it. A module the
+   other portal does not have leaves an empty cell rather than a switch,
+   because "the Worker Portal has no Scan" and "Scan is switched off for
+   workers" are different sentences and a switch could only say the second. */
+function portalRows() {
+  const rows = [];
+  const seen = new Set();
+
+  const add = (m, portal) => {
+    if (seen.has(m.key)) return;
+    seen.add(m.key);
+    rows.push({ kind: 'module', key: m.key, name: m.name });
+    (m.functions || []).forEach((f) => rows.push({
+      kind: 'fn', module: m.key, key: f.key, name: f.name,
+    }));
+  };
+
+  PORTAL_MODULES.fc.forEach((m) => add(m, 'fc'));
+  PORTAL_MODULES.worker.forEach((m) => add(m, 'worker'));
+  return rows;
+}
+
+/** Does this portal have this module at all? */
+const portalHas = (portal, moduleKey) =>
+  PORTAL_MODULES[portal].some((m) => m.key === moduleKey);
 let portalOn = { fc:{}, worker:{} };
 /* Per module, per function: { maintenance: { gps:false } }. A function absent
    is NOT vetoed — same rule as the modules, so a function added to the apps
@@ -396,65 +457,78 @@ let portalOn = { fc:{}, worker:{} };
 let portalFn = { fc:{}, worker:{} };
 
 function drawPortals() {
-  Object.keys(PORTAL_MODULES).forEach(p => {
-    $('m-' + p).innerHTML = PORTAL_MODULES[p].map(m => {
-      const on = portalOn[p][m.key] !== false;      // absent means on
-      const row = `<label class="m-row ${on ? 'on' : ''}" data-portal="${p}" data-key="${m.key}">
-                <span class="m-name">${esc(m.name)}</span>
-                <span class="m-key">${esc(m.key)}</span>
-                <input type="checkbox" ${on ? 'checked' : ''}
-                       onchange="toggleModule('${p}','${m.key}',this.checked)">
-                <span class="sw" aria-hidden="true"></span>
-              </label>`;
-      if (!m.functions) return row;
+  $('m-body').innerHTML = portalRows().map((r) => {
+    const cell = (portal) => {
+      /* A portal that does not have this module gets a dash. It is not off —
+         there is nothing there to switch. */
+      if (!portalHas(portal, r.kind === 'fn' ? r.module : r.key)) {
+        return `<td class="pt-p pt-none" title="The ${
+          portal === 'fc' ? '555 FC Portal' : '555 Worker Portal'} does not have this.">—</td>`;
+      }
 
-      /* Drawn, but hidden while the module itself is off — switching the
-         module back on should put the answers back rather than an empty
-         space.
+      const on = r.kind === 'fn'
+        ? ((portalFn[portal][r.module] || {})[r.key]) !== false
+        : portalOn[portal][r.key] !== false;               // absent means on
 
-         The same list in both columns, deliberately. Which of them a worker
-         gets is the office's decision, not this file's, so nothing is left
-         out on the grounds that somebody probably would not want it. Where a
-         switch cannot yet be honoured it says so on the row and can still be
-         set — the answer is kept, and starts working the day the gap is
-         closed. */
-      const fns = m.functions
-        .map(f => {
-          const fon = ((portalFn[p][m.key] || {})[f.key]) !== false;
-          const warn = (CANNOT_YET[p] || {})[f.key];
-          const cls = ['m-row', 'm-sub'].concat(fon ? ['on'] : [], warn ? ['m-cant'] : []).join(' ');
-          return `<label class="${cls}"
-                         data-portal="${p}" data-key="${m.key}" data-fn="${f.key}"
-                         ${warn ? `title="${esc(warn)}"` : ''}>
-                    <span class="m-name">${esc(f.name)}${
-                      warn ? `<span class="m-warn">${esc(warn)}</span>` : ''}</span>
-                    <span class="m-key">${esc(f.key)}</span>
-                    <input type="checkbox" ${fon ? 'checked' : ''}
-                           onchange="toggleFunction('${p}','${m.key}','${f.key}',this.checked)">
-                    <span class="sw" aria-hidden="true"></span>
-                  </label>`;
-        }).join('');
-      return row + `<div class="m-kids ${on ? '' : 'hidden'}"
-                         data-kids-for="${p}:${m.key}">${fns}</div>`;
-    }).join('');
-  });
+      /* A function whose module is off does nothing, and dimming the cell says
+         so without taking the switch away: the answer is still worth setting
+         now for when the module goes back on, which is exactly how it behaved
+         when these were hidden under a module heading. */
+      const moduleOff = r.kind === 'fn' && portalOn[portal][r.module] === false;
+      /* Modules as well as functions: the Worker Portal's Scan switch is a
+         real switch with nothing yet behind its ON, and that belongs on the
+         switch rather than in a paragraph somebody scrolls past. */
+      const warn = (CANNOT_YET[portal] || {})[r.key];
+      const cls = ['pt-cell'].concat(
+        on ? ['on'] : [],
+        moduleOff ? ['pt-dim'] : [],
+        warn ? ['m-cant'] : []).join(' ');
+      const tip = warn || (moduleOff
+        ? 'Maintenance is off for this portal, so this does nothing until it is switched back on.'
+        : '');
+
+      return `<td class="pt-p">
+        <label class="${cls}" data-portal="${portal}" data-key="${
+          r.kind === 'fn' ? r.module : r.key}" ${r.kind === 'fn' ? `data-fn="${r.key}"` : ''}
+               ${tip ? `title="${esc(tip)}"` : ''}>
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="${r.kind === 'fn'
+            ? `toggleFunction('${portal}','${r.module}','${r.key}',this.checked)`
+            : `toggleModule('${portal}','${r.key}',this.checked)`}">
+          <span class="sw" aria-hidden="true"></span>
+        </label></td>`;
+    };
+
+    /* The caveat is not written across the row any more — five lines of red
+       under five names is a wall of text on a screen that is meant to be read
+       across, not down. The switch still carries it: amber rather than
+       purple, and the sentence on hover. The note under the table says which
+       ones and why, once. */
+
+    return `<tr class="${r.kind === 'fn' ? 'pt-sub' : 'pt-mod'}">
+      <td class="pt-fn">
+        <span class="pt-name">${esc(r.name)}</span>
+        <span class="pt-key">${esc(r.key)}</span>
+      </td>
+      ${cell('fc')}${cell('worker')}
+    </tr>`;
+  }).join('');
 }
 
 function toggleModule(portal, key, on) {
   portalOn[portal][key] = !!on;
-  const row = document.querySelector(`.m-row[data-portal="${portal}"][data-key="${key}"]:not(.m-sub)`);
-  if (row) row.classList.toggle('on', !!on);
-  const kids = document.querySelector(`[data-kids-for="${portal}:${key}"]`);
-  if (kids) kids.classList.toggle('hidden', !on);
+  /* Redrawn rather than patched: switching a module off dims every function
+     under it in that portal's column, and there is no tidy way to reach those
+     cells one at a time that is shorter than saying it again. */
+  drawPortals();
   $('m-status').textContent = 'Not saved yet.';
 }
 
 function toggleFunction(portal, moduleKey, fnKey, on) {
   if (!portalFn[portal][moduleKey]) portalFn[portal][moduleKey] = {};
   portalFn[portal][moduleKey][fnKey] = !!on;
-  const row = document.querySelector(
-    `.m-sub[data-portal="${portal}"][data-key="${moduleKey}"][data-fn="${fnKey}"]`);
-  if (row) row.classList.toggle('on', !!on);
+  const cell = document.querySelector(
+    `.pt-cell[data-portal="${portal}"][data-key="${moduleKey}"][data-fn="${fnKey}"]`);
+  if (cell) cell.classList.toggle('on', !!on);
   $('m-status').textContent = 'Not saved yet.';
 }
 

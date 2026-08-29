@@ -310,6 +310,29 @@
         const SUPABASE_URL = 'https://kibqjztozokohqmhqqqf.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Scanned papers used to be saved as base64 data URLs straight into
+        // the table — multi-MB rows whose reads/writes OOM-crashed the
+        // database. Files go to the public `documents` bucket instead; the
+        // column stores only the URL. Never fall back to returning the data
+        // URL. Same helper lives in the current (non-legacy) pages.
+        async function mjmUploadDoDocToStorage(folder, refNo, dataUrl) {
+            try {
+                if (!dataUrl) return null;
+                if (!dataUrl.startsWith('data:')) return dataUrl; // already a URL
+                const blob = await (await fetch(dataUrl)).blob();
+                const ext = blob.type === 'application/pdf' ? 'pdf' : ((blob.type.split('/')[1] || '').replace(/[^a-z0-9]/gi, '') || 'bin');
+                const safeRef = String(refNo || 'unknown').replace(/[^A-Za-z0-9_-]/g, '_');
+                const path = `${folder}/${safeRef}-${Date.now()}.${ext}`;
+                const { error } = await _supabase.storage.from('documents').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true });
+                if (error) throw error;
+                const { data } = _supabase.storage.from('documents').getPublicUrl(path);
+                return (data && data.publicUrl) || null;
+            } catch (e) {
+                console.warn('Document upload to Storage failed — record saves without document:', e);
+                return null;
+            }
+        }
         
         let globalALs = []; 
         let globalDOs = []; 
@@ -1138,7 +1161,8 @@
                 }
                 const genALNumber = `${prefix}${String(nextSeq).padStart(4, '0')}`; nextSeq++;
                 
-                let payload = { al_number: genALNumber, order_date: new Date(orderDate).toISOString(), customer_name: custName, order_number: poOrder, product_name: prodName, quantity_ordered: qty, balance_quantity: qty, price_per_unit: price, status: 'Unverified', remark: remark, image_url: base64Image };
+                const docUrl = await mjmUploadDoDocToStorage('al-docs', genALNumber, base64Image);
+                let payload = { al_number: genALNumber, order_date: new Date(orderDate).toISOString(), customer_name: custName, order_number: poOrder, product_name: prodName, quantity_ordered: qty, balance_quantity: qty, price_per_unit: price, status: 'Unverified', remark: remark, image_url: docUrl };
                 const { error: err } = await _supabase.from('shared_al_orders').insert([payload]);
 
                 if (!err) {
