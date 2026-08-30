@@ -5,67 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=57">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=61">
 </head>
 <body>
 
+<!-- The ribbon every module page wears: wordmark left, module title in the
+     middle, Welcome / Portal / Sign Out on the right. Mounted here rather
+     than hand-built, so this page cannot drift from the others. -->
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System"
+     data-center="Schedule &amp; Maintenance"
+     data-sub="Monthly Work Planning &amp; Record System" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
 <!-- ═══ APP VIEW ═══ -->
 <div id="view-app">
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a href="nursery_ops_dashboard.html" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-decoration:none;border:1.5px solid var(--border);border-radius:99px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">&#8592; Back</a>
-      <div class="logo-wrap">
-        <div class="logo-mark">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 3L7 8H4L2.5 12L4 16L7 21H17L20 16L21.5 12L20 8H17L12 3Z" stroke="#fff" stroke-width="1.7" fill="none"/>
-            <path d="M12 8V16M9 10.5L12 8L15 10.5M9 13.5L12 16L15 13.5" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
-          </svg>
-        </div>
-        <div>
-          <div class="logo-name">MJM NURSERY <span class="ai-chip">AI</span></div>
-          <div class="logo-sub">MAINTENANCE SYSTEM</div>
-        </div>
-      </div>
-      <div class="topbar-mid">
-        <div class="top-ctrl"><label data-i18n="top.month">Month</label>
-          <input type="hidden" id="global-month">
-          <button type="button" class="top-sel" id="global-month-btn" style="min-width:110px;text-align:left;" onclick="openMonthWheel('global')">—</button>
-        </div>
-        <div class="top-ctrl" id="top-nursery-ctrl"><label data-i18n="top.nursery">Nursery</label>
-          <select id="global-nursery" style="display:none;" onchange="onNurseryChange()">
-            <option value="PN">PN</option><option value="BNN">BNN</option>
-            <option value="UNN1">UNN 1</option><option value="UNN2">UNN 2</option>
-          </select>
-          <div class="nursery-circles" id="nursery-circles">
-            <button type="button" class="nursery-circle" data-n="PN"   onclick="pickNursery('PN')"   title="Pre Nursery">PN</button>
-            <button type="button" class="nursery-circle" data-n="BNN"  onclick="pickNursery('BNN')"  title="Batu Niah Nursery">BNN</button>
-            <button type="button" class="nursery-circle" data-n="UNN1" onclick="pickNursery('UNN1')" title="Ulu Niah Nursery 1">UNN 1</button>
-            <button type="button" class="nursery-circle" data-n="UNN2" onclick="pickNursery('UNN2')" title="Ulu Niah Nursery 2">UNN 2</button>
-          </div>
-        </div>
-      </div>
-      <div class="topbar-right">
-        <div class="nursery-pill" id="nursery-pill">BNN</div>
-        <div class="lang-toggle" role="group" aria-label="Language">
-          <button type="button" class="lang-seg" data-l="en" onclick="setLang('en')">EN</button>
-          <button type="button" class="lang-seg" data-l="bm" onclick="setLang('bm')">BM</button>
-        </div>
-        <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
-      </div>
-    </div>
-  </header>
+  <div class="page sm-frame">
 
-  <div class="page">
-    <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
-      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
-      <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">📋 Worker Record</button>
-      <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
-      <button class="tab-btn" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
-    </div>
+    <!-- ── The side bar ──────────────────────────────────────────────
+         The same bar PALMS wears, and deliberately so: same widths, same
+         pills, same rule between the way out and the pages inside. It is
+         a COPY rather than shared_palms_nav.js because that bar moves
+         between four HTML pages and this one moves between panels of one
+         — same shape, different mechanism. Change one, change the other;
+         the geometry is in plot_maintenance_styles.css beside a note
+         saying the same. -->
+    <aside id="sm-nav">
+      <nav aria-label="Schedule &amp; Maintenance">
+        <a class="pn-out" href="nursery_ops_dashboard.html">
+          <span aria-hidden="true">&#8592;</span>
+          <span>Back to Operation Manage Page</span>
+        </a>
+        <div class="pn-group">
+          <div class="pn-cap">Schedule &amp; Maintenance</div>
+          <!-- Monthly Scheduled Work lands first: it is what the page is
+               for. Worker Record is last because it may be leaving. -->
+          <button type="button" class="pn-tab is-on" onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
+          <button type="button" class="pn-tab"       onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
+          <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
+          <button type="button" class="pn-tab" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)" data-i18n="tab.setting">Setting</button>
+          <button type="button" class="pn-tab"       onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">Worker Record</button>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="sm-body">
+
+      <!-- ── The section head ─────────────────────────────────────────
+           Names the panel the side bar has chosen, and carries the two
+           things a panel is read THROUGH — which nursery and which month.
+           Both hide themselves on a panel that has no use for them:
+           Schedule shows every nursery at once, Setting has no month. -->
+      <div class="sm-head">
+        <div class="sm-title" id="sm-title">Monthly Scheduled Work</div>
+        <div class="sm-tools">
+          <div class="top-ctrl" id="top-nursery-ctrl">
+            <select id="global-nursery" style="display:none;" onchange="onNurseryChange()">
+              <option value="PN">PN</option><option value="BNN">BNN</option>
+              <option value="UNN1">UNN 1</option><option value="UNN2">UNN 2</option>
+            </select>
+            <div class="nursery-circles" id="nursery-circles">
+              <button type="button" class="nursery-circle" data-n="PN"   onclick="pickNursery('PN')"   title="Pre Nursery">PN</button>
+              <button type="button" class="nursery-circle" data-n="BNN"  onclick="pickNursery('BNN')"  title="Batu Niah Nursery">BNN</button>
+              <button type="button" class="nursery-circle" data-n="UNN1" onclick="pickNursery('UNN1')" title="Ulu Niah Nursery 1">UNN 1</button>
+              <button type="button" class="nursery-circle" data-n="UNN2" onclick="pickNursery('UNN2')" title="Ulu Niah Nursery 2">UNN 2</button>
+            </div>
+          </div>
+          <!-- The month every panel reads. Hidden, because the two arrows
+               and the label beside them are how it is now set; the wheel
+               still writes the same field from the label. -->
+          <div class="sm-month" id="sm-month-ctrl">
+            <input type="hidden" id="global-month">
+            <button type="button" class="sched-step" onclick="stepSchedMonth(-1)" title="The month before">&#8249;</button>
+            <button type="button" class="sm-month-btn" id="global-month-btn" onclick="openMonthWheel('global')">&#8212;</button>
+            <button type="button" class="sched-step" onclick="stepSchedMonth(1)" title="The month after &#8212; set it in advance">&#8250;</button>
+          </div>
+          <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+        </div>
+      </div>
 
     <!-- WORK RECORD (default) — headline metrics + List / Analytics sub-views -->
-    <div id="tab-record" class="tab-panel active">
+    <div id="tab-record" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="record-nursery-line"></div></div>
       <div id="rec-metrics" class="metrics-big"></div>
       <div class="subtabs-bar">
@@ -193,20 +212,14 @@
          were hiding three quarters of what you were about to save.
          One page, one toolbar, one Save — and the four programs stacked in
          the order they are worked. -->
-    <div id="tab-schedule" class="tab-panel">
-      <!-- Everything you can do to the month, said once. -->
-      <div class="section-hdr">
-        <div class="sched-month">
-          <button type="button" class="sched-step" onclick="stepSchedMonth(-1)"
-            title="The month before">&#8249;</button>
-          <div class="page-hdr-title" id="sched-month-label"></div>
-          <button type="button" class="sched-step" onclick="stepSchedMonth(1)"
-            title="The month after — set it in advance">&#8250;</button>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary schedule-edit-ctrl" onclick="saveAllSchedules()" style="font-size:11px;padding:5px 14px;" data-i18n="btn.save">💾 Save Schedule</button>
-          <button class="btn-pdf" onclick="openPdfModal()" style="font-size:11px;padding:6px 14px;" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
-        </div>
+    <div id="tab-schedule" class="tab-panel active">
+      <!-- What is left of the old bar once the title and the month moved
+           into the section head: two buttons, which need no box of their
+           own — an empty framed strip with a rule down one side reads as
+           something that failed to load. -->
+      <div class="sm-actions">
+        <button class="btn btn-primary schedule-edit-ctrl" onclick="saveAllSchedules()" data-i18n="btn.save">💾 Save Schedule</button>
+        <button class="btn-pdf" onclick="openPdfModal()" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
       </div>
 
       <!-- ── SUMMARY ────────────────────────────────────────────────
@@ -383,7 +396,8 @@
       </div>
     </div>
 
-  </div>
+    </div><!-- /.sm-body -->
+  </div><!-- /.page.sm-frame -->
 
   <footer><div class="app-footer">
     <div>MJM NURSERY (MJM Nursery Sdn Bhd 663951-U) — Maintenance Schedule System v2.1</div>
@@ -416,9 +430,7 @@
 </div>
 
 <!-- The week's dates, over the column header that opened them. -->
-<div id="week-pick" class="hidden" style="position:absolute;z-index:90;background:#fff;
-     border:1.5px solid var(--border);border-radius:var(--r-md);box-shadow:0 12px 30px rgba(0,0,0,.16);
-     padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+<div id="week-pick" class="hidden">
   <input type="date" id="wp-from" class="set-in" style="width:150px;">
   <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
   <input type="date" id="wp-to" class="set-in" style="width:150px;">
@@ -511,7 +523,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=74"></script>
+<script src="plot_maintenance_script.js?v=77"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->
