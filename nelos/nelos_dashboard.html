@@ -537,7 +537,7 @@
       <div class="m-sec" id="s-details">
         <div class="m-sec-h">Solve Case Details</div>
 
-        <div class="s-lab">Close case photo</div>
+        <div class="s-lab">Photo of the fix</div>
         <!-- A bare file input renders as the browser's grey "Choose file",
              which on a phone says nothing about the camera it opens. The
              real input is hidden and this label drives it. -->
@@ -549,8 +549,25 @@
         </label>
         <input id="s-photo" class="s-shot-file" type="file" accept="image/*">
         <img id="s-photo-prev" class="s-prev hidden" alt="Photo of the fix">
-        <div class="s-lab s-lab-2">Close case remark</div>
+        <div class="s-lab s-lab-2">What was done</div>
         <textarea id="s-remark" class="inp" rows="3"></textarea>
+      </div>
+
+      <!-- Closing a case: what the solver left, read only — the closer is
+           accepting THEIR work, not redoing the write-up — then a section
+           of the closer's own. Both hidden until openSolve() knows the
+           case is already solved. -->
+      <div class="m-sec hidden" id="s-solved">
+        <div class="m-sec-h">Solved Details</div>
+        <div id="s-solved-remark" class="s-case-v"></div>
+        <img id="s-solved-photo" class="s-prev hidden" alt="Photo of the fix">
+        <div id="s-solved-by" class="s-case-by"></div>
+      </div>
+
+      <div class="m-sec hidden" id="s-close-details">
+        <div class="m-sec-h">Close Case Remark</div>
+        <textarea id="s-close-remark" class="inp" rows="3"
+                  placeholder="Optional — anything about accepting this."></textarea>
       </div>
 
       <div id="s-err" class="s-err hidden"></div>
@@ -1171,18 +1188,33 @@ function openSolve(c) {
   $('s-shot-t').textContent = SHOT_IDLE;
   $('s-photo-prev').classList.add('hidden');
   $('s-photo-prev').removeAttribute('src');
+  $('s-close-remark').value = '';
 
   $('s-case').innerHTML = caseBlockHtml(c);
 
   /* Already solved → nothing to save, and the only move left is closing
-     it, for somebody whose ticks allow that. */
+     it, for somebody whose ticks allow that. Three sections instead of
+     one solving section: the case (above), what the solver already left
+     — read only, the closer is accepting THEIR work, not rewriting it —
+     then a remark of the closer's own. */
   const done = c.status === 'resolved';
   $('s-heading').textContent = (done ? 'Close ' : 'Solve ') + (c.case_no || 'Case');
   $('s-save').classList.toggle('hidden', done);
-  // One section now, so one thing to hide: a case already solved has
-  // nothing left to photograph or write up.
   $('s-details').classList.toggle('hidden', done);
+  $('s-solved').classList.toggle('hidden', !done);
+  $('s-close-details').classList.toggle('hidden', !done);
   $('s-close-case').classList.toggle('hidden', !(rights.may_close && done));
+
+  if (done) {
+    $('s-solved-remark').textContent = c.resolution || 'Solved, with nothing written about it.';
+    const rp = $('s-solved-photo');
+    rp.classList.toggle('hidden', !c.resolution_photo_url);
+    if (c.resolution_photo_url) rp.src = c.resolution_photo_url; else rp.removeAttribute('src');
+    const by = [c.resolved_by, c.resolved_at && fmtDate(String(c.resolved_at).slice(0, 10))]
+      .filter(Boolean).join(' · ');
+    $('s-solved-by').textContent = by ? 'Solved by ' + by : '';
+    $('s-solved-by').classList.toggle('hidden', !by);
+  }
 
   $('solve-scrim').classList.remove('hidden');
 }
@@ -1313,18 +1345,31 @@ async function closeCase() {
   if (!solving) return;
   const btn = $('s-close-case');
   btn.disabled = true; sErr('');
-  const { error } = await _supabase.from('nelos_cases').update({
+  const patch = {
     status: 'closed',
+    close_remark: $('s-close-remark').value.trim() || null,
     closed_by: me.name,
     closed_at: new Date().toISOString(),
     updated_by: me.name,
     updated_at: new Date().toISOString()
-  }).eq('id', solving.id);
+  };
+  let { error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id);
+  /* No close_remark column → this database has not run
+     migration_nelos_close_remark.sql. Closing still matters more than
+     the note, so close it without the note rather than refusing. */
+  let missingColumn = false;
+  if (error && /close_remark/.test(error.message || '')) {
+    missingColumn = true;
+    delete patch.close_remark;
+    ({ error } = await _supabase.from('nelos_cases').update(patch).eq('id', solving.id));
+  }
   btn.disabled = false;
   if (error) { sErr('Could not close it — ' + error.message); return; }
   const no = solving.case_no || 'Case';
   closeSolve();
-  toast(`${no} closed.`);
+  toast(missingColumn
+    ? `${no} closed — run migration_nelos_close_remark.sql to keep the remark.`
+    : `${no} closed.`);
   await loadCases();
 }
 
