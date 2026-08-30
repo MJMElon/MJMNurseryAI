@@ -300,6 +300,11 @@
   .rt-row { padding:9px 0; border-bottom:1px dashed #ede9fe; align-items:start; }
   .rt-row:last-child { border-bottom:none; }
   .rt-row.is-default { background:#f8fafc; }
+  /* A staged row, marked on the ROW. The tag used to sit inside the PIC
+     cell, so changing the SYSTEM dropdown put "unsaved" under PIC — which
+     reads as "the PIC could not be saved". It is neither an error nor about
+     the PIC: it means this row is waiting for Save. */
+  .rt-row.is-pend { background:#fffbeb; }
   .rt-row.is-default .rt-cat { font-style:italic; color:#64748b; }
   .rt-n { font-size:12px; font-weight:900; color:#a78bfa; padding-top:8px;
           font-variant-numeric:tabular-nums; }
@@ -319,7 +324,7 @@
   .rt-add .inp { flex:1; min-width:170px; padding:7px 10px; font-size:12.5px; }
   .pend-tag { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
               padding:2px 8px; border-radius:999px; background:#fef3c7; color:#a16207; }
-  .cell-note.pend { color:#a16207; font-weight:900; }
+  .cell-note.pend { color:#a16207; font-weight:900; display:inline-block; margin-left:8px; }
   .btn:disabled { opacity:.4; cursor:not-allowed; }
   .r-clear { align-self:flex-start; background:none; border:none; cursor:pointer; padding:0;
              font-size:10px; font-weight:900; letter-spacing:.07em; text-transform:uppercase;
@@ -1136,7 +1141,6 @@ function solveCells(mod, cat) {
         ${staff.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
           esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
       </select>
-      ${pend ? '<span class="cell-note pend">unsaved</span>' : ''}
     </div>`;
 }
 
@@ -1168,9 +1172,10 @@ function renderRouting() {
           <div class="rt-band"><span>From</span><span>Solve by</span></div>
           <div class="rt-sub"><span>#</span><span>Case Category</span><span>System</span><span>PIC</span></div>
           ${titles.map((cat, i) => `
-            <div class="rt-row">
+            <div class="rt-row${draftOf(m.key, cat) ? ' is-pend' : ''}">
               <span class="rt-n">${i + 1}.</span>
-              <span class="rt-cat">${esc(cat)}</span>
+              <span class="rt-cat">${esc(cat)}
+                ${draftOf(m.key, cat) ? '<span class="cell-note pend">unsaved</span>' : ''}</span>
               ${solveCells(m.key, cat)}
             </div>`).join('')}
           ${addRow}
