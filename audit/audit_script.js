@@ -142,9 +142,54 @@ const PLOT_TO_NURSERY = (function(){
   }));
   return m;
 })();
+/* ── OFFLINE CACHE ──
+   Five live reads below, and the first (audit_plot_audits) has no
+   .catch of its own — a failure there throws past the whole function,
+   records/plotBatches never get set, renderList() never runs, and a
+   first-ever offline visit to this page shows nothing at all, not
+   even yesterday's answer. Cached is the PROCESSED state, the same
+   shape renderList() already reads — restoring it needs no
+   re-derivation. */
+const _PLOT_CACHE_KEY = 'mjm_plot_cache_v1';
+function _saveOfflineCache(){
+  try {
+    localStorage.setItem(_PLOT_CACHE_KEY, JSON.stringify({
+      records, plotBatches, balanceByPB, savedAt: Date.now()
+    }));
+  } catch(e) { /* storage full/unavailable — no offline fallback next time, not fatal now */ }
+}
+function _loadOfflineCache(){
+  try {
+    const raw = localStorage.getItem(_PLOT_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    records     = c.records     || [];
+    plotBatches = c.plotBatches || [];
+    balanceByPB = c.balanceByPB || {};
+    return c.savedAt || 0;
+  } catch(e) { return null; }
+}
+
 async function loadRecords(){
   setLoading(true);
   try{
+    /* Offline: five requests would just be five round trips to the
+       service worker's synthetic 503 — send none of them, and use
+       whatever this device last saw while it still had a signal. No
+       cache at all (never loaded successfully here before) falls
+       through to the live attempt, which fails exactly as it always
+       did. */
+    if (!navigator.onLine) {
+      const savedAt = _loadOfflineCache();
+      if (savedAt) {
+        console.log('[plot-audit] offline — served from cache saved',
+          new Date(savedAt).toLocaleString());
+        renderList();
+        setLoading(false);
+        return;
+      }
+    }
+
     // Pull audit records + two possible batch sources + operation_batches
     // (for breed fallback) in parallel. Two sources because the operation
     // ledger (shared_inventory_logs) is the freshest but might be RLS-
@@ -232,6 +277,7 @@ async function loadRecords(){
       balanceByPB[plot + '|' + batch] = Number(r.qty || 0);
     });
 
+    _saveOfflineCache();
     console.log('[plot-audit] loaded', {
       audits: records.length,
       fromLogs: (tRows || []).length,
