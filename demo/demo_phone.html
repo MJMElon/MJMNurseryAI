@@ -53,8 +53,13 @@
      that, and the whole thing is scaled to whatever height the desk has. The
      page inside is never scaled on its own — it is rendered at true phone
      size, which is the only way the demo shows what a phone shows. */
+  /* The bezel is deeper at the top, and the clock and the speaker grille live
+     IN it. They used to be drawn over the screen — which is fine on a mock-up
+     of an app, and wrong here: the portals are real pages that use all 844
+     pixels, and the auditor portal's own "Synced" bar was underneath ours.
+     A frame that hides part of what it is framing is not a frame. */
   .phone {
-    width:428px; padding:19px; border-radius:56px; background:#0b1220;
+    width:428px; padding:34px 19px 19px; border-radius:56px; background:#0b1220;
     box-shadow:0 0 0 2px #1e293b, 0 30px 70px rgba(0,0,0,.55);
     position:relative;
   }
@@ -63,17 +68,17 @@
     background:#fff; position:relative;
   }
   .screen iframe { width:390px; height:844px; border:0; display:block; }
+  /* The speaker grille, centred in the top bezel. */
   .notch {
-    position:absolute; top:0; left:50%; transform:translateX(-50%);
-    width:126px; height:26px; background:#0b1220; border-radius:0 0 18px 18px; z-index:3;
+    position:absolute; top:15px; left:50%; transform:translateX(-50%);
+    width:56px; height:5px; background:#1e293b; border-radius:3px;
   }
   .bar {
-    position:absolute; top:0; left:0; right:0; height:26px; z-index:2;
+    position:absolute; top:0; left:0; right:0; height:34px;
     display:flex; align-items:center; justify-content:space-between;
-    padding:0 18px; font-size:10.5px; font-weight:800; color:#0f172a;
+    padding:0 30px; font-size:10.5px; font-weight:800; color:#64748b;
     pointer-events:none;
   }
-  .bar.dark { color:#e2e8f0; }
   .stage { transform-origin:top center; }
 
   .pill {
@@ -87,9 +92,11 @@
   .note { font-size:11.5px; font-weight:600; color:var(--faint); line-height:1.6; }
 
   /* ── Layout ──────────────────────────────────────────────────────────── */
-  .wrap { max-width:1200px; margin:0 auto; padding:32px 20px; }
+  /* Tight at the top on purpose: every pixel spent on the heading is a pixel
+     off the phone on a laptop screen. */
+  .wrap { max-width:1200px; margin:0 auto; padding:22px 20px 32px; }
   .top { display:flex; align-items:baseline; justify-content:space-between;
-         gap:16px; flex-wrap:wrap; margin-bottom:28px; }
+         gap:16px; flex-wrap:wrap; margin-bottom:20px; }
   .title { font-size:32px; font-weight:900; letter-spacing:-.02em; color:#f1f5f9; line-height:1.1; }
   .subtitle { font-size:11px; font-weight:900; letter-spacing:.22em; text-transform:uppercase;
               color:#34d399; margin-top:6px; }
@@ -147,12 +154,12 @@
     <div class="main">
       <div id="stage" class="stage">
         <div class="phone">
+          <div class="notch"></div>
+          <div class="bar">
+            <span id="clock">—</span>
+            <span style="letter-spacing:.14em">▮▮▮ ▮</span>
+          </div>
           <div class="screen">
-            <div class="notch"></div>
-            <div class="bar" id="statusbar">
-              <span id="clock">—</span>
-              <span style="letter-spacing:.14em">▮▮▮ ▮</span>
-            </div>
             <iframe id="frame"
                     title="Portal demo"
                     allow="geolocation; camera"
@@ -214,7 +221,6 @@ const PORTALS = [
        signed in here lands on the app rather than on the login screen. That
        is what mirroring means, and it is said out loud below. */
     local: '../audit/audit_index.html',
-    dark: true,
     note: 'The auditor app as it is on a phone. It shares this browser\'s '
         + 'sign-in, so if you are already signed in to the hub it opens past '
         + 'the login screen — sign out, or use a private window, to see the '
@@ -254,7 +260,6 @@ const picks  = document.getElementById('picks');
 const what   = document.getElementById('what');
 const newtab = document.getElementById('newtab');
 const stage  = document.getElementById('stage');
-const bar    = document.getElementById('statusbar');
 
 let current = PORTALS[0];
 
@@ -281,7 +286,6 @@ function show() {
   draw();
   what.textContent = current.note;
   newtab.href = current.url;
-  bar.classList.toggle('dark', !!current.dark);
   /* about:blank first, so picking the same portal twice really does start it
      again rather than doing nothing — and so a heavy app is not left running
      behind the one being looked at. */
@@ -291,15 +295,41 @@ function show() {
 
 document.getElementById('reload').onclick = show;
 
-/* Fit the phone to the desk. The frame is 844 + 38 of bezel; anything shorter
-   than that and it is scaled down as one piece, contents included, so the
-   proportions stay those of a phone. Never scaled UP: a phone shown larger
-   than life is a phone nobody believes. */
+/* ── How big the phone is ──────────────────────────────────────────────
+ *
+ * The frame is 428 x 876 — a 390 x 844 screen in 19px of bezel — and the
+ * WHOLE thing is scaled as one piece. The page inside is never scaled on its
+ * own; see the note at the top of this file for why that matters.
+ *
+ * Fitted to the room there is, then deliberately pushed past it:
+ *
+ *   MIN_SCALE   it is allowed to be taller than the window and let the page
+ *               scroll. A phone shrunk to fit a 13-inch laptop is a phone
+ *               nobody can read across a desk, which is what this page is for.
+ *   MAX_SCALE   and bigger than life on a monitor with the room for it, up to
+ *               the point where a phone stops looking like a phone.
+ */
+/* Life size, and never smaller. A phone shrunk to fit a 13-inch laptop is a
+   phone nobody can read across a desk, and reading it across a desk is what
+   this page is for — so on a short screen the page scrolls instead. */
+const MIN_SCALE = 1;
+const MAX_SCALE = 1.45;
+const FRAME_W = 428;
+const FRAME_H = 897;      // 34 of top bezel + 844 of screen + 19 under it
+
 function fit() {
-  const avail = window.innerHeight - stage.getBoundingClientRect().top - 90;
-  const scale = Math.min(1, Math.max(0.45, avail / 882));
+  const top = stage.getBoundingClientRect().top + window.scrollY
+            - (parseFloat(getComputedStyle(document.body).marginTop) || 0);
+  /* 40px under it for the "nothing loading?" line, and no more: every pixel
+     kept back here is a pixel off the phone. */
+  const byHeight = (window.innerHeight - stage.getBoundingClientRect().top - 46) / FRAME_H;
+  const byWidth  = (stage.parentElement.clientWidth - 8) / FRAME_W;
+  const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, byHeight, byWidth));
   stage.style.transform = `scale(${scale})`;
-  stage.style.height = `${882 * scale}px`;
+  /* The transform does not change how much room the element takes, so the
+     page would either overlap what follows or leave a gap the size of the
+     shrinking. Told here instead. */
+  stage.style.height = `${FRAME_H * scale}px`;
 }
 window.addEventListener('resize', fit);
 
