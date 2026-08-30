@@ -63,11 +63,44 @@ CREATE INDEX IF NOT EXISTS nops_maint_field_records_awaiting_verify
 -- like this file never having been run.
 NOTIFY pgrst, 'reload schema';
 
--- What you should see: the three columns, and how the records stand today.
-SELECT 'maint verification ready'                             AS status,
-       count(*)                                               AS records,
-       count(*) FILTER (WHERE verified_at IS NOT NULL)        AS verified,
-       count(*) FILTER (WHERE rejected_at IS NOT NULL)        AS sent_back,
-       count(*) FILTER (WHERE verified_at IS NULL
-                          AND rejected_at IS NULL)            AS awaiting
-  FROM nops_maint_field_records;
+-- ── What you should see ─────────────────────────────────────────────────
+-- The SQL Editor shows only the LAST statement's result, so this is one
+-- query rather than two: the three columns proving the file ran, then a
+-- line each for how the records stand.
+--
+--   column   rejected_at     timestamp with time zone
+--   column   rejected_by     text
+--   column   reject_reason   text
+--   records  <n>             every maintenance record
+--   verified <n>             signed off
+--   sent back 0              none yet — this file has only just added it
+--   awaiting <n>             what the Verify Hub will show
+--
+-- Three "column" rows means the deck can now send a record back. Fewer than
+-- three means the ALTER did not take, and it is worth reading the error
+-- above rather than opening the app.
+-- ────────────────────────────────────────────────────────────────────────
+SELECT * FROM (
+  SELECT 1 AS ord, 'column'    AS what, column_name::TEXT AS value, data_type::TEXT AS detail
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'nops_maint_field_records'
+     AND column_name IN ('rejected_at', 'rejected_by', 'reject_reason')
+  UNION ALL
+  SELECT 2, 'records',   count(*)::TEXT, 'every maintenance record'
+    FROM nops_maint_field_records
+  UNION ALL
+  SELECT 3, 'verified',  count(*) FILTER (WHERE verified_at IS NOT NULL)::TEXT,
+            'signed off by a conductor'
+    FROM nops_maint_field_records
+  UNION ALL
+  SELECT 4, 'sent back', count(*) FILTER (WHERE rejected_at IS NOT NULL)::TEXT,
+            'refused and back on the list'
+    FROM nops_maint_field_records
+  UNION ALL
+  SELECT 5, 'awaiting',  count(*) FILTER (WHERE verified_at IS NULL
+                                            AND rejected_at IS NULL)::TEXT,
+            'what the Verify Hub will show'
+    FROM nops_maint_field_records
+) x
+ORDER BY ord, value;
