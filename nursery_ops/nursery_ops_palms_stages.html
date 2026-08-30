@@ -30,13 +30,20 @@
   .lbl { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
          color:#64748b; margin-bottom:5px; }
 
-  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
+  /* A 6th column, after Ideal days, for a delete button — but only a row
+     just added in this same edit and not yet saved gets one drawn into it.
+     Removing an EXISTING stage would shift sort_order for every stage after
+     it, and a plot log stores the stage NUMBER, not its name — exactly the
+     history-rewriting risk already called out below for renaming and
+     reordering. A row with nothing saved yet has no such history to
+     disturb, so only that one may be pulled back out. */
+  .iw-row { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px 30px; gap:10px 14px;
             align-items:center; padding:5px 6px; border-radius:12px; border:1.5px solid transparent; }
   .iw-row + .iw-row { margin-top:2px; }
   .iw-row.edit { border-color:#f1f5f9; }
   .iw-row.dragging { background:#f0fdfa; border-color:#5eead4; opacity:.85; }
   .iw-row.over { border-color:#14b8a6; }
-  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px; gap:10px 14px;
+  .iw-head { display:grid; grid-template-columns:24px 34px minmax(150px,1fr) 54px 106px 30px; gap:10px 14px;
              padding:0 6px 6px; font-size:10px; font-weight:900; letter-spacing:.1em;
              text-transform:uppercase; color:#94a3b8; }
   .iw-handle { cursor:grab; touch-action:none; user-select:none; color:#cbd5e1; font-size:15px;
@@ -62,7 +69,7 @@
   .iw-sw[disabled] { cursor:default; }
   .iw-sw.dirty { border-color:#f59e0b; box-shadow:0 0 0 2px #fef3c7; }
   .iw-dot { width:34px; height:26px; border-radius:8px; border:1.5px solid #e2e8f0; display:block; }
-  .iw-row.no-map, .iw-head.no-map { grid-template-columns:24px 34px minmax(150px,1fr) 106px; }
+  .iw-row.no-map, .iw-head.no-map { grid-template-columns:24px 34px minmax(150px,1fr) 106px 30px; }
   .iw-head.no-map .iw-mapcol { display:none; }
   .iw-add { display:flex; align-items:center; gap:8px; width:100%; margin-top:6px; padding:9px 12px;
             border-radius:12px; border:1.5px dashed #99f6e4; background:#f0fdfa; color:#0f766e;
@@ -80,6 +87,14 @@
              padding:0; transition:all .15s; }
   .iw-icon:hover { background:#ccfbf1; }
   .iw-icon svg { width:16px; height:16px; display:block; }
+  /* Only ever drawn on a row this same edit added and has not saved yet —
+     see the .iw-row column comment above for why a saved stage does not
+     get one. */
+  .iw-del { width:26px; height:26px; border-radius:8px; background:white; border:1.5px solid #fecdd3;
+            color:#be123c; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+            padding:0; font-family:inherit; }
+  .iw-del:hover { background:#fff1f2; }
+  .iw-del svg { width:14px; height:14px; display:block; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -114,7 +129,7 @@
     <div id="iw-note" class="hidden text-[12px] font-bold text-amber-700 leading-relaxed mb-3"></div>
 
     <div class="iw-head">
-      <div></div><div>#</div><div>Work status</div><div class="iw-mapcol">Map</div><div class="text-right">Ideal days</div>
+      <div></div><div>#</div><div>Work status</div><div class="iw-mapcol">Map</div><div class="text-right">Ideal days</div><div></div>
     </div>
     <div id="iw-list"></div>
     <button id="iw-add" class="iw-add hidden">＋ Add new work</button>
@@ -233,6 +248,14 @@ function renderIdealWork() {
         : '') +
       '<input class="iw-in' + (dDays ? ' dirty' : '') + '" type="number" min="0" step="1" ' +
         'data-iw-days="' + esc(r.key) + '" value="' + esc(r.days == null ? '' : r.days) + '">' +
+      (r.isNew
+        ? '<button type="button" class="iw-del" data-iw-del="' + esc(r.key) + '" ' +
+            'title="Remove this — it has not been saved" aria-label="Remove">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+              '<path d="M6 6 18 18"></path><path d="M18 6 6 18"></path></svg>' +
+          '</button>'
+        : '<div></div>') +
       '</div>';
   }).join('');
 }
@@ -267,6 +290,17 @@ $('iw-add').addEventListener('click', () => {
   renderIdealWork();
   const boxes = $('iw-list').querySelectorAll('[data-iw-name]');
   if (boxes.length) boxes[boxes.length - 1].focus();
+});
+
+// Only ever rendered on a row this edit added and has not saved, so there
+// is no ID to worry about and nothing to confirm — it never touched the
+// database. Removing an already-saved stage is a different, harder
+// question (see the .iw-row column comment) and is not this button's job.
+$('iw-list').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-iw-del]');
+  if (!del) return;
+  IW_WORK = IW_WORK.filter((r) => r.key !== del.dataset.iwDel);
+  renderIdealWork();
 });
 
 $('iw-list').addEventListener('input', (e) => {
