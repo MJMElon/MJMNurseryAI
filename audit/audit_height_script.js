@@ -136,12 +136,60 @@ const PLOT_TO_NURSERY=(function(){
    Fetch audit records + batch roster (from two sources) + balance in
    parallel. All non-critical sources fail-open (empty array) so a stray
    RLS block on one table doesn't take the whole grid down. */
+/* ── OFFLINE CACHE ──
+   Four live reads below, and the first (audit_height_records) has no
+   .catch of its own — a failure there throws past the whole function,
+   records/plotBatches never get set, renderList() never runs, and a
+   first-ever offline visit to this page shows nothing at all, not
+   even yesterday's answer. Cached is the PROCESSED state, the same
+   shape renderList() already reads — restoring it needs no
+   re-derivation, only _rebuildPlanted() to redo (cheap, pure local
+   work over what was just restored). */
+const _HGT_CACHE_KEY = 'mjm_height_cache_v1';
+function _saveOfflineCache(){
+  try {
+    localStorage.setItem(_HGT_CACHE_KEY, JSON.stringify({
+      records, plotBatches, balanceByPB, savedAt: Date.now()
+    }));
+  } catch(e) { /* storage full/unavailable — no offline fallback next time, not fatal now */ }
+}
+function _loadOfflineCache(){
+  try {
+    const raw = localStorage.getItem(_HGT_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    records     = c.records     || [];
+    plotBatches = c.plotBatches || [];
+    balanceByPB = c.balanceByPB || {};
+    return c.savedAt || 0;
+  } catch(e) { return null; }
+}
+
 async function loadRecords(){
   setLoading(true);
   try{
     // The ages being audited are read alongside everything else; a failure
     // there leaves MJMAuditSettings on its defaults, which is every age.
     try { await MJMAuditSettings.load(); } catch(_) {}
+
+    /* Offline: four requests would just be four round trips to the
+       service worker's synthetic 503 — send none of them, and use
+       whatever this device last saw while it still had a signal. No
+       cache at all (never loaded successfully here before) falls
+       through to the live attempt, which fails exactly as it always
+       did. */
+    if (!navigator.onLine) {
+      const savedAt = _loadOfflineCache();
+      if (savedAt) {
+        _rebuildPlanted();
+        console.log('[height-audit] offline — served from cache saved',
+          new Date(savedAt).toLocaleString());
+        renderList();
+        setLoading(false);
+        return;
+      }
+    }
+
     const [aRows, tRows, abRows, balRows] = await Promise.all([
       sb.select('audit_height_records','select=*'),
       // Planted → PN, Transplanted* → MN. Both are enough to know a
@@ -199,6 +247,7 @@ async function loadRecords(){
     });
 
     _rebuildPlanted();
+    _saveOfflineCache();
     console.log('[height-audit] loaded', {
       audits: records.length,
       fromLogs:(tRows||[]).length,
