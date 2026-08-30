@@ -81,7 +81,8 @@ button.top-sel:focus{outline:none;border-color:var(--border-focus);box-shadow:0 
 .btn-pdf:hover{background:var(--green);color:#fff;border-color:var(--green);}
 
 /* ─── PAGE & TABS ─── */
-.page{width:100%;max-width:1800px;margin:0 auto;padding:24px 28px;}
+.page{width:100%;max-width:1720px;margin:0 auto;padding:20px 16px;}
+@media(min-width:768px){.page{padding:20px 22px;}}
 .tabs-bar{display:flex;gap:4px;margin-bottom:22px;background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:5px;box-shadow:var(--shadow-sm);width:fit-content;}
 .tab-btn{font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:0.3px;color:var(--text-muted);background:transparent;border:none;cursor:pointer;padding:8px 18px;border-radius:var(--r-sm);transition:all 0.14s;}
 .tab-btn:hover{color:var(--text-body);background:var(--green-bg);}
@@ -912,3 +913,103 @@ th.we-plot,td.we-plot{width:1%;}
 /* The ribbon is the page's own sticky header now, so the control strip
    below it must not claim the same top:0 and cover it. */
 #mjm-ribbon+#view-app .topbar{position:static;}
+
+
+/* ══════════════════════════════════════════════════════════════
+   THE SIDE BAR, AND THE HEAD BESIDE IT
+
+   This is PALMS's bar — shared/shared_palms_nav.js — measured and
+   coloured the same on purpose, so the two modules are one system rather
+   than two houses. It is a COPY and not that file because PALMS moves
+   between four HTML pages and this page moves between panels of itself:
+   same shape, different mechanism. CHANGE ONE, CHANGE THE OTHER. The
+   same note sits in shared_palms_nav.js.
+
+   Everything is a class rather than an inline style, for the reason that
+   file gives: an inline declaration outranks a stylesheet one whatever
+   the selector, so a bar styled inline cannot be narrowed by a media
+   query — and this bar has to become a row on a phone.
+   ══════════════════════════════════════════════════════════════ */
+.sm-frame{display:block;}
+.sm-body{min-width:0;}
+@media(min-width:768px){
+  .sm-frame{display:grid;grid-template-columns:212px minmax(0,1fr);
+    gap:24px;align-items:start;}
+}
+
+#sm-nav{display:block;}
+#sm-nav .pn-out{display:flex;align-items:center;gap:8px;padding:10px 13px;
+  border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;
+  text-decoration:none;font-size:11px;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;line-height:1.25;transition:background .15s,color .15s;}
+#sm-nav .pn-out:hover{background:#f1f5f9;color:#0f172a;}
+/* The panels, held apart from the way out by a rule rather than by
+   distance alone, so the bar reads as "leave" then "inside". */
+#sm-nav .pn-group{margin-top:14px;padding-top:14px;border-top:1px solid #ccfbf1;
+  display:flex;flex-direction:column;gap:4px;}
+#sm-nav .pn-cap{font-size:9.5px;font-weight:900;letter-spacing:.18em;
+  text-transform:uppercase;color:#5eead4;padding:0 4px 7px;line-height:1.4;}
+#sm-nav .pn-tab{display:block;width:100%;text-align:left;padding:10px 12px;
+  border-radius:12px;font-family:var(--font);font-size:12.5px;font-weight:800;
+  color:#0f766e;background:transparent;border:1px solid transparent;
+  line-height:1.25;cursor:pointer;transition:background .15s,color .15s;}
+#sm-nav .pn-tab:hover{background:#ccfbf1;}
+#sm-nav .pn-tab.is-on{background:#0f766e;color:#fff;}
+#sm-nav .pn-tab.is-on:hover{background:#115e59;}
+/* 84px clears the ribbon, which is sticky. */
+@media(min-width:768px){#sm-nav{position:sticky;top:84px;align-self:start;}}
+/* Phone: the column becomes a row above the content — a 212px column
+   beside a table on a 412px screen leaves neither of them usable. */
+@media(max-width:767px){
+  #sm-nav .pn-group{margin-top:10px;padding-top:10px;flex-direction:row;
+    overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  #sm-nav .pn-group::-webkit-scrollbar{display:none;}
+  #sm-nav .pn-cap{display:none;}
+  #sm-nav .pn-tab{width:auto;flex:0 0 auto;background:#f0fdfa;border-color:#99f6e4;
+    font-size:12px;padding:9px 13px;white-space:nowrap;}
+  #sm-nav .pn-out{justify-content:center;}
+}
+
+/* The head every panel shares: what the side bar chose, and the two
+   things a panel is read THROUGH. */
+.sm-head{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;padding-bottom:14px;margin-bottom:16px;
+  border-bottom:1.5px solid var(--border);}
+.sm-title{font-size:22px;font-weight:800;color:var(--text-head);
+  letter-spacing:.2px;line-height:1.2;}
+.sm-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.sm-month{display:flex;align-items:center;gap:6px;}
+.sm-month-btn{height:32px;min-width:104px;padding:0 12px;font-family:var(--font);
+  font-size:12px;font-weight:700;color:var(--text-head);background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer;
+  transition:border-color .15s;}
+.sm-month-btn:hover{border-color:var(--green);}
+
+/* The Schedule tab's own title and stepper moved into .sm-head, so what is
+   left of its bar is the buttons — which belong at the right, in nothing. */
+.sm-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  flex-wrap:wrap;margin-bottom:14px;}
+.sm-actions .btn,.sm-actions .btn-pdf{font-size:11.5px;padding:7px 15px;}
+
+
+/* ── The ribbon title on a phone ───────────────────────────────────────
+   shared_ribbon.js sizes the centred title from ONE scale that moves the
+   desk size and the phone size together, so a module cannot ask for
+   PALMS's 30px on a desk and something smaller on a phone. PALMS can
+   live with that: "PALMS" is five characters. "SCHEDULE & MAINTENANCE"
+   is twenty-two, and at the ribbon's phone size of 21px with .16em
+   tracking it runs past 412px of screen and is cut off mid-word.
+
+   So the desk size is the ribbon's own — the same as PALMS, which is
+   what was asked for — and only the phone is overridden here. Higher
+   specificity than the ribbon's own `#mjm-ribbon .mjm-rb-title` rule so
+   it wins wherever the injected <style> ends up in the cascade, and
+   !important for the reason that file gives: the size is written inline
+   on the element, and an inline declaration outranks a stylesheet one. */
+@media(max-width:640px){
+  body #mjm-ribbon .mjm-rb-title{font-size:15px !important;letter-spacing:.1em !important;}
+  body #mjm-ribbon .mjm-rb-sub{font-size:9.5px !important;letter-spacing:.05em !important;}
+}
+/* The side bar becomes a row of pills on a phone; the section title
+   underneath needs to not sit against them. */
+@media(max-width:767px){.sm-head{margin-top:14px;}}

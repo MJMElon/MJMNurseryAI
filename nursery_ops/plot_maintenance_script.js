@@ -1219,7 +1219,7 @@ const I18N = {
     'btn.reset':'↺ Reset to Defaults', 'btn.clearAll':'Clear All', 'btn.selectAll':'Select All',
     'sched.ticked':'ticked', 'sched.none':'not set yet',
     'tab.pd':'P & D — Spraying', 'tab.manuring':'Manuring', 'tab.weeding':'Weeding',
-    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Monthly Scheduled Work', 'tab.payroll':'📋 Worker Record', 'tab.setting':'⚙️ Setting',
+    'tab.interrow':'Interrow Spray', 'tab.record':'Work Record', 'tab.chart':'Analytics', 'tab.schedule':'Monthly Scheduled Work', 'tab.payroll':'Worker Record', 'tab.setting':'Setting',
     'pay.form':'Worker Record', 'pay.month':'Month', 'pay.date':'Date', 'pay.plot':'Plot',
     'pay.plotCap':'Plot Capacity (seedlings)', 'pay.perWorker':'Capacity per Worker (seedlings)',
     'pay.totalCap':'Total (Capacity)', 'pay.rate':'Piece Rate (RM)', 'pay.totalRM':'Total (RM)',
@@ -1301,7 +1301,7 @@ const I18N = {
     'btn.reset':'↺ Set Semula', 'btn.clearAll':'Kosongkan', 'btn.selectAll':'Pilih Semua',
     'sched.ticked':'ditanda', 'sched.none':'belum ditetapkan',
     'tab.pd':'P & D — Racun', 'tab.manuring':'Membaja', 'tab.weeding':'Merumput',
-    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Kerja Berjadual Bulanan', 'tab.payroll':'📋 Rekod Pekerja', 'tab.setting':'⚙️ Tetapan',
+    'tab.interrow':'Racun Selingan', 'tab.record':'Rekod Kerja', 'tab.chart':'Analitik', 'tab.schedule':'Kerja Berjadual Bulanan', 'tab.payroll':'Rekod Pekerja', 'tab.setting':'Tetapan',
     'pay.form':'Rekod Pekerja', 'pay.month':'Bulan', 'pay.date':'Tarikh', 'pay.plot':'Plot',
     'pay.plotCap':'Kapasiti plot (bibit)', 'pay.perWorker':'Kapasiti Kerja Setiap Orang (bibit)',
     'pay.totalCap':'Jumlah (Kapasiti)', 'pay.rate':'Kadar Sekeping (RM)', 'pay.totalRM':'Jumlah (RM)',
@@ -1856,8 +1856,7 @@ function _syncMonthButtons() {
 }
 
 function onNurseryChange() {
-  document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
-syncNurseryCircles();
+  syncNurseryCircles();
   renderAll();
   autoSyncRecords();
 }
@@ -1876,8 +1875,9 @@ function renderAll() {
   try { localStorage.setItem('mjm_maint_month', m); localStorage.setItem('mjm_maint_nursery', n); } catch (_) {}
   /* The Schedule tab shows every nursery at once, so its header names the
      month instead: "Monthly Work Schedule : Aug 26". */
-  const schedHdr = document.getElementById('sched-month-label');
-  if (schedHdr) schedHdr.textContent = 'Monthly Work Schedule : ' + shortMonth(m);
+  // The month lives in the section head now, beside the ‹ › that step it,
+  // and every panel reads the same one.
+  _syncMonthButtons();
   renderPD(); renderManuring(); renderWeeding(); renderInterrow(); renderRecords();
   renderSchedCounts();
   renderSchedSummary();
@@ -2352,17 +2352,23 @@ function applyNopsAdminUI() {
     const panel = document.getElementById('tab-setting');
     if (panel && panel.classList.contains('active')) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#sm-nav .pn-tab').forEach(b => b.classList.remove('is-on'));
       /* The landing tab, named rather than "the first .tab-btn" — the tabs
          have been reordered once and that selector silently pointed at a
          different one than the panel below it. */
       const land = document.getElementById('tab-schedule');
       if (land) land.classList.add('active');
-      const landBtn = document.querySelector('.tab-btn[onclick*="\'schedule\'"]');
-      if (landBtn) landBtn.classList.add('active');
+      const landBtn = navTabFor('schedule');
+      if (landBtn) landBtn.classList.add('is-on');
       renderSchedSummary();
     }
   }
+}
+
+/* The side bar button that opens a panel. Named by the panel it opens, so
+   nothing has to keep a parallel list of which button is which. */
+function navTabFor(name) {
+  return document.querySelector(`#sm-nav .pn-tab[onclick*="'${name}'"]`);
 }
 
 function switchTab(name, btn) {
@@ -2374,8 +2380,14 @@ function switchTab(name, btn) {
           'chemical or fertiliser needs changing.');
     return;
   }
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  document.querySelectorAll('#sm-nav .pn-tab').forEach(b=>b.classList.remove('is-on'));
+  if (btn) btn.classList.add('is-on');
+  /* The section is titled with the side bar's own wording rather than a
+     second list of names here — one source, and it follows the language
+     toggle without being told. */
+  const title = document.getElementById('sm-title');
+  const src = btn || navTabFor(name);
+  if (title && src) title.textContent = src.textContent.trim();
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   const panel = document.getElementById('tab-'+name);
   if (panel) panel.classList.add('active');
@@ -2385,10 +2397,11 @@ function switchTab(name, btn) {
   /* Setting has its own nursery tabs and no month, so the two pickers in the
      top bar would be choosing something it does not use. */
   const topCtrl = document.getElementById('top-nursery-ctrl');
-  const topPill = document.getElementById('nursery-pill');
   const noNursery = (name === 'setting' || name === 'schedule');
   if (topCtrl) topCtrl.style.display = noNursery ? 'none' : '';
-  if (topPill) topPill.style.display = noNursery ? 'none' : '';
+  // Setting is the one panel that is not about a month.
+  const monthCtrl = document.getElementById('sm-month-ctrl');
+  if (monthCtrl) monthCtrl.style.display = name === 'setting' ? 'none' : '';
 
   if (name==='schedule') renderSchedSummary();
   if (name==='setting') renderSetting();
@@ -4360,7 +4373,6 @@ try {
   if (savedNursery && Array.from(nSel.options).some(o => o.value === savedNursery)) nSel.value = savedNursery;
 } catch (_) {}
 _syncMonthButtons();
-document.getElementById('nursery-pill').textContent = nurseryShort(getNursery());
 syncNurseryCircles();
 applyLang();        // applies saved language + renders all views
 applySchedFolds();  // whichever schedule blocks this person keeps folded
@@ -4471,7 +4483,7 @@ async function initDb() {
   try {
     const landing = document.querySelector('.tab-panel.active');
     const key = landing && landing.id.replace(/^tab-/, '');
-    if (key) switchTab(key, document.querySelector(`.tab-btn[onclick*="'${key}'"]`));
+    if (key) switchTab(key, navTabFor(key));
   } catch (_) {}
   /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
      neither of which existed at first paint. */

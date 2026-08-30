@@ -23,6 +23,12 @@
    data-page is one of the keys in PAGES. An unknown key, or none, marks
    nothing current — a page not in the bar can still show it to get out.
 
+   SHARED SHAPE. Schedule & Maintenance wears this same bar — same widths,
+   same pills, same rule between the way out and the pages inside — from a
+   copy in nursery_ops/plot_maintenance_styles.css, because that page moves
+   between panels of itself rather than between HTML pages. Same shape,
+   different mechanism. CHANGE ONE, CHANGE THE OTHER.
+
    STYLING NOTE. Everything here is a class in the injected <style>, not
    an inline style attribute. That is deliberate: an inline declaration
    outranks a stylesheet one whatever the selector, so a bar styled
