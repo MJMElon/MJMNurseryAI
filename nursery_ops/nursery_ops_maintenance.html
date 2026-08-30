@@ -5,27 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=57">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=58">
 </head>
 <body>
 
+<!-- The ribbon every module page wears: wordmark left, module title in the
+     middle, Welcome / Portal / Sign Out on the right. Mounted here rather
+     than hand-built, so this page cannot drift from the others. -->
+<div id="mjm-ribbon" data-brand="MJM Nursery AI System"
+     data-center="Schedule &amp; Maintenance" data-center-scale="0.6" data-logo="off"></div>
+<script src="../shared/shared_ribbon.js"></script>
+
 <!-- ═══ APP VIEW ═══ -->
 <div id="view-app">
+  <!-- What is left of the old header: the controls, without the second
+       wordmark. Back goes to Nursery Ops, which is not where the ribbon's
+       Portal goes — one is the module list, the other the site. -->
   <header class="topbar">
     <div class="topbar-inner">
-      <a href="nursery_ops_dashboard.html" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-decoration:none;border:1.5px solid var(--border);border-radius:99px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">&#8592; Back</a>
-      <div class="logo-wrap">
-        <div class="logo-mark">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 3L7 8H4L2.5 12L4 16L7 21H17L20 16L21.5 12L20 8H17L12 3Z" stroke="#fff" stroke-width="1.7" fill="none"/>
-            <path d="M12 8V16M9 10.5L12 8L15 10.5M9 13.5L12 16L15 13.5" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
-          </svg>
-        </div>
-        <div>
-          <div class="logo-name">MJM NURSERY <span class="ai-chip">AI</span></div>
-          <div class="logo-sub">MAINTENANCE SYSTEM</div>
-        </div>
-      </div>
+      <a href="nursery_ops_dashboard.html" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-decoration:none;border:1.5px solid var(--border);border-radius:99px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">&#8592; Nursery Ops</a>
       <div class="topbar-mid">
         <div class="top-ctrl"><label data-i18n="top.month">Month</label>
           <input type="hidden" id="global-month">
@@ -57,15 +55,17 @@
 
   <div class="page">
     <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
-      <button class="tab-btn"        onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
-      <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">📋 Worker Record</button>
+      <!-- Monthly Scheduled Work lands first: it is what the page is for.
+           Worker Record is last because it may be leaving. -->
+      <button class="tab-btn active" onclick="switchTab('schedule',this)" data-i18n="tab.schedule">Monthly Scheduled Work</button>
+      <button class="tab-btn"        onclick="switchTab('record',this)"   data-i18n="tab.record">Work Record</button>
       <!-- Hidden until MJMAccess confirms an admin (see applyNopsAdminUI). -->
       <button class="tab-btn" id="tab-btn-setting" style="display:none;" onclick="switchTab('setting',this)"  data-i18n="tab.setting">⚙️ Setting</button>
+      <button class="tab-btn"        onclick="switchTab('payroll',this)"  data-i18n="tab.payroll">📋 Worker Record</button>
     </div>
 
     <!-- WORK RECORD (default) — headline metrics + List / Analytics sub-views -->
-    <div id="tab-record" class="tab-panel active">
+    <div id="tab-record" class="tab-panel">
       <div class="page-hdr"><div class="page-hdr-title" id="record-nursery-line"></div></div>
       <div id="rec-metrics" class="metrics-big"></div>
       <div class="subtabs-bar">
@@ -193,7 +193,7 @@
          were hiding three quarters of what you were about to save.
          One page, one toolbar, one Save — and the four programs stacked in
          the order they are worked. -->
-    <div id="tab-schedule" class="tab-panel">
+    <div id="tab-schedule" class="tab-panel active">
       <!-- Everything you can do to the month, said once. -->
       <div class="section-hdr">
         <div class="sched-month">
@@ -416,9 +416,7 @@
 </div>
 
 <!-- The week's dates, over the column header that opened them. -->
-<div id="week-pick" class="hidden" style="position:absolute;z-index:90;background:#fff;
-     border:1.5px solid var(--border);border-radius:var(--r-md);box-shadow:0 12px 30px rgba(0,0,0,.16);
-     padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+<div id="week-pick" class="hidden">
   <input type="date" id="wp-from" class="set-in" style="width:150px;">
   <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
   <input type="date" id="wp-to" class="set-in" style="width:150px;">
@@ -511,7 +509,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=74"></script>
+<script src="plot_maintenance_script.js?v=75"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

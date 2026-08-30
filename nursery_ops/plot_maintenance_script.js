@@ -2353,11 +2353,14 @@ function applyNopsAdminUI() {
     if (panel && panel.classList.contains('active')) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      const rec = document.getElementById('tab-record');
-      if (rec) rec.classList.add('active');
-      const recBtn = document.querySelector('.tab-btn');
-      if (recBtn) recBtn.classList.add('active');
-      renderRecords();
+      /* The landing tab, named rather than "the first .tab-btn" — the tabs
+         have been reordered once and that selector silently pointed at a
+         different one than the panel below it. */
+      const land = document.getElementById('tab-schedule');
+      if (land) land.classList.add('active');
+      const landBtn = document.querySelector('.tab-btn[onclick*="\'schedule\'"]');
+      if (landBtn) landBtn.classList.add('active');
+      renderSchedSummary();
     }
   }
 }
@@ -4462,6 +4465,14 @@ async function initDb() {
     });
   } catch (e) { console.warn('[maint] initial DB load failed:', e); }
   _dbReady = true;
+  /* Land on the tab the markup marks active, through switchTab, so the side
+     effects of being on it happen — Schedule hides the top bar's nursery
+     picker, which it shows every nursery of. */
+  try {
+    const landing = document.querySelector('.tab-panel.active');
+    const key = landing && landing.id.replace(/^tab-/, '');
+    if (key) switchTab(key, document.querySelector(`.tab-btn[onclick*="'${key}'"]`));
+  } catch (_) {}
   /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
      neither of which existed at first paint. */
   renderAll();

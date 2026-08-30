@@ -890,3 +890,25 @@ th.we-plot,td.we-plot{text-align:left;font-size:12.5px;font-weight:700;
 /* Two columns across a 760px modal leaves the ticks stranded in acres of
    space; the plot name only needs the width of a plot name. */
 th.we-plot,td.we-plot{width:1%;}
+
+
+/* ── The week-dates popover ────────────────────────────────────────────
+   Its look used to be written INLINE on the element, `display:flex` among
+   it, while class="hidden" was supposed to put it away. An inline
+   declaration outranks any stylesheet rule whatever the selector — and
+   this stylesheet had no .hidden rule at all — so it never hid. It sat at
+   the foot of every tab, two date boxes and three buttons, looking for all
+   the world like a search bar somebody had left behind.
+
+   Both halves live here now, and the hiding rule is the more specific of
+   the two, so it wins without !important. */
+#week-pick{position:absolute;z-index:90;display:flex;gap:8px;align-items:center;
+  flex-wrap:wrap;padding:12px;background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-md);
+  box-shadow:0 12px 30px rgba(0,0,0,.16);}
+#week-pick.hidden{display:none;}
+#week-pick .set-in{width:150px;}
+
+/* The ribbon is the page's own sticky header now, so the control strip
+   below it must not claim the same top:0 and cover it. */
+#mjm-ribbon+#view-app .topbar{position:static;}
