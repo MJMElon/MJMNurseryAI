@@ -199,7 +199,7 @@
            "you cannot change this" from "this page does not do that". -->
       <span id="ro-note" class="hidden text-[11px] font-bold text-amber-700 bg-amber-50
             border border-amber-200 rounded-full px-3 py-1">
-        Read only — changing a status needs the FC Portal module, or Manage Users
+        Read only — this account cannot write the plot log
       </span>
     </div>
     <div class="overflow-x-auto">
@@ -935,16 +935,25 @@ function render() {
     ME = (u && (u.full_name || u.email)) || '';
     /* Guarded like the rest: an older cached shared_access.js has no
        isAdminOf, and it must not take the page down. Fails closed. */
-    /* Changing a status writes the plot log, which the RLS gives to whoever
-       holds the FC Portal (or manages users) — NOT to an ops admin as such.
-       Offering a dropdown that always fails would be worse than plain text,
-       so the check matches the policy. Guarded and fails closed, like the
-       rest. */
+    /* Changing a status writes the plot log, and this has to be the SAME
+       question palms_has_access() asks as row-level security — offering a
+       dropdown whose save the database refuses is worse than plain text.
+
+       nursery_ops is in the list because it is also the test the guard above
+       used to let this person through the door. Anyone who can open this
+       page can correct what is on it: the office PALMS pages are the record
+       of plot status, and the people who keep them should be able to keep
+       them. See shared/migration_palms_ops_may_update.sql — if that has not
+       been run, this offers a dropdown the database will refuse.
+
+       Guarded and fails closed, like the rest. */
     CAN_UPDATE = (function () {
       try {
         const perms = MJMAccess.permissions() || {};
         const mods = perms.modules || {};
-        return (mods.scan && mods.scan !== 'none') || !!perms.manage_users;
+        return (mods.nursery_ops && mods.nursery_ops !== 'none')
+            || (mods.scan && mods.scan !== 'none')
+            || !!perms.manage_users;
       } catch (e) { return false; }
     })();
 
