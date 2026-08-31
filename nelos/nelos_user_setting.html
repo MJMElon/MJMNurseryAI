@@ -1118,6 +1118,22 @@ const dirty = mod => Object.keys(draft).some(k => k.split('|')[0] === mod);
 
 /* SOLVE BY — which system takes the case, and which person in it. Reads the
    pending edit if there is one, so the row shows what Save would write. */
+/* A seat number, compared as a NUMBER whatever it arrived as.
+
+   A <select>'s value is always a string, so a seat staged from the dropdown
+   was "3" while the same seat read back from Postgres is 3 — and `===` said
+   they were different people. Nothing matched, no <option> carried `selected`,
+   and the browser fell back to the first one: the PIC read "Anyone" however
+   carefully it had been chosen. It came right only after Save, because saving
+   casts to Number and the reload then compared 3 with 3.
+
+   Both ends are fixed — staged as a number below, and compared as one here —
+   because either alone would leave the other free to bring it back. */
+function sameSeat(a, b) {
+  if (a == null || b == null || a === '' || b === '') return a == null && b == null;
+  return Number(a) === Number(b);
+}
+
 function solveCells(mod, cat) {
   const pend = draftOf(mod, cat);
   const rule = pend || routes.find(r => r.source_module === mod && r.category === cat);
@@ -1138,7 +1154,7 @@ function solveCells(mod, cat) {
       <select class="inp r-seat" data-rule="${esc(mod)}" data-cat="${esc(cat)}"
               ${staff.length ? '' : 'disabled'}>
         <option value="">${staff.length ? 'Anyone' : 'Nobody tagged'}</option>
-        ${staff.map(p => `<option value="${p.seat_no}" ${toSeat === p.seat_no ? 'selected' : ''}>${
+        ${staff.map(p => `<option value="${p.seat_no}" ${sameSeat(toSeat, p.seat_no) ? 'selected' : ''}>${
           esc(seatName(toModule, p.seat_no))} — ${esc(p.full_name || p.email)}</option>`).join('')}
       </select>
     </div>`;
@@ -1229,7 +1245,9 @@ function renderRouting() {
     el.addEventListener('change', () => {
       const dest = $('routing').querySelector(
         `.r-dest[data-rule="${el.dataset.rule}"][data-cat="${el.dataset.cat}"]`);
-      stage(el.dataset.rule, el.dataset.cat, dest.value, el.value || null);
+      // A number, not the select's string, so the draft holds what the
+      // database holds and the row redraws with the person still chosen.
+      stage(el.dataset.rule, el.dataset.cat, dest.value, el.value ? Number(el.value) : null);
     }));
 
   $('routing').querySelectorAll('.rt-save').forEach(b =>
