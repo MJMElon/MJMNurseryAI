@@ -766,17 +766,26 @@ function statusCell(unitKey, ln) {
   if (!CAN_UPDATE) {
     return '<td>' + esc(ln && ln.status ? ln.status : '—') + '</td>';
   }
-  /* Two stages running at once cannot be shown in one dropdown honestly, so
-     that plot keeps plain text and stays the field app's to change. */
-  if (cur.length > 1) {
-    /* Plain text, and the reason in the tooltip rather than a second line.
-       Two stages at once is rare and the note was costing every OTHER row
-       nothing while making this one twice as tall. */
-    return '<td title="Two stages are running at once here — change it in the field app">' +
-           esc(ln.status) + '</td>';
-  }
+  /* MORE THAN ONE STAGE RUNNING still gets a dropdown — it just does not
+     pretend to be showing the current one.
+
+     This used to be plain text: two stages cannot be shown in one dropdown
+     honestly, so the row was left to the field app. That was the wrong half
+     of the problem to solve. A plot carrying two or three open entries is
+     usually not somebody deliberately running two activities — it is a plot
+     whose log has picked up duplicates (a phone pushing its old entries back
+     after the log was reseeded, say), and the office looking at it is
+     exactly the person who wants to say "no, it is on ONE stage, this one".
+     Leaving it read-only made the board unable to fix the one thing most
+     worth fixing.
+
+     So the control stays, with a first option naming what is actually
+     running and selected, so it claims nothing it cannot show. Picking a
+     stage closes EVERY open entry and opens the chosen one — which is what
+     confirmChange has always done, since it loops over all of them. */
+  const many = cur.length > 1;
   const opts = MJMPalms.ACTIVITIES.map((a) =>
-    '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+    '<option value="' + a.n + '"' + (!many && a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
   /* The control IS the colour patch. A separate swatch beside it would be a
      second thing to look at saying what the first already could, so the
      whole pill carries the stage's fill and its border — the row reads as
@@ -786,8 +795,10 @@ function statusCell(unitKey, ln) {
     ? ' style="background:' + esc(entry.fill) + ';border-color:' + esc(entry.stroke) + '"'
     : '';
   return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' +
-    (curN == null ? '' : curN) + '"' + tint + '>' +
-    (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
+    (curN == null ? '' : curN) + '"' + (many ? '' : tint) + '>' +
+    (many
+      ? '<option value="" selected>' + esc(cur.length + ' running: ' + ln.status) + '</option>'
+      : (curN == null ? '<option value="" selected>— nothing running —</option>' : '')) +
     opts + '</select></td>';
 }
 
@@ -813,12 +824,21 @@ function askChange(unit, fromN, toN) {
   const to = MJMPalms.actByN(toN);
   const ln = lineForPlot(unit);
 
+  /* Every open entry, not just the one the dropdown was showing — on a plot
+     carrying duplicates the whole point of the change is that ALL of them
+     are being closed, and a panel naming one of three would be describing a
+     smaller change than the one about to happen. */
+  const open = MJMPalms.currentEntries(LOGS, unit);
+  const names = open.map((e) => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
+
   $('cf-plot').textContent = MJMPalms.keyLabel(unit);
-  $('cf-was-v').textContent = from ? from.name : 'Nothing running';
-  $('cf-was-s').textContent = from && ln && ln.state !== 'none'
-    ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
-      ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
-    : '';
+  $('cf-was-v').textContent = names.length ? names.join(' + ') : 'Nothing running';
+  $('cf-was-s').textContent = names.length > 1
+    ? 'All ' + names.length + ' are closed today'
+    : (from && ln && ln.state !== 'none'
+        ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
+          ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
+        : '');
   // The new due date, worked out the same way the board will once it is
   // saved — so what is promised here is what appears in the row.
   const due = MJMPalms.addDays(today, to && to.days != null ? to.days : 0);

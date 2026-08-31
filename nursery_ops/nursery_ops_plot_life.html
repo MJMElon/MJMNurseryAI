@@ -753,15 +753,22 @@ function statusCell(plotName, st) {
   if (unit !== plotName) {
     return `<span title="This plot is split into areas — change it on the PALMS board, where each area has its own row">${chip}</span>`;
   }
+  /* More than one stage running still gets the dropdown — it just does not
+     pretend to be showing the current one. A plot carrying two or three open
+     entries is usually a log that has picked up duplicates rather than
+     somebody deliberately running two activities, and the office looking at
+     it is exactly the person who wants to say "it is on ONE stage, this
+     one". Picking closes every open entry and opens the chosen one. */
   const open = MJMPalms.currentEntries(PALMS_LOGS, unit);
-  if (open.length > 1) {
-    return `<span title="Two stages are running at once here — change it on the PALMS board or in the field app">${chip}</span>`;
-  }
+  const many = open.length > 1;
   const curN = open.length === 1 ? open[0].actN : null;
   const opts = MJMPalms.ACTIVITIES.map(a =>
-    `<option value="${a.n}"${a.n === curN ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+    `<option value="${a.n}"${!many && a.n === curN ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  const names = open.map(e => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
   return `<select class="st-pick" data-st="${esc(plotName)}" data-cur="${curN == null ? '' : curN}">` +
-    (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
+    (many
+      ? `<option value="" selected>${esc(open.length + ' running: ' + names.join(' + '))}</option>`
+      : (curN == null ? '<option value="" selected>— nothing running —</option>' : '')) +
     opts + '</select>';
 }
 
@@ -775,14 +782,21 @@ document.addEventListener('change', (e) => {
 });
 
 function askStatusChange(plotName, fromN, toN) {
-  const from = fromN == null ? null : MJMPalms.actByN(fromN);
   const to = MJMPalms.actByN(toN);
   if (!to) return;
   SF = { plot: plotName, unit: plotName, fromN: fromN, toN: toN };
   const today = MJMPalms.todayStr();
+  /* Every open entry, not just the one the dropdown was showing — on a plot
+     carrying duplicates the whole point is that ALL of them are closed, and
+     naming one of three would describe a smaller change than the one about
+     to happen. */
+  const names = MJMPalms.currentEntries(PALMS_LOGS, plotName)
+    .map(e => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
   $('sf-line').innerHTML =
     `<strong>${esc(plotName)}</strong> — ` +
-    (from ? `close <strong>${esc(from.name)}</strong> today and start ` : 'start ') +
+    (names.length
+      ? `close <strong>${esc(names.join(' + '))}</strong> today and start `
+      : 'start ') +
     `<strong>${esc(to.name)}</strong> on ${esc(MJMPalms.prettyD(today))}` +
     (to.days != null ? `, due in ${to.days} day${to.days === 1 ? '' : 's'}` : '');
   $('sf-msg').textContent = '';
