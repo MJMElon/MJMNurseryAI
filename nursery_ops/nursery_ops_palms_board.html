@@ -847,6 +847,11 @@ function askChange(unit, fromN, toN) {
     ' · ' + MJMPalms.diffDays(today, due) + 'd';
   $('cf-msg').textContent = '';
   $('cf-msg').className = 'text-[11px] font-bold text-slate-400';
+  /* Confirm is disabled while a save is in flight and was only re-enabled
+     when one FAILED — so after a save that worked it stayed dead, and the
+     next plot could not be changed until the page was reloaded. Every open
+     starts from a live button. */
+  $('cf-ok').disabled = false;
   $('cf-modal').classList.remove('hidden');
 }
 
@@ -905,6 +910,7 @@ $('cf-ok').addEventListener('click', async () => {
     /* Re-read rather than patch: last update, the new due date and the days
        left all come off the log, and the server is the record. */
     LOGS = await MJMPalms.loadLogs(_supabase);
+    btn.disabled = false;
     closeCf(false);
     render();
   } catch (err) {
