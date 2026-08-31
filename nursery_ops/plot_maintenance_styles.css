@@ -743,11 +743,18 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
   background:#f2f7f4;border-bottom:1.5px solid var(--border);}
 .ss-name{flex:1;font-size:13.5px;font-weight:800;letter-spacing:.5px;
   text-transform:uppercase;color:var(--green-text);}
-.ss-addweek{font-family:var(--font);font-size:11px;font-weight:700;
-  color:var(--green-text);background:var(--bg-white);border:1.5px solid var(--green-mid);
-  border-radius:var(--r-sm);padding:4px 10px;cursor:pointer;white-space:nowrap;
-  transition:background .13s,border-color .13s;}
-.ss-addweek:hover{background:#eaf7f0;border-color:var(--green);}
+.ss-count{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--text-muted);white-space:nowrap;}
+/* Week headers are two lines: which week, then when. They used to be a
+   button opening a date box; the dates are set in the Edit popup now,
+   beside the chemicals and ticks they belong to. */
+.ss-wk{font-size:11px;font-weight:800;color:var(--text-head);letter-spacing:.4px;}
+.ss-wk-d{font-size:9.5px;font-weight:700;color:var(--text-muted);
+  letter-spacing:0;text-transform:none;margin-top:1px;}
+/* A month nobody has set a week in. Not an error — most months start here. */
+.ss-none-th{font-weight:700 !important;color:var(--border-strong) !important;
+  text-transform:none !important;letter-spacing:0 !important;font-size:11px !important;}
+.ss-empty-cell{color:var(--border-strong);font-size:11.5px;font-style:italic;}
 
 .ss-table{width:100%;border-collapse:collapse;}
 .ss-table thead th{background:var(--bg-white);color:var(--text-muted);font-weight:800;
@@ -824,14 +831,14 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 .we-cfgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
   gap:10px;margin-bottom:14px;}
 .we-cfg{background:#f2f7f4;border:1.5px solid var(--border);border-radius:var(--r-md);
-  padding:9px 11px;min-width:0;}
+  padding:9px 11px;min-width:0;max-width:660px;margin-bottom:12px;}
 .we-cfg-h{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--green-text);padding-bottom:6px;margin-bottom:4px;
   border-bottom:1px solid var(--border);}
 .we-cfg-h-orphan{color:#92400e;}
 /* One field to a line, and the labels in a column of their own so PEST and
    DISEASE STICKER line their controls up rather than staggering them. */
-.we-cfg-row{display:grid;grid-template-columns:88px minmax(0,1fr) 58px 26px;
+.we-cfg-row{display:grid;grid-template-columns:88px minmax(0,1fr) 66px 28px;
   align-items:center;gap:8px;padding:3px 0;}
 .we-cfg-l{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--text-muted);}
@@ -847,7 +854,11 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 .we-num:focus{outline:none;border-color:var(--green);}
 
 .we-table{width:100%;border-collapse:collapse;}
-.we-table{table-layout:auto;}
+/* The plot column takes the slack; a tick column needs the width of a tick.
+   Left the other way round, two columns split 1,100px between them and the
+   checkbox for B1 sat 400px from the word B1. */
+.we-table{table-layout:auto;max-width:820px;}
+.we-table th.we-col,.we-table tbody td:not(.we-plot){width:110px;}
 .we-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:800;font-size:10.5px;
   letter-spacing:.6px;text-transform:uppercase;padding:7px 8px;
   border-bottom:2px solid var(--border-strong);text-align:center;}
@@ -890,7 +901,7 @@ th.we-plot,td.we-plot{text-align:left;font-size:12.5px;font-weight:700;
 #we-modal .modal-body{flex:1 1 auto;overflow-y:auto;min-height:0;}
 /* Two columns across a 760px modal leaves the ticks stranded in acres of
    space; the plot name only needs the width of a plot name. */
-th.we-plot,td.we-plot{width:1%;}
+th.we-plot,td.we-plot{width:auto;min-width:120px;}
 
 
 /* ── The week-dates popover ────────────────────────────────────────────
@@ -1013,3 +1024,35 @@ th.we-plot,td.we-plot{width:1%;}
 /* The side bar becomes a row of pills on a phone; the section title
    underneath needs to not sit against them. */
 @media(max-width:767px){.sm-head{margin-top:14px;}}
+
+
+/* ── The Edit popup, one block per week ────────────────────────────────
+   A week is a round now: its dates, what is mixed for it and which plots
+   get it are one thing, asked for in that order. */
+.we-week{border:1.5px solid var(--border);border-radius:var(--r-md);
+  padding:12px 13px;margin-bottom:14px;background:var(--bg-white);}
+.we-week:last-child{margin-bottom:0;}
+.we-week-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-bottom:10px;margin-bottom:11px;border-bottom:1.5px solid var(--border);}
+.we-week-n{font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--green-text);}
+.we-dates{display:flex;align-items:center;gap:7px;}
+.we-to{font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;}
+.we-date{height:32px;padding:0 9px;font-family:var(--font);font-size:12.5px;font-weight:600;
+  color:var(--text-head);background:var(--bg-white);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);}
+.we-date:focus{outline:none;border-color:var(--green);}
+/* Removing a week takes its ticks with it, so it is the one control here
+   that is coloured like a consequence. */
+.we-week-x{margin-left:auto;width:28px;height:28px;padding:0;font-size:17px;line-height:1;
+  font-family:var(--font);color:var(--red);background:var(--bg-white);
+  border:1.5px solid var(--red-border);border-radius:var(--r-sm);cursor:pointer;}
+.we-week-x:hover{background:var(--red-bg);border-color:var(--red);}
+
+
+/* The plot column is wide now that the tick columns are fixed, which made
+   a centring rule that never showed before very visible: `.we-table tbody
+   td` (0,1,2) outranks `td.we-plot` (0,1,1), so the names were centring in
+   half a table. Said again at a specificity that wins. */
+.we-table thead th.we-plot,
+.we-table tbody td.we-plot{text-align:left;padding-left:14px;}
