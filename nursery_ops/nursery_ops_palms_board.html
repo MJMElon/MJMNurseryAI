@@ -193,6 +193,14 @@
       <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
         Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
       </h2>
+      <!-- Said, rather than silently degraded. Current Status is a dropdown
+           for an account that may write the plot log and plain text for one
+           that may not, and until now nothing on the page distinguished
+           "you cannot change this" from "this page does not do that". -->
+      <span id="ro-note" class="hidden text-[11px] font-bold text-amber-700 bg-amber-50
+            border border-amber-200 rounded-full px-3 py-1">
+        Read only — this account cannot write the plot log
+      </span>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
@@ -758,17 +766,26 @@ function statusCell(unitKey, ln) {
   if (!CAN_UPDATE) {
     return '<td>' + esc(ln && ln.status ? ln.status : '—') + '</td>';
   }
-  /* Two stages running at once cannot be shown in one dropdown honestly, so
-     that plot keeps plain text and stays the field app's to change. */
-  if (cur.length > 1) {
-    /* Plain text, and the reason in the tooltip rather than a second line.
-       Two stages at once is rare and the note was costing every OTHER row
-       nothing while making this one twice as tall. */
-    return '<td title="Two stages are running at once here — change it in the field app">' +
-           esc(ln.status) + '</td>';
-  }
+  /* MORE THAN ONE STAGE RUNNING still gets a dropdown — it just does not
+     pretend to be showing the current one.
+
+     This used to be plain text: two stages cannot be shown in one dropdown
+     honestly, so the row was left to the field app. That was the wrong half
+     of the problem to solve. A plot carrying two or three open entries is
+     usually not somebody deliberately running two activities — it is a plot
+     whose log has picked up duplicates (a phone pushing its old entries back
+     after the log was reseeded, say), and the office looking at it is
+     exactly the person who wants to say "no, it is on ONE stage, this one".
+     Leaving it read-only made the board unable to fix the one thing most
+     worth fixing.
+
+     So the control stays, with a first option naming what is actually
+     running and selected, so it claims nothing it cannot show. Picking a
+     stage closes EVERY open entry and opens the chosen one — which is what
+     confirmChange has always done, since it loops over all of them. */
+  const many = cur.length > 1;
   const opts = MJMPalms.ACTIVITIES.map((a) =>
-    '<option value="' + a.n + '"' + (a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+    '<option value="' + a.n + '"' + (!many && a.n === curN ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
   /* The control IS the colour patch. A separate swatch beside it would be a
      second thing to look at saying what the first already could, so the
      whole pill carries the stage's fill and its border — the row reads as
@@ -778,8 +795,10 @@ function statusCell(unitKey, ln) {
     ? ' style="background:' + esc(entry.fill) + ';border-color:' + esc(entry.stroke) + '"'
     : '';
   return '<td><select class="st-pick" data-st="' + esc(unitKey) + '" data-cur="' +
-    (curN == null ? '' : curN) + '"' + tint + '>' +
-    (curN == null ? '<option value="" selected>— nothing running —</option>' : '') +
+    (curN == null ? '' : curN) + '"' + (many ? '' : tint) + '>' +
+    (many
+      ? '<option value="" selected>' + esc(cur.length + ' running: ' + ln.status) + '</option>'
+      : (curN == null ? '<option value="" selected>— nothing running —</option>' : '')) +
     opts + '</select></td>';
 }
 
@@ -805,12 +824,21 @@ function askChange(unit, fromN, toN) {
   const to = MJMPalms.actByN(toN);
   const ln = lineForPlot(unit);
 
+  /* Every open entry, not just the one the dropdown was showing — on a plot
+     carrying duplicates the whole point of the change is that ALL of them
+     are being closed, and a panel naming one of three would be describing a
+     smaller change than the one about to happen. */
+  const open = MJMPalms.currentEntries(LOGS, unit);
+  const names = open.map((e) => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
+
   $('cf-plot').textContent = MJMPalms.keyLabel(unit);
-  $('cf-was-v').textContent = from ? from.name : 'Nothing running';
-  $('cf-was-s').textContent = from && ln && ln.state !== 'none'
-    ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
-      ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
-    : '';
+  $('cf-was-v').textContent = names.length ? names.join(' + ') : 'Nothing running';
+  $('cf-was-s').textContent = names.length > 1
+    ? 'All ' + names.length + ' are closed today'
+    : (from && ln && ln.state !== 'none'
+        ? 'Started ' + MJMPalms.prettyD(ln.start) + ' · due ' + MJMPalms.prettyD(ln.due) +
+          ' · ' + (ln.left < 0 ? (-ln.left) + 'd over' : ln.left + 'd left')
+        : '');
   // The new due date, worked out the same way the board will once it is
   // saved — so what is promised here is what appears in the row.
   const due = MJMPalms.addDays(today, to && to.days != null ? to.days : 0);
@@ -890,6 +918,8 @@ $('cf-ok').addEventListener('click', async () => {
 });
 
 function render() {
+  const note = $('ro-note');
+  if (note) note.classList.toggle('hidden', CAN_UPDATE);
   renderHidden();
   LINES = new Map();
   MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
@@ -925,16 +955,25 @@ function render() {
     ME = (u && (u.full_name || u.email)) || '';
     /* Guarded like the rest: an older cached shared_access.js has no
        isAdminOf, and it must not take the page down. Fails closed. */
-    /* Changing a status writes the plot log, which the RLS gives to whoever
-       holds the FC Portal (or manages users) — NOT to an ops admin as such.
-       Offering a dropdown that always fails would be worse than plain text,
-       so the check matches the policy. Guarded and fails closed, like the
-       rest. */
+    /* Changing a status writes the plot log, and this has to be the SAME
+       question palms_has_access() asks as row-level security — offering a
+       dropdown whose save the database refuses is worse than plain text.
+
+       nursery_ops is in the list because it is also the test the guard above
+       used to let this person through the door. Anyone who can open this
+       page can correct what is on it: the office PALMS pages are the record
+       of plot status, and the people who keep them should be able to keep
+       them. See shared/migration_palms_ops_may_update.sql — if that has not
+       been run, this offers a dropdown the database will refuse.
+
+       Guarded and fails closed, like the rest. */
     CAN_UPDATE = (function () {
       try {
         const perms = MJMAccess.permissions() || {};
         const mods = perms.modules || {};
-        return (mods.scan && mods.scan !== 'none') || !!perms.manage_users;
+        return (mods.nursery_ops && mods.nursery_ops !== 'none')
+            || (mods.scan && mods.scan !== 'none')
+            || !!perms.manage_users;
       } catch (e) { return false; }
     })();
 

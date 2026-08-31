@@ -283,6 +283,29 @@
   </div>
 </div>
 
+<!-- ── Confirm a status change ───────────────────────────────────
+     Nothing is written until Confirm. A status is read by the map, the
+     alert board and the motion study, so a mis-click must be undoable by
+     walking away rather than by keying the old stage back in. -->
+<div id="sf-back" class="modal-back hidden"></div>
+<div id="sf-modal" class="modal hidden">
+  <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+    <h3 class="font-black text-slate-800 uppercase tracking-widest text-sm">Change plot status</h3>
+    <button data-sf-close class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 text-xl leading-none">×</button>
+  </div>
+  <div class="p-6 space-y-3">
+    <p id="sf-line" class="text-[13px] font-semibold text-slate-600 bg-teal-50 border border-teal-200 rounded-xl p-3">—</p>
+    <p class="text-[11px] text-slate-400">
+      Written to the same plot log the Field Conductors' app records into, under your name and today's date.
+      Their phones pick it up on their next sync.</p>
+    <p id="sf-msg" class="text-[12px] font-bold text-rose-600"></p>
+  </div>
+  <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-[20px]">
+    <button data-sf-close class="btn btn-ghost">Cancel</button>
+    <button id="sf-ok" class="btn btn-teal">Confirm</button>
+  </div>
+</div>
+
 <!-- ── Plot status pop-out (current + daily history) ──────────── -->
 <div id="ps-back" class="modal-back hidden"></div>
 <div id="ps-modal" class="modal hidden" style="max-width:640px">
@@ -618,6 +641,13 @@ async function loadAllStatuses() {
         over: ln.state === 'overdue',
         last: ln.lastDate,
         reported_by: ln.lastBy,
+        /* The UNIT this came from, which is the plot ("B2") until it is split
+           into areas ("B2#A"). The table draws one row per plot, so a split
+           plot's row is standing in for whichever area is worst — and a
+           status written against the plot would open a second unit beside the
+           areas rather than correct one. Kept so the dropdown knows to stay
+           out of it. */
+        unit: ln.key,
       });
     });
   } catch (e) {
@@ -666,7 +696,7 @@ function renderStatusTable() {
         if (!st) return `
           <tr>
             <td><button class="plot-link" data-plot-pop="${esc(p.plot_name)}">${esc(p.plot_name)}</button></td>
-            <td class="text-slate-400">— no status reported —</td>
+            <td>${statusCell(p.plot_name, null)}</td>
             <td class="text-slate-400">—</td><td class="text-slate-400">—</td><td class="text-slate-400">—</td>
           </tr>`;
         const idealTxt = st.ideal != null ? `${st.ideal} day${Number(st.ideal) === 1 ? '' : 's'}` : '—';
@@ -675,13 +705,173 @@ function renderStatusTable() {
         return `
           <tr class="${st.over ? 'over' : ''}">
             <td><button class="plot-link" data-plot-pop="${esc(p.plot_name)}">${esc(p.plot_name)}</button></td>
-            <td><span class="chip ${st.over ? 'chip-over' : 'chip-done'}">${esc(st.stage_name)}</span></td>
+            <td>${statusCell(p.plot_name, st)}</td>
             <td>${idealTxt}</td>
             <td class="${st.over ? 'text-rose-600 font-black' : ''}">${actualTxt}</td>
             <td class="text-slate-500">${fmtDate(st.last)}${st.reported_by ? ' · ' + esc(st.reported_by) : ''}</td>
           </tr>`;
       }).join('')}</tbody>
     </table>`;
+}
+
+/* ── Setting a plot's status from this table ──────────────────────────────
+   The Current Status cell IS the control, exactly as it is on the PALMS
+   board: pick a different stage and a confirm step asks before anything is
+   written. Same rule, same write, same table — this page and the board are
+   two views of one plot log, and a status set on either is the same record.
+
+   Who may: anyone who can open this page. The page guard is
+   canAccess('nursery_ops'), and palms_has_access() — the row-level rule on
+   the log — asks the same question, so the dropdown is offered exactly when
+   the save will be accepted. See shared/migration_palms_ops_may_update.sql.
+
+   TWO ROWS DELIBERATELY KEEP PLAIN TEXT:
+
+     a split plot   PALMS logs against a UNIT: the plot while it is whole
+                    ("B2"), and "B2#A" once it is split into areas. This
+                    table draws one row per PLOT, so a split plot's row is
+                    standing in for whichever area is worst. Writing a status
+                    against the plot would open a second unit beside the
+                    areas rather than correct one of them. Those stay the
+                    board's to change, where every area has its own row.
+     two at once    PALMS allows two activities on one unit and a dropdown is
+                    one. Same rule the board uses.
+────────────────────────────────────────────────────────────────────────── */
+let CAN_UPDATE = false;   // may this account write the plot log?
+let SF = null;            // { plot, unit, fromN, toN } awaiting confirmation
+
+function statusCell(plotName, st) {
+  const label = st ? st.stage_name : '— no status reported —';
+  const chip = st
+    ? `<span class="chip ${st.over ? 'chip-over' : 'chip-done'}">${esc(label)}</span>`
+    : `<span class="text-slate-400">${esc(label)}</span>`;
+  if (!CAN_UPDATE) return chip;
+
+  /* A plot that has never been logged has no unit yet, so the plot name IS
+     the unit — that is what the field app opens too. */
+  const unit = st ? st.unit : plotName;
+  if (unit !== plotName) {
+    return `<span title="This plot is split into areas — change it on the PALMS board, where each area has its own row">${chip}</span>`;
+  }
+  /* More than one stage running still gets the dropdown — it just does not
+     pretend to be showing the current one. A plot carrying two or three open
+     entries is usually a log that has picked up duplicates rather than
+     somebody deliberately running two activities, and the office looking at
+     it is exactly the person who wants to say "it is on ONE stage, this
+     one". Picking closes every open entry and opens the chosen one. */
+  const open = MJMPalms.currentEntries(PALMS_LOGS, unit);
+  const many = open.length > 1;
+  const curN = open.length === 1 ? open[0].actN : null;
+  const opts = MJMPalms.ACTIVITIES.map(a =>
+    `<option value="${a.n}"${!many && a.n === curN ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  const names = open.map(e => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
+  return `<select class="st-pick" data-st="${esc(plotName)}" data-cur="${curN == null ? '' : curN}">` +
+    (many
+      ? `<option value="" selected>${esc(open.length + ' running: ' + names.join(' + '))}</option>`
+      : (curN == null ? '<option value="" selected>— nothing running —</option>' : '')) +
+    opts + '</select>';
+}
+
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('select.st-pick');
+  if (!sel) return;
+  const toN = Number(sel.value);
+  const fromN = sel.dataset.cur === '' ? null : Number(sel.dataset.cur);
+  if (!toN || toN === fromN) return;
+  askStatusChange(sel.dataset.st, fromN, toN);
+});
+
+function askStatusChange(plotName, fromN, toN) {
+  const to = MJMPalms.actByN(toN);
+  if (!to) return;
+  SF = { plot: plotName, unit: plotName, fromN: fromN, toN: toN };
+  const today = MJMPalms.todayStr();
+  /* Every open entry, not just the one the dropdown was showing — on a plot
+     carrying duplicates the whole point is that ALL of them are closed, and
+     naming one of three would describe a smaller change than the one about
+     to happen. */
+  const names = MJMPalms.currentEntries(PALMS_LOGS, plotName)
+    .map(e => { const a = MJMPalms.actByN(e.actN); return a ? a.name : '?'; });
+  $('sf-line').innerHTML =
+    `<strong>${esc(plotName)}</strong> — ` +
+    (names.length
+      ? `close <strong>${esc(names.join(' + '))}</strong> today and start `
+      : 'start ') +
+    `<strong>${esc(to.name)}</strong> on ${esc(MJMPalms.prettyD(today))}` +
+    (to.days != null ? `, due in ${to.days} day${to.days === 1 ? '' : 's'}` : '');
+  $('sf-msg').textContent = '';
+  $('sf-ok').disabled = false;
+  $('sf-back').classList.remove('hidden');
+  $('sf-modal').classList.remove('hidden');
+}
+
+/* Cancelling has to put the dropdown back — it is showing the stage that was
+   picked, not the one the plot is on, and leaving it there would be the
+   screen claiming a change that never happened. */
+function closeStatusModal() {
+  SF = null;
+  $('sf-back').classList.add('hidden');
+  $('sf-modal').classList.add('hidden');
+  renderStatusTable();
+}
+
+async function confirmStatusChange() {
+  if (!SF) return;
+  $('sf-ok').disabled = true;
+  $('sf-msg').textContent = 'Saving…';
+  const today = MJMPalms.todayStr();
+  const unit = SF.unit;
+  const open = MJMPalms.currentEntries(PALMS_LOGS, unit);
+  const act = MJMPalms.actByN(SF.toN);
+  const u = MJMAccess.user() || {};
+
+  try {
+    /* Close what is running, then open the chosen stage today — the same two
+       writes the board makes and the same the field app makes, so a status
+       set here is indistinguishable from one set there. */
+    for (const e of open) {
+      if (!e.uid) continue;              // never synced — no server row to close
+      const res = await _supabase.from('fcportal_palms_plot_logs')
+        .update({ end_date: today, updated_at: new Date().toISOString() })
+        .eq('client_uid', e.uid);
+      if (res.error) throw res.error;
+    }
+    // seq_no orders a plot's log; the motion study reads it back in that order
+    // to tell one cycle from the next.
+    const seq = (PALMS_LOGS[unit] || []).reduce((m, e) => Math.max(m, e.no || 0), 0) + 1;
+    const res = await _supabase.from('fcportal_palms_plot_logs').insert([{
+      client_uid: (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
+      nursery_name: MJMPalms.nurseryOfPlot(MJMPalms.plotOf(unit)),
+      plot_name: unit,
+      act_n: SF.toN,
+      start_date: today,
+      end_date: null,
+      ideal_days: act && act.days != null ? act.days : null,
+      recorded_by: u.full_name || u.email || 'Office',
+      seq_no: seq,
+      updated_at: new Date().toISOString(),
+    }]);
+    if (res.error) throw res.error;
+
+    // Re-read rather than patch: the map, the alert board and the days-over
+    // figures all come off the log, and the server is the record.
+    await loadAllStatuses();
+    await loadActions();
+    SF = null;
+    $('sf-back').classList.add('hidden');
+    $('sf-modal').classList.add('hidden');
+    renderStatusTable();
+    renderMapPlots();
+    renderAlerts();
+    showToast('Status updated.');
+  } catch (err) {
+    console.warn(err);
+    // The likeliest failure is the row-level policy — see the note above.
+    $('sf-msg').textContent = (err && err.message) || 'Could not save.';
+    $('sf-ok').disabled = false;
+  }
 }
 
 // ── Alert board: plots over their stage's ideal time ─────────
@@ -1065,6 +1255,8 @@ async function saveLog() {
 
 // ── Events ───────────────────────────────────────────────────
 document.addEventListener('click', e => {
+  if (e.target.closest('[data-sf-close]')) { closeStatusModal(); return; }
+  if (e.target.closest('#sf-ok')) { confirmStatusChange(); return; }
   if (e.target.closest('[data-close]')) { closeModals(); return; }
   const pi = e.target.closest('[data-plot]');
   if (pi) { selectPlot(pi.dataset.plot); return; }
@@ -1139,6 +1331,21 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
       window.location.href = '../index.html';
       return;
     }
+
+    /* Whoever got past the line above may set a status. It is the same test
+       palms_has_access() applies as row-level security on the plot log, so
+       the dropdown is offered exactly when the save will be accepted —
+       offering one whose save the database refuses is worse than plain text.
+       Guarded and fails closed, like the rest. */
+    CAN_UPDATE = (function () {
+      try {
+        const perms = MJMAccess.permissions() || {};
+        const mods = perms.modules || {};
+        return (mods.nursery_ops && mods.nursery_ops !== 'none')
+            || (mods.scan && mods.scan !== 'none')
+            || !!perms.manage_users;
+      } catch (e) { return false; }
+    })();
     const [{ data: pl, error: e1 }, { data: wt, error: e2 }, { data: wk }, nurRes] = await Promise.all([
       _supabase.from('shared_plots').select('nursery_name, plot_name, map_top').order('plot_name'),
       _supabase.from('nops_work_types').select('*').order('sort_order').order('name'),
