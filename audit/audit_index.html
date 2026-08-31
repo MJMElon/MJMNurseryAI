@@ -503,6 +503,7 @@
 </div>
 
 <script src="audit_lang.js?v=20260825b"></script>
+<script src="audit_offline_vault.js?v=20260831a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
@@ -543,6 +544,10 @@
     window.location.href = auditLanding();
   }
 
+  /* Any phone that picks this build up sheds the plaintext credentials the
+     vault replaced, signed in or not — see audit_offline_vault.js. */
+  MJMOfflineVault.dropPlaintext();
+
   // Show offline banner
   function updateOfflineBar(){
     let bar = document.getElementById('offline-bar');
@@ -551,7 +556,7 @@
         bar = document.createElement('div');
         bar.id = 'offline-bar';
         bar.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:6px;z-index:9999;letter-spacing:.3px';
-        bar.textContent = '📴 Offline — login requires internet connection';
+        bar.textContent = '📴 Offline — sign-in works if this phone has signed in before';
         document.body.appendChild(bar);
       }
     } else {
@@ -579,32 +584,34 @@
 
     btn.classList.add('loading');
 
-    // OFFLINE LOGIN — use cached credentials
+    /* OFFLINE LOGIN — open the phone's sealed copy (audit_offline_vault.js).
+       The typed password either decrypts the state saved at the last ONLINE
+       login — the user object AND the Supabase session, so the Dexie queue
+       can sync once the line returns — or nothing opens. This replaced a
+       plaintext email+password kept in localStorage, which anyone holding
+       the phone could read. */
     if (!navigator.onLine) {
-      const cached = localStorage.getItem('mjm_cached_creds');
-      if (cached) {
-        try {
-          const creds = JSON.parse(cached);
-          if (creds.email === email && creds.password === password) {
-            /* Restore the cached user. Without this the redirect landed on a
-               page whose guard found no mjm_user and sent it straight back
-               here — offline login looked like it did nothing. */
-            const cachedUser = localStorage.getItem('mjm_cached_user');
-            if (!cachedUser) {
-              btn.classList.remove('loading');
-              errEl.textContent = '📴 Offline — no cached profile. Sign in online once first.';
-              errEl.classList.add('show');
-              return;
-            }
-            localStorage.setItem('mjm_user', cachedUser);
-            window.location.href = auditLanding();
-            return;
-          }
-        } catch(e) {}
+      if (!MJMOfflineVault.has(email)) {
+        btn.classList.remove('loading');
+        errEl.textContent = '📴 Offline — this phone has not signed in to this account before. The first sign-in needs a line; after that it works offline.';
+        errEl.classList.add('show');
+        return;
       }
-      btn.classList.remove('loading');
-      errEl.textContent = '📴 Offline — wrong email/password. Must login online at least once first.';
-      errEl.classList.add('show');
+      const saved = await MJMOfflineVault.open(email, password);
+      if (!saved || !saved.user) {
+        btn.classList.remove('loading');
+        errEl.textContent = '📴 Offline — password does not match (checked against the copy saved on this phone).';
+        errEl.classList.add('show');
+        return;
+      }
+      localStorage.setItem('mjm_user', JSON.stringify(saved.user));
+      /* The Supabase session too, where supabase-js keeps it — the OLD
+         plaintext path never restored this, so records queued offline could
+         not sync after an offline re-login until somebody signed in online. */
+      if (saved.storageKey && saved.session) {
+        try { localStorage.setItem(saved.storageKey, JSON.stringify(saved.session)); } catch(e) {}
+      }
+      window.location.href = auditLanding();
       return;
     }
 
@@ -641,13 +648,22 @@
                         user_type: profile?.user_type || null,
                         permissions: profile?.permissions || null };
 
-      // Save session + cache credentials for offline login. The user object
-      // is cached alongside them because signing out clears mjm_user, and
-      // the offline path below has nothing to sign anyone back in with
-      // otherwise.
       localStorage.setItem('mjm_user', JSON.stringify(userObj));
-      localStorage.setItem('mjm_cached_user', JSON.stringify(userObj));
-      localStorage.setItem('mjm_cached_creds', JSON.stringify({ email, password }));
+
+      /* Seal what this login produced under the password itself, so signing
+         out and back in works with no line — see audit_offline_vault.js.
+         The Supabase session goes in the payload: supabase-js has just
+         written it, and it is what lets queued records sync later. Sealing
+         is best effort — a phone that cannot seal simply keeps needing a
+         line to sign in, which is where it started. */
+      try {
+        const sbKey = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k));
+        const sbRaw = sbKey ? JSON.parse(localStorage.getItem(sbKey)) : null;
+        await MJMOfflineVault.seal(email, password,
+          { user: userObj, storageKey: sbKey || null, session: sbRaw || data.session || null });
+      } catch (e) { /* nothing to do */ }
+      // The plaintext credentials the vault replaced. Gone for good.
+      MJMOfflineVault.dropPlaintext();
 
       window.location.href = auditLanding();
 
@@ -758,6 +774,6 @@
   }
 
 </script>
-<script src="audit_dexie_offline.js?v=20260823n"></script>
+<script src="audit_dexie_offline.js?v=20260831b"></script>
 </body>
 </html>

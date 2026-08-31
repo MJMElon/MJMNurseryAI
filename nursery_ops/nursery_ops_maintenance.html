@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=61">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=64">
 </head>
 <body>
 
@@ -213,14 +213,9 @@
          One page, one toolbar, one Save — and the four programs stacked in
          the order they are worked. -->
     <div id="tab-schedule" class="tab-panel active">
-      <!-- What is left of the old bar once the title and the month moved
-           into the section head: two buttons, which need no box of their
-           own — an empty framed strip with a rule down one side reads as
-           something that failed to load. -->
-      <div class="sm-actions">
-        <button class="btn btn-primary schedule-edit-ctrl" onclick="saveAllSchedules()" data-i18n="btn.save">💾 Save Schedule</button>
-        <button class="btn-pdf" onclick="openPdfModal()" data-i18n="btn.pdf">⬇ Download Schedule PDF</button>
-      </div>
+      <!-- No Save and no PDF here. Saving is what every tick already does,
+           and publishing to the worker app happens when the Edit popup's
+           Save is pressed — see saveWorkEditor(). -->
 
       <!-- ── SUMMARY ────────────────────────────────────────────────
            Every nursery, every week, the four works. A tick means that work
@@ -413,7 +408,7 @@
 
 <!-- ═══ ONE WORK, ONE WEEK ═══ -->
 <div class="modal-overlay" id="we-modal">
-  <div class="modal" style="width:1180px;max-width:96vw;">
+  <div class="modal" style="width:1000px;max-width:96vw;">
     <div class="modal-top">
       <div>
         <div class="modal-title" id="we-title">Work</div>
@@ -423,21 +418,14 @@
     </div>
     <div class="modal-body" id="we-body"></div>
     <div class="modal-footer">
+      <!-- Weeks are made here, where their dates, chemicals and ticks are
+           set. The summary only counts them. -->
+      <button class="btn schedule-edit-ctrl" id="we-add-week" onclick="weAddWeek()"
+        style="margin-right:auto;">&#65291; Add Week</button>
       <button class="btn" onclick="cancelWorkEditor()">Cancel</button>
       <button class="btn btn-primary" onclick="saveWorkEditor()">Save</button>
     </div>
   </div>
-</div>
-
-<!-- The week's dates, over the column header that opened them. -->
-<div id="week-pick" class="hidden">
-  <input type="date" id="wp-from" class="set-in" style="width:150px;">
-  <span style="font-size:12px;font-weight:700;color:var(--text-muted);">to</span>
-  <input type="date" id="wp-to" class="set-in" style="width:150px;">
-  <button class="btn" style="font-size:12px;" onclick="closeWeekPicker()">Cancel</button>
-  <button class="btn btn-danger" id="wp-remove" style="font-size:12px;" onclick="removeSummaryWeek()"
-    title="Remove this week — its days join the week beside it">Remove</button>
-  <button class="btn btn-primary" style="font-size:12px;" onclick="saveWeekPick()">Set</button>
 </div>
 
 <!-- ═══ ADD/EDIT RECORD MODAL ═══ -->
@@ -523,7 +511,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=77"></script>
+<script src="plot_maintenance_script.js?v=78"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

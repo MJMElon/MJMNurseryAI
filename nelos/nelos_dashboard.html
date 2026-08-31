@@ -350,6 +350,10 @@
   .s-lab-2 { margin-top:13px; }
   .s-prev { width:100%; max-height:210px; object-fit:cover; border-radius:11px; margin-top:9px;
             display:block; border:1.5px solid #ede9fe; }
+  /* The case's own photo, sitting between the title and the facts. A
+     little more room than the fix photos below it: it is the evidence
+     somebody is judging, not a receipt for work already accepted. */
+  .s-case-shot { max-height:240px; margin:11px 0 4px; }
   .s-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:10px;
            padding:9px 11px; font-size:12px; font-weight:700; }
 
@@ -596,7 +600,8 @@
     </div>
 
     <div class="m-body">
-      <img id="v-photo" class="s-prev hidden" alt="Photo on the case">
+      <!-- The case photo is inside the block now, printed by
+           caseBlockHtml, so every dialog that restates a case shows it. -->
       <div id="v-case" class="s-case"></div>
 
       <!-- Only on a case that has been solved. -->
@@ -604,6 +609,15 @@
         <div class="m-sec-h">How it was solved</div>
         <div id="v-res" class="s-case-v"></div>
         <img id="v-res-photo" class="s-prev hidden" alt="Photo of the fix">
+      </div>
+
+      <!-- Only on a case somebody has closed. The solver's word and the
+           closer's are two different sentences by two different people,
+           so they are two sections rather than one paragraph. -->
+      <div class="m-sec hidden" id="v-closed">
+        <div class="m-sec-h">Closed</div>
+        <div id="v-close-remark" class="s-case-v"></div>
+        <div id="v-closed-by" class="s-case-by"></div>
       </div>
     </div>
 
@@ -1239,7 +1253,16 @@ function caseBlockHtml(c) {
   detailRows(c).forEach(r => bits.push(r));
   if (c.due_date) bits.push(['Due', fmtDate(c.due_date)]);
 
-  return `<div class="s-case-t">${esc(c.title || '')}</div>` +
+  /* The photo raised WITH the case. It was in the view dialog and nowhere
+     else, so somebody deciding whether a case was solved — the one moment
+     the picture matters most — could not see the picture. It lives here
+     now, which puts it in the solve sheet and the close sheet too, and
+     means the next dialog to restate a case gets it without being told. */
+  const shot = c.photo_url
+    ? `<img class="s-prev s-case-shot" src="${esc(c.photo_url)}" alt="Photo on the case" loading="lazy">`
+    : '';
+
+  return `<div class="s-case-t">${esc(c.title || '')}</div>` + shot +
     `<div class="s-case-g">` +
       bits.map(([k, v]) => `<div class="s-case-k">${esc(k)}</div><div class="s-case-v">${esc(v)}</div>`).join('') +
     `</div>` +
@@ -1265,10 +1288,6 @@ function openView(c) {
   $('v-sub').textContent = STATUS_SUB[c.status] || c.status || '';
   $('v-case').innerHTML = caseBlockHtml(c);
 
-  const photo = $('v-photo');
-  photo.classList.toggle('hidden', !c.photo_url);
-  if (c.photo_url) photo.src = c.photo_url; else photo.removeAttribute('src');
-
   const done = c.status === 'resolved' || c.status === 'closed';
   $('v-solved').classList.toggle('hidden', !done);
   if (done) {
@@ -1280,6 +1299,22 @@ function openView(c) {
     const rp = $('v-res-photo');
     rp.classList.toggle('hidden', !c.resolution_photo_url);
     if (c.resolution_photo_url) rp.src = c.resolution_photo_url; else rp.removeAttribute('src');
+  }
+
+  /* close_remark, closed_by and closed_at have been WRITTEN by the close
+     sheet since it gained a remark box, and read by nothing — so the one
+     person who bothered to say why they accepted the work was saying it
+     into the void. A closed case with no remark still shows the section,
+     because who closed it and when is worth seeing on its own. */
+  const shut = c.status === 'closed';
+  $('v-closed').classList.toggle('hidden', !shut);
+  if (shut) {
+    $('v-close-remark').textContent =
+      c.close_remark || 'Closed with nothing written about it.';
+    const by = [c.closed_by, c.closed_at && fmtDate(String(c.closed_at).slice(0, 10))]
+      .filter(Boolean).join(' · ');
+    $('v-closed-by').textContent = by ? 'Closed by ' + by : '';
+    $('v-closed-by').classList.toggle('hidden', !by);
   }
 
   $('view-scrim').classList.remove('hidden');
