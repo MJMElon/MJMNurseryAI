@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-08-31b */
 /* ================================================================
    MJM NURSERY AUDIT — OFFLINE STORAGE v5
    dexie_offline.js
@@ -336,7 +336,14 @@ async function syncNow(manual){
 
   const pending = await getPending();
   if(!pending.length){
+<<<<<<< HEAD
     if(manual) showToast('✓ Already up to date — nothing to sync.');
+=======
+    /* Online with nothing waiting IS a successful sync — everything this
+       phone recorded is on the server. The pill's stamp says so. */
+    stampSyncOk();
+    renderSyncPill();
+>>>>>>> origin/claude/mjm-ai-system-stock-krx3ox
     return;
   }
 
@@ -435,6 +442,8 @@ async function syncNow(manual){
   await clearDone();
   _syncing = false;
   refreshBadge();
+  if(fail===0) stampSyncOk();
+  renderSyncPill();
 
   if(ok>0){
     showToast('✓ Synced '+ok+' record'+(ok>1?'s':''));
@@ -445,6 +454,64 @@ async function syncNow(manual){
      Supabase (duplicate id, missing batch/task, RLS), not the network — and
      tapping again will never fix it, so the reason has to reach the phone. */
   if(fail>0) showToast('⚠ '+fail+' failed to sync — '+(lastErr||'unknown error'), 7000);
+}
+
+/* ================================================================
+   SYNC PILL — the visible button, and the last time a sync WORKED
+
+   The top badge only exists while something is pending or stuck; this
+   sits at the foot of every signed-in page all the time, so an auditor
+   about to walk out of coverage can press one thing and read when the
+   phone was last fully squared with the server. The stamp only moves on
+   a sweep that came back clean (or found nothing waiting while online),
+   so the time it shows can be trusted the way it reads. Same card, same
+   rule, on the FC and Admin portal dashboards.
+================================================================ */
+const SYNC_STAMP_KEY = 'mjm_audit_last_sync_v1';
+function stampSyncOk(){
+  try{ localStorage.setItem(SYNC_STAMP_KEY, JSON.stringify({at: Date.now()})); }catch(e){}
+}
+function lastSyncAt(){
+  try{ const s = JSON.parse(localStorage.getItem(SYNC_STAMP_KEY)); return (s && s.at) || null; }catch(e){ return null; }
+}
+function fmtSyncWhen(at){
+  try{
+    return new Date(at).toLocaleString(undefined, {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+  }catch(e){ return ''; }
+}
+function renderSyncPill(){
+  try{
+    // Not on the login page — a pill about a signed-in phone's queue has
+    // nothing to say to somebody who has not signed in.
+    if(!localStorage.getItem('mjm_user')){
+      const gone = document.getElementById('_sync_pill');
+      if(gone) gone.remove();
+      return;
+    }
+    let p = document.getElementById('_sync_pill');
+    if(!p){
+      p = document.createElement('button');
+      p.id = '_sync_pill';
+      p.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:9998;'+
+        'padding:8px 16px;border-radius:9999px;border:none;font-size:11px;font-weight:800;'+
+        'letter-spacing:.04em;color:#fff;background:rgba(31,122,69,.92);'+
+        'box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;font-family:inherit';
+      p.onclick = async ()=>{
+        if(!navigator.onLine){
+          showToast('📴 Offline — sync needs a line. Saved records send themselves when it returns.');
+          return;
+        }
+        showToast('🔄 Syncing…', 1500);
+        await syncNow();
+        renderSyncPill();
+        if((await countPending())===0) showToast('✓ Synced');
+      };
+      document.body.appendChild(p);
+    }
+    const at = lastSyncAt();
+    p.textContent = '🔄 Sync' + (at ? ' · ✓ '+fmtSyncWhen(at) : ' · not yet');
+    p.style.background = navigator.onLine ? 'rgba(31,122,69,.92)' : 'rgba(120,120,120,.85)';
+  }catch(e){}
 }
 
 /* ================================================================
@@ -615,11 +682,13 @@ async function initOffline(){
   // Purge stale blocked records on load so a lingering banner from a
   // previous session clears itself as soon as the app opens.
   autoDropOldBlocked().catch(_=>{}).finally(refreshBadge);
+  renderSyncPill();
 
   window.addEventListener('online',()=>{
     console.log('[Net] Online');
     showToast('🔄 Back online — syncing...');
     refreshBadge();
+    renderSyncPill();
     startSync();
   });
   window.addEventListener('offline',()=>{
@@ -627,6 +696,7 @@ async function initOffline(){
     showToast('📴 Offline — records saved to phone');
     stopSync();
     refreshBadge();
+    renderSyncPill();
   });
   document.addEventListener('visibilitychange',()=>{
     if(!document.hidden && navigator.onLine) syncNow();
