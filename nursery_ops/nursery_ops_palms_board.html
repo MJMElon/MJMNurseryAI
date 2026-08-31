@@ -193,6 +193,14 @@
       <h2 class="font-black text-slate-800 uppercase tracking-widest text-[13px]">
         Plot Status — <span id="tbl-nursery" class="text-teal-700">—</span>
       </h2>
+      <!-- Said, rather than silently degraded. Current Status is a dropdown
+           for an account that may write the plot log and plain text for one
+           that may not, and until now nothing on the page distinguished
+           "you cannot change this" from "this page does not do that". -->
+      <span id="ro-note" class="hidden text-[11px] font-bold text-amber-700 bg-amber-50
+            border border-amber-200 rounded-full px-3 py-1">
+        Read only — changing a status needs the FC Portal module, or Manage Users
+      </span>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse">
@@ -890,6 +898,8 @@ $('cf-ok').addEventListener('click', async () => {
 });
 
 function render() {
+  const note = $('ro-note');
+  if (note) note.classList.toggle('hidden', CAN_UPDATE);
   renderHidden();
   LINES = new Map();
   MJMPalms.boardLines(LOGS, SCOPE).forEach((ln) => LINES.set(ln.key, ln));
