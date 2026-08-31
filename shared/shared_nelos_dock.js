@@ -525,7 +525,14 @@
   function fetchPending()  { return fetchCases('open,in_progress'); }
   /* Solved most recently first — the useful order for "did mine land?",
      where the oldest resolved case is the least interesting row. */
-  function fetchResolved() { return fetchCases('resolved', 'resolved_at.desc.nullslast'); }
+  /* Solved AND closed. It used to be 'resolved' alone — solved and waiting
+     on somebody — which was right when this was a "did that save?" view
+     and wrong the moment it became the place you look back from: a case
+     vanished from it at the exact moment it was finished, and the closer's
+     remark could never be read anywhere in the dock. */
+  function fetchResolved() {
+    return fetchCases('resolved,closed', 'resolved_at.desc.nullslast');
+  }
 
   /* ── Look ────────────────────────────────────────────────────── */
 
@@ -776,6 +783,16 @@
                  white-space:pre-wrap; }
   .nd-solved-m { font-size:10.5px; font-weight:700; color:#15803d; margin-top:6px; }
   .nd-solved-card img { width:100%; border-radius:8px; margin-top:8px; display:block; }
+  /* Closing is a different act by a different person, so its card is a
+     different colour — green for the work, slate for accepting it. Side
+     by side in green they read as one person writing twice. */
+  .nd-closed-card { border-color:#cbd5e1; background:#f8fafc; margin-top:9px; }
+  .nd-closed-card .nd-solved-h,
+  .nd-closed-card .nd-solved-m { color:#475569; }
+
+  /* The photo raised with the case, above the facts it is evidence for. */
+  .nd-d-shot { width:100%; max-height:210px; object-fit:cover; border-radius:10px;
+               margin-top:10px; display:block; border:1px solid #e2e8f0; }
 
   .nd-detail { overflow-y:auto; flex:1; padding:14px; -webkit-overflow-scrolling:touch; }
   .nd-detail[hidden] { display:none; }
@@ -977,8 +994,8 @@
            for one idea, in a panel that is mostly list. */
         '<div class="nd-head">' +
           '<div class="nd-head-t">Nelos To Do List</div>' +
-          '<button class="nd-hist" type="button" title="Solved, not yet closed" ' +
-                  'aria-label="Solved, not yet closed">' +
+          '<button class="nd-hist" type="button" title="Solved and closed cases" ' +
+                  'aria-label="Solved and closed cases">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true">' +
               '<path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/>' +
               '<polyline points="12 7 12 12 15 14"/></svg>' +
@@ -1657,16 +1674,37 @@
           ? '<div class="nd-d-none">No further detail was written.</div>'
           : '<div class="nd-d-none">Loading detail…</div>';
 
-    var solved = (full && full.status === 'resolved') || c.status === 'resolved';
+    /* Closed counts as solved here — there is nothing left to write on a
+       case somebody has already accepted, and gating on 'resolved' alone
+       put the blank solve form under a finished case. */
+    var st = (full && full.status) || c.status;
+    var solved = st === 'resolved' || st === 'closed';
 
     /* Two blocks, in the order the job is done: read what is being asked,
        then answer it. The chips that used to sit under the title — the
        module, the priority, the status — said "Nelos · Normal · Open" on
        almost every case, which is three words of nothing above the one
        thing being read. The case number is in the panel heading already. */
-    return '<div class="nd-d-sec">Pending Case Details</div>' +
+    /* The photo raised WITH the case. The row showed a thumbnail of it and
+       the detail — which is the sheet somebody solves from — showed
+       nothing, so the one screen where the picture decides the answer was
+       the one screen without it. From `f`, so it is there whether it came
+       down with the list or only with the full read. */
+    var shot = f.photo_url
+      ? '<img class="nd-d-shot" src="' + esc(f.photo_url) + '" alt="Photo on the case" loading="lazy">'
+      : '';
+
+    /* "Pending" was true when this pane only ever opened from the to-do
+       list. History opens it on finished work now, where the word is a
+       small lie printed above a closed case. */
+    var head = st === 'closed' ? 'Closed Case Details'
+             : st === 'resolved' ? 'Solved Case Details'
+             : 'Pending Case Details';
+
+    return '<div class="nd-d-sec">' + head + '</div>' +
            '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
            (meta ? '<div class="nd-d-meta">' + meta + '</div>' : '') +
+           shot +
            '<div class="nd-d-facts">' +
              fact('Nursery (Plot)', where) +
              fact('Assigned to', esc(SOURCE_LABEL[f.assigned_module || f.source_module] ||
@@ -1790,15 +1828,35 @@
            '</div>';
   }
 
+  /* What was done, and — once somebody has accepted it — what they said
+     about accepting it. Two cards rather than one: the solver's word and
+     the closer's are two sentences by two people, often days apart, and
+     running them together reads as one person contradicting themselves.
+
+     close_remark, closed_by and closed_at are not on any column tier, so
+     they arrive only with the full read (select=*) that showDetail does.
+     On the first paint, from the list row, this simply shows the solved
+     half — which is what the list knows. */
   function solvedCardHtml(c) {
-    return '<div class="nd-solved-card">' +
+    var shut = c.status === 'closed';
+    var solved = '<div class="nd-solved-card">' +
              '<div class="nd-solved-h">&#10003; Solved</div>' +
              '<div class="nd-solved-b">' + esc(c.resolution || '') + '</div>' +
              (c.resolution_photo_url
                ? '<img src="' + esc(c.resolution_photo_url) + '" alt="Photo of the fix">' : '') +
              '<div class="nd-solved-m">' + esc(c.resolved_by || 'unknown') +
                (c.resolved_at ? ' · ' + esc(String(c.resolved_at).slice(0, 10)) : '') +
-               ' · waiting to be closed</div>' +
+               (shut ? '' : ' · waiting to be closed') + '</div>' +
+           '</div>';
+    if (!shut) return solved;
+
+    return solved +
+           '<div class="nd-solved-card nd-closed-card">' +
+             '<div class="nd-solved-h">&#10003;&#10003; Closed</div>' +
+             '<div class="nd-solved-b">' +
+               esc(c.close_remark || 'Closed with nothing written about it.') + '</div>' +
+             '<div class="nd-solved-m">' + esc(c.closed_by || 'unknown') +
+               (c.closed_at ? ' · ' + esc(String(c.closed_at).slice(0, 10)) : '') + '</div>' +
            '</div>';
   }
 
@@ -1834,11 +1892,16 @@
     syncSolveBtn(full || c);
   }
 
-  /* ── SOLVED, NOT YET CLOSED ──────────────────────────────────────
-     Where a solved case goes. It leaves the to-do list the moment it
-     is saved, and without this it would simply vanish — which reads as
-     "did that save?" rather than "that is done and waiting on
-     somebody". Closing is still the Nelos page's job. */
+  /* ── WHAT HAS BEEN DONE ──────────────────────────────────────────
+     Where a solved case goes. It leaves the to-do list the moment it is
+     saved, and without this it would simply vanish — which reads as "did
+     that save?" rather than "that is done".
+
+     It holds CLOSED cases too. It used to stop at 'resolved', so a case
+     disappeared from here the moment somebody accepted it — the exact
+     point at which it became history — and the closer's remark could be
+     read nowhere in the dock at all. Closing is still the Nelos page's
+     job; this is where you look back at it. */
   var doneRows = [];
   var doneBusy = false;
   var _cameFromHistory = false;
@@ -1847,7 +1910,7 @@
     view = 'done-list';
     showPane('list');
     panel.querySelector('.nd-foot-list').hidden = false;
-    panel.querySelector('.nd-head-t').textContent = 'Solved';
+    panel.querySelector('.nd-head-t').textContent = 'Solved & Closed';
     panel.querySelector('.nd-hist').classList.add('on');
     listEl.innerHTML = '<div class="nd-empty">loading…</div>';
     if (doneBusy) return;
@@ -1860,7 +1923,7 @@
       ? doneRows.map(function (c, i) { return rowHtml(c, i + 1); }).join('')
       : '<div class="nd-empty">' + (out.error
           ? 'Could not read the solved cases.'
-          : 'Nothing solved and waiting to be closed.') + '</div>';
+          : 'Nothing solved yet.') + '</div>';
   }
 
   function findCase(id) {
