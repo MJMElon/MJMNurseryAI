@@ -5767,49 +5767,133 @@ function weNum(val, onch) {
   return `<input class="we-num" type="number" min="0" step="0.01" value="${val ?? ''}" oninput="${onch}">`;
 }
 
+/* What one week's column asks for, and what its ticks mean.
+
+   P & D asks twice — pest and disease can go on different plots in the
+   same week — so it has two sub-columns. Manuring and Interrow have as
+   many as their config holds, one per fertiliser or chemical. Weeding has
+   one, and nothing to choose.
+
+   The STICKER is deliberately not here: a sticker goes in every tank
+   whatever else does, so asking about it once a week was a question with
+   one answer. The doses still save and still publish; the Setting page is
+   where a sticker changes. */
+function weCols(kind, i, n, m) {
+  const s = getState(n, m);
+  if (kind === 'pd') {
+    const w = 'W' + (i + 1);
+    if (!s.pdConfig[w]) s.pdConfig[w] = defaultPDConfig().W1;
+    const c = s.pdConfig[w];
+    return [
+      { ci: 0, label: 'Pest', opts: chemNames('pest'), val: c.P,
+        onSel: `updatePDChem('${w}','P',this.value);renderWorkEditor()`,
+        dose: c.P_dose, unit: c.P_unit,
+        onDose: `updatePDDose('${w}','P_dose',+this.value)` },
+      { ci: 1, label: 'Disease', opts: chemNames('disease'), val: c.D,
+        onSel: `updatePDChem('${w}','D',this.value);renderWorkEditor()`,
+        dose: c.D_dose, unit: c.D_unit,
+        onDose: `updatePDDose('${w}','D_dose',+this.value)` }
+    ];
+  }
+  if (kind === 'weeding') return [{ ci: 0, label: 'Weeding' }];
+
+  const many = kind === 'manuring';
+  const cfg = (many ? s.manuringConfig : s.interrowConfig)[i] || [];
+  const word = many ? 'Fertiliser' : 'Chemical';
+  return cfg.map((c, ci) => ({
+    ci,
+    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,
+    opts: many ? fertNames('monthly') : taggedNames('interrow'),
+    val: many ? c.name : c.chem,
+    onSel: many
+      ? `updateManuringChem(${i},${ci},this.value);renderWorkEditor()`
+      : `updateInterrowChem(${i},${ci},this.value);renderWorkEditor()`,
+    dose: many ? c.dose : c.chem_dose,
+    unit: many ? (c.unit || 'gm') : (c.chem_unit || 'mL'),
+    onDose: many
+      ? `updateManuringDose(${i},${ci},'dose',+this.value)`
+      : `updateInterrowDose(${i},${ci},'chem_dose',+this.value)`
+  }));
+}
+
+function weTicked(kind, i, ci, plot) {
+  const s = getState(_we.n, getMonth());
+  if (kind === 'pd')      return !!(s.pd['W' + (i + 1)]?.[plot]?.[ci === 0 ? 'P' : 'D']);
+  if (kind === 'weeding') return !!(s.weeding[plot]?.['R' + (i + 1)]);
+  return !!((s[kind][plot] || [])[i] || [])[ci];
+}
+
+function weToggle(kind, i, ci, plot, skipRender) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  if (kind === 'pd') {
+    const w = 'W' + (i + 1);
+    if (!s.pd[w]) s.pd[w] = {};
+    if (!s.pd[w][plot]) s.pd[w][plot] = { P: false, D: false };
+    const f = ci === 0 ? 'P' : 'D';
+    s.pd[w][plot][f] = !s.pd[w][plot][f];
+  } else if (kind === 'weeding') {
+    if (!s.weeding[plot]) s.weeding[plot] = { R1: false, R2: false };
+    const r = 'R' + (i + 1);
+    s.weeding[plot][r] = !s.weeding[plot][r];
+  } else {
+    if (!s[kind][plot]) s[kind][plot] = [];
+    if (!s[kind][plot][i]) s[kind][plot][i] = [];
+    s[kind][plot][i][ci] = !s[kind][plot][i][ci];
+  }
+  if (skipRender) return;
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* One repaint for the whole column, not one per plot — 52 plots through the
+   single-tick path is 52 renders of a table nobody has seen yet. */
+function weToggleAll(kind, i, ci) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), plots = NURSERY_PLOTS[n] || [];
+  const all = plots.every(p => weTicked(kind, i, ci, p));
+  plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* ── The popup ─────────────────────────────────────────────────────────
+   One block per week: the week's number, its dates, what is being sprayed
+   or fed in it, and every plot with a tick. That is the whole of a week,
+   and it is asked for in the order somebody fills it in — when, with what,
+   where.
+
+   Weeks are made here rather than on the summary. The summary is a reading
+   surface; this is the writing one, and a week made anywhere else would be
+   a week with no dates and no chemicals until somebody came here anyway. */
+
+/* A <select> whose value is not among its options shows the FIRST option
+   instead — silently, and looking exactly like a saved answer. On a screen
+   that says what to spray, that is the wrong kind of wrong, so a saved name
+   the list no longer offers is carried in and marked rather than dropped. */
+function weSel(opts, val, onch) {
+  const missing = val && val !== '\u2014' && !opts.includes(val);
+  const o = (missing ? [{ v: val, t: val + ' \u2014 no longer in the list' }] : [])
+    .concat(opts.map(x => ({ v: x, t: x })));
+  return `<select class="we-sel" onchange="${onch}">` +
+    o.map(x => `<option value="${esc(x.v)}"${x.v === val ? ' selected' : ''}>${esc(x.t)}</option>`).join('') +
+    '</select>';
+}
+
+function weNum(val, onch) {
+  return `<input class="we-num" type="number" min="0" step="0.01" value="${val ?? ''}" oninput="${onch}">`;
+}
+
 /* What this work mixes for one week. The STICKER rows are deliberately not
    here: a sticker goes in every tank whatever else does, so asking about it
    once a week was asking a question with one answer. The doses still save,
    and the Setting page is where a sticker is changed. */
-function weChemRows(kind, i, n, m) {
-  const s = getState(n, m);
-  const row = (label, control, dose, unit, onDose) =>
-    `<div class="we-cfg-row"><span class="we-cfg-l">${esc(label)}</span>${control}` +
-    weNum(dose, onDose) + `<span class="we-cfg-u">${esc(unit || '')}</span></div>`;
-
-  if (kind === 'weeding') return '';   // there is nothing to mix for it
-
-  if (kind === 'pd') {
-    const w = 'W' + (i + 1), c = s.pdConfig[w] || (s.pdConfig[w] = defaultPDConfig().W1);
-    return row('Pest', weSel(chemNames('pest'), c.P,
-                 `updatePDChem('${w}','P',this.value);renderWorkEditor()`),
-               c.P_dose, c.P_unit, `updatePDDose('${w}','P_dose',+this.value)`) +
-           row('Disease', weSel(chemNames('disease'), c.D,
-                 `updatePDChem('${w}','D',this.value);renderWorkEditor()`),
-               c.D_dose, c.D_unit, `updatePDDose('${w}','D_dose',+this.value)`);
-  }
-
-  const cfg = (kind === 'manuring' ? s.manuringConfig : s.interrowConfig)[i] || [];
-  return cfg.map((c, ci) => kind === 'manuring'
-    ? row('Fertiliser ' + (ci + 1),
-        weSel(fertNames('monthly'), c.name, `updateManuringChem(${i},${ci},this.value);renderWorkEditor()`),
-        c.dose, c.unit || 'gm', `updateManuringDose(${i},${ci},'dose',+this.value)`)
-    : row('Chemical ' + (ci + 1),
-        weSel(taggedNames('interrow'), c.chem, `updateInterrowChem(${i},${ci},this.value);renderWorkEditor()`),
-        c.chem_dose, c.chem_unit || 'mL', `updateInterrowDose(${i},${ci},'chem_dose',+this.value)`)
-  ).join('');
-}
-
-/* The sub-columns one week's ticks have. P & D asks twice — pest and
-   disease can be sprayed on different plots in the same week. */
-function weCols(kind, i, n, m) {
-  const s = getState(n, m);
-  if (kind === 'pd') return [{ label: 'Pest', ci: 0 }, { label: 'Disease', ci: 1 }];
-  if (kind === 'weeding') return [{ label: 'Weeding', ci: 0 }];
-  const cfg = (kind === 'manuring' ? s.manuringConfig : s.interrowConfig)[i] || [];
-  return cfg.map((c, ci) => ({ label: c.name || c.chem || ('Column ' + (ci + 1)), ci }));
-}
-
 function weTicked(kind, i, ci, plot) {
   const s = getState(_we.n, getMonth());
   if (kind === 'pd')      return !!(s.pd['W' + (i + 1)]?.[plot]?.[ci === 0 ? 'P' : 'D']);
@@ -5881,8 +5965,11 @@ function weAddWeek() {
   if (i < 0) return;
   renderWorkEditor();
   renderSchedSummary();
-  const el = document.querySelector('#we-body .we-week:last-child');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  /* The new column is off the right edge of a month with a few weeks in
+     it, so the scroller is sent there rather than leaving somebody to
+     wonder whether the button did anything. */
+  const box = document.querySelector('#we-body .we-scroll');
+  if (box) box.scrollTo({ left: box.scrollWidth, behavior: 'smooth' });
 }
 
 function weRemoveWeek(i) {
@@ -5892,6 +5979,15 @@ function weRemoveWeek(i) {
   renderSchedSummary();
 }
 
+/* ── One table, not a stack of them ────────────────────────────────────
+   The weeks used to be blocks down the page, each with its own copy of the
+   plot list — the same fourteen names printed once per week, so comparing
+   week 1 with week 3 meant scrolling past everything between them.
+
+   The plots are a column, once, and the weeks go across: a plot is a row
+   whatever week you are reading, which is the question this screen is
+   asked. Under each week's dates sit its own chemical choices, directly
+   over the ticks they govern. Add Week adds a column to the right. */
 function renderWorkEditor() {
   if (!_we) return;
   const { n, kind } = _we;
@@ -5903,44 +5999,57 @@ function renderWorkEditor() {
   document.getElementById('we-title').textContent = `${stockLabel(n)} \u00b7 ${work.label}`;
   document.getElementById('we-sub').textContent = weeks.length
     ? `${weeks.length} week${weeks.length === 1 ? '' : 's'} in ${m}. Ticks save as you make them \u2014 Cancel puts them back.`
-    : `No weeks in ${m} yet. Add one below.`;
+    : `No weeks in ${m} yet. Add Week starts one.`;
 
   const body = document.getElementById('we-body');
-  if (!plots.length) {
-    body.innerHTML = '<div class="set-empty">This nursery has no plots.</div>';
+  if (!plots.length) { body.innerHTML = '<div class="set-empty">This nursery has no plots.</div>'; return; }
+  if (!weeks.length) {
+    body.innerHTML = '<div class="set-empty">No weeks yet. <b>Add Week</b> starts one, ' +
+      'and every week you add becomes a column here.</div>';
     return;
   }
 
+  const cols = weeks.map((_, i) => weCols(kind, i, n, m));
   const dayInput = (i, which, day) =>
     `<input class="we-date" type="date" value="${iso ? `${iso}-${String(day).padStart(2, '0')}` : ''}" ` +
     `min="${iso}-01" max="${iso}-${String(days).padStart(2, '0')}" ` +
     `onchange="weSetDate(${i},'${which}',this.value)">`;
 
-  body.innerHTML = weeks.map((w, i) => {
-    const cols = weCols(kind, i, n, m);
-    const head = '<tr><th class="we-plot">Plot</th>' +
-      cols.map(c => `<th class="we-col"><div>${esc(c.label)}</div>` +
-        `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${i},${c.ci})" ` +
-        `title="Tick or clear every plot in this column">all</button></th>`).join('') + '</tr>';
-    const rows = plots.map(pl => '<tr><td class="we-plot">' + esc(pl) + '</td>' +
-      cols.map(c => {
-        const on = weTicked(kind, i, c.ci, pl);
-        return `<td><button type="button" class="we-tick${on ? ' on' : ''}" ` +
-          `onclick="weToggle('${kind}',${i},${c.ci},'${esc(pl)}')" ` +
-          `aria-pressed="${on}">${on ? '&#10003;' : ''}</button></td>`;
-      }).join('') + '</tr>').join('');
+  /* Three header rows: which week, when, and what goes in it. The dates
+     get a row of their own because two date boxes are wider than the two
+     tick columns underneath them, and squeezing them into the week band
+     would set the column width from the widget rather than the data. */
+  const h1 = '<tr><th class="we-plot" rowspan="3">Plot</th>' +
+    weeks.map((w, i) =>
+      `<th colspan="${cols[i].length}" class="we-wk">` +
+        `<span class="we-wk-n">Week ${i + 1}</span>` +
+        `<button type="button" class="we-week-x schedule-edit-ctrl" title="Remove this week"` +
+        ` onclick="weRemoveWeek(${i})">&times;</button></th>`).join('') + '</tr>';
 
-    const chem = weChemRows(kind, i, n, m);
-    return `<div class="we-week">
-        <div class="we-week-h">
-          <div class="we-week-n">Week ${i + 1}</div>
-          <div class="we-dates">${dayInput(i, 'from', w.from)}<span class="we-to">to</span>${dayInput(i, 'to', w.to)}</div>
-          <button type="button" class="we-week-x schedule-edit-ctrl" title="Remove this week"
-            onclick="weRemoveWeek(${i})">&times;</button>
-        </div>
-        ${chem ? `<div class="we-cfg">${chem}</div>` : ''}
-        <div class="tbl-wrap"><table class="we-table">
-          <thead>${head}</thead><tbody>${rows}</tbody></table></div>
-      </div>`;
-  }).join('') || '<div class="set-empty">No weeks yet. Add Week starts one.</div>';
+  const h2 = '<tr>' + weeks.map((w, i) =>
+    `<th colspan="${cols[i].length}" class="we-wk-d">` +
+      dayInput(i, 'from', w.from) + '<span class="we-to">to</span>' + dayInput(i, 'to', w.to) +
+    '</th>').join('') + '</tr>';
+
+  const h3 = '<tr>' + weeks.map((w, i) => cols[i].map((c, k) =>
+    `<th class="we-col${k === 0 && i ? ' grp' : ''}">` +
+      `<div class="we-col-l">${esc(c.label)}</div>` +
+      (c.opts ? weSel(c.opts, c.val, c.onSel) : '') +
+      (c.opts ? `<div class="we-col-d">${weNum(c.dose, c.onDose)}` +
+                `<span class="we-cfg-u">${esc(c.unit || '')}</span></div>` : '') +
+      `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${i},${c.ci})" ` +
+      `title="Tick or clear every plot in this column">all</button>` +
+    '</th>').join('')).join('') + '</tr>';
+
+  const rows = plots.map(pl => '<tr><td class="we-plot">' + esc(pl) + '</td>' +
+    weeks.map((w, i) => cols[i].map((c, k) => {
+      const on = weTicked(kind, i, c.ci, pl);
+      return `<td class="${k === 0 && i ? 'grp' : ''}"><button type="button" ` +
+        `class="we-tick${on ? ' on' : ''}" ` +
+        `onclick="weToggle('${kind}',${i},${c.ci},'${esc(pl)}')" ` +
+        `aria-pressed="${on}">${on ? '&#10003;' : ''}</button></td>`;
+    }).join('')).join('') + '</tr>').join('');
+
+  body.innerHTML = `<div class="tbl-wrap we-scroll"><table class="we-table">
+      <thead>${h1}${h2}${h3}</thead><tbody>${rows}</tbody></table></div>`;
 }
