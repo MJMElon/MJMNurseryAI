@@ -5102,29 +5102,51 @@ async function saveChemEdit() {
   if (_supabase) {
     const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
-    const fresh = named.filter(c => !c.id).map(c => ({
-      kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
-      coverage: c.coverage ?? null, tag: c.tag ?? null,
-      updated_at: new Date().toISOString() }));
+
+    /* A database that has not run every migration does not know every
+       column — "Could not find the 'tag' column … in the schema cache" is
+       PostgREST refusing the WHOLE row over the one field. Losing the tag
+       is a smaller failure than losing the save, so the unknown column is
+       dropped and the write tried again, and the alert at the end says
+       which file brings it back. The columns each migration adds:
+         coverage  shared/migration_nops_chem_coverage.sql
+         tag       shared/migration_nops_chem_tag.sql */
+    const missing = new Set();
+    const strip = o => {
+      const out = { ...o };
+      missing.forEach(k => delete out[k]);
+      return out;
+    };
+    const noteMissing = e => {
+      const m = /find the '([a-z_]+)' column/i.exec((e && e.message) || '');
+      if (m && !missing.has(m[1])) { missing.add(m[1]); return true; }
+      return false;
+    };
+    const attempt = async run => {
+      for (let go = 0; go < 3; go++) {
+        const { error } = await run().then(r => r, e => ({ error: e }));
+        if (!error) return null;
+        if (!noteMissing(error)) return error;
+      }
+      return { message: 'this database is missing too many columns' };
+    };
 
     let err = null;
     if (gone.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').delete().in('id', gone)
-        .then(r => r, e => ({ error: e }));
-      err = err || error;
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').delete().in('id', gone));
     }
     for (const c of named.filter(x => x.id)) {
       if (err) break;
-      const { error } = await _supabase.from('nops_maint_chemicals').update({
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').update(strip({
         name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
-        tag: c.tag ?? null, updated_at: new Date().toISOString() })
-        .eq('id', c.id).then(r => r, e => ({ error: e }));
-      err = error;
+        tag: c.tag ?? null, updated_at: new Date().toISOString() })).eq('id', c.id));
     }
-    if (!err && fresh.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').insert(fresh)
-        .then(r => r, e => ({ error: e }));
-      err = error;
+    if (!err && named.some(x => !x.id)) {
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').insert(
+        named.filter(c => !c.id).map(c => strip({
+          kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
+          coverage: c.coverage ?? null, tag: c.tag ?? null,
+          updated_at: new Date().toISOString() }))));
     }
     if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
       const { error } = await _supabase.from('nops_maint_config').upsert({
@@ -5137,11 +5159,17 @@ async function saveChemEdit() {
     if (err) {
       done();
       alert('Could not save — ' + (err.message || 'try again') +
-            (/coverage/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
             (/kind/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
+              ? '\n\nThis database does not allow Other chemicals yet. ' +
+                'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor.' : ''));
       return;
+    }
+    if (missing.size) {
+      alert('Saved — but this database has no ' + [...missing].join(', ') +
+            ' column' + (missing.size > 1 ? 's' : '') + ', so th' +
+            (missing.size > 1 ? 'ose' : 'at') + ' did not stick.\n\n' +
+            'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
+            'once, then save again.');
     }
     // Read it back, so what is on screen is what is stored — and so the new
     // rows arrive with the ids the next edit needs.
