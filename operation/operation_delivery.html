@@ -897,6 +897,31 @@
             } catch (e) { return false; }
         }
 
+        // Scanned DO/BA papers used to be saved as base64 data URLs straight
+        // into shared_do_records — multi-MB rows whose reads/writes OOM-crashed
+        // the database (the recurring "unhealthy" incidents). Files go to the
+        // public `documents` bucket instead; the column stores only the URL.
+        // Never fall back to returning the data URL — a lost document is
+        // recoverable, a crashed database is not.
+        // Same helper lives in operation_ba.html — change one, change both.
+        async function mjmUploadDoDocToStorage(folder, refNo, dataUrl) {
+            try {
+                if (!dataUrl) return null;
+                if (!dataUrl.startsWith('data:')) return dataUrl; // already a URL (row migrated to Storage)
+                const blob = await (await fetch(dataUrl)).blob();
+                const ext = blob.type === 'application/pdf' ? 'pdf' : ((blob.type.split('/')[1] || '').replace(/[^a-z0-9]/gi, '') || 'bin');
+                const safeRef = String(refNo || 'unknown').replace(/[^A-Za-z0-9_-]/g, '_');
+                const path = `${folder}/${safeRef}-${Date.now()}.${ext}`;
+                const { error } = await _supabase.storage.from('documents').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true });
+                if (error) throw error;
+                const { data } = _supabase.storage.from('documents').getPublicUrl(path);
+                return (data && data.publicUrl) || null;
+            } catch (e) {
+                console.warn('Document upload to Storage failed — record saves without document:', e);
+                return null;
+            }
+        }
+
         // Resolve a stored image (data URL or https URL) into an image data URL
         // usable by jsPDF; returns null for PDFs / unreadable files.
         async function mjmImageAsDataUrl(src) {
@@ -1304,7 +1329,8 @@
                     continue;
                 }
 
-                let doPayload = { do_number: doNum, al_number: targetAL, delivery_date: doDate, remark: customerName, total_qty: doTotalQty, status: 'Delivered', image_url: base64Image }; 
+                const docUrl = await mjmUploadDoDocToStorage('do-docs', doNum, base64Image);
+                let doPayload = { do_number: doNum, al_number: targetAL, delivery_date: doDate, remark: customerName, total_qty: doTotalQty, status: 'Delivered', image_url: docUrl };
                 const itemRows = document.getElementById(`items_container_${rId}`).querySelectorAll('.item-row'); let idx = 1; 
                 itemRows.forEach(itemRow => { 
                     if (idx <= 5) { 

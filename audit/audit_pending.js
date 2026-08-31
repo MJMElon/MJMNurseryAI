@@ -103,6 +103,54 @@
     return false;
   }
 
+  /* ── OFFLINE CACHE ──
+     Six live reads feed this, and none of them had anywhere to fall
+     back to with no signal — every one turned into [] via soft()
+     below, roster and papanBat both ended up empty, covers() said no
+     for every module, and the portal's plot chips vanished with the
+     pending count falling back to counting ROWS instead of plots (a
+     nursery with 114 plots owed read as "3 pending" — three ROWS,
+     Seedling Height / Plot Condition / Papan, not three plots).
+
+     The fix is the one smartSave() already uses for writes: keep the
+     last good answer somewhere durable, and hand it back when there
+     is nothing better to offer. Cached is the PROCESSED state
+     (roster, balance, audited, papanBat), not the raw rows — restoring
+     it offline needs no re-derivation, just what plots() already
+     reads from these same variables when the load was live. */
+  const _CACHE_KEY = 'mjm_pending_cache_v1';
+  function _saveCache(){
+    try {
+      localStorage.setItem(_CACHE_KEY, JSON.stringify({
+        scope, roster, balance,
+        audited: {
+          plot:   [...audited.plot.entries()],
+          height: [...audited.height.entries()],
+          papan:  [...audited.papan.entries()]
+        },
+        papanBat,
+        savedAt: Date.now()
+      }));
+    } catch (e) { /* storage full/unavailable — no offline fallback next time, not fatal now */ }
+  }
+  function _loadCache(){
+    try {
+      const raw = localStorage.getItem(_CACHE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      scope    = c.scope   || [];
+      roster   = c.roster  || [];
+      balance  = c.balance || {};
+      audited  = {
+        plot:   new Map((c.audited && c.audited.plot)   || []),
+        height: new Map((c.audited && c.audited.height) || []),
+        papan:  new Map((c.audited && c.audited.papan)  || [])
+      };
+      papanBat = c.papanBat || [];
+      return c.savedAt || 0;
+    } catch (e) { return null; }
+  }
+
   /* ── LOAD ───────────────────────────────────────────────────────
      Every table this needs, in one pass, on page load. Each read
      fails soft on its own: a module whose audits could not be read
@@ -111,6 +159,23 @@
      loses an hour, a plot silently dropped loses a month. */
   async function load(nurseries){
     scope = (nurseries || []).slice();
+
+    /* Offline: six requests would just be six round trips to the
+       service worker's synthetic 503 — send none of them, and use
+       whatever this device last saw while it still had a signal. A
+       device that has never loaded successfully has nothing cached;
+       that case falls through to the live attempt below, which fails
+       soft per table exactly as it always did. */
+    if (!navigator.onLine) {
+      const savedAt = _loadCache();
+      if (savedAt) {
+        loaded = true;
+        console.log('[audit-pending] offline — served from cache saved',
+          new Date(savedAt).toLocaleString());
+        return;
+      }
+    }
+
     const soft = (label) => (e) => {
       console.warn('[audit-pending] ' + label + ' load failed:', e);
       return [];
@@ -215,6 +280,16 @@
                l.transaction_date || (l.created_at || '').split('T')[0]));
 
     loaded = true;
+    /* Only worth keeping when at least the roster came back — an
+       empty roster from a genuinely empty nursery and an empty
+       roster from a failed read look identical here, and caching the
+       second would serve a blank state offline just as confidently
+       as a real one. roster.length also being legitimately 0 (a
+       nursery truly carrying nothing right now) is the one case this
+       gets conservative about — it simply won't refresh the cache
+       that round, and the previous real snapshot keeps serving until
+       a load that actually sees rows replaces it. */
+    if (roster.length) _saveCache();
     console.log('[audit-pending] loaded', {
       scope, roster: roster.length, balanceRows: Object.keys(balance).length,
       papanBatches: papanBat.length,

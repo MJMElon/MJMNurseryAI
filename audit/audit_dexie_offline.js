@@ -311,16 +311,34 @@ async function smartSave(table, method, payload, editId=null){
 ================================================================ */
 let _syncing = false;
 
-async function syncNow(){
-  if(_syncing){ console.log('[Sync] Already running'); return; }
-  if(!navigator.onLine){ console.log('[Sync] No network'); return; }
+/* manual=true is a person tapping the Sync button, not the 30s timer
+   or the 'online' event. The two silent early-returns below (already
+   syncing, offline, nothing pending) are correct behaviour either way
+   — the difference is only whether a tap that lands on one of them
+   gets told so. A button that sometimes does nothing with no
+   explanation reads as broken; the 30s poll doing the same thing
+   quietly is what "automatic" is supposed to look like. */
+async function syncNow(manual){
+  if(_syncing){
+    console.log('[Sync] Already running');
+    if(manual) showToast('🔄 Already syncing…');
+    return;
+  }
+  if(!navigator.onLine){
+    console.log('[Sync] No network');
+    if(manual) showToast('📴 You\'re offline — records stay saved on this phone and sync automatically once you\'re back online.');
+    return;
+  }
 
   // Sweep stale blocked records before each sync so the badge doesn't
   // hang around when the server keeps refusing something transient.
   try { await autoDropOldBlocked(); } catch(_){}
 
   const pending = await getPending();
-  if(!pending.length){ return; }
+  if(!pending.length){
+    if(manual) showToast('✓ Already up to date — nothing to sync.');
+    return;
+  }
 
   _syncing = true;
   console.log('[Sync] Starting:', pending.length, 'pending');
@@ -432,57 +450,78 @@ async function syncNow(){
 /* ================================================================
    BADGE
 ================================================================ */
+/* This is the Sync button. It used to only exist while something was
+   queued — tap-to-sync, then vanish once the queue drained — which
+   meant there was never a way to ASK for a sync on demand: nothing to
+   tap when the queue was already empty, and no visible control at all
+   on a page that happened to have nothing pending yet. It is a
+   permanent fixture now, in every state, so "trigger a sync manually
+   at any time" has something to press regardless of whether anything
+   is actually waiting. */
 async function refreshBadge(){
   try{
     const n       = await countPending();
     const blocked = await countBlocked();
     let b = document.getElementById('_offl_badge');
-    if(n>0 || blocked>0){
-      if(!b){
-        b = document.createElement('div');
-        b.id = '_offl_badge';
-        b.onclick = async ()=>{
-          const blk = await countBlocked();
-          const pen = await countPending();
-          // Stuck-only badge → the queue has records the server keeps
-          // refusing (23503, RLS, etc). Retrying does not fix that. Ask
-          // whether to drop them; only fall back to retry when the user
-          // explicitly declines the discard prompt.
-          if(blk > 0 && pen === blk){
-            const why    = (await getBlocked())[0];
-            const reason = (why && why.last_error) ? why.last_error : 'sync failed';
-            const msg    = 'Delete '+blk+' stuck record'+(blk>1?'s':'')+' permanently?\n\n'
-                         + 'Reason: '+reason+'\n\n'
-                         + 'These will not sync — the linked batch or task no longer '
-                         + 'exists on the server. OK deletes them; Cancel keeps them '
-                         + 'in the queue.';
-            if(confirm(msg)){
-              await discardBlocked();
-              showToast('Cleared '+blk+' stuck record'+(blk>1?'s':''));
-            }
-            return;
+    if(!b){
+      b = document.createElement('div');
+      b.id = '_offl_badge';
+      b.setAttribute('role','button');
+      b.setAttribute('tabindex','0');
+      b.onclick = async ()=>{
+        const blk = await countBlocked();
+        const pen = await countPending();
+        // Stuck-only badge → the queue has records the server keeps
+        // refusing (23503, RLS, etc). Retrying does not fix that. Ask
+        // whether to drop them; only fall back to retry when the user
+        // explicitly declines the discard prompt.
+        if(blk > 0 && pen === blk){
+          const why    = (await getBlocked())[0];
+          const reason = (why && why.last_error) ? why.last_error : 'sync failed';
+          const msg    = 'Delete '+blk+' stuck record'+(blk>1?'s':'')+' permanently?\n\n'
+                       + 'Reason: '+reason+'\n\n'
+                       + 'These will not sync — the linked batch or task no longer '
+                       + 'exists on the server. OK deletes them; Cancel keeps them '
+                       + 'in the queue.';
+          if(confirm(msg)){
+            await discardBlocked();
+            showToast('Cleared '+blk+' stuck record'+(blk>1?'s':''));
           }
-          if(!navigator.onLine) return;
-          if(blk) await retryBlocked();
-          else await syncNow();
-        };
-        b.style.cssText = 'position:fixed;top:0;left:0;right:0;margin:0 auto;width:fit-content;max-width:480px;padding:5px 18px;border-radius:0 0 12px 12px;font-size:11px;font-weight:700;z-index:99999;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center';
-        document.body.appendChild(b);
-      }
-      if(blocked>0 && n===0){
-        // Nothing is going to happen on its own — say so, and prompt the
-        // tap that surfaces the confirm dialog (reason + Delete option).
-        b.style.background = '#b91c1c';
-        b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — tap to clear';
-      } else {
-        b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
-        b.textContent = navigator.onLine
-          ? '🔄 '+n+' pending — tap to sync now'
-            + (blocked ? ' ('+blocked+' stuck)' : '')
-          : '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally';
-      }
+          return;
+        }
+        if(!navigator.onLine){ syncNow(true); return; }   // shows the offline toast
+        if(blk) await retryBlocked();
+        else await syncNow(true);
+      };
+      b.onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); b.click(); } };
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;margin:0 auto;width:fit-content;max-width:480px;padding:5px 18px;border-radius:0 0 12px 12px;font-size:11px;font-weight:700;z-index:99999;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center;transition:background .15s';
+      document.body.appendChild(b);
+    }
+    if(blocked>0 && n===0){
+      // Nothing is going to happen on its own — say so, and prompt the
+      // tap that surfaces the confirm dialog (reason + Delete option).
+      b.style.background = '#b91c1c';
+      b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — tap to clear';
+    } else if(n>0){
+      b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
+      b.textContent = navigator.onLine
+        ? '🔄 '+n+' pending — tap to sync now'
+          + (blocked ? ' ('+blocked+' stuck)' : '')
+        : '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally';
+    } else if(navigator.onLine){
+      // Idle: everything is already synced. Quiet on purpose — this is
+      // not a state anyone needs to react to — but still there, still
+      // the same tap target, so a sync can be asked for even when
+      // nothing is known to be waiting.
+      b.style.background = '#f4f7f4';
+      b.style.color = '#3d5c3d';
+      b.style.boxShadow = '0 1px 4px rgba(0,0,0,.12)';
+      b.textContent = '✓ Synced — tap to check for updates';
     } else {
-      if(b) b.remove();
+      b.style.background = '#64748b';
+      b.style.color = '#fff';
+      b.style.boxShadow = '0 2px 8px rgba(0,0,0,.3)';
+      b.textContent = '📴 Offline — tap Sync when you\'re back online';
     }
   }catch(e){}
 }

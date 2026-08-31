@@ -308,9 +308,60 @@ function updateStats(){
    resolves. If the same (nursery, plot, batch) is already keyed in
    manually, the audit_batches row wins — we don't duplicate.
 ================================================================ */
+/* ── OFFLINE CACHE ──
+   The live load below reads audit_batches first with no .catch of its
+   own — a failure there throws past the whole function, batches/
+   audits never get set, and a first-ever offline visit shows nothing
+   at all. Cached is the PROCESSED state (batches, audits) — restoring
+   it needs no re-derivation, only the same render + deep-link tail
+   the live path already runs. */
+const _PAPAN_CACHE_KEY = 'mjm_papan_cache_v1';
+function _saveOfflineCache(){
+  try {
+    localStorage.setItem(_PAPAN_CACHE_KEY, JSON.stringify({
+      batches, audits, savedAt: Date.now()
+    }));
+  } catch(e) { /* storage full/unavailable — no offline fallback next time, not fatal now */ }
+}
+function _loadOfflineCache(){
+  try {
+    const raw = localStorage.getItem(_PAPAN_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    batches = c.batches || [];
+    audits  = c.audits  || [];
+    return c.savedAt || 0;
+  } catch(e) { return null; }
+}
+
+/* Thin wrapper: offline with something cached skips straight to the
+   render + deep-link tail (_finishLoadAll) on what this device last
+   saw; everything else goes through the live fetch (_loadAllLive)
+   first, same as always, then the same tail. Both paths end up in
+   exactly the same place — one screen, whether the data behind it is
+   fresh or the last good answer this device has. */
 async function loadAll(){
   setLoading(true);
   try{
+    if (!navigator.onLine) {
+      const savedAt = _loadOfflineCache();
+      if (savedAt) {
+        console.log('[papan] offline — served from cache saved', new Date(savedAt).toLocaleString());
+        _finishLoadAll();
+        setLoading(false);
+        return;
+      }
+    }
+    await _loadAllLive();
+    _saveOfflineCache();
+    _finishLoadAll();
+  }catch(e){
+    showToast('⚠ Failed to load');console.error(e);
+  }
+  setLoading(false);
+}
+
+async function _loadAllLive(){
     const monthStart = _startOfThisMonthISO();
     // Filter logs server-side to this month + the four life-stage events
     // that put a new batch onto a plot. transaction_date is the real
@@ -472,7 +523,12 @@ async function loadAll(){
       date:       r.date||'',
       createdAt:  r.created_at
     }));
+}
 
+/* The render + deep-link tail, shared by both the live path and the
+   offline-cache path — one screen either way, whichever supplied
+   batches/audits. */
+function _finishLoadAll(){
     renderAuditList();
     renderPapanAlerts();
     renderBatchTable();
@@ -507,10 +563,6 @@ async function loadAll(){
         try { MJMAuditDeepLink.reveal(); } catch (_) {}
       }
     })();
-  }catch(e){
-    showToast('⚠ Failed to load');console.error(e);
-  }
-  setLoading(false);
 }
 
 /* --- PAPAN ALERT STRIP --- */

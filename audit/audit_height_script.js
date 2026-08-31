@@ -29,6 +29,14 @@ let plotBatches=[];
 let balanceByPB={};
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formState={nursery:'PN',s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
+/* ── BATCH QUEUE (Main Nursery carousel entry) ──
+   Null outside a queue. While set: {plot, items:[{batch,breed},…],
+   idx, data:[payload,…]}. Tapping a pending batch on a MN plot walks
+   every other pending batch on that plot in one continuous run — fill
+   one, tap Save Record, land straight on the next; nothing reaches
+   Supabase until the LAST batch's Save Record, which writes every
+   collected payload in one go. See _openBatchQueue(). */
+let bq=null;
 let toastTimer=null;
 
 /* --- HELPERS --- */
@@ -128,12 +136,60 @@ const PLOT_TO_NURSERY=(function(){
    Fetch audit records + batch roster (from two sources) + balance in
    parallel. All non-critical sources fail-open (empty array) so a stray
    RLS block on one table doesn't take the whole grid down. */
+/* ── OFFLINE CACHE ──
+   Four live reads below, and the first (audit_height_records) has no
+   .catch of its own — a failure there throws past the whole function,
+   records/plotBatches never get set, renderList() never runs, and a
+   first-ever offline visit to this page shows nothing at all, not
+   even yesterday's answer. Cached is the PROCESSED state, the same
+   shape renderList() already reads — restoring it needs no
+   re-derivation, only _rebuildPlanted() to redo (cheap, pure local
+   work over what was just restored). */
+const _HGT_CACHE_KEY = 'mjm_height_cache_v1';
+function _saveOfflineCache(){
+  try {
+    localStorage.setItem(_HGT_CACHE_KEY, JSON.stringify({
+      records, plotBatches, balanceByPB, savedAt: Date.now()
+    }));
+  } catch(e) { /* storage full/unavailable — no offline fallback next time, not fatal now */ }
+}
+function _loadOfflineCache(){
+  try {
+    const raw = localStorage.getItem(_HGT_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    records     = c.records     || [];
+    plotBatches = c.plotBatches || [];
+    balanceByPB = c.balanceByPB || {};
+    return c.savedAt || 0;
+  } catch(e) { return null; }
+}
+
 async function loadRecords(){
   setLoading(true);
   try{
     // The ages being audited are read alongside everything else; a failure
     // there leaves MJMAuditSettings on its defaults, which is every age.
     try { await MJMAuditSettings.load(); } catch(_) {}
+
+    /* Offline: four requests would just be four round trips to the
+       service worker's synthetic 503 — send none of them, and use
+       whatever this device last saw while it still had a signal. No
+       cache at all (never loaded successfully here before) falls
+       through to the live attempt, which fails exactly as it always
+       did. */
+    if (!navigator.onLine) {
+      const savedAt = _loadOfflineCache();
+      if (savedAt) {
+        _rebuildPlanted();
+        console.log('[height-audit] offline — served from cache saved',
+          new Date(savedAt).toLocaleString());
+        renderList();
+        setLoading(false);
+        return;
+      }
+    }
+
     const [aRows, tRows, abRows, balRows] = await Promise.all([
       sb.select('audit_height_records','select=*'),
       // Planted → PN, Transplanted* → MN. Both are enough to know a
@@ -191,6 +247,7 @@ async function loadRecords(){
     });
 
     _rebuildPlanted();
+    _saveOfflineCache();
     console.log('[height-audit] loaded', {
       audits: records.length,
       fromLogs:(tRows||[]).length,
@@ -392,11 +449,16 @@ function renderList(){
    bottom; ascending batch number within each band. Whole row is the
    tap target (opens the form pre-linked to that batch). */
 /* PN opens the per-plot form directly (batches are chips inside it).
-   MN opens the batch list — each MN plot carries several batches
-   with distinct ages, each with its own record. */
+   MN skips the "here are your batches" list too — a plot icon (this
+   grid's own tiles, and the deep-link chip from the home To Do list)
+   now goes straight into the carousel for whatever is still pending.
+   The list still exists — _openBatchQueue falls back to it when
+   nothing is pending, and Edit/Delete on a finished record still
+   opens it via openPlotDetail directly — it is just no longer a step
+   between tapping the plot and entering data. */
 function openPlot(plot){
   if(activeTab==='PN') openMultiBatchForm(plot);
-  else                 openPlotDetail(plot);
+  else                 _openBatchQueue(plot, null);
 }
 window.openPlot=openPlot;
 
@@ -1137,8 +1199,14 @@ window.saveAllBatches=saveAllBatches;
 
 /* Open the form with plot + batch already selected and LOCKED — the
    plot / batch pair is what identifies the audit; a stray edit here
-   would silently write against a different batch. */
+   would silently write against a different batch.
+
+   A real batch (tapped from the MN batch list) enters the carousel —
+   every other pending batch on this plot rides along in one run. The
+   `batch===null` case ("Audit without a batch", the empty-state
+   button) has no queue to join and keeps the old single-form path. */
 function _openFormForPlot(plot, batch){
+  if(batch!=null){ _openBatchQueue(plot, batch); return; }
   openAddForm();
   const ps=document.getElementById('f-plot');
   if(ps){
@@ -1150,9 +1218,73 @@ function _openFormForPlot(plot, batch){
     ps.style.color='var(--text3)';
     ps.style.cursor='not-allowed';
   }
+}
+window._openFormForPlot=_openFormForPlot;
+
+/* Every batch on this plot with no audit yet and no "not required" —
+   the same test openPlotDetail's rank() uses for its pending band,
+   pulled out so the queue can walk exactly that set. Ascending batch
+   number, same as the list shows them. */
+function _pendingBatchesOnPlot(plot){
+  return batchesOnPlot(plot).filter(b=>{
+    const audited=records.some(r=>r.nursery===activeTab && r.plot===plot &&
+                              String(r.batch||'').trim()===b.batch);
+    if(audited) return false;
+    if(isBatchNotRequired(plot,b.batch)) return false;
+    return true;
+  }).sort((a,b)=>{
+    const na=Number(a.batch)||0, nb=Number(b.batch)||0;
+    if(na!==nb) return na-nb;
+    return String(a.batch).localeCompare(String(b.batch));
+  });
+}
+
+/* Start (or resume) the carousel for a plot. openAddForm() runs once,
+   here, to get the ordinary new-record scaffolding (view, reset UI);
+   every step after the first calls _bqLoadStep() directly so it does
+   not stomp the queue state openAddForm() itself clears. */
+function _openBatchQueue(plot, startBatch){
+  const items=_pendingBatchesOnPlot(plot);
+  // Nothing pending — everything on this plot is already done, marked
+  // Not Required, or there are no batches on file at all. There is no
+  // queue to run; show the list instead, so the auditor sees why
+  // (finished plot, or the "Audit without a batch" empty state).
+  if(!items.length){ openPlotDetail(plot); return; }
+  let startIdx=startBatch!=null ? items.findIndex(b=>b.batch===startBatch) : -1;
+  if(startIdx<0) startIdx=0;
+  window._lastOpenedPlot=plot;
+  openAddForm();
+  bq={plot, items, idx:startIdx, data:new Array(items.length)};
+  _bqLoadStep();
+}
+
+/* One step of the carousel: blank form, batch locked to items[idx],
+   title + dot strip updated. Forward-only — there is no "back a
+   batch" here on purpose. A mistake on an earlier batch in the run is
+   fixed the same way any other saved record is fixed: the whole queue
+   finishes, the record lands in the plot's list like any other, and
+   Edit opens it same as always. Keeping the queue one-way is what
+   keeps this step simple — no state to restore, no re-validating an
+   already-passed batch. */
+function _bqLoadStep(){
+  const item=bq.items[bq.idx];
+  editMode=false; editId=null;
+  formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
+  populateForm();
+  _resetDeclineUI();
+  const ps=document.getElementById('f-plot');
+  if(ps){
+    Array.from(ps.options).forEach(o=>{if(o.value===bq.plot)ps.value=bq.plot;});
+    ps.disabled=true;
+    ps.setAttribute('aria-readonly','true');
+    ps.title='Plot is fixed for this audit — cancel and choose another to change';
+    ps.style.background='var(--g50)';
+    ps.style.color='var(--text3)';
+    ps.style.cursor='not-allowed';
+  }
   const bf=document.getElementById('f-batch');
-  if(bf && batch!=null){
-    bf.value=batch;
+  if(bf){
+    bf.value=item.batch;
     bf.readOnly=true;
     bf.setAttribute('aria-readonly','true');
     bf.title='Batch is fixed for this audit — cancel and choose another to change';
@@ -1160,8 +1292,39 @@ function _openFormForPlot(plot, batch){
     bf.style.color='var(--text3)';
     bf.style.cursor='not-allowed';
   }
+  const ttl=document.getElementById('form-view-title');
+  if(ttl) ttl.textContent='Batch '+item.batch+(item.breed?' · '+item.breed:'')+' — '+NURSERY_LABELS[activeTab];
+  _bqRenderHeader();
 }
-window._openFormForPlot=_openFormForPlot;
+
+/* Position header + dot strip, and the Save button's own label — the
+   button IS the "next batch" action for every step but the last, where
+   it becomes the one save that actually reaches Supabase. Pulled out of
+   its normal data-t="save" translation binding while the queue is
+   live so a language switch mid-carousel can't overwrite the count;
+   restored the moment the queue ends. */
+function _bqRenderHeader(){
+  const hdr=document.getElementById('bq-header');
+  const btn=document.getElementById('btn-save-record');
+  if(!hdr) return;
+  if(!bq){
+    hdr.style.display='none';
+    if(btn && !btn.hasAttribute('data-t')){ btn.setAttribute('data-t','save'); btn.textContent=(typeof t==='function'?t('save'):'Save Record'); }
+    return;
+  }
+  hdr.style.display='';
+  const pos=document.getElementById('bq-pos');
+  if(pos) pos.textContent='Batch '+(bq.idx+1)+' of '+bq.items.length;
+  const dots=document.getElementById('bq-dots');
+  if(dots) dots.innerHTML=bq.items.map((_,i)=>
+    '<span class="bq-dot'+(i<bq.idx?' done':'')+(i===bq.idx?' current':'')+'"></span>').join('');
+  if(btn){
+    btn.removeAttribute('data-t');
+    btn.textContent = (bq.idx===bq.items.length-1)
+      ? '💾 Save All ('+bq.items.length+(bq.items.length===1?' Batch)':' Batches)')
+      : '➡ Save & Next Batch';
+  }
+}
 
 /* Refresh that stays on the current view — remember which plot detail
    was open, reload, and re-open the same detail with fresh data. */
@@ -1225,19 +1388,23 @@ window.noAuditReason=noAuditReason;
 
 /* --- FORM --- */
 function openAddForm(){
+  bq=null;      // a fresh single-record form abandons any batch queue in progress
   editMode=false;editId=null;
   formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
   populateForm();setView('form');
   _unlockPlotBatchInputs();
   _resetDeclineUI();
   document.getElementById('form-view-title').textContent='New Record — '+NURSERY_LABELS[activeTab];
+  _bqRenderHeader();
 }
 function openEdit(uid){
   const r=records.find(x=>x.uid===uid);if(!r)return;
+  bq=null;      // editing a saved record is never part of a batch queue
   editMode=true;editId=uid;
   formState={nursery:r.nursery,s1:r.s1,s2:r.s2,s3:r.s3,p1:r.p1,p2:r.p2,p3:r.p3};
   populateForm(r);setView('form');
   _resetDeclineUI();
+  _bqRenderHeader();
   // Replay the declined state if this record was closed with No Audit
   // Required — the auditor can still Undo and fill in real numbers.
   if(isNoAuditRequired(r)){
@@ -1413,7 +1580,19 @@ async function handlePhoto(n,input){
   }
   input.value='';
 }
-function cancelForm(){setView('list');}
+/* Leaving the form early. Mid-queue with anything already stepped
+   past, that is real entered data about to be thrown away — ask
+   first, the same caution a form with unsaved changes deserves
+   anywhere else in this app. */
+function cancelForm(){
+  if(bq && bq.idx>0 && !confirm(
+    'You have filled '+bq.idx+' of '+bq.items.length+' batches on this plot. '+
+    'Leaving now discards that — none of it has been saved yet. Leave anyway?'
+  )) return;
+  bq=null;
+  _bqRenderHeader();
+  setView('list');
+}
 
 /* --- SAVE --- */
 async function saveRecord(){
@@ -1431,24 +1610,74 @@ async function saveRecord(){
       showToast(t('err_3_photos'));return;
     }
   }
+  // Pass photos as base64 — smartSave handles upload (online) or queues (offline).
+  // Declined rows write nulls into the numeric columns and the sentinel
+  // into the URL columns, so isNoAuditRequired() picks them up on reload.
+  const avg=declined ? null : calcAvg(formState.s1,formState.s2,formState.s3);
+  const payload={
+    nursery:formState.nursery,plot,batch:batch||null,
+    sample_1: declined ? null : (formState.s1?parseFloat(formState.s1):null),
+    sample_2: declined ? null : (formState.s2?parseFloat(formState.s2):null),
+    sample_3: declined ? null : (formState.s3?parseFloat(formState.s3):null),
+    avg_height: avg?parseFloat(avg):null,
+    photo_1_url: declined ? formState.p1 : (formState.p1||null),
+    photo_2_url: declined ? formState.p2 : (formState.p2||null),
+    photo_3_url: declined ? formState.p3 : (formState.p3||null),
+    date:todayISO(),
+    auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
+  };
+
+  /* ── BATCH QUEUE: nothing reaches Supabase until the last batch ──
+     Validation above already ran for THIS batch — passing it is what
+     "detect the column yet fill and ask for fill it" means: the toast
+     already fired and returned above if anything was missing, so
+     reaching here at all means this batch is complete. Snapshot it and
+     either step to the next blank batch, or — on the last one — write
+     every collected batch in one run. */
+  if(bq){
+    bq.data[bq.idx]=payload;
+    if(bq.idx<bq.items.length-1){
+      bq.idx++;
+      _bqLoadStep();
+      return;
+    }
+    setLoading(true);
+    /* nextID() counts records.length, which does not grow between these
+       calls — smartSave() writes to Supabase but never pushes into the
+       local records array, only loadRecords() does. Called N times in
+       this loop unchanged, every batch in the same nursery would get
+       the identical record_id. seq[] tracks the count locally instead,
+       seeded once from the real records array and incremented per save
+       — the same number nextID() would have produced one at a time. */
+    const seq={};
+    let savedOk=0, queuedOffline=0; const failed=[];
+    for(const step of bq.data){
+      if(!step) continue;
+      if(seq[step.nursery]==null) seq[step.nursery]=records.filter(r=>r.nursery===step.nursery).length;
+      seq[step.nursery]++;
+      const record_id='HGT-'+step.nursery+'-'+pad(seq[step.nursery]);
+      try{
+        const result=await smartSave('audit_height_records','insert',
+          {...step,record_id}, null);
+        if(result?.offline) queuedOffline++; else savedOk++;
+      }catch(e){ failed.push((step.batch||'?')+': '+(e.message||'failed')); }
+    }
+    const finishedPlot=bq.plot;
+    bq=null;
+    _bqRenderHeader();
+    await loadRecords();
+    openPlotDetail(finishedPlot);   // sets its own view — shows the plot's batches, now done
+    setLoading(false);
+    const parts=[];
+    if(savedOk)        parts.push(savedOk+' saved');
+    if(queuedOffline)  parts.push(queuedOffline+' queued offline');
+    if(failed.length)  parts.push(failed.length+' failed');
+    showToast((failed.length?'⚠ ':'✅ ')+parts.join(', ')+(failed.length?' — '+failed.join('; '):''));
+    return;
+  }
+
   setLoading(true);
   try{
-    // Pass photos as base64 — smartSave handles upload (online) or queues (offline).
-    // Declined rows write nulls into the numeric columns and the sentinel
-    // into the URL columns, so isNoAuditRequired() picks them up on reload.
-    const avg=declined ? null : calcAvg(formState.s1,formState.s2,formState.s3);
-    const payload={
-      nursery:formState.nursery,plot,batch:batch||null,
-      sample_1: declined ? null : (formState.s1?parseFloat(formState.s1):null),
-      sample_2: declined ? null : (formState.s2?parseFloat(formState.s2):null),
-      sample_3: declined ? null : (formState.s3?parseFloat(formState.s3):null),
-      avg_height: avg?parseFloat(avg):null,
-      photo_1_url: declined ? formState.p1 : (formState.p1||null),
-      photo_2_url: declined ? formState.p2 : (formState.p2||null),
-      photo_3_url: declined ? formState.p3 : (formState.p3||null),
-      date:todayISO(),
-      auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
-    };
     const result=await smartSave('audit_height_records',editMode?'update':'insert',
       editMode?payload:{...payload,record_id:nextID(formState.nursery)},
       editMode?editId:null);

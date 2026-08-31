@@ -23,6 +23,7 @@
 --  14. migration_nelos_access.sql which systems a person may use Nelos in
 --  15. migration_nelos_automation.sql  work that repeats, raised on schedule
 --  16. migration_nelos_directory_staff.sql  the search finds staff, not customers
+--  17. migration_nelos_close_remark.sql  a close remark, and a real may_close right
 --
 -- Safe to re-run as often as you like: every statement is guarded, later
 -- parts stand down where an earlier part has been superseded, and nothing
@@ -42,7 +43,7 @@
 -- ============================================================================
 
 -- ############################################################################
--- ##  PART 1 of 16 — migration_nelos.sql
+-- ##  PART 1 of 17 — migration_nelos.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -384,7 +385,7 @@ SELECT 'nelos_case_comments',      count(*) FROM nelos_case_comments;
 -- Batch Detail's insert target is all that is needed to go back.
 
 -- ############################################################################
--- ##  PART 2 of 16 — migration_nelos_modules.sql
+-- ##  PART 2 of 17 — migration_nelos_modules.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -687,7 +688,7 @@ SELECT m.key, m.label, count(mm.id) AS members
 --   DROP TABLE IF EXISTS nelos_module_members, nelos_modules;
 
 -- ############################################################################
--- ##  PART 3 of 16 — migration_nelos_routing.sql
+-- ##  PART 3 of 17 — migration_nelos_routing.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1006,7 +1007,7 @@ SELECT m.key,
 -- nelos_module_members is untouched, so the old page would work again.
 
 -- ############################################################################
--- ##  PART 4 of 16 — migration_nelos_roles.sql
+-- ##  PART 4 of 17 — migration_nelos_roles.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1355,7 +1356,7 @@ SELECT r.source_module AS raised_in,
 --   was never cleared, so the old section routing comes back with it.
 
 -- ############################################################################
--- ##  PART 5 of 16 — migration_nelos_seats.sql
+-- ##  PART 5 of 17 — migration_nelos_seats.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1672,7 +1673,7 @@ SELECT m.label AS system,
 --   never cleared, so the old behaviour comes back with them.
 
 -- ############################################################################
--- ##  PART 6 of 16 — migration_nelos_hq.sql
+-- ##  PART 6 of 17 — migration_nelos_hq.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1774,7 +1775,7 @@ SELECT label AS system,
 --   nelos_my_scope().
 
 -- ############################################################################
--- ##  PART 7 of 16 — migration_nelos_category_system.sql
+-- ##  PART 7 of 17 — migration_nelos_category_system.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -1869,7 +1870,7 @@ SELECT m.label AS system,
 --   ALTER TABLE nelos_categories ADD CONSTRAINT nelos_categories_name_key UNIQUE (name);
 
 -- ############################################################################
--- ##  PART 8 of 16 — migration_nelos_rls.sql
+-- ##  PART 8 of 17 — migration_nelos_rls.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2049,7 +2050,7 @@ SELECT tablename,
 --     CREATE POLICY "Authenticated write <x>" ON <t> FOR ALL    TO authenticated USING (true) WITH CHECK (true);
 
 -- ############################################################################
--- ##  PART 9 of 16 — migration_nelos_grant.sql
+-- ##  PART 9 of 17 — migration_nelos_grant.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2155,7 +2156,7 @@ SELECT p.proname, pg_get_function_result(p.oid) AS returns
 --   DROP FUNCTION IF EXISTS public.nelos_grant_access(UUID);
 
 -- ############################################################################
--- ##  PART 10 of 16 — migration_nelos_case_tools.sql
+-- ##  PART 10 of 17 — migration_nelos_case_tools.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2425,7 +2426,7 @@ SELECT policyname, cmd FROM pg_policies
 --   …then re-run migration_nelos_rls.sql to put the old case policies back.
 
 -- ############################################################################
--- ##  PART 11 of 16 — migration_nelos_close_right.sql
+-- ##  PART 11 of 17 — migration_nelos_close_right.sql
 -- ############################################################################
 
 -- ================================================================
@@ -2532,7 +2533,7 @@ SELECT 'nelos_my_rights() returns 6 columns',
            AND parameter_mode='TABLE') = 6;
 
 -- ############################################################################
--- ##  PART 12 of 16 — migration_nelos_solve_photo.sql
+-- ##  PART 12 of 17 — migration_nelos_solve_photo.sql
 -- ############################################################################
 
 -- ================================================================
@@ -2598,7 +2599,7 @@ BEGIN
 END $bucket$;
 
 -- ############################################################################
--- ##  PART 13 of 16 — migration_nelos_tier.sql
+-- ##  PART 13 of 17 — migration_nelos_tier.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2691,7 +2692,7 @@ SELECT key, label, tier_label, handler_label
 --   ALTER TABLE public.nelos_modules DROP COLUMN IF EXISTS tier_label;
 
 -- ############################################################################
--- ##  PART 14 of 16 — migration_nelos_access.sql
+-- ##  PART 14 of 17 — migration_nelos_access.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -2871,7 +2872,7 @@ SELECT COALESCE(NULLIF(h.full_name, ''), h.email) AS person,
 --   to put the narrower nelos_my_scope() and nelos_people() back.
 
 -- ############################################################################
--- ##  PART 15 of 16 — migration_nelos_automation.sql
+-- ##  PART 15 of 17 — migration_nelos_automation.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -3184,7 +3185,7 @@ SELECT 'monthly, 28th',       public.nelos_next_run(CURRENT_DATE, 'monthly', 28)
 --   DROP TABLE IF EXISTS nelos_work_types;
 
 -- ############################################################################
--- ##  PART 16 of 16 — migration_nelos_directory_staff.sql
+-- ##  PART 16 of 17 — migration_nelos_directory_staff.sql
 -- ############################################################################
 
 -- ============================================================================
@@ -3302,3 +3303,145 @@ SELECT count(*)                                                            AS ev
 
 -- ── Rollback (manual, if ever needed) ───────────────────────────
 --   Re-run migration_nelos_modules.sql, which defines the unfiltered one.
+
+-- ############################################################################
+-- ##  PART 17 of 17 — migration_nelos_close_remark.sql
+-- ############################################################################
+
+-- ================================================================
+-- NELOS — a remark of the closer's own, and a real right to close with
+-- Run in the Supabase SQL Editor (project kibqjztozokohqmhqqqf).
+-- Safe to re-run.
+--
+-- What this adds
+-- --------------
+-- The Close Case sheet used to write nothing but the status change —
+-- nowhere for whoever accepts the work to say why, if they wanted to.
+-- close_remark is that line, separate from nelos_cases.resolution:
+-- resolution is the SOLVER's word on what was done, close_remark is
+-- the CLOSER's on accepting it, and they can be two different people
+-- days apart. Neither overwrites the other.
+--
+-- The dock works without this column: it retries the close without the
+-- remark if the column is missing, keeping the status change. Run this
+-- and the remark starts sticking too.
+--
+-- The real fix in this file
+-- --------------------------
+-- migration_nelos_close_right.sql (an earlier file) gave handlers a
+-- may_close tick and a nelos_my_rights() that reports it — but never
+-- taught nelos_may(), the function the ROW-LEVEL SECURITY policy on
+-- nelos_cases actually calls, to recognise 'close' as a right at all.
+-- Asked for it, nelos_may('close') fell through to the CASE statement's
+-- ELSE and returned false for every single person, and the UPDATE
+-- policy's WITH CHECK never named 'close' either — only 'edit' and
+-- 'solve'. So the Close Case button has been showing to anyone with
+-- may_close ticked, while Postgres would have refused the write for
+-- anyone whose may_solve was not ALSO true (which is most Nelos
+-- holders by default, so this went unnoticed) or explicitly false. A
+-- foreman ticked "may close, may not solve" — a real shape, a reviewer
+-- who accepts work without doing it — could open the sheet, press
+-- Close Case, and be told the case saved when the database had
+-- silently ignored the write. That is fixed here, not worked around.
+--
+-- Requires shared/migration_nelos_case_tools.sql (nelos_may(), the
+-- update policy) and shared/migration_nelos_close_right.sql (may_close).
+-- Run migration_nelos_all.sql first if neither has run.
+-- ================================================================
+
+-- ── PREFLIGHT ───────────────────────────────────────────────────
+DO $preflight$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.routines
+                  WHERE routine_schema='public' AND routine_name='nelos_may') THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'nelos_may() does not exist yet.',
+      HINT    = 'Run shared/migration_nelos_case_tools.sql first, then this file.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='nelos_handlers'
+                    AND column_name='may_close') THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'nelos_handlers.may_close does not exist yet.',
+      HINT    = 'Run shared/migration_nelos_close_right.sql first, then this file.';
+  END IF;
+END $preflight$;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 1: the column
+-- ────────────────────────────────────────────────────────────────
+ALTER TABLE public.nelos_cases
+  ADD COLUMN IF NOT EXISTS close_remark TEXT;
+
+COMMENT ON COLUMN public.nelos_cases.close_remark IS
+  'What the CLOSER wrote when accepting the work — separate from '
+  'resolution, which is the SOLVER''s word on what was done. Either or '
+  'both may be null.';
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 2: nelos_may('close') answers for real
+--
+-- A scalar-returning function, so CREATE OR REPLACE is enough — this
+-- is not the RETURNS TABLE case that needs a DROP first.
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.nelos_may(p_right TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+      FROM public.shared_profiles p
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(p.permissions->'modules'->>'nelos', 'none') AS lvl) AS a
+      LEFT JOIN public.nelos_handlers h ON h.user_id = p.id
+     WHERE p.id = auth.uid()
+       AND (a.lvl = 'admin'
+            OR (a.lvl <> 'none'
+                AND CASE p_right
+                      WHEN 'solve'  THEN COALESCE(h.may_solve,  true)
+                      WHEN 'edit'   THEN COALESCE(h.may_edit,   false)
+                      WHEN 'delete' THEN COALESCE(h.may_delete, false)
+                      WHEN 'close'  THEN COALESCE(h.may_close,  false)
+                      ELSE false
+                    END))
+  )
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nelos_may(TEXT) TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- PART 3: the UPDATE policy recognises 'close' too
+--
+-- Same shape as migration_nelos_case_tools.sql, one right wider.
+-- ────────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "nelos update" ON public.nelos_cases;
+
+  CREATE POLICY "nelos update" ON public.nelos_cases
+    FOR UPDATE TO authenticated
+    USING (public.nelos_may('edit') OR public.nelos_may('solve') OR public.nelos_may('close'))
+    WITH CHECK (public.nelos_may('edit') OR public.nelos_may('solve') OR public.nelos_may('close'));
+END $$;
+
+
+-- ── Check it landed ─────────────────────────────────────────────
+-- Good result: all three rows read true.
+SELECT 'nelos_cases.close_remark exists' AS what,
+       EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='nelos_cases'
+                  AND column_name='close_remark') AS ok
+UNION ALL
+SELECT 'nelos update policy checks close',
+       EXISTS (SELECT 1 FROM pg_policies
+                WHERE schemaname='public' AND tablename='nelos_cases'
+                  AND policyname='nelos update'
+                  AND (qual LIKE '%nelos_may(''close''%'
+                       OR with_check LIKE '%nelos_may(''close''%'))
+UNION ALL
+SELECT 'nelos_may() function body mentions close',
+       (SELECT prosrc FROM pg_proc
+         WHERE proname='nelos_may' AND pronamespace='public'::regnamespace) LIKE '%may_close%';

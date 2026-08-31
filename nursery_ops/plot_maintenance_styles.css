@@ -81,7 +81,8 @@ button.top-sel:focus{outline:none;border-color:var(--border-focus);box-shadow:0 
 .btn-pdf:hover{background:var(--green);color:#fff;border-color:var(--green);}
 
 /* ─── PAGE & TABS ─── */
-.page{width:100%;max-width:1800px;margin:0 auto;padding:24px 28px;}
+.page{width:100%;max-width:1720px;margin:0 auto;padding:20px 16px;}
+@media(min-width:768px){.page{padding:20px 22px;}}
 .tabs-bar{display:flex;gap:4px;margin-bottom:22px;background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:5px;box-shadow:var(--shadow-sm);width:fit-content;}
 .tab-btn{font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:0.3px;color:var(--text-muted);background:transparent;border:none;cursor:pointer;padding:8px 18px;border-radius:var(--r-sm);transition:all 0.14s;}
 .tab-btn:hover{color:var(--text-body);background:var(--green-bg);}
@@ -716,64 +717,101 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    is a reading surface — you come to it to find out whether something is
    set, not to set it — so it stays pale and the ticks carry the weight.
    ══════════════════════════════════════════════════════════════ */
-.ss-wrap{border:1.5px solid var(--border);border-radius:var(--r-md);
-  background:var(--bg-white);margin-bottom:16px;overflow:hidden;}
-.ss-wrap:last-child{margin-bottom:0;}
+/* Two nurseries to a row. Four nurseries stacked was four screens of
+   scrolling to compare them, which is the one thing this table is for. Below
+   1100px they go back to one — two tables of five week columns in half a
+   laptop's width is not a summary, it is a squeeze. */
+/* ‹ Monthly Work Schedule : Aug 26 › — the title IS the stepper, so the two
+   arrows sit against the thing they change rather than somewhere else on the
+   bar. */
+.sched-month{display:flex;align-items:center;gap:10px;}
+.sched-step{display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;font-family:var(--font);font-size:20px;font-weight:700;
+  line-height:1;color:var(--green-text);background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer;
+  transition:background .13s,border-color .13s;}
+.sched-step:hover{background:#eaf7f0;border-color:var(--green);}
 
-.ss-head{display:flex;align-items:center;gap:12px;padding:11px 16px;
+#sched-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;align-items:start;}
+@media (max-width:1100px){ #sched-summary{grid-template-columns:1fr;} }
+
+.ss-wrap{border:1.5px solid var(--border);border-radius:var(--r-md);
+  background:var(--bg-white);overflow:hidden;min-width:0;}
+
+.ss-head{display:flex;align-items:center;gap:10px;padding:9px 13px;
   background:#f2f7f4;border-bottom:1.5px solid var(--border);}
-.ss-name{flex:1;font-size:15px;font-weight:800;letter-spacing:.6px;
+.ss-name{flex:1;font-size:13.5px;font-weight:800;letter-spacing:.5px;
   text-transform:uppercase;color:var(--green-text);}
-.ss-addweek{font-family:var(--font);font-size:12px;font-weight:700;
+.ss-addweek{font-family:var(--font);font-size:11px;font-weight:700;
   color:var(--green-text);background:var(--bg-white);border:1.5px solid var(--green-mid);
-  border-radius:var(--r-sm);padding:5px 12px;cursor:pointer;white-space:nowrap;
+  border-radius:var(--r-sm);padding:4px 10px;cursor:pointer;white-space:nowrap;
   transition:background .13s,border-color .13s;}
 .ss-addweek:hover{background:#eaf7f0;border-color:var(--green);}
 
 .ss-table{width:100%;border-collapse:collapse;}
 .ss-table thead th{background:var(--bg-white);color:var(--text-muted);font-weight:800;
-  font-size:12px;letter-spacing:.8px;text-transform:uppercase;padding:11px 12px;
+  font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;padding:8px 6px;
   border-bottom:2px solid var(--border-strong);text-align:center;white-space:nowrap;}
 /* .period-btn is written for the dark schedule headers; on this pale one it
    needs the underline it can actually be seen against. */
 .ss-table thead th .period-btn{border-bottom-color:var(--border-strong);
-  font-size:12.5px;color:var(--text-head);}
+  font-size:11px;color:var(--text-head);letter-spacing:0;}
 .ss-table thead th .period-btn:hover{background:rgba(13,122,71,.09);
   border-bottom-color:var(--green);}
 
-.ss-table tbody td{padding:10px 12px;border-bottom:1px solid #eaf1ed;
-  text-align:center;vertical-align:middle;font-size:14px;color:var(--text-body);}
+.ss-table tbody td{padding:7px 6px;border-bottom:1px solid #eaf1ed;
+  text-align:center;vertical-align:middle;font-size:13px;color:var(--text-body);}
 .ss-table tbody tr:last-child td{border-bottom:none;}
 
 /* The work's name is the row's label, so it reads left and heavier than the
    cells it is labelling. */
-th.ss-work,td.ss-work{text-align:left;font-size:14px;font-weight:800;
-  color:var(--text-head);white-space:nowrap;min-width:150px;}
-th.ss-act,td.ss-act{width:1%;white-space:nowrap;}
+th.ss-work,td.ss-work{text-align:left;font-size:12.5px;font-weight:800;
+  color:var(--text-head);white-space:nowrap;padding-left:13px;}
+th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 
 .ss-cell{color:var(--border-strong);font-size:15px;}
 .ss-cell.on{background:#f0faf5;}
 .ss-tick{display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
-  font-size:14px;font-weight:800;line-height:1;}
+  width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;
+  font-size:12px;font-weight:800;line-height:1;}
 
 .ss-btn{display:inline-flex;align-items:center;justify-content:center;
-  font-family:var(--font);font-size:13px;line-height:1;color:var(--text-muted);
+  font-family:var(--font);font-size:11px;line-height:1;color:var(--text-muted);
   background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-sm);
-  width:30px;height:30px;cursor:pointer;transition:all .13s;vertical-align:middle;}
-.ss-btn+.ss-btn{margin-left:6px;}
+  width:26px;height:26px;cursor:pointer;transition:all .13s;vertical-align:middle;}
+.ss-btn+.ss-btn{margin-left:4px;}
 .ss-btn:hover{border-color:var(--green);color:var(--green);background:#eaf7f0;}
 .ss-btn-edit{color:var(--green-text);border-color:var(--green-mid);}
 
 .ss-row.is-open td{border-bottom-color:transparent;background:#f7fbf9;}
 
-/* The plots behind a tick. A row of chips rather than a list, because the
-   question it answers is "which ones", not "how many". */
-.ss-detail td{padding:2px 10px 12px;background:#f7fbf9;
-  border-bottom:1px solid #eaf1ed;vertical-align:top;}
-.ss-plot{display:inline-block;margin:2px 3px;padding:3px 8px;font-size:12px;
-  font-weight:700;color:var(--green-text);background:#e6f5ec;
-  border:1px solid var(--green-mid);border-radius:20px;}
+/* EVERY plot, ticked or not, in ONE table — plots down, weeks across. It
+   listed only what was set, which made the panel a different shape every time
+   and gave no way to see a plot had been MISSED. The week columns are
+   numbered; the dates are two rows up in the summary's own header, and
+   repeating them here would cost the width the plot names need. */
+.ss-detail td{padding:10px 13px 14px;background:#f7fbf9;
+  border-bottom:1px solid #eaf1ed;vertical-align:top;text-align:left;}
+.xp-wrap{max-height:420px;overflow:auto;}
+.xp-table{width:100%;border-collapse:collapse;}
+.xp-table thead th{position:sticky;top:0;z-index:1;background:#f7fbf9;
+  font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);
+  text-transform:uppercase;padding:0 6px 6px;border-bottom:1px solid var(--border);
+  text-align:center;}
+.xp-table th.xp-plot{text-align:left;padding-left:0;}
+.xp-table tbody td{padding:3px 6px;font-size:12px;text-align:center;
+  line-height:1.5;border:none;}
+.xp-table td.xp-plot{text-align:left;padding-left:0;font-weight:700;
+  color:var(--text-head);white-space:nowrap;}
+.xp-on{color:var(--green);font-weight:800;}
+/* An empty cell needs a mark of its own or the row reads as ragged; a faint
+   dot says "asked and not set" where blank says only "nothing here". */
+.xp-off::after{content:"\00b7";color:var(--border-strong);}
+/* A plot with nothing set anywhere this month is the one worth spotting. */
+.xp-blank td.xp-plot{color:var(--text-muted);font-weight:600;}
+.xp-tot{font-size:11px;font-weight:800;color:var(--green-text);width:1%;
+  padding-left:10px;}
 .ss-none{color:var(--border-strong);font-size:13px;}
 
 
@@ -781,15 +819,20 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;}
    Every plot in the nursery with the ticks that round holds, and above them
    what it is being sprayed or fed with. Same questions as the sheet, about
    one column of it. */
-.we-round{margin-bottom:18px;}
-.we-round:last-child{margin-bottom:0;}
-
+/* One config card per round, side by side — the popup holds the whole month
+   now, so stacking five of them would put the grid below the fold. */
+.we-cfgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
+  gap:10px;margin-bottom:14px;}
 .we-cfg{background:#f2f7f4;border:1.5px solid var(--border);border-radius:var(--r-md);
-  padding:10px 12px;margin-bottom:12px;}
+  padding:9px 11px;min-width:0;}
+.we-cfg-h{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--green-text);padding-bottom:6px;margin-bottom:4px;
+  border-bottom:1px solid var(--border);}
+.we-cfg-h-orphan{color:#92400e;}
 /* One field to a line, and the labels in a column of their own so PEST and
    DISEASE STICKER line their controls up rather than staggering them. */
-.we-cfg-row{display:grid;grid-template-columns:118px minmax(0,1fr) 78px 34px;
-  align-items:center;gap:10px;padding:4px 0;}
+.we-cfg-row{display:grid;grid-template-columns:88px minmax(0,1fr) 58px 26px;
+  align-items:center;gap:8px;padding:3px 0;}
 .we-cfg-l{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--text-muted);}
 .we-cfg-u{font-size:12px;font-weight:700;color:var(--text-muted);}
@@ -804,13 +847,27 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;}
 .we-num:focus{outline:none;border-color:var(--green);}
 
 .we-table{width:100%;border-collapse:collapse;}
-.we-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:800;font-size:11px;
-  letter-spacing:.8px;text-transform:uppercase;padding:8px 10px;
+.we-table{table-layout:auto;}
+.we-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:800;font-size:10.5px;
+  letter-spacing:.6px;text-transform:uppercase;padding:7px 8px;
   border-bottom:2px solid var(--border-strong);text-align:center;}
-.we-table tbody td{padding:6px 10px;border-bottom:1px solid #eaf1ed;text-align:center;}
+/* The week band. A left rule on each group is what keeps two weeks of Pest /
+   Disease from reading as one run of four columns. */
+.we-table thead th.we-wk{background:var(--green);color:#fff;font-size:11px;
+  border-bottom:1px solid rgba(255,255,255,.35);white-space:nowrap;}
+.we-table thead th.we-wk-orphan{background:#92400e;}
+.we-table thead th.we-wk+.we-wk,.we-table thead th.we-col.grp,
+.we-table tbody td.grp{border-left:2px solid var(--border-strong);}
+.we-table thead th.we-col{font-size:10px;min-width:62px;}
+.we-table tbody td{padding:4px 8px;border-bottom:1px solid #eaf1ed;text-align:center;}
+.we-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .we-table tbody tr:last-child td{border-bottom:none;}
-th.we-plot,td.we-plot{text-align:left;font-size:13px;font-weight:700;
-  color:var(--text-head);white-space:nowrap;}
+th.we-plot,td.we-plot{text-align:left;font-size:12.5px;font-weight:700;
+  color:var(--text-head);white-space:nowrap;position:sticky;left:0;z-index:1;
+  background:var(--bg-white);}
+/* Sticky needs its own background or the striped rows show through it. */
+.we-table tbody tr:nth-child(even) td.we-plot{background:var(--bg-row-alt);}
+.we-table thead th.we-plot{background:#f2f7f4;z-index:2;}
 
 .we-all{display:block;margin:4px auto 0;font-family:var(--font);font-size:10px;
   font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--green-text);
@@ -818,7 +875,7 @@ th.we-plot,td.we-plot{text-align:left;font-size:13px;font-weight:700;
   padding:2px 9px;cursor:pointer;}
 .we-all:hover{background:#eaf7f0;}
 
-.we-tick{width:28px;height:28px;border-radius:var(--r-sm);border:1.5px solid var(--border);
+.we-tick{width:26px;height:26px;border-radius:var(--r-sm);border:1.5px solid var(--border);
   background:var(--bg-white);color:transparent;font-size:14px;font-weight:800;line-height:1;
   cursor:pointer;transition:all .12s;}
 .we-tick:hover{border-color:var(--green);}
@@ -833,4 +890,126 @@ th.we-plot,td.we-plot{text-align:left;font-size:13px;font-weight:700;
 #we-modal .modal-body{flex:1 1 auto;overflow-y:auto;min-height:0;}
 /* Two columns across a 760px modal leaves the ticks stranded in acres of
    space; the plot name only needs the width of a plot name. */
-th.we-plot,td.we-plot{width:34%;}
+th.we-plot,td.we-plot{width:1%;}
+
+
+/* ── The week-dates popover ────────────────────────────────────────────
+   Its look used to be written INLINE on the element, `display:flex` among
+   it, while class="hidden" was supposed to put it away. An inline
+   declaration outranks any stylesheet rule whatever the selector — and
+   this stylesheet had no .hidden rule at all — so it never hid. It sat at
+   the foot of every tab, two date boxes and three buttons, looking for all
+   the world like a search bar somebody had left behind.
+
+   Both halves live here now, and the hiding rule is the more specific of
+   the two, so it wins without !important. */
+#week-pick{position:absolute;z-index:90;display:flex;gap:8px;align-items:center;
+  flex-wrap:wrap;padding:12px;background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-md);
+  box-shadow:0 12px 30px rgba(0,0,0,.16);}
+#week-pick.hidden{display:none;}
+#week-pick .set-in{width:150px;}
+
+/* The ribbon is the page's own sticky header now, so the control strip
+   below it must not claim the same top:0 and cover it. */
+#mjm-ribbon+#view-app .topbar{position:static;}
+
+
+/* ══════════════════════════════════════════════════════════════
+   THE SIDE BAR, AND THE HEAD BESIDE IT
+
+   This is PALMS's bar — shared/shared_palms_nav.js — measured and
+   coloured the same on purpose, so the two modules are one system rather
+   than two houses. It is a COPY and not that file because PALMS moves
+   between four HTML pages and this page moves between panels of itself:
+   same shape, different mechanism. CHANGE ONE, CHANGE THE OTHER. The
+   same note sits in shared_palms_nav.js.
+
+   Everything is a class rather than an inline style, for the reason that
+   file gives: an inline declaration outranks a stylesheet one whatever
+   the selector, so a bar styled inline cannot be narrowed by a media
+   query — and this bar has to become a row on a phone.
+   ══════════════════════════════════════════════════════════════ */
+.sm-frame{display:block;}
+.sm-body{min-width:0;}
+@media(min-width:768px){
+  .sm-frame{display:grid;grid-template-columns:212px minmax(0,1fr);
+    gap:24px;align-items:start;}
+}
+
+#sm-nav{display:block;}
+#sm-nav .pn-out{display:flex;align-items:center;gap:8px;padding:10px 13px;
+  border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;
+  text-decoration:none;font-size:11px;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;line-height:1.25;transition:background .15s,color .15s;}
+#sm-nav .pn-out:hover{background:#f1f5f9;color:#0f172a;}
+/* The panels, held apart from the way out by a rule rather than by
+   distance alone, so the bar reads as "leave" then "inside". */
+#sm-nav .pn-group{margin-top:14px;padding-top:14px;border-top:1px solid #ccfbf1;
+  display:flex;flex-direction:column;gap:4px;}
+#sm-nav .pn-cap{font-size:9.5px;font-weight:900;letter-spacing:.18em;
+  text-transform:uppercase;color:#5eead4;padding:0 4px 7px;line-height:1.4;}
+#sm-nav .pn-tab{display:block;width:100%;text-align:left;padding:10px 12px;
+  border-radius:12px;font-family:var(--font);font-size:12.5px;font-weight:800;
+  color:#0f766e;background:transparent;border:1px solid transparent;
+  line-height:1.25;cursor:pointer;transition:background .15s,color .15s;}
+#sm-nav .pn-tab:hover{background:#ccfbf1;}
+#sm-nav .pn-tab.is-on{background:#0f766e;color:#fff;}
+#sm-nav .pn-tab.is-on:hover{background:#115e59;}
+/* 84px clears the ribbon, which is sticky. */
+@media(min-width:768px){#sm-nav{position:sticky;top:84px;align-self:start;}}
+/* Phone: the column becomes a row above the content — a 212px column
+   beside a table on a 412px screen leaves neither of them usable. */
+@media(max-width:767px){
+  #sm-nav .pn-group{margin-top:10px;padding-top:10px;flex-direction:row;
+    overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  #sm-nav .pn-group::-webkit-scrollbar{display:none;}
+  #sm-nav .pn-cap{display:none;}
+  #sm-nav .pn-tab{width:auto;flex:0 0 auto;background:#f0fdfa;border-color:#99f6e4;
+    font-size:12px;padding:9px 13px;white-space:nowrap;}
+  #sm-nav .pn-out{justify-content:center;}
+}
+
+/* The head every panel shares: what the side bar chose, and the two
+   things a panel is read THROUGH. */
+.sm-head{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;padding-bottom:14px;margin-bottom:16px;
+  border-bottom:1.5px solid var(--border);}
+.sm-title{font-size:22px;font-weight:800;color:var(--text-head);
+  letter-spacing:.2px;line-height:1.2;}
+.sm-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.sm-month{display:flex;align-items:center;gap:6px;}
+.sm-month-btn{height:32px;min-width:104px;padding:0 12px;font-family:var(--font);
+  font-size:12px;font-weight:700;color:var(--text-head);background:var(--bg-white);
+  border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer;
+  transition:border-color .15s;}
+.sm-month-btn:hover{border-color:var(--green);}
+
+/* The Schedule tab's own title and stepper moved into .sm-head, so what is
+   left of its bar is the buttons — which belong at the right, in nothing. */
+.sm-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  flex-wrap:wrap;margin-bottom:14px;}
+.sm-actions .btn,.sm-actions .btn-pdf{font-size:11.5px;padding:7px 15px;}
+
+
+/* ── The ribbon title on a phone ───────────────────────────────────────
+   shared_ribbon.js sizes the centred title from ONE scale that moves the
+   desk size and the phone size together, so a module cannot ask for
+   PALMS's 30px on a desk and something smaller on a phone. PALMS can
+   live with that: "PALMS" is five characters. "SCHEDULE & MAINTENANCE"
+   is twenty-two, and at the ribbon's phone size of 21px with .16em
+   tracking it runs past 412px of screen and is cut off mid-word.
+
+   So the desk size is the ribbon's own — the same as PALMS, which is
+   what was asked for — and only the phone is overridden here. Higher
+   specificity than the ribbon's own `#mjm-ribbon .mjm-rb-title` rule so
+   it wins wherever the injected <style> ends up in the cascade, and
+   !important for the reason that file gives: the size is written inline
+   on the element, and an inline declaration outranks a stylesheet one. */
+@media(max-width:640px){
+  body #mjm-ribbon .mjm-rb-title{font-size:15px !important;letter-spacing:.1em !important;}
+  body #mjm-ribbon .mjm-rb-sub{font-size:9.5px !important;letter-spacing:.05em !important;}
+}
+/* The side bar becomes a row of pills on a phone; the section title
+   underneath needs to not sit against them. */
+@media(max-width:767px){.sm-head{margin-top:14px;}}

@@ -1655,7 +1655,7 @@ async function saveScanDO() {
         const { data: urlData } = _supabase.storage.from('documents').getPublicUrl(filePath);
         imageUrl = urlData?.publicUrl || null;
       }
-    } catch (e) { imageUrl = scanPhotoBase64; }
+    } catch (e) { imageUrl = null; } // never save base64 into the row — multi-MB rows OOM-crash the database
   }
 
   // Build payload with up to 5 item rows

@@ -930,6 +930,19 @@ html, body {
 .photo-clear:hover { background: rgba(185,28,28,0.8); }
 #photo-input { display: none; }
 
+/* BATCH QUEUE — carousel position + dot strip. Only shown while
+   stepping through a Main Nursery plot's pending batches in one run
+   (see bq / _bqRenderHeader in audit_script.js). */
+.bq-header{display:flex;flex-direction:column;align-items:center;gap:8px;
+           padding:12px 12px 4px}
+.bq-pos{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--g700);
+        text-transform:uppercase}
+.bq-dots{display:flex;gap:6px}
+.bq-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);
+        transition:background .15s,transform .15s}
+.bq-dot.done{background:var(--g500)}
+.bq-dot.current{background:var(--g800);transform:scale(1.35)}
+
 /* form action bar */
 .form-actions {
   display: grid;
