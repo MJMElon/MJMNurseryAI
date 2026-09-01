@@ -212,7 +212,7 @@ async function warnIfSessionLapsed() {
       'background:#b45309;color:#fff;font-size:12px;font-weight:700;text-align:center;cursor:pointer';
     b.textContent = '⚠ Session expired — tap to sign in again, or records will not load';
     b.onclick = () => {
-      window.location.href = window.MJMAuditLogin ? MJMAuditLogin.url() : '../index.html';
+      window.location.href = window.MJMAuditLogin ? MJMAuditLogin.url() : 'audit_index.html';
     };
     document.body.appendChild(b);
 

@@ -41,7 +41,7 @@
     try {
       admin = !!(window.MJMAuditLogin && MJMAuditLogin.isAdmin && MJMAuditLogin.isAdmin());
     } catch (e) {}
-    var href  = admin ? 'audit_admin.html' : '../index.html#sector-nursery';
+    var href  = admin ? 'audit_admin.html' : 'https://ai.mjmnursery.com/index.html#sector-nursery';
     var label = admin ? 'Back to Auditor Portal Manage' : 'Back to the Nursery sector';
     a.setAttribute('href', href);
     a.setAttribute('title', label);

@@ -62,11 +62,15 @@ BEGIN
         ('disease', 'Daconil',  30.0, 'gm', 3),
         ('disease', 'Manzate',  30.0, 'gm', 4)
       ) AS v(kind, name, dose, unit, ord)
-     -- Already there wins. Somebody may have corrected a dose on screen
-     -- since, and a seed must never talk over that.
+     -- Already there wins — under ANY kind, not just the kind this seed
+     -- filed it under. Somebody may have corrected a dose on screen, and a
+     -- later migration moves Asir from Pest to Other; a per-kind check saw
+     -- "no pest Asir" after that move and seeded it BACK, and the move then
+     -- collided with the Other one. The seed list has no name in two kinds,
+     -- so name alone is the right key here.
      WHERE NOT EXISTS (
        SELECT 1 FROM public.nops_maint_chemicals c
-        WHERE c.kind = v.kind AND lower(c.name) = lower(v.name))
+        WHERE lower(c.name) = lower(v.name))
   $q$;
   GET DIAGNOSTICS n = ROW_COUNT;
   RAISE NOTICE '1. chemicals added: % (9 in the source list)', n;
