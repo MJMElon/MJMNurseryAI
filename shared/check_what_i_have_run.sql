@@ -183,6 +183,21 @@ BEGIN
                ELSE ' - run the file again; it is safe to re-run' END);
   END IF;
 
+  -- ── 7c. migration_palms_latest_wins.sql ───────────────────────
+  IF to_regclass('public.fcportal_palms_history') IS NULL THEN
+    INSERT INTO what_i_have_run VALUES
+      (9, 'migration_palms_latest_wins.sql', 'NOT RUN', 'the PALMS history table is missing');
+  ELSIF EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'palms_history_latest_wins'
+                AND tgrelid = 'public.fcportal_palms_history'::regclass) THEN
+    INSERT INTO what_i_have_run VALUES
+      (9, 'migration_palms_latest_wins.sql', 'RAN',
+       'the latest day report from anyone now rules the plot status');
+  ELSE
+    INSERT INTO what_i_have_run VALUES
+      (9, 'migration_palms_latest_wins.sql', 'NOT RUN',
+       'a status set from the FC portal can still show as the old stage on the office board');
+  END IF;
+
   -- ── 7. migration_nelos_seats.sql ──────────────────────────────
   -- Left behind: four columns and two functions. Counted, so a half-run shows.
   IF to_regclass('public.nelos_handlers') IS NULL THEN
