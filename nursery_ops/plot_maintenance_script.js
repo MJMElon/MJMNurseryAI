@@ -5082,6 +5082,44 @@ function dropChemRow(kind, i) {
   renderChemicals(kind);
 }
 
+/* A database that has not run every migration refuses a write in one of
+   two ways, and both take the WHOLE row down over one field:
+
+   - "Could not find the 'tag' column … in the schema cache" — the column
+     does not exist yet (migration_nops_chem_tag.sql unrun).
+   - "null value in column \"coverage\" … violates not-null constraint" —
+     the column exists but still demands a number, because the migration
+     that taught it NULL-means-follow-the-preset is the unrun one
+     (migration_nops_chem_other_preset.sql).
+
+   Losing one field is a smaller failure than losing the save, so either
+   way the field is dropped from the payload and the write tried again: an
+   UPDATE then keeps the row's old value, an INSERT takes the table's own
+   default. The caller's alert names shared/RUN_ME_maintenance_setting.sql,
+   which ends the need for any of this. */
+function columnFallback() {
+  const dropped = new Set();
+  const note = e => {
+    const msg = (e && e.message) || '';
+    const m = /find the '([a-z_]+)' column/i.exec(msg) ||
+              /null value in column "([a-z_]+)"/i.exec(msg);
+    if (m && !dropped.has(m[1])) { dropped.add(m[1]); return true; }
+    return false;
+  };
+  return {
+    dropped,
+    strip(o) { const out = { ...o }; dropped.forEach(k => delete out[k]); return out; },
+    async attempt(run) {
+      for (let go = 0; go < 4; go++) {
+        const { error } = await run().then(r => r, e => ({ error: e }));
+        if (!error) return null;
+        if (!note(error)) return error;
+      }
+      return { message: 'this database refused too many columns' };
+    }
+  };
+}
+
 async function saveChemEdit() {
   const named = chemDraft.map(c => ({ ...c, name: (c.name || '').trim() })).filter(c => c.name);
   // Two of the same name in one column would break the table's own unique
@@ -5103,33 +5141,8 @@ async function saveChemEdit() {
     const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
 
-    /* A database that has not run every migration does not know every
-       column — "Could not find the 'tag' column … in the schema cache" is
-       PostgREST refusing the WHOLE row over the one field. Losing the tag
-       is a smaller failure than losing the save, so the unknown column is
-       dropped and the write tried again, and the alert at the end says
-       which file brings it back. The columns each migration adds:
-         coverage  shared/migration_nops_chem_coverage.sql
-         tag       shared/migration_nops_chem_tag.sql */
-    const missing = new Set();
-    const strip = o => {
-      const out = { ...o };
-      missing.forEach(k => delete out[k]);
-      return out;
-    };
-    const noteMissing = e => {
-      const m = /find the '([a-z_]+)' column/i.exec((e && e.message) || '');
-      if (m && !missing.has(m[1])) { missing.add(m[1]); return true; }
-      return false;
-    };
-    const attempt = async run => {
-      for (let go = 0; go < 3; go++) {
-        const { error } = await run().then(r => r, e => ({ error: e }));
-        if (!error) return null;
-        if (!noteMissing(error)) return error;
-      }
-      return { message: 'this database is missing too many columns' };
-    };
+    const fallback = columnFallback();
+    const { strip, attempt } = fallback;
 
     let err = null;
     if (gone.length) {
@@ -5164,10 +5177,11 @@ async function saveChemEdit() {
                 'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor.' : ''));
       return;
     }
-    if (missing.size) {
-      alert('Saved — but this database has no ' + [...missing].join(', ') +
-            ' column' + (missing.size > 1 ? 's' : '') + ', so th' +
-            (missing.size > 1 ? 'ose' : 'at') + ' did not stick.\n\n' +
+    if (fallback.dropped.size) {
+      alert('Saved — but this database could not take ' +
+            [...fallback.dropped].join(', ') + ' the way the screen means ' +
+            (fallback.dropped.size > 1 ? 'them' : 'it') +
+            ', so existing rows kept their old value there.\n\n' +
             'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
             'once, then save again.');
     }
@@ -5309,25 +5323,30 @@ async function saveFertEdit() {
                          dose_monthly: f.dose_monthly, unit: f.unit || 'gm',
                          updated_at: new Date().toISOString() });
 
+    const fallback = columnFallback();
+
     let err = null;
     if (gone.length) {
-      const { error } = await _supabase.from('nops_maint_fertilisers').delete().in('id', gone)
-        .then(r => r, e => ({ error: e }));
-      err = err || error;
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').delete().in('id', gone));
     }
     for (const f of named.filter(x => x.id)) {
       if (err) break;
-      const { error } = await _supabase.from('nops_maint_fertilisers').update(cols(f))
-        .eq('id', f.id).then(r => r, e => ({ error: e }));
-      err = error;
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').update(fallback.strip(cols(f))).eq('id', f.id));
     }
-    const fresh = named.filter(f => !f.id).map(cols);
-    if (!err && fresh.length) {
-      const { error } = await _supabase.from('nops_maint_fertilisers').insert(fresh)
-        .then(r => r, e => ({ error: e }));
-      err = error;
+    if (!err && named.some(f => !f.id)) {
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').insert(
+          named.filter(f => !f.id).map(f => fallback.strip(cols(f)))));
     }
     if (err) { done(); alert('Could not save — ' + (err.message || 'try again')); return; }
+    if (fallback.dropped.size) {
+      alert('Saved — but this database could not take ' +
+            [...fallback.dropped].join(', ') + '.\n\n' +
+            'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
+            'once, then save again.');
+    }
 
     const { data } = await _supabase.from('nops_maint_fertilisers').select('*')
       .order('sort_order').order('name').then(r => r, () => ({ data: null }));

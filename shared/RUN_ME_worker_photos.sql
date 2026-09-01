@@ -7,10 +7,17 @@
    ── 1. A photo OF the worker ──────────────────────────────────────────
 
    `mjmnpayroll_workers.photo_url` — one picture per person, shown on their
-   chip on the Worker System board and on their record. The office is signed
-   in as `authenticated`, so the `documents` bucket already takes the upload
-   and there is no storage rule to add for this half. The column holds a link;
-   the picture itself lives under worker_id_photos/ in the bucket.
+   chip on the Worker System board and on their record. Set two ways:
+
+     · by the OFFICE, on the worker's record. Signed in as `authenticated`,
+       so the documents bucket already takes that upload and there is no
+       storage rule to add for it;
+     · by the WORKER, on the registration page, so a name arriving in
+       "Waiting to be allocated" arrives with a face on it. That one is a
+       PIN sign-in and needs the ticket below — see part 2.
+
+   The column holds a link either way; the picture itself lives under
+   worker_id_photos/ in the bucket.
 
    ── 2. Photos of the WORK, from a phone signed in with a PIN ──────────
 
@@ -35,6 +42,22 @@
        worker_photos/<ticket>/ — and for nothing else in the bucket;
      · the phone uploads into that folder, records the job, and then burns
        the ticket (worker_photo_done). In practice it lives for seconds.
+
+   A ticket comes in two KINDS, and the difference matters:
+
+     work  the pictures of a job. Behind the photos switch, and behind the
+           Maintenance module, because that is what they belong to.
+     id    the worker's own face, from the registration page. NOT behind
+           either — a worker who has just registered has every module
+           switched off (that is what "waiting to be allocated" means), so
+           asking the Maintenance switch about their passport photo would
+           refuse every single one of them. It is behind a valid session and
+           nothing else, and a session is only ever handed out by
+           worker_signin or worker_signup.
+
+   Note what registration does NOT do: open a door to the world. The photo
+   goes up AFTER worker_signup has answered, using the session token it just
+   returned. Nobody without a token can mint a ticket of either kind.
 
    So `anon` can write to the bucket, but only inside a folder somebody was
    handed thirty seconds ago on the strength of a valid session. It cannot
@@ -84,6 +107,13 @@ CREATE TABLE IF NOT EXISTS mjmnpayroll_worker_photo_tickets (
   -- photo's URL, so its life is the length of the window it opens.
   expires_at TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '10 minutes'
 );
+
+-- Which folder this ticket opens. Added as a column rather than a second
+-- table because it is one word about a row that is otherwise identical, and
+-- the storage rule has to ask about it either way. 'work' is the default so
+-- a ticket minted by an older build of the app still means what it meant.
+ALTER TABLE mjmnpayroll_worker_photo_tickets
+  ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'work';
 
 CREATE INDEX IF NOT EXISTS mjmnpayroll_worker_photo_tickets_expiry
   ON mjmnpayroll_worker_photo_tickets (expires_at);
@@ -163,11 +193,89 @@ BEGIN
   -- often as the table grows.
   DELETE FROM mjmnpayroll_worker_photo_tickets WHERE expires_at < now();
 
-  INSERT INTO mjmnpayroll_worker_photo_tickets (worker_id)
-  VALUES (w.id)
+  INSERT INTO mjmnpayroll_worker_photo_tickets (worker_id, kind)
+  VALUES (w.id, 'work')
   RETURNING ticket INTO v_ticket;
 
   RETURN v_ticket;
+END;
+$$;
+
+
+/* A ticket for the worker's OWN FACE — the registration page's photo.
+ *
+ * Deliberately not behind the Maintenance module or the photos switch, and
+ * this is the whole reason it is a separate function rather than an argument
+ * to the one above. A worker who has just registered has every module off
+ * until the office files them, so asking Maintenance about their passport
+ * photo would refuse every single new worker — which is exactly the case the
+ * registration page exists to serve.
+ *
+ * What it IS behind is a session, and a session comes only from worker_signin
+ * or worker_signup. Registering is therefore still the only way in, and that
+ * is rate-limited and leaves a visible row on the board either way.
+ *
+ * One live ticket per worker: minting a second cancels the first. A person
+ * has one face, so there is never a reason to hold two doors open, and it
+ * bounds what a signed-in worker can do with this by hammering it.
+ */
+CREATE OR REPLACE FUNCTION public.worker_id_photo_ticket(p_token UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  w        mjmnpayroll_workers;
+  v_ticket UUID;
+BEGIN
+  w := public.worker_from_token(p_token);
+
+  DELETE FROM mjmnpayroll_worker_photo_tickets
+   WHERE expires_at < now()
+      OR (worker_id = w.id AND kind = 'id');
+
+  INSERT INTO mjmnpayroll_worker_photo_tickets (worker_id, kind)
+  VALUES (w.id, 'id')
+  RETURNING ticket INTO v_ticket;
+
+  RETURN v_ticket;
+END;
+$$;
+
+
+/* A worker putting their own face on their own row, and nobody else's.
+ *
+ * The URL is checked rather than trusted. Without this the function is a
+ * "write any string you like into a column the office reads and renders",
+ * which is a stored-content hole dressed as a photo. It has to look like a
+ * public link to a .jpg under worker_id_photos/ in this project's documents
+ * bucket — which covers both shapes that folder holds: the office's
+ * worker_id_photos/w12-1234.jpg and the phone's
+ * worker_id_photos/<ticket>/1234_0.jpg.
+ *
+ * An empty URL clears it, so a worker can take a bad photo off again.
+ */
+CREATE OR REPLACE FUNCTION public.worker_set_my_photo(p_token UUID, p_url TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  w mjmnpayroll_workers;
+  u TEXT := NULLIF(btrim(COALESCE(p_url, '')), '');
+BEGIN
+  w := public.worker_from_token(p_token);
+
+  IF u IS NOT NULL
+     AND u !~ '^https://[A-Za-z0-9.-]+/storage/v1/object/public/documents/worker_id_photos/[A-Za-z0-9_/-]+\.jpg$'
+  THEN
+    RAISE EXCEPTION 'that is not a photo this portal uploaded' USING ERRCODE = '22023';
+  END IF;
+
+  UPDATE mjmnpayroll_workers SET photo_url = u WHERE id = w.id;
+  RETURN true;
 END;
 $$;
 
@@ -203,7 +311,26 @@ $$;
  * check would raise, and an RLS check that raises is a 500 where a `false`
  * belonged.
  */
-CREATE OR REPLACE FUNCTION public.worker_photo_ticket_live(p_folder TEXT)
+-- The earlier one-argument version, if this file has been run before. It has
+-- to go before the two-argument one is created, not after: with both present
+-- a one-argument call is AMBIGUOUS and raises rather than choosing, which
+-- inside a storage rule is every upload failing at once. The policy that
+-- referenced it is dropped further down and rebuilt, so nothing is left
+-- pointing at it in between.
+-- Guarded, and EXECUTEd: a plain reference to storage.objects is resolved
+-- when the statement is PLANNED, so it fails on a database that has no
+-- storage schema even inside an IF that is false.
+DO $do$
+BEGIN
+  IF to_regclass('storage.objects') IS NOT NULL THEN
+    EXECUTE $p$DROP POLICY IF EXISTS "documents bucket — worker photo upload" ON storage.objects$p$;
+  END IF;
+END
+$do$;
+
+DROP FUNCTION IF EXISTS public.worker_photo_ticket_live(TEXT);
+
+CREATE OR REPLACE FUNCTION public.worker_photo_ticket_live(p_folder TEXT, p_kind TEXT DEFAULT 'work')
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
@@ -217,16 +344,20 @@ BEGIN
     RETURN false;
   END IF;
   RETURN EXISTS (SELECT 1 FROM mjmnpayroll_worker_photo_tickets
-                  WHERE ticket = p_folder::uuid AND expires_at > now());
+                  WHERE ticket = p_folder::uuid
+                    AND kind = p_kind
+                    AND expires_at > now());
 END;
 $$;
 
 
 -- The phone calls the first two. The third is called by the storage rule, on
 -- behalf of whoever is uploading, so `anon` has to be able to run it.
-GRANT EXECUTE ON FUNCTION public.worker_photo_ticket(UUID)      TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.worker_photo_done(UUID, UUID)  TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.worker_photo_ticket_live(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_photo_ticket(UUID)            TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_id_photo_ticket(UUID)         TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_photo_done(UUID, UUID)        TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_set_my_photo(UUID, TEXT)      TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.worker_photo_ticket_live(TEXT, TEXT) TO anon, authenticated;
 
 
 -- ── 3. The storage rule ─────────────────────────────────────────────────
@@ -247,12 +378,21 @@ BEGIN
     TO anon
     WITH CHECK (
       bucket_id = 'documents'
-      -- worker_photos/<ticket>/<something>.jpg, and nothing else. The folder
-      -- is pinned so a ticket cannot be used to write over a delivery note,
-      -- and the extension so the bucket cannot be handed a payload.
-      AND (storage.foldername(name))[1] = 'worker_photos'
+      -- The extension is pinned so the bucket cannot be handed a payload
+      -- dressed as a photograph.
       AND name ~ '\.jpg$'
-      AND public.worker_photo_ticket_live((storage.foldername(name))[2])
+      AND (
+        -- <folder>/<ticket>/<something>.jpg, and nothing else. The folder is
+        -- pinned so a ticket cannot be used to write over a delivery note,
+        -- and the KIND is checked against it so a ticket for one job's
+        -- photographs cannot be spent on somebody's face or the other way
+        -- about.
+        ((storage.foldername(name))[1] = 'worker_photos'
+          AND public.worker_photo_ticket_live((storage.foldername(name))[2], 'work'))
+        OR
+        ((storage.foldername(name))[1] = 'worker_id_photos'
+          AND public.worker_photo_ticket_live((storage.foldername(name))[2], 'id'))
+      )
     )
   $p$;
 END
@@ -267,9 +407,10 @@ NOTIFY pgrst, 'reload schema';
 
    1  worker photo column      the column added in part 1
    2  work photo column        photo_urls on the maintenance records
-   3  ticket table             the table added in part 2
-   4  functions                4 of them: may_photos, ticket, done, live
-   5  anon may call            2: worker_photo_ticket, worker_photo_ticket_live
+   3  ticket table             the table added in part 2, with its kind column
+   4  functions                6: may_photos, ticket, id_ticket, done,
+                                  set_my_photo, live
+   5  anon may call            the three the phone and the bucket need
    6  storage rule             the INSERT policy for anon on documents
 
    Row 6 saying MISSING on Supabase means the policy did not take — nothing
@@ -290,18 +431,24 @@ SELECT * FROM (
   UNION ALL
   SELECT 3, 'ticket table',
          CASE WHEN to_regclass('public.mjmnpayroll_worker_photo_tickets') IS NOT NULL
+               AND EXISTS (SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'mjmnpayroll_worker_photo_tickets'
+                              AND column_name = 'kind')
               THEN 'OK' ELSE 'MISSING' END
   UNION ALL
   SELECT 4, 'functions',
          CASE WHEN (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                      WHERE n.nspname = 'public'
                        AND p.proname IN ('worker_may_photos', 'worker_photo_ticket',
-                                         'worker_photo_done', 'worker_photo_ticket_live')) = 4
+                                         'worker_id_photo_ticket', 'worker_photo_done',
+                                         'worker_set_my_photo', 'worker_photo_ticket_live')) = 6
               THEN 'OK' ELSE 'MISSING' END
   UNION ALL
   SELECT 5, 'anon may call',
          CASE WHEN has_function_privilege('anon', 'public.worker_photo_ticket(uuid)', 'EXECUTE')
-               AND has_function_privilege('anon', 'public.worker_photo_ticket_live(text)', 'EXECUTE')
+               AND has_function_privilege('anon', 'public.worker_id_photo_ticket(uuid)', 'EXECUTE')
+               AND has_function_privilege('anon', 'public.worker_set_my_photo(uuid,text)', 'EXECUTE')
+               AND has_function_privilege('anon', 'public.worker_photo_ticket_live(text,text)', 'EXECUTE')
               THEN 'OK' ELSE 'MISSING' END
   UNION ALL
   SELECT 6, 'storage rule',
