@@ -160,6 +160,29 @@ BEGIN
             ELSE n || ' demo rows in the log and ' || n2 || ' in the history are still showing on the board' END);
   END IF;
 
+  -- ── 7b. migration_palms_no_takebacks.sql ──────────────────────
+  -- Left behind: the tombstone table and three triggers on the plot log.
+  IF to_regclass('public.fcportal_palms_plot_logs') IS NULL THEN
+    INSERT INTO what_i_have_run VALUES
+      (8, 'migration_palms_no_takebacks.sql', 'NOT RUN', 'the PALMS log table is missing');
+  ELSE
+    SELECT (to_regclass('public.fcportal_palms_tombstones') IS NOT NULL)::int
+         + (EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'palms_log_bury'
+                    AND tgrelid = 'public.fcportal_palms_plot_logs'::regclass))::int
+         + (EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'palms_log_stay_buried'
+                    AND tgrelid = 'public.fcportal_palms_plot_logs'::regclass))::int
+         + (EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'palms_log_keep_closed'
+                    AND tgrelid = 'public.fcportal_palms_plot_logs'::regclass))::int
+      INTO parts;
+    INSERT INTO what_i_have_run VALUES
+      (8, 'migration_palms_no_takebacks.sql',
+       CASE WHEN parts = 4 THEN 'RAN' WHEN parts = 0 THEN 'NOT RUN' ELSE 'PART ONLY' END,
+       'pieces in place: ' || parts || ' of 4 (tombstone table + 3 triggers)'
+       || CASE WHEN parts = 4 THEN ' - deleted rows stay deleted, phones cannot resurrect them'
+               WHEN parts = 0 THEN ' - a phone syncing can still undo office corrections'
+               ELSE ' - run the file again; it is safe to re-run' END);
+  END IF;
+
   -- ── 7. migration_nelos_seats.sql ──────────────────────────────
   -- Left behind: four columns and two functions. Counted, so a half-run shows.
   IF to_regclass('public.nelos_handlers') IS NULL THEN

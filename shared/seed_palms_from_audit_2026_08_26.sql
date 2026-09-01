@@ -35,7 +35,9 @@
 --
 -- Run in the Supabase SQL Editor (main project: kibqjztozokohqmhqqqf).
 -- Needs: create_palms_tables.sql, migration_palms_rls.sql and
---        migration_palms_stages_seed.sql already run.
+--        migration_palms_stages_seed.sql already run. Run
+--        migration_palms_no_takebacks.sql FIRST, or the plots this file
+--        deletes will be resurrected by the first phone that syncs.
 -- ============================================================================
 
 
@@ -163,6 +165,21 @@ BEGIN;
 
 DELETE FROM public.fcportal_palms_plot_logs;
 DELETE FROM public.fcportal_palms_history;
+
+-- If migration_palms_no_takebacks.sql is in, the DELETE above just left a
+-- tombstone for every row it removed — INCLUDING this file's own rows from a
+-- previous run, which would block the INSERT below from putting them back.
+-- Clear this file's own ids (and no others: every other tombstone is doing
+-- its job, keeping the rows this seed is replacing from being resurrected
+-- by a phone that still holds them).
+DO $tomb$
+BEGIN
+  IF to_regclass('public.fcportal_palms_tombstones') IS NOT NULL THEN
+    DELETE FROM public.fcportal_palms_tombstones
+    WHERE client_uid LIKE 'audit-20260826-%';
+  END IF;
+END
+$tomb$;
 
 INSERT INTO public.fcportal_palms_plot_logs
   (client_uid, nursery_name, plot_name, act_n, start_date, end_date,
