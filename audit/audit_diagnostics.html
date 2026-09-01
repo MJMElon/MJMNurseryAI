@@ -270,7 +270,7 @@ function reLogin() {
   localStorage.removeItem('mjm_cached_creds');
   localStorage.removeItem(AUTH_KEY);
   sessionStorage.clear();
-  location.href = (window.MJMAuditLogin ? MJMAuditLogin.url() : '../index.html');
+  location.href = (window.MJMAuditLogin ? MJMAuditLogin.url() : 'audit_index.html');
 }
 
 run();
