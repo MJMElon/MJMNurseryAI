@@ -616,10 +616,30 @@ async function bootstrap() {
     return;
   }
 
-  const { data, error } = await _supabase
-    .from('shared_profiles')
-    .select('id, email, full_name, permissions, user_type')
-    .order('email', { ascending: true });
+  /* A PAGE AT A TIME. Supabase caps one request at 1000 rows and does not
+     say so — it just returns the first thousand and no error. Ordered by
+     email, that means everybody from roughly the middle of the alphabet
+     onward silently vanished from this list once the profile table passed
+     a thousand rows, which is what a customer signup list does long before
+     the staff list gets anywhere near it. A new signup was in the database
+     and not on this page, with nothing anywhere saying why.
+
+     Read until a page comes back short. */
+  const PAGE = 1000;
+  const rows = [];
+  let error = null;
+  for (let from = 0; ; from += PAGE) {
+    const res = await _supabase
+      .from('shared_profiles')
+      .select('id, email, full_name, permissions, user_type')
+      .order('email', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (res.error) { error = res.error; break; }
+    const got = res.data || [];
+    rows.push.apply(rows, got);
+    if (got.length < PAGE) break;
+  }
+  const data = rows;
 
   if (error) {
     document.getElementById('loading').classList.add('hidden');
