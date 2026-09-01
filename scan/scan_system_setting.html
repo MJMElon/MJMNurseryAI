@@ -371,11 +371,12 @@ const MAINT_FUNCTIONS = [
    one off here closes it and keeps it closed. It is ON that has nothing behind
    it yet, and the row says which.
 
-   Upload photo: a PIN sign-in is `anon`. The documents bucket takes uploads
-   from `authenticated` only, and the anon key is public, so opening that
-   bucket to anon would open it to anybody who reads the app bundle. It needs a
-   way for a worker to upload that does not hand the internet a writable
-   bucket.
+   Upload photo used to be listed here and is not any more: it works. A PIN
+   sign-in is `anon` and the anon key is public, so the documents bucket could
+   not simply be opened to it — a worker's photos go up through a ticket the
+   database mints against their own token, good for one folder for ten
+   minutes. See shared/RUN_ME_worker_photos.sql, which has to have been run
+   for this switch to mean anything.
 
    Scan / Delivery Order / PALMS / Culling: the Worker Portal has no such
    screen built yet. The switch is here because the decision is yours to record
@@ -383,7 +384,6 @@ const MAINT_FUNCTIONS = [
    it, rather than appearing on every worker's phone unannounced. */
 const CANNOT_YET = {
   worker: {
-    photos:  'Stored, not yet acted on. A worker signs in with a PIN, and the storage bucket does not take uploads from a PIN sign-in.',
     scan:    'No Scan screen on a worker phone yet — off is obeyed, on waits for one.',
     do:      'No Delivery Order screen on a worker phone yet — off is obeyed, on waits for one.',
     palms:   'No PALMS screen on a worker phone yet — off is obeyed, on waits for one.',
