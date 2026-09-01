@@ -1,14 +1,20 @@
 # Nursery Audit
 
-The one and only audit app. Live at
-<https://ai.mjmnursery.com/audit/audit_home.html>, reached from the portal's
-Audit card.
+The one and only audit app **source**. Served in two places, edited in one:
 
-There used to be a second copy in the [`MJMElon/MJMNurseryAudit`](https://github.com/MJMElon/MJMNurseryAudit)
-repository, and a second copy of several pages inside this folder. Both are
-gone — that repository now only redirects here. **Do not restore either.** When
-the same page exists twice, edits land in the copy nobody serves and appear to
-do nothing.
+- <https://audit.mjmnursery.com> — the auditors' door. The
+  [`MJMElon/MJMNurseryAudit`](https://github.com/MJMElon/MJMNurseryAudit)
+  repository owns that domain and serves a MACHINE-WRITTEN mirror of this
+  folder (plus `shared/*.js`), refreshed by its `sync_audit_mirror` workflow —
+  hourly, or immediately from its Actions tab → Run workflow.
+- <https://ai.mjmnursery.com/audit/audit_home.html> — the same pages inside
+  the portal, reached from the Audit card.
+
+**Edit only here.** Never edit the mirror by hand: the next sync overwrites
+it. (There used to be a second hand-maintained copy in that repository, and a
+second copy of several pages inside this folder; both were retired in June
+2026 because edits kept landing in the copy nobody serves. The mirror is not
+that — it is generated, and this folder is its only input.)
 
 ## Files
 

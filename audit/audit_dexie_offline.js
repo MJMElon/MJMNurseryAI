@@ -336,14 +336,11 @@ async function syncNow(manual){
 
   const pending = await getPending();
   if(!pending.length){
-<<<<<<< HEAD
-    if(manual) showToast('✓ Already up to date — nothing to sync.');
-=======
     /* Online with nothing waiting IS a successful sync — everything this
        phone recorded is on the server. The pill's stamp says so. */
     stampSyncOk();
     renderSyncPill();
->>>>>>> origin/claude/mjm-ai-system-stock-krx3ox
+    if(manual) showToast('✓ Already up to date — nothing to sync.');
     return;
   }
 
