@@ -58,6 +58,34 @@
      and one click away on their record. */
   .bd-cell-in .wchip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* ── A face against a name ─────────────────────────────────────────────
+     Twenty-eight names on a board are twenty-eight strings until one of
+     them has a face on it. The chip stays a chip — same height, same
+     ellipsis, same drag — with a round thumbnail in front of the name, and
+     an empty circle carrying the initials where there is no photo yet, so
+     the rows do not go ragged between the people who have one and the
+     people who do not. */
+  .bd-cell-in .wchip,
+  .pend-list .wchip { display: flex; align-items: center; gap: 7px; }
+  .wface { width: 22px; height: 22px; border-radius: 999px; flex: 0 0 22px;
+           object-fit: cover; background: #ede9fe; display: grid;
+           place-items: center; font-size: 9px; font-weight: 900;
+           color: #7c3aed; letter-spacing: .02em; overflow: hidden; }
+  .wchip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wchip-off .wface { filter: grayscale(1); opacity: .7; }
+
+  /* ── The photo on the form ── */
+  .wf-photo { display: flex; align-items: center; gap: 14px; }
+  .wf-photo-img { width: 78px; height: 78px; border-radius: 999px; flex: 0 0 78px;
+                  object-fit: cover; border: 2px solid #e9e4f7; background: #f5f3ff;
+                  display: grid; place-items: center; font-size: 22px; color: #b9a9e8; }
+  .wf-photo-btns { display: flex; flex-wrap: wrap; gap: 7px; }
+  .wf-photo-btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line, #e5e7eb);
+                  background: #fff; font-size: 11.5px; font-weight: 800; cursor: pointer;
+                  color: var(--text-head, #334155); }
+  .wf-photo-btn:hover { background: #faf9ff; }
+  .wf-photo-btn.is-danger { color: #b91c1c; border-color: #fecaca; }
+
   /* ── Waiting to be allocated ── */
   .pend-wrap { padding: 14px 16px; margin-bottom: 14px;
                border-left: 4px solid #f59e0b; background: #fffbeb; }
@@ -104,6 +132,11 @@
       Run <code>shared/add_npayroll_worker_pin.sql</code> in the Supabase SQL Editor, then reload.
       Until then the PIN boxes below are read-only.
     </div>
+    <div id="photo-setup" class="warn hidden">
+      <b>⚠️ Worker photos are not switched on yet.</b>
+      Run <code>shared/RUN_ME_worker_photos.sql</code> in the Supabase SQL Editor, then reload.
+      Until then the Photo box on a worker's record is read-only and the board shows initials.
+    </div>
     <!-- The board is the register now. It was one of two views; the list
          said the same thing in a longer way, and a screen that shows the
          same facts twice is a screen where the two can disagree. -->
@@ -124,6 +157,35 @@
       </div>
       <div class="frow hidden" id="wf-section-row"><label>Move to section</label>
         <select id="wf-section" onchange="onWorkerSectionChange()"></select></div>
+      <!-- A photo of the worker. Not an attachment on their record — it IS
+           how they are recognised on the board, which is why it sits at the
+           top of the form beside the name rather than at the bottom with
+           the remark. -->
+      <div class="frow" id="wf-photo-row">
+        <label>Photo</label>
+        <div class="wf-photo">
+          <span class="wf-photo-img" id="wf-photo-img" aria-hidden="true">👤</span>
+          <div>
+            <div class="wf-photo-btns">
+              <!-- Two doors, because the office does both: somebody stood in
+                   front of the desk, and somebody whose picture is already on
+                   the phone. `capture` opens the camera straight away on a
+                   phone or tablet and is ignored on a desktop, where it falls
+                   back to the file picker — so one button works everywhere. -->
+              <button type="button" class="wf-photo-btn" onclick="wfPhotoPick(true)">📷 Take photo</button>
+              <button type="button" class="wf-photo-btn" onclick="wfPhotoPick(false)">🖼️ Choose file</button>
+              <button type="button" class="wf-photo-btn is-danger hidden" id="wf-photo-clear"
+                      onclick="wfPhotoClear()">Remove</button>
+            </div>
+            <div id="wf-photo-note"
+                 style="font-size:11px;font-weight:500;color:var(--text-faint);margin-top:5px;">
+              Shown on their chip on the board. Shrunk before it is kept.
+            </div>
+          </div>
+        </div>
+        <input type="file" id="wf-photo-file" accept="image/*" class="hidden"
+               onchange="wfPhotoChosen(this)">
+      </div>
       <div class="frow"><label>Name *</label><input type="text" id="wf-name" placeholder="e.g. Asriawan"></div>
       <div class="grid2">
         <!-- Filled from ROLES; the same list in every section. -->
@@ -358,6 +420,7 @@ let userEmail = '';
 let _tablesOk = true;
 let _maintGeneralCol = true;
 let _pinCol = true;
+let _photoCol = true;
 
 /* Whether this person may do one thing on the register. Same question the
    Payroll tab asked, so the answer is the same. Allows it when the shared
@@ -410,6 +473,159 @@ async function loadWorkers() {
   _pinCol = !pinProbe.error;
   const pw = $('pin-setup');
   if (pw) pw.classList.toggle('hidden', _pinCol);
+  // And again for the photo column, added later still. Same reason as the
+  // two above: writing a column the table does not have fails the whole
+  // save, so the form has to know before it offers the box.
+  const photoProbe = await _supabase.from('mjmnpayroll_workers').select('photo_url').limit(1);
+  _photoCol = !photoProbe.error;
+  const ph = $('photo-setup');
+  if (ph) ph.classList.toggle('hidden', _photoCol);
+}
+
+/* ── A photo of a worker ────────────────────────────────────────────────
+
+   Where it goes, and why not into the database: a camera hands over three to
+   eight megabytes and there are twenty-eight workers, which is a table the
+   database would have to carry through every read of the register. The
+   picture goes to the `documents` bucket — public, already there, already
+   how scanned D/Os and maintenance photos are kept — and the column holds
+   the link.
+
+   Shrunk first, and harder than a work photo is: this is a face at 22px on a
+   board and 78px on a form, so 512px wide is generous and the file lands
+   around thirty kilobytes. The same idea as lib/image.js on the phone side,
+   written out here because this page has no bundler and no imports.
+
+   Nothing is uploaded until Save. Choosing a photo and then pressing Cancel
+   must leave nothing behind — an orphan in the bucket that no row points at
+   is a file nobody will ever find to delete. */
+const PHOTO_MAX_W = 512;
+const PHOTO_MAX_BYTES = 120 * 1024;
+
+function dataUrlBytes(u) {
+  const i = String(u || '').indexOf(',');
+  if (i < 0) return 0;
+  const b64 = u.slice(i + 1);
+  const pad = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor(b64.length * 3 / 4) - pad);
+}
+
+/* Square, and cropped to the middle rather than squashed. A portrait taken
+   on a phone is 3:4, and stretching it into a circle gives everybody the
+   same slightly wrong face. */
+function shrinkPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const side = Math.min(img.width, img.height);
+        const sx = Math.round((img.width  - side) / 2);
+        const sy = Math.round((img.height - side) / 2);
+        const w = Math.min(PHOTO_MAX_W, side);
+        const c = document.createElement('canvas');
+        c.width = c.height = Math.max(1, w);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, c.width, c.height);
+        let q = 0.78, out = c.toDataURL('image/jpeg', q);
+        while (dataUrlBytes(out) > PHOTO_MAX_BYTES && q > 0.4) {
+          q = Math.max(0.4, q - 0.1);
+          out = c.toDataURL('image/jpeg', q);
+        }
+        URL.revokeObjectURL(url);
+        resolve(out);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file is not a picture this browser can read.')); };
+    img.src = url;
+  });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [head, b64] = String(dataUrl || '').split(',');
+  const mime = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64 || '');
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+/* Named for the worker where there is one, and for the clock where there is
+   not — Save can be the first time a new worker has an id at all. Never
+   overwritten in place: a browser that has cached the old picture would go
+   on showing it, and "I changed her photo and it did not change" is the one
+   complaint this would otherwise generate for ever. */
+async function uploadWorkerPhoto(dataUrl, workerId) {
+  const who = workerId ? ('w' + workerId) : ('new' + Date.now());
+  const path = `worker_id_photos/${who}-${Date.now()}.jpg`;
+  const { error } = await _supabase.storage.from('documents')
+    .upload(path, dataUrlToBlob(dataUrl), { contentType: 'image/jpeg', upsert: true });
+  if (error) throw new Error('Could not upload the photo: ' + error.message);
+  const { data } = _supabase.storage.from('documents').getPublicUrl(path);
+  if (!data || !data.publicUrl) throw new Error('The photo uploaded but has no link.');
+  return data.publicUrl;
+}
+
+/* What the form is currently holding: either a link already saved, or a
+   data: URL chosen this session and not yet uploaded. One variable for both
+   because Save only has to ask "does this start with data:". */
+let _wfPhoto = null;
+
+function wfPhotoPick(camera) {
+  const f = $('wf-photo-file');
+  if (camera) f.setAttribute('capture', 'environment'); else f.removeAttribute('capture');
+  f.value = '';                       // so choosing the same file twice fires
+  f.click();
+}
+
+async function wfPhotoChosen(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    _wfPhoto = await shrinkPhoto(file);
+    wfPhotoDraw();
+  } catch (e) {
+    alert(e.message || 'Could not read that picture.');
+  }
+}
+
+function wfPhotoClear() { _wfPhoto = null; wfPhotoDraw(); }
+
+function wfPhotoDraw() {
+  const box = $('wf-photo-img');
+  if (!box) return;
+  if (_wfPhoto) {
+    box.innerHTML = `<img src="${esc(_wfPhoto)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px;">`;
+  } else {
+    box.textContent = '👤';
+  }
+  $('wf-photo-clear').classList.toggle('hidden', !_wfPhoto);
+  // No column, no photo. The box still shows whatever is saved, so a
+  // database mid-migration does not look like it lost anybody's picture.
+  const off = !_photoCol;
+  $('wf-photo-row').querySelectorAll('.wf-photo-btn').forEach(b => { b.disabled = off; });
+  $('wf-photo-note').textContent = off
+    ? 'Run shared/RUN_ME_worker_photos.sql to switch photos on.'
+    : 'Shown on their chip on the board. Shrunk before it is kept.';
+}
+
+/* The initials that stand in for a face. Two letters, from the first and
+   last word of the name — "Aaa Bin Bbb" is AB, not AA. */
+function initialsOf(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  const first = parts[0][0] || '';
+  const last  = parts.length > 1 ? (parts[parts.length - 1][0] || '') : '';
+  return (first + last).toUpperCase();
+}
+
+/** The round thumbnail in front of a name, wherever a name is listed. */
+function faceHtml(w) {
+  return w.photo_url
+    ? `<img class="wface" src="${esc(w.photo_url)}" alt="" loading="lazy">`
+    : `<span class="wface">${esc(initialsOf(w.full_name))}</span>`;
 }
 
 /* ════════════ WORKER SYSTEM ════════════ */
@@ -509,7 +725,7 @@ function renderWorkerBoard() {
               ondragstart="boardDragStart(event, ${w.id})" ondragend="boardDragEnd(event)"
               onclick="openWorker(${w.id})"
               title="${esc(w.full_name)}${w.role ? ' - ' + esc(w.role) : ''}${w.active === false ? ' (inactive)' : ''}"
-              >${esc(w.full_name)}</span>`).join('');
+              >${faceHtml(w)}<span>${esc(w.full_name)}</span></span>`).join('');
       // Adding from the Other row would have to invent a role for them, so
       // that one row takes drops but does not offer to add.
       const add = (canEdit && r.key !== BOARD_OTHER)
@@ -548,7 +764,7 @@ function renderWorkerBoard() {
               ondragstart="boardDragStart(event, ${w.id})" ondragend="boardDragEnd(event)"
               onclick="openWorker(${w.id})"
               title="${esc(w.full_name)}${w.role ? ' - ' + esc(w.role) : ''}"
-              >${esc(w.full_name)}</span>`).join('')}</div>
+              >${faceHtml(w)}<span>${esc(w.full_name)}</span></span>`).join('')}</div>
     </div>` : '';
 
   const hiddenNote = (workers.some(w => w.active === false) && !$('w-show-inactive').checked)
@@ -760,6 +976,8 @@ function openWorker(id, section, role) {
   $('wf-active').value = (w && w.active === false) ? '0' : '1';
   $('wf-pin').value    = pinClean(w?.pin);
   $('wf-pin').disabled = !_pinCol;
+  _wfPhoto = w?.photo_url || null;
+  wfPhotoDraw();
   $('wf-remark').value = w?.remark || '';
   _maintExplicit = w ? (w.maint_general === true || w.maint_general === false) : false;
   $('wf-maint').checked = w ? onMaintSheet(w) : true;
@@ -841,6 +1059,17 @@ async function saveWorker() {
   }
   $('wf-save').disabled = true;
   try {
+    /* The picture goes up FIRST, and a failure here stops the save. That is
+       deliberate and it is the opposite of how the phone treats a photo of
+       the work: there, a picture that will not upload is dropped rather than
+       losing a morning's record, because the record is the thing that
+       matters. Here the photo IS what was asked for — saving the row without
+       it would report success for the one edit somebody actually made. */
+    if (_photoCol) {
+      row.photo_url = _wfPhoto && _wfPhoto.startsWith('data:')
+        ? await uploadWorkerPhoto(_wfPhoto, editWorkerId)
+        : (_wfPhoto || null);
+    }
     let error;
     if (editWorkerId) ({ error } = await _supabase.from('mjmnpayroll_workers').update(row).eq('id', editWorkerId));
     else { row.created_by = userEmail || null; ({ error } = await _supabase.from('mjmnpayroll_workers').insert(row)); }

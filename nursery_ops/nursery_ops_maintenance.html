@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MJM Nursery AI — Maintenance System</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="plot_maintenance_styles.css?v=65">
+  <link rel="stylesheet" href="plot_maintenance_styles.css?v=66">
 </head>
 <body>
 
@@ -346,8 +346,11 @@
           </div>
 
           <!-- Weedicides, stickers, and anything dosed its own way — Asir is
-               measured per seedling, which is not how the Pest list works. -->
-          <div class="col-block">
+               measured per seedling, which is not how the Pest list works.
+               Full width, under the other two: it carries one more column
+               (Used on), and squeezed into a third of the card its name box
+               was 40px wide — you could type into it but not see what. -->
+          <div class="col-block col-block-wide">
             <div class="col-h col-h-other">&#127807; Other</div>
             <div class="lst-head other-row">
               <span>Chemical</span><span>Dosage</span><span>Covers</span><span>Per seedling</span>
@@ -511,7 +514,7 @@
 <script src="../shared/shared_plot_movement.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="plot_maintenance_script.js?v=79"></script>
+<script src="plot_maintenance_script.js?v=81"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

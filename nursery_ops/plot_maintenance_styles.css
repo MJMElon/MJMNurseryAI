@@ -611,9 +611,18 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    down the column, which is what a price list is for. */
 /* Three lists side by side where there is room. Below that they stack —
    three of these columns squeezed into a phone is three unreadable ones. */
-.three-col { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px; }
-@media (max-width:1180px) { .three-col { grid-template-columns:1fr 1fr; } }
-@media (max-width:860px)  { .three-col { grid-template-columns:1fr; } }
+/* Pest and Disease side by side; Other full width underneath — it carries
+   one more column (Used on), and in a third of the card its name box came
+   out 40px wide: typing worked, seeing what you typed did not. The stack
+   points moved up when the side bar arrived: these widths are what is left
+   AFTER its 212px column, not the screen. */
+.three-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px; }
+.col-block-wide { grid-column:1 / -1; }
+@media (max-width:1080px) { .three-col { grid-template-columns:1fr; } }
+/* A grid child refuses to shrink below its content unless told it may, and
+   a row that cannot shrink walks out of the card instead. */
+.lst-head > *, .lst-row > * { min-width:0; }
+.lst-head span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .preset-row { display:flex; align-items:center; justify-content:center; gap:10px;
               flex-wrap:wrap; margin-bottom:18px; padding:12px;
@@ -636,13 +645,22 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .lst-head.fert-head, .fert-row { grid-template-columns:1fr 152px 94px 84px 34px; }
 /* The Other list carries one more column: which schedule dropdown may offer
    the chemical. Pest and disease have a dropdown each already. */
-.lst-head.other-row, .other-row { grid-template-columns:1fr 104px 60px 82px 84px 30px; }
+.lst-head.other-row, .other-row { grid-template-columns:1fr 128px 70px 92px 104px 30px; }
 .lst-tagsel { height:37px; padding:0 4px; font-family:inherit; font-size:12px; font-weight:700;
               color:var(--text-head); background:#fff; border:1.5px solid var(--border);
               border-radius:var(--r-sm); min-width:0; }
 .lst-tagsel:focus { outline:none; border-color:var(--green-mid); }
-@media (max-width:560px) {
-  .lst-head.other-row, .other-row { grid-template-columns:1fr 84px 34px; }
+/* On a phone the derived and secondary cells go rather than shrink: the
+   name, the dose and the remove are what a row is edited with. The rows
+   hide the same cells the heading does, so the columns still line up. */
+@media (max-width:640px) {
+  .lst-head, .lst-row { grid-template-columns:1fr 118px 30px; }
+  .lst-head.other-row, .other-row { grid-template-columns:1fr 118px 30px; }
+  .lst-head.fert-head, .fert-row { grid-template-columns:1fr 130px 34px; }
+  .lst-head > :nth-child(3), .lst-row > :nth-child(3),
+  .lst-head > :nth-child(4), .lst-row > :nth-child(4) { display:none; }
+  .other-row > :nth-child(5), .lst-head.other-row > :nth-child(5) { display:none; }
+  .lst-head > :last-child, .lst-row > :last-child { display:flex; }
 }
 .lst-head  { padding:10px; background:#f7f9f8; border:1.5px solid var(--border);
              font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase;

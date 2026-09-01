@@ -243,15 +243,36 @@ function defaultPDConfig() {
     W4: mk({name:'—',   dose:0,unit:'mL',sticker:stickerOff}, {name:'Daconil', dose:30,unit:'gm',sticker:stickerOn}),
   };
 }
+/* One fertiliser to a week. It used to be three columns in a round —
+   Yaramila, Compound 55 and Organic Matter side by side — which is how the
+   old sheet worked and not how a week is fed: a week is one feed, and
+   three columns asked the same question three times over the same plots.
+   Still an array of rounds each holding an array of columns, because the
+   ticks are stored that way and a shape change would strand them; the
+   array is simply one long now. */
 function defaultManuringConfig() {
-  // Nested: array of rounds → each round is an array of fertilizer columns
-  return [
-    [
-      { name:'Yaramila',       dose:20,  unit:'gm' },
-      { name:'Compound 55',    dose:20,  unit:'gm' },
-      { name:'Organic Matter', dose:180, unit:'gm' },
-    ],
-  ];
+  return [ [ { name:'Yaramila', dose:20, unit:'gm' } ] ];
+}
+
+/* A round saved with more than one fertiliser, from before the above.
+   Column 0 survives with its ticks; anything ticked on a second or third
+   fertiliser is counted and said out loud rather than disappearing — a
+   tick that vanishes quietly is a plot that does not get fed. */
+function migrateManuringSingle(s, plots) {
+  if (!s || !Array.isArray(s.manuringConfig)) return;
+  let lost = 0;
+  s.manuringConfig.forEach((round, i) => {
+    if (!Array.isArray(round) || round.length <= 1) return;
+    (plots || []).forEach(p => {
+      const cols = (s.manuring || {})[p] && s.manuring[p][i];
+      if (!Array.isArray(cols)) return;
+      for (let ci = 1; ci < cols.length; ci++) if (cols[ci]) lost++;
+      s.manuring[p][i] = [!!cols[0]];
+    });
+    s.manuringConfig[i] = [round[0]];
+  });
+  if (lost) console.warn('[maint] manuring is one fertiliser a week now; ' +
+    lost + ' tick(s) on a second or third fertiliser were dropped.');
 }
 /* Migrate old flat manuringConfig (and manuring ticks) to the new nested rounds shape */
 function migrateManuringShape(s, plots) {
@@ -1425,6 +1446,7 @@ function getState(nursery, month) {
     const persisted = loadPersistedState(nursery, month);
     if (persisted) {
       migrateManuringShape(persisted, NURSERY_PLOTS[nursery]);
+      migrateManuringSingle(persisted, NURSERY_PLOTS[nursery]);
       migrateInterrowShape(persisted, NURSERY_PLOTS[nursery]);
       appState[nursery][month] = persisted;
       return appState[nursery][month];
@@ -1438,6 +1460,7 @@ function getState(nursery, month) {
       const inherited = loadPersistedState(nursery, from);   // already a deep copy
       if (inherited) {
         migrateManuringShape(inherited, NURSERY_PLOTS[nursery]);
+        migrateManuringSingle(inherited, NURSERY_PLOTS[nursery]);
         migrateInterrowShape(inherited, NURSERY_PLOTS[nursery]);
         // Snapshot what was carried in, so nothing shows as "modified" until
         // this month is actually changed.
@@ -5079,29 +5102,51 @@ async function saveChemEdit() {
   if (_supabase) {
     const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
-    const fresh = named.filter(c => !c.id).map(c => ({
-      kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
-      coverage: c.coverage ?? null, tag: c.tag ?? null,
-      updated_at: new Date().toISOString() }));
+
+    /* A database that has not run every migration does not know every
+       column — "Could not find the 'tag' column … in the schema cache" is
+       PostgREST refusing the WHOLE row over the one field. Losing the tag
+       is a smaller failure than losing the save, so the unknown column is
+       dropped and the write tried again, and the alert at the end says
+       which file brings it back. The columns each migration adds:
+         coverage  shared/migration_nops_chem_coverage.sql
+         tag       shared/migration_nops_chem_tag.sql */
+    const missing = new Set();
+    const strip = o => {
+      const out = { ...o };
+      missing.forEach(k => delete out[k]);
+      return out;
+    };
+    const noteMissing = e => {
+      const m = /find the '([a-z_]+)' column/i.exec((e && e.message) || '');
+      if (m && !missing.has(m[1])) { missing.add(m[1]); return true; }
+      return false;
+    };
+    const attempt = async run => {
+      for (let go = 0; go < 3; go++) {
+        const { error } = await run().then(r => r, e => ({ error: e }));
+        if (!error) return null;
+        if (!noteMissing(error)) return error;
+      }
+      return { message: 'this database is missing too many columns' };
+    };
 
     let err = null;
     if (gone.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').delete().in('id', gone)
-        .then(r => r, e => ({ error: e }));
-      err = err || error;
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').delete().in('id', gone));
     }
     for (const c of named.filter(x => x.id)) {
       if (err) break;
-      const { error } = await _supabase.from('nops_maint_chemicals').update({
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').update(strip({
         name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
-        tag: c.tag ?? null, updated_at: new Date().toISOString() })
-        .eq('id', c.id).then(r => r, e => ({ error: e }));
-      err = error;
+        tag: c.tag ?? null, updated_at: new Date().toISOString() })).eq('id', c.id));
     }
-    if (!err && fresh.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').insert(fresh)
-        .then(r => r, e => ({ error: e }));
-      err = error;
+    if (!err && named.some(x => !x.id)) {
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').insert(
+        named.filter(c => !c.id).map(c => strip({
+          kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
+          coverage: c.coverage ?? null, tag: c.tag ?? null,
+          updated_at: new Date().toISOString() }))));
     }
     if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
       const { error } = await _supabase.from('nops_maint_config').upsert({
@@ -5114,11 +5159,17 @@ async function saveChemEdit() {
     if (err) {
       done();
       alert('Could not save — ' + (err.message || 'try again') +
-            (/coverage/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
             (/kind/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
+              ? '\n\nThis database does not allow Other chemicals yet. ' +
+                'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor.' : ''));
       return;
+    }
+    if (missing.size) {
+      alert('Saved — but this database has no ' + [...missing].join(', ') +
+            ' column' + (missing.size > 1 ? 's' : '') + ', so th' +
+            (missing.size > 1 ? 'ose' : 'at') + ' did not stick.\n\n' +
+            'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
+            'once, then save again.');
     }
     // Read it back, so what is on screen is what is stored — and so the new
     // rows arrive with the ids the next edit needs.
@@ -5364,26 +5415,9 @@ function addWeek(n, m) {
     return -1;
   }
   s.weeks.push(nextWeekRange(n, m));
-  const i = s.weeks.length - 1;
-
-  // P & D keeps its config in an object keyed W1, W2, …
-  if (!s.pdConfig) s.pdConfig = {};
-  const w = 'W' + (i + 1);
-  if (!s.pdConfig[w]) {
-    const prev = s.pdConfig['W' + i];
-    s.pdConfig[w] = prev ? JSON.parse(JSON.stringify(prev)) : defaultPDConfig().W1;
-  }
-  // Manuring and Interrow keep theirs as an array of rounds.
-  [['manuringConfig', defaultManuringConfig], ['interrowConfig', defaultInterrowConfig]]
-    .forEach(([key, mk]) => {
-      if (!Array.isArray(s[key])) s[key] = mk();
-      while (s[key].length <= i) {
-        const prev = s[key][s[key].length - 1];
-        s[key].push(prev ? JSON.parse(JSON.stringify(prev)) : mk()[0]);
-      }
-    });
+  ensureRounds(n, m);          // the new week gets a round in all three configs
   persistStateSoon(n, m);
-  return i;
+  return s.weeks.length - 1;
 }
 
 /* Removing a week removes the ROUND with it — its dates, its chemicals and
@@ -5778,6 +5812,33 @@ function weNum(val, onch) {
    whatever else does, so asking about it once a week was a question with
    one answer. The doses still save and still publish; the Setting page is
    where a sticker changes. */
+/* Every week needs a round behind it, in all three configs. addWeek() makes
+   one as it goes, but a month can reach the editor with more weeks than
+   rounds — carried forward from a shorter month, or saved before addWeek
+   existed. That left weCols() returning [], which became colspan="0"; a
+   browser reads that as "to the end of the column group", which is why
+   Manuring drew a white band where weeks 3 and 4 should have been. */
+function ensureRounds(n, m) {
+  const s = getState(n, m);
+  const want = weeksOf(n, m).length;
+  if (!s.pdConfig) s.pdConfig = {};
+  for (let i = 0; i < want; i++) {
+    const w = 'W' + (i + 1);
+    if (!s.pdConfig[w]) {
+      const prev = s.pdConfig['W' + i];
+      s.pdConfig[w] = prev ? JSON.parse(JSON.stringify(prev)) : defaultPDConfig().W1;
+    }
+  }
+  [['manuringConfig', defaultManuringConfig], ['interrowConfig', defaultInterrowConfig]]
+    .forEach(([key, mk]) => {
+      if (!Array.isArray(s[key]) || !s[key].length) s[key] = mk();
+      while (s[key].length < want) {
+        const prev = s[key][s[key].length - 1];
+        s[key].push(JSON.parse(JSON.stringify(prev || mk()[0])));
+      }
+    });
+}
+
 function weCols(kind, i, n, m) {
   const s = getState(n, m);
   if (kind === 'pd') {
@@ -5802,7 +5863,7 @@ function weCols(kind, i, n, m) {
   const word = many ? 'Fertiliser' : 'Chemical';
   return cfg.map((c, ci) => ({
     ci,
-    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,
+    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,   // manuring is always one
     opts: many ? fertNames('monthly') : taggedNames('interrow'),
     val: many ? c.name : c.chem,
     onSel: many
@@ -5995,6 +6056,7 @@ function renderWorkEditor() {
   const work = WORKS.find(w => w.key === kind);
   const weeks = weeksOf(n, m);
   const plots = NURSERY_PLOTS[n] || [];
+  ensureRounds(n, m);   // no week without a round behind it
 
   document.getElementById('we-title').textContent = `${stockLabel(n)} \u00b7 ${work.label}`;
   document.getElementById('we-sub').textContent = weeks.length
@@ -6009,7 +6071,14 @@ function renderWorkEditor() {
     return;
   }
 
-  const cols = weeks.map((_, i) => weCols(kind, i, n, m));
+  const cols = weeks.map((_, i) => {
+    const c = weCols(kind, i, n, m);
+    /* colspan="0" means "to the end of the column group" to a browser, not
+       "no columns" — the bug that put a white band where Manuring's later
+       weeks should have been. ensureRounds() above should make this
+       impossible; this makes it harmless if it ever is not. */
+    return c.length ? c : [{ ci: 0, label: '\u2014' }];
+  });
   const dayInput = (i, which, day) =>
     `<input class="we-date" type="date" value="${iso ? `${iso}-${String(day).padStart(2, '0')}` : ''}" ` +
     `min="${iso}-01" max="${iso}-${String(days).padStart(2, '0')}" ` +
