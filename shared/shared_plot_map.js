@@ -475,7 +475,26 @@
         nurseries = nurseries.filter((n) =>
           want.indexOf(String(n.name).replace(/[^a-z0-9]/gi, '').toUpperCase()) !== -1);
       }
-      setNursery(nurseries.length ? nurseries[0].name : null);
+      /* KEEP THE NURSERY THAT IS OPEN. This used to be an unconditional
+         setNursery(nurseries[0].name), so every reload snapped back to the
+         first tab — and load() is called after hiding a plot, restoring
+         one, or redrawing a boundary. Hide a plot on UNN2 and you were
+         thrown back to BNN, having to find your way back to the row you
+         were working on. Only fall back to the first when nothing is open
+         yet (the initial load) or when the nursery that was open has gone.
+
+         The zoom and pan go with it. setNursery resets them, which is right
+         when somebody picks a DIFFERENT nursery — different image, different
+         framing — and wrong when the same one is simply being re-read. */
+      const stillThere = nurseries.some((n) => n.name === active);
+      if (stillThere) {
+        const keepZ = { zoom: z.zoom, panX: z.panX, panY: z.panY };
+        setNursery(active);
+        z = keepZ;
+        applyTransform();
+      } else {
+        setNursery(nurseries.length ? nurseries[0].name : null);
+      }
       return { plots: plots.length, nurseries: nurseries.length };
     }
 

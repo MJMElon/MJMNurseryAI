@@ -611,9 +611,18 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    down the column, which is what a price list is for. */
 /* Three lists side by side where there is room. Below that they stack —
    three of these columns squeezed into a phone is three unreadable ones. */
-.three-col { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px; }
-@media (max-width:1180px) { .three-col { grid-template-columns:1fr 1fr; } }
-@media (max-width:860px)  { .three-col { grid-template-columns:1fr; } }
+/* Pest and Disease side by side; Other full width underneath — it carries
+   one more column (Used on), and in a third of the card its name box came
+   out 40px wide: typing worked, seeing what you typed did not. The stack
+   points moved up when the side bar arrived: these widths are what is left
+   AFTER its 212px column, not the screen. */
+.three-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px; }
+.col-block-wide { grid-column:1 / -1; }
+@media (max-width:1080px) { .three-col { grid-template-columns:1fr; } }
+/* A grid child refuses to shrink below its content unless told it may, and
+   a row that cannot shrink walks out of the card instead. */
+.lst-head > *, .lst-row > * { min-width:0; }
+.lst-head span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .preset-row { display:flex; align-items:center; justify-content:center; gap:10px;
               flex-wrap:wrap; margin-bottom:18px; padding:12px;
@@ -636,13 +645,22 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .lst-head.fert-head, .fert-row { grid-template-columns:1fr 152px 94px 84px 34px; }
 /* The Other list carries one more column: which schedule dropdown may offer
    the chemical. Pest and disease have a dropdown each already. */
-.lst-head.other-row, .other-row { grid-template-columns:1fr 104px 60px 82px 84px 30px; }
+.lst-head.other-row, .other-row { grid-template-columns:1fr 128px 70px 92px 104px 30px; }
 .lst-tagsel { height:37px; padding:0 4px; font-family:inherit; font-size:12px; font-weight:700;
               color:var(--text-head); background:#fff; border:1.5px solid var(--border);
               border-radius:var(--r-sm); min-width:0; }
 .lst-tagsel:focus { outline:none; border-color:var(--green-mid); }
-@media (max-width:560px) {
-  .lst-head.other-row, .other-row { grid-template-columns:1fr 84px 34px; }
+/* On a phone the derived and secondary cells go rather than shrink: the
+   name, the dose and the remove are what a row is edited with. The rows
+   hide the same cells the heading does, so the columns still line up. */
+@media (max-width:640px) {
+  .lst-head, .lst-row { grid-template-columns:1fr 118px 30px; }
+  .lst-head.other-row, .other-row { grid-template-columns:1fr 118px 30px; }
+  .lst-head.fert-head, .fert-row { grid-template-columns:1fr 130px 34px; }
+  .lst-head > :nth-child(3), .lst-row > :nth-child(3),
+  .lst-head > :nth-child(4), .lst-row > :nth-child(4) { display:none; }
+  .other-row > :nth-child(5), .lst-head.other-row > :nth-child(5) { display:none; }
+  .lst-head > :last-child, .lst-row > :last-child { display:flex; }
 }
 .lst-head  { padding:10px; background:#f7f9f8; border:1.5px solid var(--border);
              font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase;
@@ -743,11 +761,18 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
   background:#f2f7f4;border-bottom:1.5px solid var(--border);}
 .ss-name{flex:1;font-size:13.5px;font-weight:800;letter-spacing:.5px;
   text-transform:uppercase;color:var(--green-text);}
-.ss-addweek{font-family:var(--font);font-size:11px;font-weight:700;
-  color:var(--green-text);background:var(--bg-white);border:1.5px solid var(--green-mid);
-  border-radius:var(--r-sm);padding:4px 10px;cursor:pointer;white-space:nowrap;
-  transition:background .13s,border-color .13s;}
-.ss-addweek:hover{background:#eaf7f0;border-color:var(--green);}
+.ss-count{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--text-muted);white-space:nowrap;}
+/* Week headers are two lines: which week, then when. They used to be a
+   button opening a date box; the dates are set in the Edit popup now,
+   beside the chemicals and ticks they belong to. */
+.ss-wk{font-size:11px;font-weight:800;color:var(--text-head);letter-spacing:.4px;}
+.ss-wk-d{font-size:9.5px;font-weight:700;color:var(--text-muted);
+  letter-spacing:0;text-transform:none;margin-top:1px;}
+/* A month nobody has set a week in. Not an error — most months start here. */
+.ss-none-th{font-weight:700 !important;color:var(--border-strong) !important;
+  text-transform:none !important;letter-spacing:0 !important;font-size:11px !important;}
+.ss-empty-cell{color:var(--border-strong);font-size:11.5px;font-style:italic;}
 
 .ss-table{width:100%;border-collapse:collapse;}
 .ss-table thead th{background:var(--bg-white);color:var(--text-muted);font-weight:800;
@@ -824,22 +849,22 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 .we-cfgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
   gap:10px;margin-bottom:14px;}
 .we-cfg{background:#f2f7f4;border:1.5px solid var(--border);border-radius:var(--r-md);
-  padding:9px 11px;min-width:0;}
+  padding:9px 11px;min-width:0;max-width:660px;margin-bottom:12px;}
 .we-cfg-h{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--green-text);padding-bottom:6px;margin-bottom:4px;
   border-bottom:1px solid var(--border);}
 .we-cfg-h-orphan{color:#92400e;}
 /* One field to a line, and the labels in a column of their own so PEST and
    DISEASE STICKER line their controls up rather than staggering them. */
-.we-cfg-row{display:grid;grid-template-columns:88px minmax(0,1fr) 58px 26px;
+.we-cfg-row{display:grid;grid-template-columns:88px minmax(0,1fr) 66px 28px;
   align-items:center;gap:8px;padding:3px 0;}
 .we-cfg-l{font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--text-muted);}
 .we-cfg-u{font-size:12px;font-weight:700;color:var(--text-muted);}
 .we-cfg-none{font-size:13px;font-weight:700;color:var(--border-strong);}
-.we-sel{width:100%;height:34px;padding:0 8px;font-family:var(--font);font-size:13px;font-weight:600;
+.we-sel{width:100%;height:28px;padding:0 5px;font-family:var(--font);font-size:13px;font-weight:600;
   color:var(--text-head);background:var(--bg-white);border:1.5px solid var(--border);
-  border-radius:var(--r-sm);cursor:pointer;min-width:120px;}
+  border-radius:var(--r-sm);cursor:pointer;min-width:0;}
 .we-sel:focus{outline:none;border-color:var(--green);}
 .we-num{height:34px;width:100%;padding:0 8px;font-family:var(--font);font-size:13px;
   font-weight:600;color:var(--text-head);background:var(--bg-white);
@@ -847,18 +872,19 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
 .we-num:focus{outline:none;border-color:var(--green);}
 
 .we-table{width:100%;border-collapse:collapse;}
-.we-table{table-layout:auto;}
+/* The plot column takes the slack; a tick column needs the width of a tick.
+   Left the other way round, two columns split 1,100px between them and the
+   checkbox for B1 sat 400px from the word B1. */
+.we-table{table-layout:auto;width:auto;min-width:100%;}
+.we-table th.we-col,.we-table tbody td:not(.we-plot){width:132px;min-width:132px;}
 .we-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:800;font-size:10.5px;
   letter-spacing:.6px;text-transform:uppercase;padding:7px 8px;
   border-bottom:2px solid var(--border-strong);text-align:center;}
 /* The week band. A left rule on each group is what keeps two weeks of Pest /
    Disease from reading as one run of four columns. */
-.we-table thead th.we-wk{background:var(--green);color:#fff;font-size:11px;
-  border-bottom:1px solid rgba(255,255,255,.35);white-space:nowrap;}
-.we-table thead th.we-wk-orphan{background:#92400e;}
 .we-table thead th.we-wk+.we-wk,.we-table thead th.we-col.grp,
 .we-table tbody td.grp{border-left:2px solid var(--border-strong);}
-.we-table thead th.we-col{font-size:10px;min-width:62px;}
+.we-table thead th.we-col{font-size:10px;vertical-align:top;padding:8px 7px;}
 .we-table tbody td{padding:4px 8px;border-bottom:1px solid #eaf1ed;text-align:center;}
 .we-table tbody tr:nth-child(even) td{background:var(--bg-row-alt);}
 .we-table tbody tr:last-child td{border-bottom:none;}
@@ -867,7 +893,8 @@ th.we-plot,td.we-plot{text-align:left;font-size:12.5px;font-weight:700;
   background:var(--bg-white);}
 /* Sticky needs its own background or the striped rows show through it. */
 .we-table tbody tr:nth-child(even) td.we-plot{background:var(--bg-row-alt);}
-.we-table thead th.we-plot{background:#f2f7f4;z-index:2;}
+.we-table thead th.we-plot{background:#f2f7f4;z-index:3;vertical-align:middle;
+  text-align:left;}
 
 .we-all{display:block;margin:4px auto 0;font-family:var(--font);font-size:10px;
   font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--green-text);
@@ -890,7 +917,7 @@ th.we-plot,td.we-plot{text-align:left;font-size:12.5px;font-weight:700;
 #we-modal .modal-body{flex:1 1 auto;overflow-y:auto;min-height:0;}
 /* Two columns across a 760px modal leaves the ticks stranded in acres of
    space; the plot name only needs the width of a plot name. */
-th.we-plot,td.we-plot{width:1%;}
+th.we-plot,td.we-plot{width:1%;min-width:96px;}
 
 
 /* ── The week-dates popover ────────────────────────────────────────────
@@ -1013,3 +1040,47 @@ th.we-plot,td.we-plot{width:1%;}
 /* The side bar becomes a row of pills on a phone; the section title
    underneath needs to not sit against them. */
 @media(max-width:767px){.sm-head{margin-top:14px;}}
+
+
+/* ── The Edit popup: plots down, weeks across ──────────────────────────
+   The weeks were blocks down the page, each with its own copy of the plot
+   list, so comparing week 1 with week 3 meant scrolling past everything
+   between them. One table instead: a plot is a row whatever week you are
+   reading, and a week is a column you can put beside another.
+
+   Three header rows — which week, when, and what goes in it — because two
+   date boxes are wider than the two tick columns under them, and letting
+   them share a row would set the column width from the widget rather than
+   from the data. */
+.we-scroll{overflow:auto;max-height:56vh;}
+.we-wk{background:var(--green) !important;color:#fff !important;font-size:11.5px !important;
+  white-space:nowrap;position:relative;padding:7px 10px !important;}
+.we-wk-n{font-weight:900;letter-spacing:.8px;}
+.we-wk-d{background:#eaf7f0 !important;color:var(--text-head) !important;
+  padding:6px 8px !important;white-space:nowrap;text-transform:none !important;
+  letter-spacing:0 !important;border-bottom:1px solid var(--border) !important;}
+.we-to{font-size:10px;font-weight:800;color:var(--text-muted);
+  text-transform:uppercase;margin:0 5px;}
+.we-date{height:28px;padding:0 6px;font-family:var(--font);font-size:11.5px;font-weight:600;
+  color:var(--text-head);background:var(--bg-white);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);width:126px;}
+.we-date:focus{outline:none;border-color:var(--green);}
+/* Removing a week takes its ticks with it, so it is the one control here
+   coloured like a consequence. On the dark week band it needs its own. */
+.we-week-x{position:absolute;top:4px;right:5px;width:20px;height:20px;padding:0;
+  font-size:14px;line-height:1;font-family:var(--font);color:#fff;
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.42);
+  border-radius:5px;cursor:pointer;}
+.we-week-x:hover{background:#fff;color:var(--red);border-color:#fff;}
+/* The chemical for a column sits directly over the ticks it governs. */
+.we-col-l{font-size:10px;font-weight:900;letter-spacing:.6px;margin-bottom:4px;}
+.we-col-d{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:4px;}
+.we-col-d .we-num{width:56px;height:26px;font-size:11.5px;}
+
+
+/* The plot column is wide now that the tick columns are fixed, which made
+   a centring rule that never showed before very visible: `.we-table tbody
+   td` (0,1,2) outranks `td.we-plot` (0,1,1), so the names were centring in
+   half a table. Said again at a specificity that wins. */
+.we-table thead th.we-plot,
+.we-table tbody td.we-plot{text-align:left;padding-left:14px;}

@@ -243,15 +243,36 @@ function defaultPDConfig() {
     W4: mk({name:'—',   dose:0,unit:'mL',sticker:stickerOff}, {name:'Daconil', dose:30,unit:'gm',sticker:stickerOn}),
   };
 }
+/* One fertiliser to a week. It used to be three columns in a round —
+   Yaramila, Compound 55 and Organic Matter side by side — which is how the
+   old sheet worked and not how a week is fed: a week is one feed, and
+   three columns asked the same question three times over the same plots.
+   Still an array of rounds each holding an array of columns, because the
+   ticks are stored that way and a shape change would strand them; the
+   array is simply one long now. */
 function defaultManuringConfig() {
-  // Nested: array of rounds → each round is an array of fertilizer columns
-  return [
-    [
-      { name:'Yaramila',       dose:20,  unit:'gm' },
-      { name:'Compound 55',    dose:20,  unit:'gm' },
-      { name:'Organic Matter', dose:180, unit:'gm' },
-    ],
-  ];
+  return [ [ { name:'Yaramila', dose:20, unit:'gm' } ] ];
+}
+
+/* A round saved with more than one fertiliser, from before the above.
+   Column 0 survives with its ticks; anything ticked on a second or third
+   fertiliser is counted and said out loud rather than disappearing — a
+   tick that vanishes quietly is a plot that does not get fed. */
+function migrateManuringSingle(s, plots) {
+  if (!s || !Array.isArray(s.manuringConfig)) return;
+  let lost = 0;
+  s.manuringConfig.forEach((round, i) => {
+    if (!Array.isArray(round) || round.length <= 1) return;
+    (plots || []).forEach(p => {
+      const cols = (s.manuring || {})[p] && s.manuring[p][i];
+      if (!Array.isArray(cols)) return;
+      for (let ci = 1; ci < cols.length; ci++) if (cols[ci]) lost++;
+      s.manuring[p][i] = [!!cols[0]];
+    });
+    s.manuringConfig[i] = [round[0]];
+  });
+  if (lost) console.warn('[maint] manuring is one fertiliser a week now; ' +
+    lost + ' tick(s) on a second or third fertiliser were dropped.');
 }
 /* Migrate old flat manuringConfig (and manuring ticks) to the new nested rounds shape */
 function migrateManuringShape(s, plots) {
@@ -1425,6 +1446,7 @@ function getState(nursery, month) {
     const persisted = loadPersistedState(nursery, month);
     if (persisted) {
       migrateManuringShape(persisted, NURSERY_PLOTS[nursery]);
+      migrateManuringSingle(persisted, NURSERY_PLOTS[nursery]);
       migrateInterrowShape(persisted, NURSERY_PLOTS[nursery]);
       appState[nursery][month] = persisted;
       return appState[nursery][month];
@@ -1438,6 +1460,7 @@ function getState(nursery, month) {
       const inherited = loadPersistedState(nursery, from);   // already a deep copy
       if (inherited) {
         migrateManuringShape(inherited, NURSERY_PLOTS[nursery]);
+        migrateManuringSingle(inherited, NURSERY_PLOTS[nursery]);
         migrateInterrowShape(inherited, NURSERY_PLOTS[nursery]);
         // Snapshot what was carried in, so nothing shows as "modified" until
         // this month is actually changed.
@@ -2282,7 +2305,7 @@ function autoSyncRecords() {
   const plots=NURSERY_PLOTS[n];
   const newRecs=[]; let id=Date.now();
 
-  ['W1','W2','W3','W4'].forEach(w=>{
+  weekKeys(n, m, 'W').forEach(w=>{
     const c=cfg[w];
     plots.forEach(plot=>{
       if (s.pd[w]?.[plot]?.P && c.P!=='—') {
@@ -2308,7 +2331,7 @@ function autoSyncRecords() {
       });
     });
   });
-  ['R1','R2'].forEach(r=>{
+  weekKeys(n, m, 'R').forEach(r=>{
     plots.filter(p=>s.weeding[p]?.[r]).forEach(plot=>{
       newRecs.push({id:id++, tarikh:'-', jenis:'Merumput',
         racun:`Round ${r[1]}: Merumput dalam polibeg`,
@@ -2496,12 +2519,12 @@ function schedTickCount(name) {
   const n = getNursery(), m = getMonth(), s = getState(n, m), plots = NURSERY_PLOTS[n] || [];
   let count = 0;
   if (name === 'pd') {
-    ['W1','W2','W3','W4'].forEach(w => plots.forEach(p => {
+    weekKeys(n, m, 'W').forEach(w => plots.forEach(p => {
       if (s.pd[w]?.[p]?.P) count++;
       if (s.pd[w]?.[p]?.D) count++;
     }));
   } else if (name === 'weeding') {
-    ['R1','R2'].forEach(r => plots.forEach(p => { if (s.weeding[p]?.[r]) count++; }));
+    weekKeys(n, m, 'R').forEach(r => plots.forEach(p => { if (s.weeding[p]?.[r]) count++; }));
   } else if (name === 'manuring') {
     s.manuringConfig.forEach((round, ri) => round.forEach((_, ci) =>
       plots.forEach(p => { if (s.manuring[p]?.[ri]?.[ci]) count++; })));
@@ -3231,6 +3254,17 @@ function saveAllSchedules() {
         keys.map(stockLabel).join(', '));
 }
 
+/* W1..Wn and R1..Rn for a month, from the weeks somebody actually made.
+   These lists were hardcoded four and two, which was right while the month
+   invented its own weeks and wrong the moment weeks became something you
+   add — a fifth week's ticks would have saved and never published. */
+function weekKeys(n, m, prefix) {
+  const out = [];
+  const len = weeksOf(n, m).length;
+  for (let i = 0; i < len; i++) out.push(prefix + (i + 1));
+  return out;
+}
+
 function saveSchedule(nursery, quiet) {
   const n = nursery || getNursery(), m = getMonth(), s = getState(n, m);
   const plots = NURSERY_PLOTS[n];
@@ -3239,7 +3273,7 @@ function saveSchedule(nursery, quiet) {
 
   // Build flat task list from schedule state
   const cfg = s.pdConfig;
-  ['W1','W2','W3','W4'].forEach(w => {
+  weekKeys(n, m, 'W').forEach(w => {
     const c = cfg[w];
     plots.forEach(plot => {
       if (s.pd[w]?.[plot]?.P && c.P !== '—') {
@@ -3268,7 +3302,7 @@ function saveSchedule(nursery, quiet) {
       });
     });
   });
-  ['R1','R2'].forEach(r => {
+  weekKeys(n, m, 'R').forEach(r => {
     plots.filter(p => s.weeding[p]?.[r]).forEach(plot => {
       tasks.push({ id:id++, type:'weeding', plot, round:`Round ${r[1]}`,
         jenis:'Merumput',
@@ -5048,6 +5082,44 @@ function dropChemRow(kind, i) {
   renderChemicals(kind);
 }
 
+/* A database that has not run every migration refuses a write in one of
+   two ways, and both take the WHOLE row down over one field:
+
+   - "Could not find the 'tag' column … in the schema cache" — the column
+     does not exist yet (migration_nops_chem_tag.sql unrun).
+   - "null value in column \"coverage\" … violates not-null constraint" —
+     the column exists but still demands a number, because the migration
+     that taught it NULL-means-follow-the-preset is the unrun one
+     (migration_nops_chem_other_preset.sql).
+
+   Losing one field is a smaller failure than losing the save, so either
+   way the field is dropped from the payload and the write tried again: an
+   UPDATE then keeps the row's old value, an INSERT takes the table's own
+   default. The caller's alert names shared/RUN_ME_maintenance_setting.sql,
+   which ends the need for any of this. */
+function columnFallback() {
+  const dropped = new Set();
+  const note = e => {
+    const msg = (e && e.message) || '';
+    const m = /find the '([a-z_]+)' column/i.exec(msg) ||
+              /null value in column "([a-z_]+)"/i.exec(msg);
+    if (m && !dropped.has(m[1])) { dropped.add(m[1]); return true; }
+    return false;
+  };
+  return {
+    dropped,
+    strip(o) { const out = { ...o }; dropped.forEach(k => delete out[k]); return out; },
+    async attempt(run) {
+      for (let go = 0; go < 4; go++) {
+        const { error } = await run().then(r => r, e => ({ error: e }));
+        if (!error) return null;
+        if (!note(error)) return error;
+      }
+      return { message: 'this database refused too many columns' };
+    }
+  };
+}
+
 async function saveChemEdit() {
   const named = chemDraft.map(c => ({ ...c, name: (c.name || '').trim() })).filter(c => c.name);
   // Two of the same name in one column would break the table's own unique
@@ -5068,29 +5140,26 @@ async function saveChemEdit() {
   if (_supabase) {
     const keep = new Set(named.filter(c => c.id).map(c => String(c.id)));
     const gone = chemicals.filter(c => !keep.has(String(c.id))).map(c => c.id);
-    const fresh = named.filter(c => !c.id).map(c => ({
-      kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
-      coverage: c.coverage ?? null, tag: c.tag ?? null,
-      updated_at: new Date().toISOString() }));
+
+    const fallback = columnFallback();
+    const { strip, attempt } = fallback;
 
     let err = null;
     if (gone.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').delete().in('id', gone)
-        .then(r => r, e => ({ error: e }));
-      err = err || error;
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').delete().in('id', gone));
     }
     for (const c of named.filter(x => x.id)) {
       if (err) break;
-      const { error } = await _supabase.from('nops_maint_chemicals').update({
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').update(strip({
         name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm', coverage: c.coverage ?? null,
-        tag: c.tag ?? null, updated_at: new Date().toISOString() })
-        .eq('id', c.id).then(r => r, e => ({ error: e }));
-      err = error;
+        tag: c.tag ?? null, updated_at: new Date().toISOString() })).eq('id', c.id));
     }
-    if (!err && fresh.length) {
-      const { error } = await _supabase.from('nops_maint_chemicals').insert(fresh)
-        .then(r => r, e => ({ error: e }));
-      err = error;
+    if (!err && named.some(x => !x.id)) {
+      err = await attempt(() => _supabase.from('nops_maint_chemicals').insert(
+        named.filter(c => !c.id).map(c => strip({
+          kind: c.kind, name: c.name, dose: +c.dose || 0, unit: c.unit || 'gm',
+          coverage: c.coverage ?? null, tag: c.tag ?? null,
+          updated_at: new Date().toISOString() }))));
     }
     if (!err && presetDraft != null && +presetDraft !== +pumpCoverage) {
       const { error } = await _supabase.from('nops_maint_config').upsert({
@@ -5103,11 +5172,18 @@ async function saveChemEdit() {
     if (err) {
       done();
       alert('Could not save — ' + (err.message || 'try again') +
-            (/coverage/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_coverage.sql for the coverage column.' : '') +
             (/kind/i.test(err.message || '')
-              ? '\n\nRun shared/migration_nops_chem_other_preset.sql for the Other list.' : ''));
+              ? '\n\nThis database does not allow Other chemicals yet. ' +
+                'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor.' : ''));
       return;
+    }
+    if (fallback.dropped.size) {
+      alert('Saved — but this database could not take ' +
+            [...fallback.dropped].join(', ') + ' the way the screen means ' +
+            (fallback.dropped.size > 1 ? 'them' : 'it') +
+            ', so existing rows kept their old value there.\n\n' +
+            'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
+            'once, then save again.');
     }
     // Read it back, so what is on screen is what is stored — and so the new
     // rows arrive with the ids the next edit needs.
@@ -5247,25 +5323,30 @@ async function saveFertEdit() {
                          dose_monthly: f.dose_monthly, unit: f.unit || 'gm',
                          updated_at: new Date().toISOString() });
 
+    const fallback = columnFallback();
+
     let err = null;
     if (gone.length) {
-      const { error } = await _supabase.from('nops_maint_fertilisers').delete().in('id', gone)
-        .then(r => r, e => ({ error: e }));
-      err = err || error;
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').delete().in('id', gone));
     }
     for (const f of named.filter(x => x.id)) {
       if (err) break;
-      const { error } = await _supabase.from('nops_maint_fertilisers').update(cols(f))
-        .eq('id', f.id).then(r => r, e => ({ error: e }));
-      err = error;
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').update(fallback.strip(cols(f))).eq('id', f.id));
     }
-    const fresh = named.filter(f => !f.id).map(cols);
-    if (!err && fresh.length) {
-      const { error } = await _supabase.from('nops_maint_fertilisers').insert(fresh)
-        .then(r => r, e => ({ error: e }));
-      err = error;
+    if (!err && named.some(f => !f.id)) {
+      err = await fallback.attempt(() =>
+        _supabase.from('nops_maint_fertilisers').insert(
+          named.filter(f => !f.id).map(f => fallback.strip(cols(f)))));
     }
     if (err) { done(); alert('Could not save — ' + (err.message || 'try again')); return; }
+    if (fallback.dropped.size) {
+      alert('Saved — but this database could not take ' +
+            [...fallback.dropped].join(', ') + '.\n\n' +
+            'Run shared/RUN_ME_maintenance_setting.sql in the Supabase SQL Editor ' +
+            'once, then save again.');
+    }
 
     const { data } = await _supabase.from('nops_maint_fertilisers').select('*')
       .order('sort_order').order('name').then(r => r, () => ({ data: null }));
@@ -5302,59 +5383,117 @@ async function saveFertEdit() {
    renderAll() reaches this summary while the script is still evaluating, so a
    declaration here would still be in the temporal dead zone. */
 
-/* The month's weeks, shared by every work and every nursery. Stored per
-   nursery+month under s.weeks once somebody changes them; until then they
-   are the same seven-day blocks every round already defaults to. */
-function defaultWeeks(m) {
-  const days = daysInMonthLabel(m);
-  const out = [];
-  for (let from = 1; from <= days; from += 7) out.push({ from, to: Math.min(from + 6, days) });
-  return out;
-}
+/* ── A week is a round ─────────────────────────────────────────────────
+   Weeks used to be five seven-day blocks this file invented for every
+   month whether anybody wanted them or not, and rounds were a separate
+   thing placed INTO them by date. Two ideas for one fact, and the summary
+   headed six columns for a month nobody had scheduled anything in.
 
+   A week is now something somebody makes. None exist until Add Week is
+   pressed, and each one IS a round of every work: week 2 of P & D is the
+   second spraying, week 2 of Manuring is the second feed. So the week
+   carries the dates, the chemicals and the ticks together, which is how
+   the popup asks for them and how the field reads them.
+
+   Nothing is migrated. A saved month keeps its ticks; a month that has
+   never had weeks set simply starts with none, which is the truth. */
 function weeksOf(n, m) {
   const s = appState[n]?.[m];
-  const w = s && Array.isArray(s.weeks) && s.weeks.length ? s.weeks : null;
-  if (!w) return defaultWeeks(m);
+  if (!s || !Array.isArray(s.weeks)) return [];
   /* A schedule carried forward brings last month's weeks with it, and last
      month may have been longer — so a 31-day August into a 30-day September
-     would head a column "29th – 31st" for days September does not have.
-     Clamped on the way out rather than on the way in: the saved figure is
-     still what somebody chose, and a month with 31 days again gets it back. */
+     would head a column "29th – 31st" for days September has not got.
+     Clamped on the way out, not on the way in: the saved figure is still
+     somebody's decision, and a 31-day month gets it back. */
   const days = daysInMonthLabel(m);
-  const out = w.filter(x => +x.from <= days)
-               .map(x => ({ from: +x.from, to: Math.min(+x.to, days) }));
-  return out.length ? out : defaultWeeks(m);
+  return s.weeks.filter(x => +x.from <= days)
+                .map(x => ({ from: +x.from, to: Math.min(+x.to, days) }));
 }
 
-/* How many rounds a work has this month. pd and weeding are fixed at four
-   and two; manuring and interrow are as many as their config holds. */
-function roundCount(kind, s) {
-  if (kind === 'pd')       return 4;
-  if (kind === 'weeding')  return 2;
-  if (kind === 'manuring') return (s.manuringConfig || []).length;
-  if (kind === 'interrow') return (s.interrowConfig || []).length;
-  return 0;
+/* Where a NEW week starts: the day after the last one ends, a seven-day
+   run from there. The first week of a month starts on the 1st. Only a
+   suggestion — the popup's from/to is the answer. */
+function nextWeekRange(n, m) {
+  const days = daysInMonthLabel(m);
+  const w = weeksOf(n, m);
+  const from = w.length ? Math.min(w[w.length - 1].to + 1, days) : 1;
+  return { from, to: Math.min(from + 6, days) };
 }
 
-/* Which week column a round belongs in — the one its start day falls in.
-   A round starting after the last week's end is put in the last week
-   rather than dropped: it is still work somebody scheduled. */
-function weekOfRound(kind, i, n, m) {
-  const r = periodRange(kind, i, n, m);
-  const weeks = weeksOf(n, m);
-  if (!r) return -1;
-  for (let k = 0; k < weeks.length; k++) {
-    if (r.from >= weeks[k].from && r.from <= weeks[k].to) return k;
+/* Adding a week adds a ROUND to every work, so each has somewhere to put
+   its chemicals for it. Without this the new column would be a column of
+   ticks with nothing saying what is being sprayed in it. */
+function addWeek(n, m) {
+  if (!canEditSchedule) return -1;
+  const s = getState(n, m);
+  if (!Array.isArray(s.weeks)) s.weeks = [];
+  const days = daysInMonthLabel(m);
+  if (s.weeks.length && s.weeks[s.weeks.length - 1].to >= days) {
+    alert('The month is already covered to the last day.\n\n' +
+          'Change an existing week\'s dates instead, or shorten the last one first.');
+    return -1;
   }
-  return r.from > weeks[weeks.length - 1].to ? weeks.length - 1 : 0;
+  s.weeks.push(nextWeekRange(n, m));
+  ensureRounds(n, m);          // the new week gets a round in all three configs
+  persistStateSoon(n, m);
+  return s.weeks.length - 1;
 }
 
-/* The plots this work is set on for one round. One list, whatever shape the
-   work stores its ticks in — which is four different shapes. */
-function plotsInRound(kind, i, n, m) {
+/* Removing a week removes the ROUND with it — its dates, its chemicals and
+   its ticks — and shifts every later round down one. A week that only
+   vanished from the header would leave its ticks behind under the next
+   week's dates, which is worse than not being able to remove it. */
+function removeWeek(n, m, k) {
+  if (!canEditSchedule) return;
+  const s = getState(n, m);
+  const weeks = weeksOf(n, m);
+  if (!weeks[k]) return;
+  const plots = NURSERY_PLOTS[n] || [];
+  if (!confirm(`Remove week ${k + 1} (${ordinalDay(weeks[k].from)}\u2013${ordinalDay(weeks[k].to)})?\n\n` +
+               'Everything ticked in it goes with it, for all four works.')) return;
+
+  s.weeks.splice(k, 1);
+  const n2 = s.weeks.length;
+
+  // P & D: object keys, so the tail has to be renumbered by hand.
+  ['pd', 'pdConfig'].forEach(key => {
+    const src = s[key] || {};
+    const out = {};
+    for (let i = 0; i < n2 + 1; i++) {
+      const from = i < k ? i : i + 1;
+      if (src['W' + (from + 1)] !== undefined && i < n2) out['W' + (i + 1)] = src['W' + (from + 1)];
+    }
+    s[key] = out;
+  });
+  // Weeding: R-keys, per plot.
+  plots.forEach(p => {
+    const src = s.weeding[p] || {};
+    const out = {};
+    for (let i = 0; i < n2; i++) {
+      const from = i < k ? i : i + 1;
+      out['R' + (i + 1)] = !!src['R' + (from + 1)];
+    }
+    s.weeding[p] = out;
+  });
+  // Manuring and Interrow: arrays, both the config and the per-plot ticks.
+  ['manuring', 'interrow'].forEach(kind => {
+    const cfg = s[kind + 'Config'];
+    if (Array.isArray(cfg) && cfg.length > k) cfg.splice(k, 1);
+    plots.forEach(p => {
+      if (Array.isArray(s[kind][p]) && s[kind][p].length > k) s[kind][p].splice(k, 1);
+    });
+  });
+
+  persistState(n, m);
+  autoSyncRecords();
+}
+
+/* The plots this work is set on in one week. Week k IS round k now, so
+   there is no placing-by-date left to do — one list, whatever shape the
+   work keeps its ticks in, which is still four different shapes. */
+function plotsInWeek(kind, i, n, m) {
   const s = appState[n]?.[m];
-  if (!s) return [];
+  if (!s || !weeksOf(n, m)[i]) return [];
   const plots = NURSERY_PLOTS[n] || [];
   const out = [];
   plots.forEach(p => {
@@ -5373,19 +5512,6 @@ function plotsInRound(kind, i, n, m) {
     if (on) out.push(p);
   });
   return out;
-}
-
-/* Every plot this work is set on in one WEEK — which may be more than one
-   round, if two rounds of the same work were dated into the same week. */
-function plotsInWeek(kind, weekIdx, n, m) {
-  const s = appState[n]?.[m];
-  if (!s) return [];
-  const seen = new Set();
-  for (let i = 0; i < roundCount(kind, s); i++) {
-    if (weekOfRound(kind, i, n, m) !== weekIdx) continue;
-    plotsInRound(kind, i, n, m).forEach(p => seen.add(p));
-  }
-  return [...seen];
 }
 
 /* ── The tables ────────────────────────────────────────────────────────
@@ -5435,21 +5561,27 @@ function summaryTable(it, m) {
         the maintenance schedule yet, so there is nothing to summarise.</div></div>`;
   }
   const weeks = weeksOf(n, m);
+  /* A plain label, not a button. Dates are set inside the Edit popup, with
+     the chemicals and the ticks they belong to — a header that opened its
+     own little date box was a second place to do one thing. */
   const head = '<tr>' +
     '<th class="ss-work">Work</th>' +
     weeks.map((w, k) =>
-      `<th><button type="button" class="period-btn" onclick="openWeekPicker('${esc(n)}',${k},event)"
-         title="Set the dates for this week">${ordinalDay(w.from)}\u2013${ordinalDay(w.to)}</button></th>`).join('') +
+      `<th><div class="ss-wk">Week ${k + 1}</div>` +
+      `<div class="ss-wk-d">${ordinalDay(w.from)}\u2013${ordinalDay(w.to)}</div></th>`).join('') +
+    (weeks.length ? '' : '<th class="ss-none-th">No weeks set yet</th>') +
     '<th class="ss-act">Actions</th></tr>';
 
   const rows = WORKS.map(work => {
     const on = weeks.map((_, k) => plotsInWeek(work.key, k, n, m).length);
+    const gap = weeks.length ? '' :
+      '<td class="ss-cell ss-empty-cell">Open Edit to add one</td>';
     const open = _expanded[n + '|' + work.key];
     let r = `<tr class="ss-row${open ? ' is-open' : ''}">` +
       `<td class="ss-work">${esc(work.label)}</td>` +
       on.map((count, k) => `<td class="ss-cell${count ? ' on' : ''}">` +
         (count ? `<span class="ss-tick" title="${count} plot${count === 1 ? '' : 's'}">&#10003;</span>` : '&ndash;') +
-        '</td>').join('') +
+        '</td>').join('') + gap +
       `<td class="ss-act">` +
         `<button type="button" class="ss-btn" title="${open ? 'Hide the plots' : 'Show the plots'}" ` +
           `onclick="toggleSummaryRow('${esc(n)}','${work.key}')">${open ? '&#9650;' : '&#9660;'}</button>` +
@@ -5458,7 +5590,7 @@ function summaryTable(it, m) {
       `</td></tr>`;
 
     if (open) {
-      r += `<tr class="ss-detail"><td colspan="${weeks.length + 2}">` +
+      r += `<tr class="ss-detail"><td colspan="${weeks.length + (weeks.length ? 2 : 3)}">` +
         expandedPlots(n, work.key, m) + '</td></tr>';
     }
     return r;
@@ -5467,9 +5599,7 @@ function summaryTable(it, m) {
   return `<div class="ss-wrap">
       <div class="ss-head">
         <div class="ss-name">${esc(label)}</div>
-        <button type="button" class="ss-addweek schedule-edit-ctrl"
-          title="Another week column, for a month that needs more rounds"
-          onclick="addSummaryWeek('${esc(n)}')">+ Week</button>
+        <div class="ss-count">${weeks.length} week${weeks.length === 1 ? '' : 's'}</div>
       </div>
       <div class="tbl-wrap"><table class="ss-table">
         <thead>${head}</thead><tbody>${rows}</tbody></table></div>
@@ -5514,114 +5644,6 @@ function toggleSummaryRow(n, kind) {
   renderSchedSummary();
 }
 
-/* ── The week's dates ──────────────────────────────────────────────────
-   Shared by every work, so this writes s.weeks rather than one work's
-   periods. Adding a week appends one; there is no removing the last, since
-   a month with no weeks has nowhere to put anything. */
-function ensureWeeks(n, m) {
-  const s = getState(n, m);
-  if (!Array.isArray(s.weeks) || !s.weeks.length) s.weeks = defaultWeeks(m);
-  return s.weeks;
-}
-
-function addSummaryWeek(n) {
-  if (!canEditSchedule) return;
-  const m = getMonth();
-  const weeks = ensureWeeks(n, m);
-  const days = daysInMonthLabel(m);
-  const last = weeks[weeks.length - 1];
-
-  if (last.to < days) {
-    // Days at the end of the month nobody has claimed — the obvious column.
-    weeks.push({ from: last.to + 1, to: days });
-  } else {
-    /* The month is already covered end to end, so another round has to come
-       out of a span that exists. The last one is halved rather than a column
-       added over the same days: a week whose dates repeat an earlier one
-       never receives a round — weekOfRound places a round in the FIRST week
-       containing its start day — so it would sit there permanently empty. */
-    if (last.to - last.from < 1) return;   // a single day cannot be halved
-    const mid = last.from + Math.floor((last.to - last.from) / 2);
-    weeks[weeks.length - 1] = { from: last.from, to: mid };
-    weeks.push({ from: mid + 1, to: last.to });
-  }
-  persistStateSoon(n, m);
-  renderSchedSummary();
-}
-
-
-function openWeekPicker(n, k, ev) {
-  if (ev) ev.stopPropagation();
-  if (!canEditSchedule) return;
-  const m = getMonth(), iso = monthISO(m);
-  if (!iso) return;
-  const days = daysInMonthLabel(m);
-  const w = weeksOf(n, m)[k];
-  if (!w) return;
-  _weekPick = { n, k };
-  const pop = document.getElementById('week-pick');
-  pop.querySelector('#wp-from').value = `${iso}-${String(w.from).padStart(2, '0')}`;
-  pop.querySelector('#wp-to').value   = `${iso}-${String(Math.min(w.to, days)).padStart(2, '0')}`;
-  pop.querySelector('#wp-from').min = pop.querySelector('#wp-to').min = `${iso}-01`;
-  pop.querySelector('#wp-from').max = pop.querySelector('#wp-to').max =
-    `${iso}-${String(days).padStart(2, '0')}`;
-  const rm = pop.querySelector('#wp-remove');
-  if (rm) rm.style.display = weeksOf(n, m).length > 1 ? '' : 'none';
-  const r = ev.target.getBoundingClientRect();
-  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 250)) + 'px';
-  pop.style.top  = (r.bottom + window.scrollY + 6) + 'px';
-  pop.classList.remove('hidden');
-}
-
-function closeWeekPicker() {
-  const pop = document.getElementById('week-pick');
-  if (pop) pop.classList.add('hidden');
-  _weekPick = null;
-}
-
-/* Removing a week gives its days to the week beside it rather than leaving a
-   hole in the month. A hole is not cosmetic: weekOfRound() places a round in
-   the week containing its start day, and a round whose day belongs to no week
-   any more falls back to the first one — so deleting the 15th–21st column
-   would silently move that round to the 1st. The neighbour swallowing the
-   days keeps every round where it was. */
-function removeSummaryWeek() {
-  if (!_weekPick || !canEditSchedule) return;
-  const { n, k } = _weekPick;
-  const m = getMonth();
-  const weeks = ensureWeeks(n, m);
-  if (weeks.length < 2) {
-    alert('A month needs at least one week. Change its dates instead of removing it.');
-    return;
-  }
-  const gone = weeks[k];
-  const into = k > 0 ? k - 1 : 1;
-  const keep = weeks[into];
-  const merged = { from: Math.min(+keep.from, +gone.from), to: Math.max(+keep.to, +gone.to) };
-  if (!confirm(`Remove ${ordinalDay(gone.from)}–${ordinalDay(gone.to)}?\n\n` +
-               `Its days join ${ordinalDay(keep.from)}–${ordinalDay(keep.to)}, which becomes ` +
-               `${ordinalDay(merged.from)}–${ordinalDay(merged.to)}. Nothing ticked is lost.`)) return;
-  weeks[into] = merged;
-  weeks.splice(k, 1);
-  persistStateSoon(n, m);
-  closeWeekPicker();
-  renderSchedSummary();
-}
-
-function saveWeekPick() {
-  if (!_weekPick) return;
-  const { n, k } = _weekPick;
-  const m = getMonth();
-  const from = +(document.getElementById('wp-from').value || '').slice(-2);
-  const to   = +(document.getElementById('wp-to').value   || '').slice(-2);
-  if (!from || !to || to < from) { alert('The second date has to be on or after the first.'); return; }
-  const weeks = ensureWeeks(n, m);
-  weeks[k] = { from, to };
-  persistStateSoon(n, m);
-  closeWeekPicker();
-  renderSchedSummary();
-}
-
 /* ── The editor: one work, one nursery, the WHOLE month ────────────────
    It used to open on a single week, which meant setting up a month of P & D
    was four trips through the same popup — and the summary row it was opened
@@ -5645,40 +5667,18 @@ function saveWeekPick() {
    nothing else, so a tick made on ANOTHER work while this popup was open —
    impossible today, but the popup is modal by convention, not by lock — is
    not rolled back with it. */
-const WORK_STATE_KEYS = {
-  pd:       ['pd', 'pdConfig'],
-  weeding:  ['weeding'],
-  manuring: ['manuring', 'manuringConfig'],
-  interrow: ['interrow', 'interrowConfig']
-};
-
-function roundsInWeek(kind, weekIdx, n, m) {
-  const s = getState(n, m);
-  const out = [];
-  for (let i = 0; i < roundCount(kind, s); i++) {
-    if (weekOfRound(kind, i, n, m) === weekIdx) out.push(i);
-  }
-  return out;
-}
-
-/* Rounds that fall in no week at all — a round numbered past the end of the
-   month. They are still saved work, so they get a group of their own rather
-   than vanishing from the only screen that could fix them. */
-function roundsOutsideWeeks(kind, n, m) {
-  const s = getState(n, m);
-  const weeks = weeksOf(n, m);
-  const out = [];
-  for (let i = 0; i < roundCount(kind, s); i++) {
-    const w = weekOfRound(kind, i, n, m);
-    if (w < 0 || w >= weeks.length) out.push(i);
-  }
-  return out;
-}
+/* Everything a week touches — which is everything. Adding or removing a
+   week adds or removes a ROUND of all four works, so a Cancel that only put
+   back the work whose popup was open would leave the other three carrying
+   a round that no longer has a week. One snapshot of the month. */
+const WORK_STATE_KEYS = ['weeks',
+  'pd', 'pdConfig', 'weeding',
+  'manuring', 'manuringConfig', 'interrow', 'interrowConfig'];
 
 function openWorkEditor(n, kind) {
   const m = getMonth(), s = getState(n, m);
   const before = {};
-  (WORK_STATE_KEYS[kind] || []).forEach(k => {
+  WORK_STATE_KEYS.forEach(k => {
     before[k] = JSON.parse(JSON.stringify(s[k] === undefined ? null : s[k]));
   });
   _we = { n, kind, before };
@@ -5694,15 +5694,25 @@ function closeWorkEditor() {
 /* Save is just "stop editing": every tick is already written. It publishes
    what is held rather than gathering it, so there is nothing here that could
    disagree with what the popup was showing. */
+/* Save both keeps the schedule and PUBLISHES it. The Schedule tab used to
+   carry a "Save Schedule" button whose only job was publishing the flat task
+   list the worker app reads (nops_maint_published); that button has gone, so
+   this is where publishing happens — at the one moment somebody has said
+   they are finished with a nursery's week. Without it the ticks would save
+   and the field would never be told. */
 function saveWorkEditor() {
-  if (_we) persistState(_we.n, getMonth());
+  if (_we) {
+    const n = _we.n, m = getMonth();
+    persistState(n, m);
+    try { saveSchedule(n, true); } catch (e) { console.warn('[maint] publish failed:', e); }
+  }
   closeWorkEditor();
   renderSchedSummary();
 }
 
 function cancelWorkEditor() {
   if (!_we) { closeWorkEditor(); return; }
-  const { n, kind, before } = _we;
+  const { n, before } = _we;
   const m = getMonth(), s = getState(n, m);
   let changed = false;
   Object.keys(before).forEach(k => {
@@ -5715,7 +5725,8 @@ function cancelWorkEditor() {
   if (changed) { persistState(n, m); autoSyncRecords(); }
   closeWorkEditor();
   renderSchedSummary();
-  redrawSheet(kind);
+  // Every work, not just this one: a cancelled week was all four's week.
+  WORKS.forEach(w => redrawSheet(w.key));
 }
 
 /* The old sheets are gone from this tab but their renderers are still called
@@ -5782,139 +5793,351 @@ function weToggleAll(kind, i, ci) {
   redrawSheet(kind);
 }
 
-/* Every round of the month, in week order, with the week each belongs to.
-   One list built once and used by the header, the body and the config block,
-   so the three cannot drift apart. */
-function editorColumns(kind, n, m) {
-  const weeks = weeksOf(n, m);
-  const groups = [];
-  weeks.forEach((w, k) => {
-    const rounds = roundsInWeek(kind, k, n, m);
-    if (!rounds.length) return;
-    groups.push({
-      label: `${ordinalDay(w.from)} – ${ordinalDay(w.to)}`,
-      rounds: rounds.map(i => ({ i, cols: roundColumns(kind, i, n, m) }))
-    });
-  });
-  const orphans = roundsOutsideWeeks(kind, n, m);
-  if (orphans.length) {
-    groups.push({
-      label: 'No week',
-      orphan: true,
-      rounds: orphans.map(i => ({ i, cols: roundColumns(kind, i, n, m) }))
-    });
-  }
-  return groups;
+/* ── The popup ─────────────────────────────────────────────────────────
+   One block per week: the week's number, its dates, what is being sprayed
+   or fed in it, and every plot with a tick. That is the whole of a week,
+   and it is asked for in the order somebody fills it in — when, with what,
+   where.
+
+   Weeks are made here rather than on the summary. The summary is a reading
+   surface; this is the writing one, and a week made anywhere else would be
+   a week with no dates and no chemicals until somebody came here anyway. */
+
+/* A <select> whose value is not among its options shows the FIRST option
+   instead — silently, and looking exactly like a saved answer. On a screen
+   that says what to spray, that is the wrong kind of wrong, so a saved name
+   the list no longer offers is carried in and marked rather than dropped. */
+function weSel(opts, val, onch) {
+  const missing = val && val !== '\u2014' && !opts.includes(val);
+  const o = (missing ? [{ v: val, t: val + ' \u2014 no longer in the list' }] : [])
+    .concat(opts.map(x => ({ v: x, t: x })));
+  return `<select class="we-sel" onchange="${onch}">` +
+    o.map(x => `<option value="${esc(x.v)}"${x.v === val ? ' selected' : ''}>${esc(x.t)}</option>`).join('') +
+    '</select>';
 }
 
+function weNum(val, onch) {
+  return `<input class="we-num" type="number" min="0" step="0.01" value="${val ?? ''}" oninput="${onch}">`;
+}
+
+/* What one week's column asks for, and what its ticks mean.
+
+   P & D asks twice — pest and disease can go on different plots in the
+   same week — so it has two sub-columns. Manuring and Interrow have as
+   many as their config holds, one per fertiliser or chemical. Weeding has
+   one, and nothing to choose.
+
+   The STICKER is deliberately not here: a sticker goes in every tank
+   whatever else does, so asking about it once a week was a question with
+   one answer. The doses still save and still publish; the Setting page is
+   where a sticker changes. */
+/* Every week needs a round behind it, in all three configs. addWeek() makes
+   one as it goes, but a month can reach the editor with more weeks than
+   rounds — carried forward from a shorter month, or saved before addWeek
+   existed. That left weCols() returning [], which became colspan="0"; a
+   browser reads that as "to the end of the column group", which is why
+   Manuring drew a white band where weeks 3 and 4 should have been. */
+function ensureRounds(n, m) {
+  const s = getState(n, m);
+  const want = weeksOf(n, m).length;
+  if (!s.pdConfig) s.pdConfig = {};
+  for (let i = 0; i < want; i++) {
+    const w = 'W' + (i + 1);
+    if (!s.pdConfig[w]) {
+      const prev = s.pdConfig['W' + i];
+      s.pdConfig[w] = prev ? JSON.parse(JSON.stringify(prev)) : defaultPDConfig().W1;
+    }
+  }
+  [['manuringConfig', defaultManuringConfig], ['interrowConfig', defaultInterrowConfig]]
+    .forEach(([key, mk]) => {
+      if (!Array.isArray(s[key]) || !s[key].length) s[key] = mk();
+      while (s[key].length < want) {
+        const prev = s[key][s[key].length - 1];
+        s[key].push(JSON.parse(JSON.stringify(prev || mk()[0])));
+      }
+    });
+}
+
+function weCols(kind, i, n, m) {
+  const s = getState(n, m);
+  if (kind === 'pd') {
+    const w = 'W' + (i + 1);
+    if (!s.pdConfig[w]) s.pdConfig[w] = defaultPDConfig().W1;
+    const c = s.pdConfig[w];
+    return [
+      { ci: 0, label: 'Pest', opts: chemNames('pest'), val: c.P,
+        onSel: `updatePDChem('${w}','P',this.value);renderWorkEditor()`,
+        dose: c.P_dose, unit: c.P_unit,
+        onDose: `updatePDDose('${w}','P_dose',+this.value)` },
+      { ci: 1, label: 'Disease', opts: chemNames('disease'), val: c.D,
+        onSel: `updatePDChem('${w}','D',this.value);renderWorkEditor()`,
+        dose: c.D_dose, unit: c.D_unit,
+        onDose: `updatePDDose('${w}','D_dose',+this.value)` }
+    ];
+  }
+  if (kind === 'weeding') return [{ ci: 0, label: 'Weeding' }];
+
+  const many = kind === 'manuring';
+  const cfg = (many ? s.manuringConfig : s.interrowConfig)[i] || [];
+  const word = many ? 'Fertiliser' : 'Chemical';
+  return cfg.map((c, ci) => ({
+    ci,
+    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,   // manuring is always one
+    opts: many ? fertNames('monthly') : taggedNames('interrow'),
+    val: many ? c.name : c.chem,
+    onSel: many
+      ? `updateManuringChem(${i},${ci},this.value);renderWorkEditor()`
+      : `updateInterrowChem(${i},${ci},this.value);renderWorkEditor()`,
+    dose: many ? c.dose : c.chem_dose,
+    unit: many ? (c.unit || 'gm') : (c.chem_unit || 'mL'),
+    onDose: many
+      ? `updateManuringDose(${i},${ci},'dose',+this.value)`
+      : `updateInterrowDose(${i},${ci},'chem_dose',+this.value)`
+  }));
+}
+
+function weTicked(kind, i, ci, plot) {
+  const s = getState(_we.n, getMonth());
+  if (kind === 'pd')      return !!(s.pd['W' + (i + 1)]?.[plot]?.[ci === 0 ? 'P' : 'D']);
+  if (kind === 'weeding') return !!(s.weeding[plot]?.['R' + (i + 1)]);
+  return !!((s[kind][plot] || [])[i] || [])[ci];
+}
+
+function weToggle(kind, i, ci, plot, skipRender) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  if (kind === 'pd') {
+    const w = 'W' + (i + 1);
+    if (!s.pd[w]) s.pd[w] = {};
+    if (!s.pd[w][plot]) s.pd[w][plot] = { P: false, D: false };
+    const f = ci === 0 ? 'P' : 'D';
+    s.pd[w][plot][f] = !s.pd[w][plot][f];
+  } else if (kind === 'weeding') {
+    if (!s.weeding[plot]) s.weeding[plot] = { R1: false, R2: false };
+    const r = 'R' + (i + 1);
+    s.weeding[plot][r] = !s.weeding[plot][r];
+  } else {
+    if (!s[kind][plot]) s[kind][plot] = [];
+    if (!s[kind][plot][i]) s[kind][plot][i] = [];
+    s[kind][plot][i][ci] = !s[kind][plot][i][ci];
+  }
+  if (skipRender) return;
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* One repaint for the whole column, not one per plot — 52 plots through the
+   single-tick path is 52 renders of a table nobody has seen yet. */
+function weToggleAll(kind, i, ci) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), plots = NURSERY_PLOTS[n] || [];
+  const all = plots.every(p => weTicked(kind, i, ci, p));
+  plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* ── The popup ─────────────────────────────────────────────────────────
+   One block per week: the week's number, its dates, what is being sprayed
+   or fed in it, and every plot with a tick. That is the whole of a week,
+   and it is asked for in the order somebody fills it in — when, with what,
+   where.
+
+   Weeks are made here rather than on the summary. The summary is a reading
+   surface; this is the writing one, and a week made anywhere else would be
+   a week with no dates and no chemicals until somebody came here anyway. */
+
+/* A <select> whose value is not among its options shows the FIRST option
+   instead — silently, and looking exactly like a saved answer. On a screen
+   that says what to spray, that is the wrong kind of wrong, so a saved name
+   the list no longer offers is carried in and marked rather than dropped. */
+function weSel(opts, val, onch) {
+  const missing = val && val !== '\u2014' && !opts.includes(val);
+  const o = (missing ? [{ v: val, t: val + ' \u2014 no longer in the list' }] : [])
+    .concat(opts.map(x => ({ v: x, t: x })));
+  return `<select class="we-sel" onchange="${onch}">` +
+    o.map(x => `<option value="${esc(x.v)}"${x.v === val ? ' selected' : ''}>${esc(x.t)}</option>`).join('') +
+    '</select>';
+}
+
+function weNum(val, onch) {
+  return `<input class="we-num" type="number" min="0" step="0.01" value="${val ?? ''}" oninput="${onch}">`;
+}
+
+/* What this work mixes for one week. The STICKER rows are deliberately not
+   here: a sticker goes in every tank whatever else does, so asking about it
+   once a week was asking a question with one answer. The doses still save,
+   and the Setting page is where a sticker is changed. */
+function weTicked(kind, i, ci, plot) {
+  const s = getState(_we.n, getMonth());
+  if (kind === 'pd')      return !!(s.pd['W' + (i + 1)]?.[plot]?.[ci === 0 ? 'P' : 'D']);
+  if (kind === 'weeding') return !!(s.weeding[plot]?.['R' + (i + 1)]);
+  return !!((s[kind][plot] || [])[i] || [])[ci];
+}
+
+function weToggle(kind, i, ci, plot, skipRender) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  if (kind === 'pd') {
+    const w = 'W' + (i + 1);
+    if (!s.pd[w]) s.pd[w] = {};
+    if (!s.pd[w][plot]) s.pd[w][plot] = { P: false, D: false };
+    const f = ci === 0 ? 'P' : 'D';
+    s.pd[w][plot][f] = !s.pd[w][plot][f];
+  } else if (kind === 'weeding') {
+    if (!s.weeding[plot]) s.weeding[plot] = {};
+    const r = 'R' + (i + 1);
+    s.weeding[plot][r] = !s.weeding[plot][r];
+  } else {
+    if (!s[kind][plot]) s[kind][plot] = [];
+    if (!s[kind][plot][i]) s[kind][plot][i] = [];
+    s[kind][plot][i][ci] = !s[kind][plot][i][ci];
+  }
+  if (skipRender) return;
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* One repaint for the whole column, not one per plot — 52 plots through the
+   single-tick path is 52 renders of a table nobody has seen yet. */
+function weToggleAll(kind, i, ci) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), plots = NURSERY_PLOTS[n] || [];
+  const all = plots.every(p => weTicked(kind, i, ci, p));
+  plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+/* The week's dates. Written straight through like the ticks, because the
+   popup's Cancel already puts the whole work back — and s.weeks is in that
+   snapshot, so a date changed and cancelled goes back with everything else. */
+function weSetDate(i, which, value) {
+  if (!canEditSchedule || !_we) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  const day = +String(value || '').slice(-2);
+  const days = daysInMonthLabel(m);
+  if (!day || day < 1 || day > days) return;
+  const w = s.weeks && s.weeks[i];
+  if (!w) return;
+  if (which === 'from') { w.from = day; if (+w.to < day) w.to = day; }
+  else                  { w.to = day;   if (+w.from > day) w.from = day; }
+  persistStateSoon(n, m);
+  renderWorkEditor();
+  renderSchedSummary();
+}
+
+function weAddWeek() {
+  if (!_we) return;
+  const i = addWeek(_we.n, getMonth());
+  if (i < 0) return;
+  renderWorkEditor();
+  renderSchedSummary();
+  /* The new column is off the right edge of a month with a few weeks in
+     it, so the scroller is sent there rather than leaving somebody to
+     wonder whether the button did anything. */
+  const box = document.querySelector('#we-body .we-scroll');
+  if (box) box.scrollTo({ left: box.scrollWidth, behavior: 'smooth' });
+}
+
+function weRemoveWeek(i) {
+  if (!_we) return;
+  removeWeek(_we.n, getMonth(), i);
+  renderWorkEditor();
+  renderSchedSummary();
+}
+
+/* ── One table, not a stack of them ────────────────────────────────────
+   The weeks used to be blocks down the page, each with its own copy of the
+   plot list — the same fourteen names printed once per week, so comparing
+   week 1 with week 3 meant scrolling past everything between them.
+
+   The plots are a column, once, and the weeks go across: a plot is a row
+   whatever week you are reading, which is the question this screen is
+   asked. Under each week's dates sit its own chemical choices, directly
+   over the ticks they govern. Add Week adds a column to the right. */
 function renderWorkEditor() {
   if (!_we) return;
   const { n, kind } = _we;
-  const m = getMonth();
+  const m = getMonth(), iso = monthISO(m), days = daysInMonthLabel(m);
   const work = WORKS.find(w => w.key === kind);
-  const groups = editorColumns(kind, n, m);
+  const weeks = weeksOf(n, m);
+  const plots = NURSERY_PLOTS[n] || [];
+  ensureRounds(n, m);   // no week without a round behind it
 
-  document.getElementById('we-title').textContent = `${stockLabel(n)} · ${work.label}`;
-  document.getElementById('we-sub').textContent =
-    `Every week of ${m}. Ticks save as you make them — Cancel puts them back.`;
+  document.getElementById('we-title').textContent = `${stockLabel(n)} \u00b7 ${work.label}`;
+  document.getElementById('we-sub').textContent = weeks.length
+    ? `${weeks.length} week${weeks.length === 1 ? '' : 's'} in ${m}. Ticks save as you make them \u2014 Cancel puts them back.`
+    : `No weeks in ${m} yet. Add Week starts one.`;
 
   const body = document.getElementById('we-body');
-  const plots = NURSERY_PLOTS[n] || [];
-  if (!groups.length || !plots.length) {
-    body.innerHTML = `<div class="set-empty">This work has no rounds this month.</div>`;
+  if (!plots.length) { body.innerHTML = '<div class="set-empty">This nursery has no plots.</div>'; return; }
+  if (!weeks.length) {
+    body.innerHTML = '<div class="set-empty">No weeks yet. <b>Add Week</b> starts one, ' +
+      'and every week you add becomes a column here.</div>';
     return;
   }
 
-  const flat = [];
-  groups.forEach((g, gi) => g.rounds.forEach((r, ri) => r.cols.forEach((c, k) =>
-    flat.push({ i: r.i, ci: c.ci, grp: !!(gi && !ri && !k) }))));
+  const cols = weeks.map((_, i) => {
+    const c = weCols(kind, i, n, m);
+    /* colspan="0" means "to the end of the column group" to a browser, not
+       "no columns" — the bug that put a white band where Manuring's later
+       weeks should have been. ensureRounds() above should make this
+       impossible; this makes it harmless if it ever is not. */
+    return c.length ? c : [{ ci: 0, label: '\u2014' }];
+  });
+  const dayInput = (i, which, day) =>
+    `<input class="we-date" type="date" value="${iso ? `${iso}-${String(day).padStart(2, '0')}` : ''}" ` +
+    `min="${iso}-01" max="${iso}-${String(days).padStart(2, '0')}" ` +
+    `onchange="weSetDate(${i},'${which}',this.value)">`;
 
-  /* Two header rows: the weeks, then the columns inside each. A week with one
-     round and one column still gets both, so every table is the same shape. */
-  const h1 = '<tr><th class="we-plot" rowspan="2">Plot</th>' +
-    groups.map(g => {
-      const span = g.rounds.reduce((a, r) => a + r.cols.length, 0);
-      return `<th colspan="${span}" class="we-wk${g.orphan ? ' we-wk-orphan' : ''}">${esc(g.label)}</th>`;
-    }).join('') + '</tr>';
-  // `grp` rules off where one week ends and the next begins; without it two
-  // weeks of Pest / Disease read as one run of four columns.
-  const h2 = '<tr>' + groups.map((g, gi) => g.rounds.map(r =>
-    r.cols.map((c, k) => `<th class="we-col${gi && !k && r === g.rounds[0] ? ' grp' : ''}">` +
-      `<div>${esc(c.label)}</div>` +
-      `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${r.i},${c.ci})" ` +
-      `title="Tick or clear every plot in this column">all</button></th>`).join('')
-  ).join('')).join('') + '</tr>';
+  /* Three header rows: which week, when, and what goes in it. The dates
+     get a row of their own because two date boxes are wider than the two
+     tick columns underneath them, and squeezing them into the week band
+     would set the column width from the widget rather than the data. */
+  const h1 = '<tr><th class="we-plot" rowspan="3">Plot</th>' +
+    weeks.map((w, i) =>
+      `<th colspan="${cols[i].length}" class="we-wk">` +
+        `<span class="we-wk-n">Week ${i + 1}</span>` +
+        `<button type="button" class="we-week-x schedule-edit-ctrl" title="Remove this week"` +
+        ` onclick="weRemoveWeek(${i})">&times;</button></th>`).join('') + '</tr>';
+
+  const h2 = '<tr>' + weeks.map((w, i) =>
+    `<th colspan="${cols[i].length}" class="we-wk-d">` +
+      dayInput(i, 'from', w.from) + '<span class="we-to">to</span>' + dayInput(i, 'to', w.to) +
+    '</th>').join('') + '</tr>';
+
+  const h3 = '<tr>' + weeks.map((w, i) => cols[i].map((c, k) =>
+    `<th class="we-col${k === 0 && i ? ' grp' : ''}">` +
+      `<div class="we-col-l">${esc(c.label)}</div>` +
+      (c.opts ? weSel(c.opts, c.val, c.onSel) : '') +
+      (c.opts ? `<div class="we-col-d">${weNum(c.dose, c.onDose)}` +
+                `<span class="we-cfg-u">${esc(c.unit || '')}</span></div>` : '') +
+      `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${i},${c.ci})" ` +
+      `title="Tick or clear every plot in this column">all</button>` +
+    '</th>').join('')).join('') + '</tr>';
 
   const rows = plots.map(pl => '<tr><td class="we-plot">' + esc(pl) + '</td>' +
-    flat.map(f => {
-      const on = weTicked(kind, f.i, f.ci, pl);
-      return `<td class="${f.grp ? 'grp' : ''}"><button type="button" class="we-tick${on ? ' on' : ''}" ` +
-        `onclick="weToggle('${kind}',${f.i},${f.ci},'${esc(pl)}')" ` +
+    weeks.map((w, i) => cols[i].map((c, k) => {
+      const on = weTicked(kind, i, c.ci, pl);
+      return `<td class="${k === 0 && i ? 'grp' : ''}"><button type="button" ` +
+        `class="we-tick${on ? ' on' : ''}" ` +
+        `onclick="weToggle('${kind}',${i},${c.ci},'${esc(pl)}')" ` +
         `aria-pressed="${on}">${on ? '&#10003;' : ''}</button></td>`;
-    }).join('') + '</tr>').join('');
+    }).join('')).join('') + '</tr>').join('');
 
-  body.innerHTML = weConfigHtml(kind, groups, n, m) +
-    `<div class="tbl-wrap"><table class="we-table">
-       <thead>${h1}${h2}</thead><tbody>${rows}</tbody></table></div>`;
-}
-
-/* What each round is being sprayed or fed with, headed by its week so the
-   figures and the columns underneath are obviously the same rounds. Weeding
-   has none — there is nothing to mix for it. */
-function weConfigHtml(kind, groups, n, m) {
-  if (kind === 'weeding') return '';
-  const s = getState(n, m);
-
-  /* A <select> whose value is not among its options shows the FIRST option
-     instead — silently, and looking exactly like a saved answer. On a screen
-     that says what to spray, that is the wrong kind of wrong, so a saved name
-     the list no longer offers is carried in and marked rather than dropped. */
-  const sel = (opts, val, onch) => {
-    const missing = val && val !== '—' && !opts.includes(val);
-    const o = (missing ? [{ v: val, t: val + ' — no longer in the list' }] : [])
-      .concat(opts.map(x => ({ v: x, t: x })));
-    return `<select class="we-sel" onchange="${onch}">` +
-      o.map(x => `<option value="${esc(x.v)}"${x.v === val ? ' selected' : ''}>${esc(x.t)}</option>`).join('') +
-      '</select>';
-  };
-
-  /* One field to a line. They were on one line and the last of them wrapped,
-     which put a stray "gm" in front of the word STICKER — a unit reading as
-     though it belonged to the next thing along is exactly the confusion this
-     screen must not create. */
-  const row = (label, control, dose, unit, onDose) =>
-    `<div class="we-cfg-row"><span class="we-cfg-l">${esc(label)}</span>${control}` +
-    (onDose ? `<input class="we-num" type="number" min="0" step="0.01" value="${dose ?? ''}" oninput="${onDose}">` : '') +
-    `<span class="we-cfg-u">${esc(unit || '')}</span></div>`;
-
-  const forRound = i => {
-    if (kind === 'pd') {
-      const w = 'W' + (i + 1), c = s.pdConfig[w];
-      const pair = (title, f, kindKey) =>
-        row(title, sel(chemNames(kindKey), c[f], `updatePDChem('${w}','${f}',this.value);renderWorkEditor()`),
-            c[f + '_dose'], c[f + '_unit'], `updatePDDose('${w}','${f}_dose',+this.value)`) +
-        row(title + ' sticker',
-            sel(taggedNames('sticker'), c[f + '_sticker'], `updatePDChem('${w}','${f}_sticker',this.value);renderWorkEditor()`),
-            c[f + '_sticker_dose'], c[f + '_sticker_unit'],
-            `updatePDDose('${w}','${f}_sticker_dose',+this.value)`);
-      return pair('Pest', 'P', 'pest') + pair('Disease', 'D', 'disease');
-    }
-    const cfg = (kind === 'manuring' ? s.manuringConfig : s.interrowConfig)[i] || [];
-    return cfg.map((c, ci) => kind === 'manuring'
-      ? row('Fertiliser ' + (ci + 1),
-          sel(fertNames('monthly'), c.name, `updateManuringChem(${i},${ci},this.value);renderWorkEditor()`),
-          c.dose, c.unit || 'gm', `updateManuringDose(${i},${ci},'dose',+this.value)`)
-      : row('Chemical ' + (ci + 1),
-          sel(taggedNames('interrow'), c.chem, `updateInterrowChem(${i},${ci},this.value);renderWorkEditor()`),
-          c.chem_dose, c.chem_unit || 'mL', `updateInterrowDose(${i},${ci},'chem_dose',+this.value)`) +
-        row('Activator ' + (ci + 1), '<span class="we-cfg-none">—</span>',
-          c.activator_dose, c.activator_unit || 'mL', `updateInterrowDose(${i},${ci},'activator_dose',+this.value)`)
-    ).join('');
-  };
-
-  return '<div class="we-cfgs">' + groups.map(g =>
-    g.rounds.map(r => `<div class="we-cfg">
-        <div class="we-cfg-h${g.orphan ? ' we-cfg-h-orphan' : ''}">${esc(g.label)}</div>
-        ${forRound(r.i)}</div>`).join('')
-  ).join('') + '</div>';
+  body.innerHTML = `<div class="tbl-wrap we-scroll"><table class="we-table">
+      <thead>${h1}${h2}${h3}</thead><tbody>${rows}</tbody></table></div>`;
 }

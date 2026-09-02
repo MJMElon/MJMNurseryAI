@@ -91,9 +91,14 @@ BEGIN
   IF to_regclass('public.nops_maint_chemicals') IS NULL THEN RETURN; END IF;
 
   -- Asir is dosed per seedling, so it keeps coverage 1 wherever it sits.
+  -- Only when Other does not already hold an Asir: the name is unique per
+  -- kind, so moving a second one in would collide — and an Other Asir
+  -- already there means this move already happened once.
   EXECUTE $q$ UPDATE public.nops_maint_chemicals
                  SET kind = 'other', updated_at = now()
-               WHERE lower(name) = 'asir' AND kind <> 'other' $q$;
+               WHERE lower(name) = 'asir' AND kind <> 'other'
+                 AND NOT EXISTS (SELECT 1 FROM public.nops_maint_chemicals
+                                  WHERE kind = 'other' AND lower(name) = 'asir') $q$;
   GET DIAGNOSTICS n = ROW_COUNT;
   RAISE NOTICE '3a. Asir moved to Other: % row(s).', n;
 
@@ -114,9 +119,11 @@ BEGIN
         ('Bond',       15.0, 'mL', 20),   -- Sticker for fungicide
         ('Activator',  15.0, 'mL', 21)    -- Sticker for weedicide
       ) AS v(name, dose, unit, ord)
+     -- Under ANY kind, for the same reason the seed file checks that way:
+     -- a chemical somebody has re-filed must not come back as a second row.
      WHERE NOT EXISTS (
        SELECT 1 FROM public.nops_maint_chemicals c
-        WHERE c.kind = 'other' AND lower(c.name) = lower(v.name))
+        WHERE lower(c.name) = lower(v.name))
   $q$;
   GET DIAGNOSTICS n = ROW_COUNT;
   RAISE NOTICE '3b. weedicides and stickers added to Other: % (8 in the source).', n;

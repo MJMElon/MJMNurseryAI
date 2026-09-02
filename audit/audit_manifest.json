@@ -1,12 +1,12 @@
 {
-  "name": "MJM Nursery Audit",
-  "short_name": "MJM Audit",
+  "name": "MJM Nursery — 555 Auditor Portal",
+  "short_name": "Auditor Portal",
   "description": "MJM Nursery field audit system — Mega Jutamas Sdn Bhd",
   "start_url": "./audit_index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#1a4d1a",
-  "theme_color": "#1a4d1a",
+  "background_color": "#e9d071",
+  "theme_color": "#e9d071",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -23,5 +23,8 @@
     }
   ],
   "screenshots": [],
-  "categories": ["productivity", "utilities"]
+  "categories": [
+    "productivity",
+    "utilities"
+  ]
 }

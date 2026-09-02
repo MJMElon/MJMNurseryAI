@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>555 Portal Demo</title>
+<link rel="icon" href="data:,">
+<!-- No Tailwind, and no CDN of any kind.
+
+     Every other page in this repository pulls Tailwind off a CDN, and for a
+     page behind a login that is fine. This one is the page somebody opens to
+     SHOW the system — on a customer's wifi, on a phone tethered in a nursery,
+     on whatever is to hand — and a demo that arrives unstyled because a CDN
+     was slow is a demo that has already failed. It is a few dozen lines of
+     CSS; they live here. -->
+<style>
+  :root { --ink:#e2e8f0; --dim:#94a3b8; --faint:#475569; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+    background:
+      radial-gradient(1100px 600px at 12% -10%, rgba(16,185,129,.10), transparent 60%),
+      radial-gradient(900px 500px at 105% 10%, rgba(56,189,248,.07), transparent 60%),
+      #04120b;
+  }
+
+  /* ── The picker, on the left ─────────────────────────────────────────── */
+  .pick-card {
+    background:rgba(5,20,12,.6); border:1px solid rgba(52,211,153,.14);
+    border-radius:26px; padding:20px; backdrop-filter:blur(14px);
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+  }
+  .pick-head {
+    font-size:11px; font-weight:900; letter-spacing:.22em; text-transform:uppercase;
+    color:#34d399; margin-bottom:14px;
+  }
+  .pick {
+    display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    padding:11px 13px; border-radius:15px; border:1px solid transparent;
+    background:transparent; color:var(--dim); cursor:pointer;
+    font-size:13.5px; font-weight:700; line-height:1.3; transition:background .15s,border-color .15s,color .15s;
+  }
+  .pick:hover { background:rgba(255,255,255,.04); color:var(--ink); }
+  .pick.on {
+    background:rgba(255,255,255,.07); border-color:rgba(148,163,184,.25); color:#f8fafc;
+    font-weight:900;
+  }
+  .dot { width:15px; height:15px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 0 3px rgba(255,255,255,.05); }
+  .pick-sub { font-size:10.5px; font-weight:700; color:var(--faint); margin-top:2px; letter-spacing:.02em; }
+
+  /* ── The phone ───────────────────────────────────────────────────────── */
+  /* A real device is 390 x 844 CSS pixels; the frame is drawn round exactly
+     that, and the whole thing is scaled to whatever height the desk has. The
+     page inside is never scaled on its own — it is rendered at true phone
+     size, which is the only way the demo shows what a phone shows. */
+  /* The bezel is deeper at the top, and the clock and the speaker grille live
+     IN it. They used to be drawn over the screen — which is fine on a mock-up
+     of an app, and wrong here: the portals are real pages that use all 844
+     pixels, and the auditor portal's own "Synced" bar was underneath ours.
+     A frame that hides part of what it is framing is not a frame. */
+  .phone {
+    width:428px; padding:34px 19px 19px; border-radius:56px; background:#0b1220;
+    box-shadow:0 0 0 2px #1e293b, 0 30px 70px rgba(0,0,0,.55);
+    position:relative;
+  }
+  .screen {
+    width:390px; height:844px; border-radius:38px; overflow:hidden;
+    background:#fff; position:relative;
+  }
+  .screen iframe { width:390px; height:844px; border:0; display:block; }
+  /* The speaker grille, centred in the top bezel. */
+  .notch {
+    position:absolute; top:15px; left:50%; transform:translateX(-50%);
+    width:56px; height:5px; background:#1e293b; border-radius:3px;
+  }
+  .bar {
+    position:absolute; top:0; left:0; right:0; height:34px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 30px; font-size:10.5px; font-weight:800; color:#64748b;
+    pointer-events:none;
+  }
+  .stage { transform-origin:top center; }
+
+  .pill {
+    display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border-radius:999px;
+    border:1px solid rgba(148,163,184,.22); background:rgba(255,255,255,.04);
+    color:var(--dim); font-size:10.5px; font-weight:800; letter-spacing:.1em;
+    text-transform:uppercase; cursor:pointer; text-decoration:none;
+    transition:color .15s, border-color .15s;
+  }
+  .pill:hover { color:#f8fafc; border-color:rgba(148,163,184,.45); }
+  .note { font-size:11.5px; font-weight:600; color:var(--faint); line-height:1.6; }
+
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  /* Tight at the top on purpose: every pixel spent on the heading is a pixel
+     off the phone on a laptop screen. */
+  .wrap { max-width:1200px; margin:0 auto; padding:22px 20px 32px; }
+  .top { display:flex; align-items:baseline; justify-content:space-between;
+         gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .title { font-size:32px; font-weight:900; letter-spacing:-.02em; color:#f1f5f9; line-height:1.1; }
+  .subtitle { font-size:11px; font-weight:900; letter-spacing:.22em; text-transform:uppercase;
+              color:#34d399; margin-top:6px; }
+  .cols { display:flex; gap:32px; align-items:flex-start; }
+  .side { width:330px; flex:0 0 auto; }
+  .main { flex:1 1 auto; display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .picks { display:flex; flex-direction:column; gap:4px; }
+  .actions { margin-top:20px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06);
+             display:flex; flex-wrap:wrap; gap:8px; }
+  .hatch { margin-top:20px; text-align:center; max-width:430px; }
+
+  /* One column on a narrow screen: the picker over the phone, both centred. */
+  @media (max-width: 900px) {
+    .cols { flex-direction:column; align-items:center; }
+    .side { width:100%; max-width:430px; }
+  }
+  @media (max-width: 520px) {
+    .title { font-size:24px; }
+    .wrap { padding:20px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <div class="title">555 Portal Demo</div>
+      <div class="subtitle">The phones, on a desk</div>
+    </div>
+    <a href="../index.html" class="pill">← Back to the hub</a>
+  </div>
+
+  <div class="cols">
+
+    <!-- ── Which portal ────────────────────────────────────────────────── -->
+    <div class="pick-card side">
+      <div class="pick-head">View as</div>
+      <div id="picks" class="picks"></div>
+
+      <div class="actions">
+        <button class="pill" id="reload">↻ Start again</button>
+        <a class="pill" id="newtab" target="_blank" rel="noopener">↗ Open full size</a>
+      </div>
+
+      <!-- Said plainly, because it is the whole nature of this page: it is not
+           a mock-up with invented numbers on it. It is the live portal in a
+           frame, which is what makes "every function is in the demo" true and
+           what makes a sign-in necessary. -->
+      <div class="note" id="what" style="margin-top:16px"></div>
+    </div>
+
+    <!-- ── The phone ───────────────────────────────────────────────────── -->
+    <div class="main">
+      <div id="stage" class="stage">
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="bar">
+            <span id="clock">—</span>
+            <span style="letter-spacing:.14em">▮▮▮ ▮</span>
+          </div>
+          <div class="screen">
+            <iframe id="frame"
+                    title="Portal demo"
+                    allow="geolocation; camera"
+                    referrerpolicy="no-referrer-when-downgrade"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <div class="note hatch">
+        Nothing loading? Some sites refuse to be shown inside another page —
+        use <b>Open full size</b>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   555 PORTAL DEMO — the four phone portals, at phone size, on a desk.
+
+   It is a FRAME around the real thing, not a drawing of it. Every screen,
+   every module and every button is whatever the portal actually does today,
+   because it IS the portal: nothing here is a mock-up that has to be kept up
+   to date, and nothing can quietly go stale and start lying about the system.
+
+   The price of that, stated on the page rather than discovered: each portal
+   asks to be signed into, exactly as it would on a phone, because it is the
+   live one. A demo that skipped the login would need a fake portal behind it.
+
+   Two things are worth knowing before changing this file:
+
+   1. THE PAGE INSIDE IS NEVER SCALED ON ITS OWN. The iframe is 390 x 844 —
+      a real device in CSS pixels — and the whole frame is scaled to fit the
+      desk it is being shown on. Scaling the iframe's contents instead would
+      change what the portal thinks the screen is, and it would lay itself out
+      as a tablet: the demo would stop showing what a phone shows, which is
+      the one thing it is for.
+
+   2. A SITE MAY REFUSE TO BE FRAMED, and there is no way to find out from
+      here. A page blocked by X-Frame-Options fires `load` on its own error
+      page, and reading anything about a cross-origin frame is not allowed —
+      so there is nothing to detect and nothing to fall back to automatically.
+      The escape hatch is a link that is always there rather than one that
+      appears when something has gone wrong.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The four front doors, each at its LOGIN page — where a phone starts.
+   The colours are the ones each portal wears on the hub, so a tile and its
+   demo are recognisably the same thing. */
+const PORTALS = [
+  {
+    key: 'audit',
+    name: '555 Auditor Portal',
+    sub: 'Height, papan, plot & maintenance audits',
+    dot: '#f97316',
+    url: 'https://ai.mjmnursery.com/audit/audit_index.html',
+    /* Same domain as this page, so it can be framed with a relative URL —
+       and it shares this browser's sign-in, which means somebody already
+       signed in here lands on the app rather than on the login screen. That
+       is what mirroring means, and it is said out loud below. */
+    local: '../audit/audit_index.html',
+    note: 'The auditor app as it is on a phone. It shares this browser\'s '
+        + 'sign-in, so if you are already signed in to the hub it opens past '
+        + 'the login screen — sign out, or use a private window, to see the '
+        + 'login itself.',
+  },
+  {
+    key: 'fc',
+    name: '555 FC Portal',
+    sub: 'Scan, delivery orders, maintenance, PALMS',
+    dot: '#22c55e',
+    url: 'https://scan.mjmnursery.com/',
+    note: 'A Field Conductor signs in with their office e-mail and password — '
+        + 'the same account as the hub.',
+  },
+  {
+    key: 'worker',
+    name: '555 Worker Portal',
+    sub: 'The worker\'s to-do list, walked and swiped',
+    dot: '#8b5cf6',
+    url: 'https://scan.mjmnursery.com/#/worker',
+    note: 'A worker signs in with the PIN on their row of the payroll '
+        + 'register — no e-mail, no password. Try the walk: Start, then hold '
+        + 'to come back.',
+  },
+  {
+    key: 'admin',
+    name: '555 Admin Portal',
+    sub: 'Collection DOs, consent, booking',
+    dot: '#06b6d4',
+    url: 'https://mobile.mjmnursery.com',
+    note: 'Collection delivery orders, customer consent and booking.',
+  },
+];
+
+const frame  = document.getElementById('frame');
+const picks  = document.getElementById('picks');
+const what   = document.getElementById('what');
+const newtab = document.getElementById('newtab');
+const stage  = document.getElementById('stage');
+
+let current = PORTALS[0];
+
+/* A relative URL when the portal lives on this domain: it saves a hop, and
+   more importantly it is the only one this page could still show if the
+   public host name ever moves. */
+const srcOf = (p) => p.local || p.url;
+
+function draw() {
+  picks.innerHTML = PORTALS.map((p) => `
+    <button class="pick ${p.key === current.key ? 'on' : ''}" data-key="${p.key}">
+      <span class="dot" style="background:${p.dot}"></span>
+      <span>
+        ${p.name}
+        <span class="pick-sub" style="display:block">${p.sub}</span>
+      </span>
+    </button>`).join('');
+  picks.querySelectorAll('.pick').forEach((b) => {
+    b.onclick = () => { current = PORTALS.find((x) => x.key === b.dataset.key); show(); };
+  });
+}
+
+function show() {
+  draw();
+  what.textContent = current.note;
+  newtab.href = current.url;
+  /* about:blank first, so picking the same portal twice really does start it
+     again rather than doing nothing — and so a heavy app is not left running
+     behind the one being looked at. */
+  frame.src = 'about:blank';
+  setTimeout(() => { frame.src = srcOf(current); }, 40);
+}
+
+document.getElementById('reload').onclick = show;
+
+/* ── How big the phone is ──────────────────────────────────────────────
+ *
+ * The frame is 428 x 876 — a 390 x 844 screen in 19px of bezel — and the
+ * WHOLE thing is scaled as one piece. The page inside is never scaled on its
+ * own; see the note at the top of this file for why that matters.
+ *
+ * Fitted to the room there is, then deliberately pushed past it:
+ *
+ *   MIN_SCALE   it is allowed to be taller than the window and let the page
+ *               scroll. A phone shrunk to fit a 13-inch laptop is a phone
+ *               nobody can read across a desk, which is what this page is for.
+ *   MAX_SCALE   and bigger than life on a monitor with the room for it, up to
+ *               the point where a phone stops looking like a phone.
+ */
+/* Life size, and never smaller. A phone shrunk to fit a 13-inch laptop is a
+   phone nobody can read across a desk, and reading it across a desk is what
+   this page is for — so on a short screen the page scrolls instead. */
+const MIN_SCALE = 1;
+const MAX_SCALE = 1.45;
+const FRAME_W = 428;
+const FRAME_H = 897;      // 34 of top bezel + 844 of screen + 19 under it
+
+function fit() {
+  const top = stage.getBoundingClientRect().top + window.scrollY
+            - (parseFloat(getComputedStyle(document.body).marginTop) || 0);
+  /* 40px under it for the "nothing loading?" line, and no more: every pixel
+     kept back here is a pixel off the phone. */
+  const byHeight = (window.innerHeight - stage.getBoundingClientRect().top - 46) / FRAME_H;
+  const byWidth  = (stage.parentElement.clientWidth - 8) / FRAME_W;
+  const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, byHeight, byWidth));
+  stage.style.transform = `scale(${scale})`;
+  /* The transform does not change how much room the element takes, so the
+     page would either overlap what follows or leave a gap the size of the
+     shrinking. Told here instead. */
+  stage.style.height = `${FRAME_H * scale}px`;
+}
+window.addEventListener('resize', fit);
+
+function tick() {
+  const d = new Date();
+  let h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
+  const ap = h < 12 ? 'AM' : 'PM';
+  h = h % 12 || 12;
+  document.getElementById('clock').textContent = `${h}:${m} ${ap}`;
+}
+setInterval(tick, 10000);
+tick();
+
+show();
+fit();
+</script>
+</body>
+</html>

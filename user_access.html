@@ -344,6 +344,58 @@ function rowHtml(p) {
     </div>`;
 }
 
+/* WHEN A SEARCH FINDS NOBODY, SAY WHY.
+   "No system users match your search" is a dead end, and the question
+   behind the search is almost always "I know this person signed up —
+   where are they?". There are only three answers, and two of them the
+   page can give on its own:
+
+     • they are on the other tab. Salesweb signups carry user_type
+       'customer', and this tab shows system users, so somebody who is
+       right there in the list looks missing. Name them and offer the
+       switch.
+     • nobody by that name or email has a profile row at all. That is
+       the one the page cannot settle, because it can only read
+       shared_profiles — the account may well exist in auth.users with
+       no profile row against it, which happens when the signup trigger
+       did not run. Say so, and name the file that checks.
+
+   The third — the read was truncated at 1000 rows — cannot happen any
+   more; the load pages through. */
+function emptyHtml(q, pool, cust) {
+  if (!q) {
+    return '<div class="text-center text-slate-400 text-sm py-12">' +
+      (pool.length ? 'Nothing to show.'
+                   : 'No system users yet — use "+ Add User" to promote a customer.') +
+      '</div>';
+  }
+  const onOther = viewMode === 'system'
+    ? cust.filter(p => (p.email || '').toLowerCase().includes(q) ||
+                       (p.full_name || '').toLowerCase().includes(q))
+    : [];
+  if (onOther.length) {
+    const who = onOther.slice(0, 3)
+      .map(p => `<strong>${(p.full_name || p.email || '').replace(/[<>&]/g, '')}</strong>`).join(', ');
+    return `<div class="text-center text-sm py-12 px-6">
+        <div class="text-slate-600 font-bold">Not a system user — but ${who}
+          ${onOther.length > 3 ? ` and ${onOther.length - 3} more` : ''}
+          ${onOther.length === 1 ? 'is' : 'are'} filed as a customer account.</div>
+        <div class="text-slate-400 mt-1">Customer signups do not appear on this tab.</div>
+        <button id="empty-goto-all"
+          class="mt-4 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest">
+          Show All Accounts</button>
+      </div>`;
+  }
+  return `<div class="text-center text-sm py-12 px-6">
+      <div class="text-slate-600 font-bold">No account here matches that.</div>
+      <div class="text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
+        This page lists <strong>shared_profiles</strong>. A brand-new signup can exist as an
+        account without a profile row against it — when that happens there is nothing for this
+        page to show, on either tab. <strong>shared/check_missing_signups.sql</strong> lists
+        those accounts and repairs them.</div>
+    </div>`;
+}
+
 function render() {
   const q = (document.getElementById('search').value || '').toLowerCase().trim();
   const sys = systemProfiles();
@@ -358,7 +410,7 @@ function render() {
   const list = document.getElementById('users-list');
   list.innerHTML = filtered.length
     ? filtered.map(rowHtml).join('')
-    : `<div class="text-center text-slate-400 text-sm py-12">${pool.length ? 'No system users match your search.' : 'No system users yet — use "+ Add User" to promote a customer.'}</div>`;
+    : emptyHtml(q, pool, cust);
   // Always show the full tally so nobody wonders where users "went".
   const cl = document.getElementById('count-line');
   if (cl) {
@@ -595,6 +647,15 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('search').addEventListener('input', render);
+/* Delegated: the button is drawn by emptyHtml and replaced on every keystroke,
+   so binding it directly would go stale on the next character typed. */
+document.getElementById('users-list').addEventListener('click', (e) => {
+  if (!e.target.closest('#empty-goto-all')) return;
+  viewMode = 'all';
+  document.querySelectorAll('[data-view]').forEach(t =>
+    t.classList.toggle('active', t.dataset.view === 'all'));
+  render();
+});
 document.getElementById('reload-btn').addEventListener('click', () => bootstrap());
 
 document.getElementById('add-user-btn'      ).addEventListener('click', openAddModal);
@@ -616,10 +677,30 @@ async function bootstrap() {
     return;
   }
 
-  const { data, error } = await _supabase
-    .from('shared_profiles')
-    .select('id, email, full_name, permissions, user_type')
-    .order('email', { ascending: true });
+  /* A PAGE AT A TIME. Supabase caps one request at 1000 rows and does not
+     say so — it just returns the first thousand and no error. Ordered by
+     email, that means everybody from roughly the middle of the alphabet
+     onward silently vanished from this list once the profile table passed
+     a thousand rows, which is what a customer signup list does long before
+     the staff list gets anywhere near it. A new signup was in the database
+     and not on this page, with nothing anywhere saying why.
+
+     Read until a page comes back short. */
+  const PAGE = 1000;
+  const rows = [];
+  let error = null;
+  for (let from = 0; ; from += PAGE) {
+    const res = await _supabase
+      .from('shared_profiles')
+      .select('id, email, full_name, permissions, user_type')
+      .order('email', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (res.error) { error = res.error; break; }
+    const got = res.data || [];
+    rows.push.apply(rows, got);
+    if (got.length < PAGE) break;
+  }
+  const data = rows;
 
   if (error) {
     document.getElementById('loading').classList.add('hidden');

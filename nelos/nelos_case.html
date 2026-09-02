@@ -173,7 +173,19 @@
   <div class="card hidden" id="resolution-card" style="border-color:#bbf7d0; background:#f0fdf4;">
     <span class="lbl" style="color:#15803d;">Resolution</span>
     <div id="c-resolution-text" class="text-[13.5px] font-semibold text-slate-700 whitespace-pre-wrap"></div>
+    <!-- The photo of the fix. It has been uploaded and stored since the
+         solve sheet gained a camera, and read by nothing on this page. -->
+    <img id="c-res-photo" class="hidden w-full rounded-lg mt-2 border border-emerald-200"
+         style="max-height:260px;object-fit:cover;" alt="Photo of the fix">
     <div id="c-resolved-meta" class="text-[10.5px] font-bold text-emerald-700 mt-2"></div>
+  </div>
+
+  <!-- What the closer said about accepting it — a different person's
+       sentence from the resolution above, so a card of its own. -->
+  <div class="card hidden" id="close-card" style="border-color:#cbd5e1; background:#f8fafc;">
+    <span class="lbl" style="color:#475569;">Closed</span>
+    <div id="c-close-text" class="text-[13.5px] font-semibold text-slate-700 whitespace-pre-wrap"></div>
+    <div id="c-closed-meta" class="text-[10.5px] font-bold text-slate-500 mt-2"></div>
   </div>
 
   <!-- ── Thread ───────────────────────────────────────────────── -->
@@ -266,14 +278,30 @@ function renderCase() {
   $('c-assignee').value = c.assignee_id || '';
   $('c-due-edit').value = c.due_date || '';
 
-  if (c.resolution) {
+  /* A case can be solved with a photo and no words, so the card shows on
+     either — keying it on the text alone hid the picture of the fix
+     whenever nobody wrote one. */
+  if (c.resolution || c.resolution_photo_url) {
     $('resolution-card').classList.remove('hidden');
-    $('c-resolution-text').textContent = c.resolution;
+    $('c-resolution-text').textContent = c.resolution || '';
+    const rp = $('c-res-photo');
+    rp.classList.toggle('hidden', !c.resolution_photo_url);
+    if (c.resolution_photo_url) rp.src = c.resolution_photo_url; else rp.removeAttribute('src');
     $('c-resolved-meta').textContent =
-      `Resolved by ${c.resolved_by || 'unknown'} · ${fmtStamp(c.resolved_at)}` +
-      (c.closed_at ? `  ·  Closed by ${c.closed_by || 'unknown'} · ${fmtStamp(c.closed_at)}` : '');
+      `Resolved by ${c.resolved_by || 'unknown'} · ${fmtStamp(c.resolved_at)}`;
   } else {
     $('resolution-card').classList.add('hidden');
+  }
+
+  /* Closing used to be a clause tacked onto the resolution's byline, which
+     put the closer's name inside the solver's sentence and left the
+     closer's own remark — written and stored — showing nowhere at all. */
+  const shut = c.status === 'closed' || !!c.closed_at;
+  $('close-card').classList.toggle('hidden', !shut);
+  if (shut) {
+    $('c-close-text').textContent = c.close_remark || 'Closed with nothing written about it.';
+    $('c-closed-meta').textContent =
+      `Closed by ${c.closed_by || 'unknown'}` + (c.closed_at ? ` · ${fmtStamp(c.closed_at)}` : '');
   }
 
   renderActions();

@@ -178,6 +178,26 @@
     return p;
   }
 
+  /* Fire and forget: the page carries on while this settles. It is one
+     insert, once, for an account that has no row — a second call finds the
+     row and never reaches here. */
+  function _healProfile(supa, u) {
+    try {
+      const row = { id: u.id, email: u.email || null };
+      const nm = (u.user_metadata && u.user_metadata.full_name) || '';
+      if (nm) row.full_name = nm;
+      supa.from('shared_profiles').insert([row]).then(function (r) {
+        if (r && r.error) {
+          console.warn('[MJMAccess] no profile row, and could not create one:', r.error.message);
+        } else {
+          /* Nothing to invalidate: the cache is only written when a row
+             was actually read, so a missing profile was never cached. */
+          console.info('[MJMAccess] created the missing profile row for this account.');
+        }
+      }, function () { /* offline — the next sign-in tries again */ });
+    } catch (e) { /* never let this take a page down */ }
+  }
+
   async function load(supa) {
     if (!supa) throw new Error('MJMAccess.load(supabase) — supabase client required');
     const { data: { session } } = await supa.auth.getSession();
@@ -211,6 +231,30 @@
         state.permissions = normalize(data.permissions);
       } else {
         state.permissions = normalize(null);
+        /* SIGNED IN, BUT NO PROFILE ROW.
+           shared_profiles is written by the on_auth_user_created trigger.
+           When that does not run — it has been dropped and reattached
+           twice as tables were renamed — an account exists with nothing
+           against it, and the person is invisible on User Access: that
+           page reads shared_profiles, so there is nothing to list and no
+           way to grant them anything. They cannot be fixed from the admin
+           side at all, because nothing there can see auth.users.
+
+           So the row is created here, by the one client that CAN prove who
+           they are: themselves. The self-insert policy allows exactly this
+           — id = auth.uid() — and refuses anything else.
+
+           NO PERMISSIONS ARE WRITTEN. Only what the trigger would have
+           written: who they are. An absent permissions column is "nobody
+           has been asked", and writing today's defaults into it would turn
+           an unasked question into a decision. They appear on User Access
+           with no access, which is exactly right — the admin then grants
+           it.
+
+           Best effort, and silent. If the policy refuses, nothing is worse
+           than it was a moment ago, and a page must never fail to load
+           over this. */
+        _healProfile(supa, u);
       }
       fetchOk = true;
     } catch (e) {
