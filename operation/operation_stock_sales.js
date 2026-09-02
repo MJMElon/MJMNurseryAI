@@ -1031,6 +1031,34 @@
                 return s !== 'cancelled';
             });
 
+            // Live DO sum per AL — the same figure the AL List
+            // (operation_booking.html / operation_ba.html) computes for its
+            // own "Cumul. Collect" / "Balance" columns: a straight sum of
+            // shared_do_records.total_qty grouped by al_number, over the
+            // rows already filtered non-cancelled at line 1029-1032, minus
+            // calibration DOs (CAL-…, see _isCalibrationDo — a stock
+            // calibration is not a customer collection and must not count
+            // toward it, same exclusion the dashboard cards above already
+            // apply to monthCollected).
+            //
+            // This is what the AL override below now reads instead of the
+            // STORED shared_al_orders.balance_quantity column. That column
+            // is maintained by incrementing/decrementing it on each DO
+            // create/delete over in operation_delivery.html — a value kept
+            // in step by hand, one DO at a time, rather than derived. The
+            // AL List never trusts it either, for the same reason: any
+            // missed update on any one of an AL's DOs leaves this page
+            // reporting a balance that disagrees with the DOs themselves,
+            // which are the actual evidence of what was delivered. Summing
+            // them fresh on every load is what keeps this page unable to
+            // drift out of step with the AL List, rather than merely
+            // usually agreeing with it.
+            const doQtyByAlNumber = {};
+            allDoRecords.forEach(d => {
+                if (!d.al_number || _isCalibrationDo(d)) return;
+                doQtyByAlNumber[d.al_number] = (doQtyByAlNumber[d.al_number] || 0) + (Number(d.total_qty) || 0);
+            });
+
             // Index ALs by the customer order number they're linked to.
             // If a single order_number happens to map to multiple ALs (e.g.
             // partial replacements), prefer the row with the highest
@@ -1106,14 +1134,16 @@
                 );
                 if (al) {
                     const alQty = Number(al.quantity_ordered);
-                    const alBal = Number(al.balance_quantity);
                     if (!isNaN(alQty)) totalQty = alQty;
-                    if (!isNaN(alBal)) {
-                        balance        = Math.max(0, alBal);
-                        totalCollected = Math.max(0, totalQty - balance);
-                    } else {
-                        balance = Math.max(0, totalQty - totalCollected);
-                    }
+                    // doQtyByAlNumber, not al.balance_quantity — see the
+                    // comment where that map is built. Same formula the AL
+                    // List uses (al.quantity_ordered - cumulative DO qty),
+                    // unclamped, so a genuine over-delivery reads the same
+                    // negative balance on both screens instead of this one
+                    // quietly floor-clamping to zero and disagreeing again.
+                    const doQty    = doQtyByAlNumber[al.al_number] || 0;
+                    totalCollected = doQty;
+                    balance        = totalQty - doQty;
                 }
                 // Cancelling the AL kills the order for fulfillment
                 // purposes — zero the balance so it stops inflating the
