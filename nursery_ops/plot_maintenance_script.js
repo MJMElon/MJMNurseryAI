@@ -243,37 +243,28 @@ function defaultPDConfig() {
     W4: mk({name:'—',   dose:0,unit:'mL',sticker:stickerOff}, {name:'Daconil', dose:30,unit:'gm',sticker:stickerOn}),
   };
 }
-/* One fertiliser to a week. It used to be three columns in a round —
-   Yaramila, Compound 55 and Organic Matter side by side — which is how the
-   old sheet worked and not how a week is fed: a week is one feed, and
-   three columns asked the same question three times over the same plots.
-   Still an array of rounds each holding an array of columns, because the
-   ticks are stored that way and a shape change would strand them; the
-   array is simply one long now. */
+/* One fertiliser to start with, and + in the week's header adds another.
+   The default is one because most weeks are one feed and a column nobody
+   needs is a column somebody has to read past — not because a week cannot
+   be two. An array of rounds each holding an array of columns, which is
+   also how the ticks are stored. */
 function defaultManuringConfig() {
   return [ [ { name:'Yaramila', dose:20, unit:'gm' } ] ];
 }
 
-/* A round saved with more than one fertiliser, from before the above.
-   Column 0 survives with its ticks; anything ticked on a second or third
-   fertiliser is counted and said out loud rather than disappearing — a
-   tick that vanishes quietly is a plot that does not get fed. */
-function migrateManuringSingle(s, plots) {
-  if (!s || !Array.isArray(s.manuringConfig)) return;
-  let lost = 0;
-  s.manuringConfig.forEach((round, i) => {
-    if (!Array.isArray(round) || round.length <= 1) return;
-    (plots || []).forEach(p => {
-      const cols = (s.manuring || {})[p] && s.manuring[p][i];
-      if (!Array.isArray(cols)) return;
-      for (let ci = 1; ci < cols.length; ci++) if (cols[ci]) lost++;
-      s.manuring[p][i] = [!!cols[0]];
-    });
-    s.manuringConfig[i] = [round[0]];
-  });
-  if (lost) console.warn('[maint] manuring is one fertiliser a week now; ' +
-    lost + ' tick(s) on a second or third fertiliser were dropped.');
-}
+/* There WAS a migration here that collapsed every manuring round back to one
+   fertiliser, dropping the ticks on any second or third. It ran on every
+   load, so a week fed two things was quietly reduced to one — which is the
+   right behaviour for exactly as long as "a week is one feed" is true, and
+   the nursery says it is not: Yaramila on some plots and organic matter on
+   others inside the same seven days is an ordinary week.
+
+   It is gone rather than switched off, because a migration nobody wants that
+   runs on every load is one edit away from eating the schedule again. The
+   payload has always been [round][column] and every reader — the work
+   records, the PDF, the summary counts, both phone apps — already walks the
+   columns. Nothing had to change but this. */
+
 /* Migrate old flat manuringConfig (and manuring ticks) to the new nested rounds shape */
 function migrateManuringShape(s, plots) {
   if (!s || !s.manuringConfig || s.manuringConfig.length === 0) return;
@@ -1446,7 +1437,6 @@ function getState(nursery, month) {
     const persisted = loadPersistedState(nursery, month);
     if (persisted) {
       migrateManuringShape(persisted, NURSERY_PLOTS[nursery]);
-      migrateManuringSingle(persisted, NURSERY_PLOTS[nursery]);
       migrateInterrowShape(persisted, NURSERY_PLOTS[nursery]);
       appState[nursery][month] = persisted;
       return appState[nursery][month];
@@ -1460,7 +1450,6 @@ function getState(nursery, month) {
       const inherited = loadPersistedState(nursery, from);   // already a deep copy
       if (inherited) {
         migrateManuringShape(inherited, NURSERY_PLOTS[nursery]);
-        migrateManuringSingle(inherited, NURSERY_PLOTS[nursery]);
         migrateInterrowShape(inherited, NURSERY_PLOTS[nursery]);
         // Snapshot what was carried in, so nothing shows as "modified" until
         // this month is actually changed.
@@ -5882,7 +5871,7 @@ function weCols(kind, i, n, m) {
   const word = many ? 'Fertiliser' : 'Chemical';
   return cfg.map((c, ci) => ({
     ci,
-    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,   // manuring is always one
+    label: cfg.length > 1 ? `${word} ${ci + 1}` : word,
     opts: many ? fertNames('monthly') : taggedNames('interrow'),
     val: many ? c.name : c.chem,
     onSel: many
@@ -6059,6 +6048,78 @@ function weRemoveWeek(i) {
   renderSchedSummary();
 }
 
+/* ── More than one thing in the same week ──────────────────────────────
+   A week is one visit to a plot, but not necessarily one product. The
+   nursery puts Yaramila on some plots and organic matter on others in the
+   same seven days, and until now that meant either a second week with the
+   wrong dates on it or a second nursery-month kept in somebody's head.
+
+   The payload has always allowed it — manuringConfig and interrowConfig are
+   [round][column], and autoSyncRecords, the PDF and the phone all read the
+   columns rather than assuming one. Only the screen was missing the button.
+
+   P & D has its two columns already, Pest and Disease, and they are what the
+   work IS rather than a choice; weeding mixes nothing. So the control shows
+   on the two works where a column means "and this product as well". */
+const WE_MULTI_COL = { manuring: 'manuringConfig', interrow: 'interrowConfig' };
+
+/** A blank column, in the shape the work keeps them in. */
+function weBlankCol(kind) {
+  return kind === 'manuring'
+    ? { name: 'Yaramila', dose: 20, unit: 'gm' }
+    : { chem: 'Basta', chem_dose: 200, chem_unit: 'mL', activator_dose: 15, activator_unit: 'mL' };
+}
+
+function weAddCol(i) {
+  if (!canEditSchedule || !_we) return;
+  const kind = _we.kind, key = WE_MULTI_COL[kind];
+  if (!key) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  ensureRounds(n, m);
+  const round = s[key][i];
+  // Six is the cap the round controls have always used. Past that the header
+  // is wider than the ticks under it are useful.
+  if (!round || round.length >= 6) return;
+  round.push(weBlankCol(kind));
+  (NURSERY_PLOTS[n] || []).forEach(pl => {
+    if (!s[kind][pl]) s[kind][pl] = [];
+    if (!s[kind][pl][i]) s[kind][pl][i] = [];
+    s[kind][pl][i].push(false);
+  });
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
+function weRemoveCol(i) {
+  if (!canEditSchedule || !_we) return;
+  const kind = _we.kind, key = WE_MULTI_COL[kind];
+  if (!key) return;
+  const n = _we.n, m = getMonth(), s = getState(n, m);
+  const round = s[key] && s[key][i];
+  // Never to nothing: a week with no column has no chemical and no ticks,
+  // and is a week that should have been removed instead.
+  if (!round || round.length <= 1) return;
+  const ci = round.length - 1;
+  const plots = NURSERY_PLOTS[n] || [];
+  /* The last column's ticks go with it. Said out loud when there are any,
+     because a column removed by mistake takes a morning's planning with it
+     and nothing on screen would show what had gone. */
+  const ticked = plots.filter(pl => weTicked(kind, i, ci, pl)).length;
+  if (ticked && !confirm(
+      `Remove the last column of week ${i + 1}? ${ticked} plot${ticked === 1 ? '' : 's'} `
+      + 'ticked in it will lose that tick.')) return;
+  round.pop();
+  plots.forEach(pl => { if (s[kind][pl] && s[kind][pl][i]) s[kind][pl][i].pop(); });
+  persistStateSoon(n, m);
+  autoSyncRecords();
+  renderWorkEditor();
+  renderSchedSummary();
+  redrawSheet(kind);
+}
+
 /* ── One table, not a stack of them ────────────────────────────────────
    The weeks used to be blocks down the page, each with its own copy of the
    plot list — the same fourteen names printed once per week, so comparing
@@ -6107,9 +6168,26 @@ function renderWorkEditor() {
      get a row of their own because two date boxes are wider than the two
      tick columns underneath them, and squeezing them into the week band
      would set the column width from the widget rather than the data. */
+  /* + and − sit on the LEFT of the week band and × on the right, because
+     they are not the same size of act: one adds or drops a product inside
+     the week, the other takes the week and every tick in it away. Side by
+     side they would be three small buttons and one bad afternoon. */
+  const colWord = kind === 'manuring' ? 'fertiliser' : 'chemical';
+  const colCtrl = (i) => WE_MULTI_COL[kind]
+    ? `<span class="we-col-n schedule-edit-ctrl">` +
+        `<button type="button" title="Another ${colWord} in this week"` +
+        ` aria-label="Add a column to week ${i + 1}"` +
+        ` onclick="weAddCol(${i})"${cols[i].length >= 6 ? ' disabled' : ''}>+</button>` +
+        `<button type="button" title="Drop the last ${colWord} from this week"` +
+        ` aria-label="Remove a column from week ${i + 1}"` +
+        ` onclick="weRemoveCol(${i})"${cols[i].length <= 1 ? ' disabled' : ''}>&minus;</button>` +
+      `</span>`
+    : '';
+
   const h1 = '<tr><th class="we-plot" rowspan="3">Plot</th>' +
     weeks.map((w, i) =>
       `<th colspan="${cols[i].length}" class="we-wk">` +
+        colCtrl(i) +
         `<span class="we-wk-n">Week ${i + 1}</span>` +
         `<button type="button" class="we-week-x schedule-edit-ctrl" title="Remove this week"` +
         ` onclick="weRemoveWeek(${i})">&times;</button></th>`).join('') + '</tr>';
