@@ -1065,6 +1065,21 @@ th.we-plot,td.we-plot{width:1%;min-width:96px;}
   color:var(--text-head);background:var(--bg-white);border:1.5px solid var(--border);
   border-radius:var(--r-sm);width:126px;}
 .we-date:focus{outline:none;border-color:var(--green);}
+/* Another product in the same week — the nursery puts Yaramila on some plots
+   and organic matter on others in the same seven days. On the LEFT of the
+   band, because × on the right takes the whole week and its ticks away, and
+   three small buttons in a row is how the wrong one gets pressed. */
+.we-col-n{position:absolute;top:4px;left:5px;display:flex;gap:3px;}
+.we-col-n button{width:20px;height:20px;padding:0;font-family:var(--font);
+  font-size:14px;font-weight:800;line-height:1;color:#fff;
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.42);
+  border-radius:5px;cursor:pointer;}
+.we-col-n button:hover:not(:disabled){background:#fff;color:var(--green);border-color:#fff;}
+/* Greyed rather than hidden at the ends: a control that disappears reads as
+   a control that was never there, and the next press lands on whatever has
+   slid into its place. */
+.we-col-n button:disabled{opacity:.32;cursor:default;}
+
 /* Removing a week takes its ticks with it, so it is the one control here
    coloured like a consequence. On the dark week band it needs its own. */
 .we-week-x{position:absolute;top:4px;right:5px;width:20px;height:20px;padding:0;
