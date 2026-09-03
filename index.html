@@ -342,11 +342,15 @@
 
       <!-- 555 Portal Demo — the four phone portals at phone size, on a desk.
 
-           Deliberately carries NO data-module, so it is not hidden by
-           applyModuleVisibility: it opens nothing privileged. Every portal
-           inside it is the live one behind its own login, so the demo grants
-           exactly as much as typing the address would. -->
-      <a class="module-card" data-card="demo555" href="demo/demo_phone.html"
+           It carried NO data-module at first, on the reasoning that it opens
+           nothing privileged: every portal inside it is the live one behind
+           its own login, so the demo grants exactly as much as typing the
+           address would. That is still true, and it is not the point any
+           more — the demo is now a module on User Access, and a switch that
+           is set but not obeyed is worse than no switch. So it is gated here
+           like every other card, and demo/demo_phone.html checks for itself
+           rather than trusting a hidden tile. -->
+      <a class="module-card" data-card="demo555" data-module="demo555" data-module-open href="demo/demo_phone.html"
          style="--accent:#38bdf8;--glow:rgba(56,189,248,.25);--glow-strong:rgba(56,189,248,.35);--icon-bg:rgba(56,189,248,.12);">
         <div class="card-corner card-tl"></div><div class="card-corner card-tr"></div>
         <div class="card-corner card-bl"></div><div class="card-corner card-br"></div>
@@ -471,7 +475,19 @@
     const mods  = (perms && perms.modules) || null;
     document.querySelectorAll('.module-card[data-module]').forEach(card => {
       const lvl = mods ? mods[card.dataset.module] : null;
-      const visible = !perms ? true : (!!lvl && lvl !== 'none');
+      /* `data-module-open` means an UNSET answer shows the card, rather than
+         hiding it. For a module that has always been there, unset means
+         "nobody has been asked" and hiding it would take a tile away from
+         everybody on the day the switch was added — which is the thing the
+         fail-open rule in shared_access.js exists to prevent. An explicit
+         "None" still closes it, exactly like every other card.
+
+         Only for cards that open nothing privileged. Anything that does
+         must stay hidden-by-default, where an unset answer costs nothing. */
+      const unaskedIsOpen = card.hasAttribute('data-module-open');
+      const visible = !perms ? true
+        : (lvl === undefined || lvl === null) ? unaskedIsOpen
+        : lvl !== 'none';
       card.style.display = visible ? '' : 'none';
     });
     // Audit tile is split: an admin lands on the back-end page (the four
@@ -517,7 +533,8 @@
           : 'audit/audit_home.html'
       );
     }
-    /* The FC Portal tile is split the same way the audit one is: an admin
+    /* The 555 Worker Portal tile (the `scan` module) is split the same way
+       the audit one is: an admin
        lands on the back-office page (User Access, and the button through to
        the phone app); everyone else goes straight to the phone app, which is
        where they were going anyway. scan_admin.html bounces non-admins over

@@ -204,10 +204,20 @@
         </div>
         <div class="flex items-center justify-between gap-4">
           <div>
-            <div class="font-black text-slate-800 text-sm">555 FC Portal</div>
-            <div class="text-[11px] text-slate-500">Barcode scanner, seal counting &amp; plot status for FC</div>
+            <!-- Called 555 FC Portal until the hub tile was renamed. Same app,
+                 same `scan` key, same saved access: only the words changed, so
+                 nobody's permissions move on the day this ships. -->
+            <div class="font-black text-slate-800 text-sm">555 Worker Portal</div>
+            <div class="text-[11px] text-slate-500">Barcode scanner, seal counting, work maintenance &amp; plot status</div>
           </div>
           <select id="d-mod-scan" class="lvl-select"></select>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <div class="font-black text-slate-800 text-sm">555 Portal Demo</div>
+            <div class="text-[11px] text-slate-500">The four phone portals at phone size, for showing the system</div>
+          </div>
+          <select id="d-mod-demo555" class="lvl-select"></select>
         </div>
       </div>
 
@@ -258,7 +268,7 @@
 const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
 // Top-level modules only — page access INSIDE a module (batch record,
 // stock, reports…) is managed from that module's own User Access page.
-const MODULES = ['operation', 'nursery_ops', 'nelos', 'npayroll', 'salesweb', 'audit', 'mobile', 'training', 'scan'];
+const MODULES = ['operation', 'nursery_ops', 'nelos', 'npayroll', 'salesweb', 'audit', 'mobile', 'training', 'scan', 'demo555'];
 const LEVELS  = ['admin', 'normal', 'none'];
 const LEVEL_LABEL = { admin:'Admin', normal:'Normal', none:'None' };
 
@@ -282,7 +292,7 @@ function showToast(msg, kind) {
 }
 
 function defaultPerms() {
-  return { modules: { operation:'none', nursery_ops:'none', npayroll:'none', reports:'none', audit_trail:'none', salesweb:'none', audit:'none', mobile:'none', training:'none', scan:'none' }, manage_users:false, can_verify_operation:false };
+  return { modules: { operation:'none', nursery_ops:'none', npayroll:'none', reports:'none', audit_trail:'none', salesweb:'none', audit:'none', mobile:'none', training:'none', scan:'none', demo555:'none' }, manage_users:false, can_verify_operation:false };
 }
 
 function normPerms(p) {
@@ -299,7 +309,7 @@ function normPerms(p) {
   // Per-function ticks managed inside the operation module's own User
   // Access page — carry them through so saving here never wipes them.
   if (p.operation_actions && typeof p.operation_actions === 'object') out.operation_actions = p.operation_actions;
-  // FC Portal nursery restriction (key named for the retired Plot Status
+  // 555 Worker Portal (`scan`) nursery restriction (key named for the retired Plot Status
   // module; renaming it would reopen every nursery). Array = only those
   // nurseries; key absent = all nurseries allowed.
   if (Array.isArray(p.plot_status_nurseries)) out.plot_status_nurseries = p.plot_status_nurseries;
@@ -469,8 +479,8 @@ function applyPresetToPending(level) {
   });
 }
 
-/* The FC Portal's nursery scope used to be a panel here. It moved to the
-   module that owns it — 555 FC Portal → User Access — along with every other
+/* The 555 Worker Portal's nursery scope used to be a panel here. It moved to
+   the module that owns it — the portal's own Setting screen — along with every other
    per-module setting. This page decides which modules a person may OPEN;
    what they can do inside one is the module's own question.
 
@@ -487,7 +497,7 @@ async function saveDrawer() {
   MODULES.forEach(m => { pending.modules[m] = document.getElementById('d-mod-' + m).value; });
   pending.manage_users = document.getElementById('d-manage-users').checked;
   // Nursery checklist state already lives on `pending` (see listeners above).
-  // Closing the FC Portal module clears the restriction so re-opening later
+  // Closing the `scan` module clears the restriction so re-opening later
   // starts clean at "all nurseries".
   if (pending.modules.scan === 'none') delete pending.plot_status_nurseries;
 
@@ -538,7 +548,7 @@ async function demoteCurrentToCustomer() {
   if (!confirm(`Move "${p.full_name || p.email}" to customer?\nThey will be removed from the system list. Their module access will also be cleared.`)) return;
   // Clear access first so nothing lingers if they're promoted again later.
   const cleared = {
-    modules: { operation:'none', nursery_ops:'none', npayroll:'none', reports:'none', audit_trail:'none', salesweb:'none', audit:'none', mobile:'none', training:'none', scan:'none' },
+    modules: { operation:'none', nursery_ops:'none', npayroll:'none', reports:'none', audit_trail:'none', salesweb:'none', audit:'none', mobile:'none', training:'none', scan:'none', demo555:'none' },
     manage_users: false,
     can_verify_operation: false,
     operation_pages: {}

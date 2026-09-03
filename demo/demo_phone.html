@@ -13,7 +13,23 @@
      on whatever is to hand — and a demo that arrives unstyled because a CDN
      was slow is a demo that has already failed. It is a few dozen lines of
      CSS; they live here. -->
+<!-- The gate. The CDN rule above is about the LOOK of this page; these two
+     are what decide whether it may be looked at, so they are the exception —
+     and they are the same two every other office page loads.
+
+     Why the page checks at all, when hiding the tile would look like enough:
+     a hidden tile is not a closed door, and this is a module on User Access
+     now. A switch that is saved and not obeyed is the failure this codebase
+     has had three times, and it always looked configured until somebody
+     trusted it. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_access.js"></script>
 <style>
+  /* Hidden until the gate has answered, so the demo never flashes up for
+     somebody who is about to be sent back to the hub. */
+  body { visibility: hidden; }
+  body.ready { visibility: visible; }
   :root { --ink:#e2e8f0; --dim:#94a3b8; --faint:#475569; }
   body {
     margin:0; min-height:100vh; color:var(--ink);
@@ -345,6 +361,49 @@ tick();
 
 show();
 fit();
+
+/* ── May this person be here? ──────────────────────────────────────────
+   Asked after the page is built rather than before, so the answer arrives
+   to a finished screen — but the screen is invisible until it does.
+
+   ABSENT IS NOT NO. The rule this codebase keeps, and keeps for a reason:
+   an unset permission means nobody has been asked about this person yet,
+   not that the answer was no — so a deploy never takes away access
+   somebody had yesterday. Adding the demo to User Access must not make it
+   vanish from every hub on the day it ships, least of all from the owner
+   who then has to go and grant it back to himself.
+
+   So: an explicit "None" closes the door, anything else opens it, and a
+   row nobody has saved since this shipped carries on exactly as before.
+   The first save through User Access writes demo555 for that person, with
+   the dropdown reading its answer in front of whoever is saving it.
+
+   `demo555` needs no change to shared_access.js — normalize() copies ANY
+   module key out of the saved row, precisely so a new module works
+   without a helper redeploy. */
+(async () => {
+  const reveal = () => document.body.classList.add('ready');
+  try {
+    const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
+    await MJMAccess.load(_supabase);
+    if (!MJMAccess.user()) { window.location.href = '../index.html'; return; }
+    const mods = (MJMAccess.permissions() || {}).modules || {};
+    if (mods.demo555 === 'none') {
+      alert('You do not have access to the 555 Portal Demo.');
+      window.location.href = '../index.html';
+      return;
+    }
+    reveal();
+  } catch (e) {
+    /* The check could not be made — no signal, a blocked CDN, Supabase
+       down. Show the page: it holds nothing that is not already behind its
+       own login, and a demo that refuses to open in front of a customer
+       because a script was slow is the failure that actually costs
+       something here. */
+    console.warn('[demo] access check failed, showing anyway:', e);
+    reveal();
+  }
+})();
 </script>
 </body>
 </html>
