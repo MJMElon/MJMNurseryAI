@@ -816,27 +816,43 @@ th.ss-act,td.ss-act{width:1%;white-space:nowrap;padding-right:11px;}
    and gave no way to see a plot had been MISSED. The week columns are
    numbered; the dates are two rows up in the summary's own header, and
    repeating them here would cost the width the plot names need. */
-.ss-detail td{padding:10px 13px 14px;background:#f7fbf9;
-  border-bottom:1px solid #eaf1ed;vertical-align:top;text-align:left;}
-.xp-wrap{max-height:420px;overflow:auto;}
-.xp-table{width:100%;border-collapse:collapse;}
-.xp-table thead th{position:sticky;top:0;z-index:1;background:#f7fbf9;
-  font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--text-muted);
-  text-transform:uppercase;padding:0 6px 6px;border-bottom:1px solid var(--border);
-  text-align:center;}
-.xp-table th.xp-plot{text-align:left;padding-left:0;}
-.xp-table tbody td{padding:3px 6px;font-size:12px;text-align:center;
-  line-height:1.5;border:none;}
-.xp-table td.xp-plot{text-align:left;padding-left:0;font-weight:700;
+/* The expanded plots are ROWS OF THE SUMMARY TABLE, not a table of their
+   own inside a colspan cell. That is the whole reason they line up: a
+   nested table sets its own column widths, so the plot ticks sat left of
+   the week they belonged to however the padding was tuned.
+
+   Everything below therefore styles cells of .ss-table, and must not set a
+   width — the columns are shared with the rows above and the widest cell in
+   each wins for all of them. */
+.ss-detail td{background:#f7fbf9;border-bottom:1px solid #eaf1ed;
+  text-align:center;vertical-align:middle;}
+.xp-head td{font-size:9.5px;font-weight:800;letter-spacing:.5px;
+  color:var(--text-muted);text-transform:uppercase;
+  padding:9px 6px 6px;border-bottom:1px solid var(--border);line-height:1.35;}
+.xp-wk{font-size:9.5px;font-weight:800;letter-spacing:.5px;}
+/* The dates the header row used to carry, now under the week they describe
+   and beside the ticks they govern. Not uppercase — "1st–7th" in capitals
+   reads as a code rather than a date. */
+.xp-wk-d{font-size:9px;font-weight:700;color:var(--text-muted);
+  text-transform:none;letter-spacing:0;margin-top:2px;white-space:nowrap;}
+.xp-row td{padding:3px 6px;font-size:12px;line-height:1.5;}
+.ss-detail td.xp-plot{text-align:left;padding-left:14px;font-weight:700;
   color:var(--text-head);white-space:nowrap;}
 .xp-on{color:var(--green);font-weight:800;}
 /* An empty cell needs a mark of its own or the row reads as ragged; a faint
    dot says "asked and not set" where blank says only "nothing here". */
 .xp-off::after{content:"\00b7";color:var(--border-strong);}
+/* A week this work does not run in at all. No dot: there was nothing to
+   ask, so there is nothing to answer. */
+.xp-none{background:#f2f7f4;}
 /* A plot with nothing set anywhere this month is the one worth spotting. */
 .xp-blank td.xp-plot{color:var(--text-muted);font-weight:600;}
-.xp-tot{font-size:11px;font-weight:800;color:var(--green-text);width:1%;
-  padding-left:10px;}
+.xp-tot{font-size:11px;font-weight:800;color:var(--green-text);
+  padding-right:11px;}
+/* The week columns keep their width from the ticks in them now that the
+   header is empty, so they are given a floor — four bare columns would
+   otherwise collapse towards the Work name. */
+.ss-table th.ss-wkcol{min-width:74px;}
 .ss-none{color:var(--border-strong);font-size:13px;}
 
 

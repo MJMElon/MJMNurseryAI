@@ -5757,11 +5757,10 @@ function summaryTable(it, m) {
      own little date box was a second place to do one thing. */
   const head = '<tr>' +
     '<th class="ss-work">Work</th>' +
-    blocks.map(b => {
-      const r = blockRange(b + 1, m);
-      return `<th><div class="ss-wk">Week ${b + 1}</div>` +
-        `<div class="ss-wk-d">${ordinalDay(r.from)}\u2013${ordinalDay(r.to)}</div></th>`;
-    }).join('') +
+    /* The week and its dates used to be here AND again on the plot rows
+       below, misaligned against each other. They are stated once now, on the
+       expanded rows, next to the ticks they describe. */
+    blocks.map(() => '<th class="ss-wkcol"></th>').join('') +
     (blocks.length ? '' : '<th class="ss-none-th">No weeks set yet</th>') +
     '<th class="ss-act">Actions</th></tr>';
 
@@ -5783,8 +5782,7 @@ function summaryTable(it, m) {
       `</td></tr>`;
 
     if (open) {
-      r += `<tr class="ss-detail"><td colspan="${blocks.length + (blocks.length ? 2 : 3)}">` +
-        expandedPlots(n, work.key, m) + '</td></tr>';
+      r += expandedPlots(n, work.key, m, blocks);
     }
     return r;
   }).join('');
@@ -5810,25 +5808,47 @@ function summaryTable(it, m) {
    week header beside itself, and two "PLOT 1 2 3 4 5" headers side by side
    read as ten weeks at a glance. One column of plots cannot be misread, and
    the panel is a table, which is what it always was pretending to be. */
-function expandedPlots(n, kind, m) {
+function expandedPlots(n, kind, m, blocks) {
   const weeks = weeksOf(n, m, kind);
   const plots = NURSERY_PLOTS[n] || [];
-  if (!plots.length) return '<div class="ss-none">No plots in this nursery.</div>';
+  const span = blocks.length + 2;
+  if (!plots.length) {
+    return `<tr class="ss-detail"><td colspan="${span}" class="ss-none">` +
+           'No plots in this nursery.</td></tr>';
+  }
 
-  const set = weeks.map((_, k) => new Set(plotsInWeek(kind, k, n, m)));
-  const head = '<tr><th class="xp-plot">Plot</th>' +
-    weeks.map((w, k) =>
-      `<th title="${ordinalDay(w.from)} \u2013 ${ordinalDay(w.to)}">Wk ${w.slot + 1}</th>`).join('') +
-    '<th class="xp-tot">Set</th></tr>';
+  /* One cell per COLUMN OF THE TABLE ABOVE, not per round of this work.
+     These are rows of the summary table itself now — a nested table inside a
+     colspan cell sets its own column widths, which is why the plot ticks
+     never lined up under the week they belonged to however the padding was
+     tuned. A work with no round in a block gets an empty cell there, which
+     is also the honest thing to show. */
+  const at = {};
+  weeks.forEach((w, k) => { at[w.slot] = new Set(plotsInWeek(kind, k, n, m)); });
+
+  const head = `<tr class="ss-detail xp-head"><td class="xp-plot">Plot</td>` +
+    blocks.map(b => {
+      if (!at[b]) return '<td class="xp-none"></td>';
+      const r = blockRange(b + 1, m);
+      /* The dates live here now, under the week they describe and beside
+         the ticks they govern. */
+      return `<td><div class="xp-wk">Wk ${b + 1}</div>` +
+             `<div class="xp-wk-d">${ordinalDay(r.from)}\u2013${ordinalDay(r.to)}</div></td>`;
+    }).join('') +
+    '<td class="xp-tot">Set</td></tr>';
+
   const body = plots.map(pl => {
-    const hits = weeks.map((_, k) => set[k].has(pl));
+    const hits = blocks.map(b => (at[b] ? at[b].has(pl) : null));
     const nOn = hits.filter(Boolean).length;
-    return `<tr class="${nOn ? '' : 'xp-blank'}"><td class="xp-plot">${esc(pl)}</td>` +
-      hits.map(on => on ? '<td class="xp-on">&#10003;</td>' : '<td class="xp-off"></td>').join('') +
+    return `<tr class="ss-detail xp-row${nOn ? '' : ' xp-blank'}">` +
+      `<td class="xp-plot">${esc(pl)}</td>` +
+      hits.map(on => on === null ? '<td class="xp-none"></td>'
+                   : on ? '<td class="xp-on">&#10003;</td>'
+                        : '<td class="xp-off"></td>').join('') +
       `<td class="xp-tot">${nOn || ''}</td></tr>`;
   }).join('');
-  return `<div class="xp-wrap"><table class="xp-table">
-    <thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+
+  return head + body;
 }
 
 function toggleSummaryRow(n, kind) {
