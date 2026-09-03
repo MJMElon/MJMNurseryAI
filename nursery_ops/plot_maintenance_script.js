@@ -145,6 +145,13 @@ const WORKS = [
   { key:'weeding',  label:'Weeding'        },
   { key:'interrow', label:'Interrow Spray' }
 ];
+/* Up here with WORKS and _expanded, and for the same reason they are:
+   renderAll() reaches the summary while this script is still evaluating, so
+   a `const` declared beside the week code halfway down is still in the
+   temporal dead zone when the first render asks for it — "Cannot access
+   WEEK_BLOCKS before initialization", and a blank page. */
+const WEEK_BLOCKS = 4;                                   // weeks in a month
+const WORK_KEYS = ['pd', 'manuring', 'weeding', 'interrow'];
 let _expanded = {};      // { "nursery|kind": true } — which summary rows are open
 let _we       = null;    // the work editor: { n, kind, week, round }
 let _weekPick = null;    // the week-dates popover: { n, k }
@@ -1151,7 +1158,12 @@ function persistState(n, m) {
     weeding:        s.weeding,
     interrow:       s.interrow,
     periods:        s.periods,
-    weeks:          s.weeks,      // the summary's shared columns
+    /* `weeks` is the OLD shared list, still written so an office running a
+       half-deployed build reads a month it can understand rather than an
+       empty one. `weeksByWork` is what this page reads now — each work's own
+       rounds. Dropping it here was the whole change not surviving a save. */
+    weeks:          s.weeks,
+    weeksByWork:    s.weeksByWork,
     _savedPd:       s._savedPd,
   };
   dbStateCache[stateKey(n, m)] = JSON.parse(JSON.stringify(_payload));
@@ -3305,10 +3317,12 @@ function saveAllSchedules() {
    invented its own weeks and wrong the moment weeks became something you
    add — a fifth week's ticks would have saved and never published. */
 function weekKeys(n, m, prefix) {
-  const out = [];
-  const len = weeksOf(n, m).length;
-  for (let i = 0; i < len; i++) out.push(prefix + (i + 1));
-  return out;
+  /* The BLOCKS this work has rounds in — W3 for a round starting on the
+     15th, whether or not there is a W2. These keys are what the phone
+     reads, and it looks up W3 when it is in week 3, so a round published
+     under the wrong key is a job the worker never sees. */
+  const kind = prefix === 'R' ? 'weeding' : 'pd';
+  return weeksOf(n, m, kind).map(w => prefix + (w.slot + 1));
 }
 
 function saveSchedule(nursery, quiet) {
@@ -3321,6 +3335,10 @@ function saveSchedule(nursery, quiet) {
   const cfg = s.pdConfig;
   weekKeys(n, m, 'W').forEach(w => {
     const c = cfg[w];
+    /* A block with no chemicals behind it publishes nothing rather than
+       throwing on c.P. ensureRounds() fills these in, but it runs when the
+       editor opens and this can be reached without opening it. */
+    if (!c) return;
     plots.forEach(plot => {
       if (s.pd[w]?.[plot]?.P && c.P !== '—') {
         const pStick = c.P_sticker && c.P_sticker !== '—' ? ` + ${c.P_sticker} ${c.P_sticker_dose}${c.P_sticker_unit}` : '';
@@ -5429,117 +5447,240 @@ async function saveFertEdit() {
    renderAll() reaches this summary while the script is still evaluating, so a
    declaration here would still be in the temporal dead zone. */
 
-/* ── A week is a round ─────────────────────────────────────────────────
-   Weeks used to be five seven-day blocks this file invented for every
-   month whether anybody wanted them or not, and rounds were a separate
-   thing placed INTO them by date. Two ideas for one fact, and the summary
-   headed six columns for a month nobody had scheduled anything in.
+/* ── A week is a DATE BLOCK, and each work keeps its own rounds ────────
 
-   A week is now something somebody makes. None exist until Add Week is
-   pressed, and each one IS a round of every work: week 2 of P & D is the
-   second spraying, week 2 of Manuring is the second feed. So the week
-   carries the dates, the chemicals and the ticks together, which is how
-   the popup asks for them and how the field reads them.
+   Two things were wrong here and they were the same thing twice.
 
-   Nothing is migrated. A saved month keeps its ticks; a month that has
-   never had weeks set simply starts with none, which is the truth. */
-function weeksOf(n, m) {
-  const s = appState[n]?.[m];
-  if (!s || !Array.isArray(s.weeks)) return [];
-  /* A schedule carried forward brings last month's weeks with it, and last
-     month may have been longer — so a 31-day August into a 30-day September
-     would head a column "29th – 31st" for days September has not got.
-     Clamped on the way out, not on the way in: the saved figure is still
-     somebody's decision, and a 31-day month gets it back. */
-  const days = daysInMonthLabel(m);
-  return s.weeks.filter(x => +x.from <= days)
-                .map(x => ({ from: +x.from, to: Math.min(+x.to, days) }));
+   The week NUMBER was the column's position. Make weeks for the 1st–7th
+   and the 15th–21st, or delete the middle one, and the second column
+   called itself Week 2 — while the phone, which works the number out from
+   the date (Math.ceil(day/7)), sent the worker out in week 2 for a job the
+   office had planned for week 3. Two systems, two answers, one of them
+   silently wrong in the field.
+
+   And the weeks were SHARED by all four works: one s.weeks for the
+   nursery. Removing manuring's second round removed P & D's, weeding's and
+   inter-row's with it, because they were the same row of the same array.
+   Weeding twice a month and spraying four times could not be expressed at
+   all.
+
+   So a month has FOUR fixed blocks — 1st–7th, 8th–14th, 15th–21st,
+   22nd–end — and each work has its own rounds, each sitting in the block
+   its start day falls in. The block IS the week number, which is what the
+   phone has always thought, so the two now agree by construction rather
+   than by luck.
+
+   That is also where the ticks live. s.pd.W3 is the third BLOCK, not the
+   third column somebody made; manuringConfig[2] likewise. For the ordinary
+   month — four contiguous weeks in order — the slot and the position are
+   the same number and nothing moves. Only the months that were already
+   wrong change meaning, and they change to right.
+
+   THE WEEK RULE IS SHARED WITH THE PHONE. weekOfDate() in Barcode_Counter
+   src/modules/maintenance/schedule.js is the same arithmetic. Change one,
+   change the other. */
+function weekNoOfDay(day) {
+  const d = +day || 1;
+  return Math.min(WEEK_BLOCKS, Math.max(1, Math.ceil(d / 7)));
 }
 
-/* Where a NEW week starts: the day after the last one ends, a seven-day
-   run from there. The first week of a month starts on the 1st. Only a
-   suggestion — the popup's from/to is the answer. */
-function nextWeekRange(n, m) {
+/** The dates of block b (1-based) in this month. */
+function blockRange(b, m) {
   const days = daysInMonthLabel(m);
-  const w = weeksOf(n, m);
-  const from = w.length ? Math.min(w[w.length - 1].to + 1, days) : 1;
-  return { from, to: Math.min(from + 6, days) };
+  const from = (b - 1) * 7 + 1;
+  return { from, to: b === WEEK_BLOCKS ? days : Math.min(b * 7, days) };
 }
 
-/* Adding a week adds a ROUND to every work, so each has somewhere to put
-   its chemicals for it. Without this the new column would be a column of
-   ticks with nothing saying what is being sprayed in it. */
-function addWeek(n, m) {
-  if (!canEditSchedule) return -1;
+/* A work's own week list, ready to be written to.
+ *
+ * Migration happens here and nowhere else, once, the first time anybody
+ * changes anything: the old shared s.weeks is copied to all four works, so
+ * a month somebody planned last week opens showing exactly what it showed
+ * before. s.weeks is left where it is — an older build of this page reads
+ * it, and a half-deployed office should not lose a month's planning. */
+function workWeeks(n, m, kind) {
+  /* A missing kind would file a round under weeksByWork[undefined] — saved,
+     carried forward, and belonging to no work on any screen. Cheaper to
+     refuse it here than to find it in a month nobody can explain. */
+  if (!WORK_KEYS.includes(kind)) {
+    console.warn('[maint] workWeeks needs a work key, got:', kind);
+    return [];
+  }
   const s = getState(n, m);
-  if (!Array.isArray(s.weeks)) s.weeks = [];
+  if (!s.weeksByWork || typeof s.weeksByWork !== 'object') s.weeksByWork = {};
+  if (!Array.isArray(s.weeksByWork[kind])) {
+    const shared = Array.isArray(s.weeks) ? s.weeks : [];
+    s.weeksByWork[kind] = shared.map(w => ({ from: +w.from, to: +w.to }));
+  }
+  return s.weeksByWork[kind];
+}
+
+/* What to SHOW for a work: its rounds, in date order, each carrying the
+   block it belongs to.
+ *
+ * Clamped to the month on the way out, not on the way in — a schedule
+ * carried forward from a 31-day August into a 30-day September would
+ * otherwise head a column for days September has not got, and the saved
+ * figure is still somebody's decision that a 31-day month gets back.
+ *
+ * Two rounds of the same work in one block cannot both be kept: they would
+ * share a tick slot and the second would overwrite the first. The later one
+ * is dropped from the view rather than silently eating the earlier one's
+ * ticks; addWeek below refuses to make one in the first place. */
+function weeksOf(n, m, kind) {
+  const s = appState[n]?.[m];
+  if (!s) return [];
   const days = daysInMonthLabel(m);
-  if (s.weeks.length && s.weeks[s.weeks.length - 1].to >= days) {
-    alert('The month is already covered to the last day.\n\n' +
-          'Change an existing week\'s dates instead, or shorten the last one first.');
+  let list;
+  if (kind && s.weeksByWork && Array.isArray(s.weeksByWork[kind])) {
+    list = s.weeksByWork[kind];
+  } else {
+    list = Array.isArray(s.weeks) ? s.weeks : [];
+  }
+  const seen = new Set();
+  return list
+    .filter(x => +x.from <= days)
+    .map(x => ({ from: +x.from, to: Math.min(+x.to, days) }))
+    .sort((p, q) => p.from - q.from)
+    .map(x => ({ ...x, slot: weekNoOfDay(x.from) - 1 }))
+    .filter(x => { if (seen.has(x.slot)) return false; seen.add(x.slot); return true; });
+}
+
+/* Every block any work has a round in — what the summary heads its columns
+   with, so the four rows line up under one set of weeks even though each
+   keeps its own. */
+function blocksUsed(n, m) {
+  const out = new Set();
+  WORK_KEYS.forEach(k => weeksOf(n, m, k).forEach(w => out.add(w.slot)));
+  return [...out].sort((a, b) => a - b);
+}
+
+/* Where a NEW round goes: the first block this work has not used yet. */
+function nextWeekRange(n, m, kind) {
+  const used = new Set(weeksOf(n, m, kind).map(w => w.slot));
+  for (let b = 1; b <= WEEK_BLOCKS; b++) if (!used.has(b - 1)) return blockRange(b, m);
+  return null;
+}
+
+/* Adding a round adds it to THIS work only. Four blocks is the ceiling —
+   a fifth would have nowhere to put its ticks, because the phone counts
+   four weeks in a month and always has. */
+function addWeek(n, m, kind) {
+  if (!canEditSchedule) return -1;
+  if (!WORK_KEYS.includes(kind)) return -1;   // a round belongs to one work
+  const r = nextWeekRange(n, m, kind);
+  if (!r) {
+    alert('All four weeks of the month already have a round of this work.\n\n' +
+          'Change an existing week\'s dates instead, or remove one first.');
     return -1;
   }
-  s.weeks.push(nextWeekRange(n, m));
-  ensureRounds(n, m);          // the new week gets a round in all three configs
+  workWeeks(n, m, kind).push(r);
+  ensureRounds(n, m);
   persistStateSoon(n, m);
-  return s.weeks.length - 1;
+  return weeksOf(n, m, kind).findIndex(w => w.from === r.from);
 }
 
-/* Removing a week removes the ROUND with it — its dates, its chemicals and
-   its ticks — and shifts every later round down one. A week that only
-   vanished from the header would leave its ticks behind under the next
-   week's dates, which is worse than not being able to remove it. */
-function removeWeek(n, m, k) {
+/* Removing a round removes it from THIS work — its dates, its chemicals and
+   its ticks — and leaves the other three alone. It used to take all four
+   with it, because they shared one list.
+ *
+ * Nothing is renumbered afterwards, and that is the point of slots: a round
+ * sits in the block its dates put it in, so taking week 2 away leaves week
+ * 3 in week 3 rather than sliding it up into week 2's ticks. */
+function removeWeek(n, m, kind, k) {
   if (!canEditSchedule) return;
   const s = getState(n, m);
-  const weeks = weeksOf(n, m);
-  if (!weeks[k]) return;
+  const weeks = weeksOf(n, m, kind);
+  const w = weeks[k];
+  if (!w) return;
+  const work = WORKS.find(x => x.key === kind);
   const plots = NURSERY_PLOTS[n] || [];
-  if (!confirm(`Remove week ${k + 1} (${ordinalDay(weeks[k].from)}\u2013${ordinalDay(weeks[k].to)})?\n\n` +
-               'Everything ticked in it goes with it, for all four works.')) return;
+  if (!confirm(`Remove week ${w.slot + 1} of ${work ? work.label : kind} ` +
+               `(${ordinalDay(w.from)}–${ordinalDay(w.to)})?\n\n` +
+               'Everything ticked in it for this work goes with it. ' +
+               'The other works are not touched.')) return;
 
-  s.weeks.splice(k, 1);
-  const n2 = s.weeks.length;
-
-  // P & D: object keys, so the tail has to be renumbered by hand.
-  ['pd', 'pdConfig'].forEach(key => {
-    const src = s[key] || {};
-    const out = {};
-    for (let i = 0; i < n2 + 1; i++) {
-      const from = i < k ? i : i + 1;
-      if (src['W' + (from + 1)] !== undefined && i < n2) out['W' + (i + 1)] = src['W' + (from + 1)];
-    }
-    s[key] = out;
-  });
-  // Weeding: R-keys, per plot.
-  plots.forEach(p => {
-    const src = s.weeding[p] || {};
-    const out = {};
-    for (let i = 0; i < n2; i++) {
-      const from = i < k ? i : i + 1;
-      out['R' + (i + 1)] = !!src['R' + (from + 1)];
-    }
-    s.weeding[p] = out;
-  });
-  // Manuring and Interrow: arrays, both the config and the per-plot ticks.
-  ['manuring', 'interrow'].forEach(kind => {
-    const cfg = s[kind + 'Config'];
-    if (Array.isArray(cfg) && cfg.length > k) cfg.splice(k, 1);
-    plots.forEach(p => {
-      if (Array.isArray(s[kind][p]) && s[kind][p].length > k) s[kind][p].splice(k, 1);
-    });
-  });
+  const list = workWeeks(n, m, kind);
+  const at = list.findIndex(x => +x.from === w.from && +x.to >= w.to);
+  if (at >= 0) list.splice(at, 1);
+  clearSlot(n, m, kind, w.slot);
 
   persistState(n, m);
   autoSyncRecords();
 }
 
+/* Wipe one work's ticks and chemicals in one block. */
+function clearSlot(n, m, kind, slot) {
+  const s = getState(n, m);
+  const plots = NURSERY_PLOTS[n] || [];
+  if (kind === 'pd') {
+    delete (s.pd || {})['W' + (slot + 1)];
+    delete (s.pdConfig || {})['W' + (slot + 1)];
+  } else if (kind === 'weeding') {
+    plots.forEach(p => { if (s.weeding && s.weeding[p]) delete s.weeding[p]['R' + (slot + 1)]; });
+  } else {
+    const cfg = s[kind + 'Config'];
+    /* An empty round, not a null. The config is an array of rounds and each
+       round is an array of columns, so [] is a shape every reader already
+       copes with — autoSyncRecords does round.forEach on it, and a null
+       there takes the whole page down. */
+    if (Array.isArray(cfg) && cfg[slot]) cfg[slot] = [];
+    plots.forEach(p => { if (Array.isArray(s[kind]?.[p])) s[kind][p][slot] = []; });
+  }
+}
+
+/* Carry one work's ticks and chemicals from one block to another, for when
+   somebody edits a round's dates across a block boundary. Without this the
+   ticks stay in the old block and the round appears empty in its new one —
+   which is the same class of bug as the numbering, one level down. */
+function moveSlot(n, m, kind, from, to) {
+  if (from === to) return;
+  const s = getState(n, m);
+  const plots = NURSERY_PLOTS[n] || [];
+  if (kind === 'pd') {
+    const a = 'W' + (from + 1), b = 'W' + (to + 1);
+    if (s.pd && s.pd[a] !== undefined) { s.pd[b] = s.pd[a]; delete s.pd[a]; }
+    if (s.pdConfig && s.pdConfig[a] !== undefined) { s.pdConfig[b] = s.pdConfig[a]; delete s.pdConfig[a]; }
+  } else if (kind === 'weeding') {
+    const a = 'R' + (from + 1), b = 'R' + (to + 1);
+    plots.forEach(p => {
+      const row = s.weeding && s.weeding[p];
+      if (!row) return;
+      if (row[a] !== undefined) { row[b] = row[a]; delete row[a]; }
+    });
+  } else {
+    const cfg = s[kind + 'Config'];
+    if (Array.isArray(cfg)) {
+      while (cfg.length <= Math.max(from, to)) cfg.push([]);
+      cfg[to] = cfg[from]; cfg[from] = [];
+    }
+    plots.forEach(p => {
+      const row = s[kind] && s[kind][p];
+      if (!Array.isArray(row)) return;
+      while (row.length <= Math.max(from, to)) row.push([]);
+      row[to] = row[from]; row[from] = [];
+    });
+  }
+}
+
+
 /* The plots this work is set on in one week. Week k IS round k now, so
    there is no placing-by-date left to do — one list, whatever shape the
    work keeps its ticks in, which is still four different shapes. */
 function plotsInWeek(kind, i, n, m) {
+  /* `i` is a position in THIS work's list of rounds; the ticks are filed
+     under the BLOCK that round falls in, and the two are only the same
+     number in a month whose weeks run 1,2,3,4 in order. */
+  const wk = weeksOf(n, m, kind)[i];
+  return wk ? plotsAtSlot(kind, wk.slot, n, m) : [];
+}
+
+/* The plots this work is set on in one BLOCK of the month. What the summary
+   asks, because its columns are the month's weeks rather than any one
+   work's rounds. */
+function plotsAtSlot(kind, i, n, m) {
   const s = appState[n]?.[m];
-  if (!s || !weeksOf(n, m)[i]) return [];
+  if (!s) return [];
   const plots = NURSERY_PLOTS[n] || [];
   const out = [];
   plots.forEach(p => {
@@ -5606,21 +5747,27 @@ function summaryTable(it, m) {
       <div class="set-empty" style="padding:16px;">This nursery is in Seedling Stock but not on
         the maintenance schedule yet, so there is nothing to summarise.</div></div>`;
   }
-  const weeks = weeksOf(n, m);
+  /* The columns are the MONTH'S weeks now, not one work's rounds — because
+     the four works no longer share a week list, and four rows each with its
+     own columns is not a table. A work simply has no tick in a week it does
+     not run in, which is the truth and reads as one. */
+  const blocks = blocksUsed(n, m);
   /* A plain label, not a button. Dates are set inside the Edit popup, with
      the chemicals and the ticks they belong to — a header that opened its
      own little date box was a second place to do one thing. */
   const head = '<tr>' +
     '<th class="ss-work">Work</th>' +
-    weeks.map((w, k) =>
-      `<th><div class="ss-wk">Week ${k + 1}</div>` +
-      `<div class="ss-wk-d">${ordinalDay(w.from)}\u2013${ordinalDay(w.to)}</div></th>`).join('') +
-    (weeks.length ? '' : '<th class="ss-none-th">No weeks set yet</th>') +
+    blocks.map(b => {
+      const r = blockRange(b + 1, m);
+      return `<th><div class="ss-wk">Week ${b + 1}</div>` +
+        `<div class="ss-wk-d">${ordinalDay(r.from)}\u2013${ordinalDay(r.to)}</div></th>`;
+    }).join('') +
+    (blocks.length ? '' : '<th class="ss-none-th">No weeks set yet</th>') +
     '<th class="ss-act">Actions</th></tr>';
 
   const rows = WORKS.map(work => {
-    const on = weeks.map((_, k) => plotsInWeek(work.key, k, n, m).length);
-    const gap = weeks.length ? '' :
+    const on = blocks.map(b => plotsAtSlot(work.key, b, n, m).length);
+    const gap = blocks.length ? '' :
       '<td class="ss-cell ss-empty-cell">Open Edit to add one</td>';
     const open = _expanded[n + '|' + work.key];
     let r = `<tr class="ss-row${open ? ' is-open' : ''}">` +
@@ -5636,7 +5783,7 @@ function summaryTable(it, m) {
       `</td></tr>`;
 
     if (open) {
-      r += `<tr class="ss-detail"><td colspan="${weeks.length + (weeks.length ? 2 : 3)}">` +
+      r += `<tr class="ss-detail"><td colspan="${blocks.length + (blocks.length ? 2 : 3)}">` +
         expandedPlots(n, work.key, m) + '</td></tr>';
     }
     return r;
@@ -5645,7 +5792,7 @@ function summaryTable(it, m) {
   return `<div class="ss-wrap">
       <div class="ss-head">
         <div class="ss-name">${esc(label)}</div>
-        <div class="ss-count">${weeks.length} week${weeks.length === 1 ? '' : 's'}</div>
+        <div class="ss-count">${blocks.length} week${blocks.length === 1 ? '' : 's'}</div>
       </div>
       <div class="tbl-wrap"><table class="ss-table">
         <thead>${head}</thead><tbody>${rows}</tbody></table></div>
@@ -5664,14 +5811,14 @@ function summaryTable(it, m) {
    read as ten weeks at a glance. One column of plots cannot be misread, and
    the panel is a table, which is what it always was pretending to be. */
 function expandedPlots(n, kind, m) {
-  const weeks = weeksOf(n, m);
+  const weeks = weeksOf(n, m, kind);
   const plots = NURSERY_PLOTS[n] || [];
   if (!plots.length) return '<div class="ss-none">No plots in this nursery.</div>';
 
   const set = weeks.map((_, k) => new Set(plotsInWeek(kind, k, n, m)));
   const head = '<tr><th class="xp-plot">Plot</th>' +
     weeks.map((w, k) =>
-      `<th title="${ordinalDay(w.from)} \u2013 ${ordinalDay(w.to)}">Wk ${k + 1}</th>`).join('') +
+      `<th title="${ordinalDay(w.from)} \u2013 ${ordinalDay(w.to)}">Wk ${w.slot + 1}</th>`).join('') +
     '<th class="xp-tot">Set</th></tr>';
   const body = plots.map(pl => {
     const hits = weeks.map((_, k) => set[k].has(pl));
@@ -5883,24 +6030,38 @@ function weNum(val, onch) {
    existed. That left weCols() returning [], which became colspan="0"; a
    browser reads that as "to the end of the column group", which is why
    Manuring drew a white band where weeks 3 and 4 should have been. */
+/* A round with no chemicals behind it is a column of ticks that says
+   nothing about what is being sprayed or fed in it. Every block a work
+   actually uses gets a config; the blocks it does not use are left alone,
+   so an empty slot stays empty rather than being filled with a copy of
+   somebody else's week. */
 function ensureRounds(n, m) {
   const s = getState(n, m);
-  const want = weeksOf(n, m).length;
   if (!s.pdConfig) s.pdConfig = {};
-  for (let i = 0; i < want; i++) {
-    const w = 'W' + (i + 1);
+  weeksOf(n, m, 'pd').forEach(wk => {
+    const w = 'W' + (wk.slot + 1);
     if (!s.pdConfig[w]) {
-      const prev = s.pdConfig['W' + i];
+      // The nearest earlier week is the best guess at what this one sprays.
+      let prev = null;
+      for (let b = wk.slot; b >= 1 && !prev; b--) prev = s.pdConfig['W' + b];
       s.pdConfig[w] = prev ? JSON.parse(JSON.stringify(prev)) : defaultPDConfig().W1;
     }
-  }
-  [['manuringConfig', defaultManuringConfig], ['interrowConfig', defaultInterrowConfig]]
-    .forEach(([key, mk]) => {
-      if (!Array.isArray(s[key]) || !s[key].length) s[key] = mk();
-      while (s[key].length < want) {
-        const prev = s[key][s[key].length - 1];
-        s[key].push(JSON.parse(JSON.stringify(prev || mk()[0])));
-      }
+  });
+  [['manuring', 'manuringConfig', defaultManuringConfig],
+   ['interrow', 'interrowConfig', defaultInterrowConfig]]
+    .forEach(([kind, key, mk]) => {
+      if (!Array.isArray(s[key])) s[key] = mk();
+      /* Blocks this work does not use still need to BE something: the array
+         is read straight through by autoSyncRecords and the PDF. */
+      for (let b = 0; b < WEEK_BLOCKS; b++) if (!Array.isArray(s[key][b])) s[key][b] = [];
+      weeksOf(n, m, kind).forEach(wk => {
+        while (s[key].length <= wk.slot) s[key].push([]);
+        if (!s[key][wk.slot] || !s[key][wk.slot].length) {
+          let prev = null;
+          for (let b = wk.slot - 1; b >= 0 && !prev; b--) prev = s[key][b];
+          s[key][wk.slot] = JSON.parse(JSON.stringify(prev || mk()[0]));
+        }
+      });
     });
 }
 
@@ -6070,16 +6231,48 @@ function weToggleAll(kind, i, ci) {
 /* The week's dates. Written straight through like the ticks, because the
    popup's Cancel already puts the whole work back — and s.weeks is in that
    snapshot, so a date changed and cancelled goes back with everything else. */
+/* Changing a round's dates can move it into another week of the month, and
+   its ticks and chemicals have to go with it — they are filed under the
+   block, not under the row. Without the move, dragging a round from the 8th
+   to the 15th leaves everything ticked in week 2 and shows an empty week 3,
+   which is the numbering bug again one level down.
+ *
+ * A move onto a block this work already uses is refused rather than allowed
+ * to overwrite it: two rounds cannot share one set of ticks, and silently
+ * eating the other one's plots is the worst of the three things that could
+ * happen here. */
 function weSetDate(i, which, value) {
   if (!canEditSchedule || !_we) return;
-  const n = _we.n, m = getMonth(), s = getState(n, m);
+  const n = _we.n, m = getMonth(), kind = _we.kind;
   const day = +String(value || '').slice(-2);
   const days = daysInMonthLabel(m);
   if (!day || day < 1 || day > days) return;
-  const w = s.weeks && s.weeks[i];
+
+  const shown = weeksOf(n, m, kind);
+  const wk = shown.find(x => x.slot === i);   // `i` is the block, not the row
+  if (!wk) return;
+  const list = workWeeks(n, m, kind);
+  const at = list.findIndex(x => +x.from === wk.from);
+  const w = list[at];
   if (!w) return;
+
+  const wasSlot = weekNoOfDay(w.from) - 1;
+  const from = which === 'from' ? day : Math.min(+w.from, day);
+  const nowSlot = weekNoOfDay(from) - 1;
+
+  if (nowSlot !== wasSlot &&
+      shown.some(x => x.slot === nowSlot && x.from !== wk.from)) {
+    alert(`This work already has a round in week ${nowSlot + 1}.\n\n` +
+          'Two rounds of the same work cannot share a week — move or remove ' +
+          'the other one first.');
+    renderWorkEditor();
+    return;
+  }
+
   if (which === 'from') { w.from = day; if (+w.to < day) w.to = day; }
   else                  { w.to = day;   if (+w.from > day) w.from = day; }
+  if (nowSlot !== wasSlot) moveSlot(n, m, kind, wasSlot, nowSlot);
+
   persistStateSoon(n, m);
   renderWorkEditor();
   renderSchedSummary();
@@ -6087,7 +6280,7 @@ function weSetDate(i, which, value) {
 
 function weAddWeek() {
   if (!_we) return;
-  const i = addWeek(_we.n, getMonth());
+  const i = addWeek(_we.n, getMonth(), _we.kind);
   if (i < 0) return;
   renderWorkEditor();
   renderSchedSummary();
@@ -6098,9 +6291,11 @@ function weAddWeek() {
   if (box) box.scrollTo({ left: box.scrollWidth, behavior: 'smooth' });
 }
 
-function weRemoveWeek(i) {
+function weRemoveWeek(slot) {
   if (!_we) return;
-  removeWeek(_we.n, getMonth(), i);
+  const at = weeksOf(_we.n, getMonth(), _we.kind).findIndex(w => w.slot === slot);
+  if (at < 0) return;
+  removeWeek(_we.n, getMonth(), _we.kind, at);
   renderWorkEditor();
   renderSchedSummary();
 }
@@ -6191,7 +6386,7 @@ function renderWorkEditor() {
   const { n, kind } = _we;
   const m = getMonth(), iso = monthISO(m), days = daysInMonthLabel(m);
   const work = WORKS.find(w => w.key === kind);
-  const weeks = weeksOf(n, m);
+  const weeks = weeksOf(n, m, kind);
   const plots = NURSERY_PLOTS[n] || [];
   ensureRounds(n, m);   // no week without a round behind it
 
@@ -6208,8 +6403,13 @@ function renderWorkEditor() {
     return;
   }
 
-  const cols = weeks.map((_, i) => {
-    const c = weCols(kind, i, n, m);
+  /* Everything below addresses a week by its BLOCK (w.slot), not by its
+     position in this list. The ticks, the chemicals and the configs are all
+     filed under the block, and in a month whose rounds are not 1,2,3,4 in
+     order the two numbers are different — passing the position is how a
+     tick lands in the wrong week. */
+  const cols = weeks.map((w) => {
+    const c = weCols(kind, w.slot, n, m);
     /* colspan="0" means "to the end of the column group" to a browser, not
        "no columns" — the bug that put a white band where Manuring's later
        weeks should have been. ensureRounds() above should make this
@@ -6230,28 +6430,28 @@ function renderWorkEditor() {
      the week, the other takes the week and every tick in it away. Side by
      side they would be three small buttons and one bad afternoon. */
   const colWord = kind === 'manuring' ? 'fertiliser' : 'chemical';
-  const colCtrl = (i) => WE_MULTI_COL[kind]
+  const colCtrl = (i, slot) => WE_MULTI_COL[kind]
     ? `<span class="we-col-n schedule-edit-ctrl">` +
         `<button type="button" title="Another ${colWord} in this week"` +
-        ` aria-label="Add a column to week ${i + 1}"` +
-        ` onclick="weAddCol(${i})"${cols[i].length >= 6 ? ' disabled' : ''}>+</button>` +
+        ` aria-label="Add a column to week ${slot + 1}"` +
+        ` onclick="weAddCol(${slot})"${cols[i].length >= 6 ? ' disabled' : ''}>+</button>` +
         `<button type="button" title="Drop the last ${colWord} from this week"` +
-        ` aria-label="Remove a column from week ${i + 1}"` +
-        ` onclick="weRemoveCol(${i})"${cols[i].length <= 1 ? ' disabled' : ''}>&minus;</button>` +
+        ` aria-label="Remove a column from week ${slot + 1}"` +
+        ` onclick="weRemoveCol(${slot})"${cols[i].length <= 1 ? ' disabled' : ''}>&minus;</button>` +
       `</span>`
     : '';
 
   const h1 = '<tr><th class="we-plot" rowspan="3">Plot</th>' +
     weeks.map((w, i) =>
       `<th colspan="${cols[i].length}" class="we-wk">` +
-        colCtrl(i) +
-        `<span class="we-wk-n">Week ${i + 1}</span>` +
+        colCtrl(i, w.slot) +
+        `<span class="we-wk-n">Week ${w.slot + 1}</span>` +
         `<button type="button" class="we-week-x schedule-edit-ctrl" title="Remove this week"` +
-        ` onclick="weRemoveWeek(${i})">&times;</button></th>`).join('') + '</tr>';
+        ` onclick="weRemoveWeek(${w.slot})">&times;</button></th>`).join('') + '</tr>';
 
   const h2 = '<tr>' + weeks.map((w, i) =>
     `<th colspan="${cols[i].length}" class="we-wk-d">` +
-      dayInput(i, 'from', w.from) + '<span class="we-to">to</span>' + dayInput(i, 'to', w.to) +
+      dayInput(w.slot, 'from', w.from) + '<span class="we-to">to</span>' + dayInput(w.slot, 'to', w.to) +
     '</th>').join('') + '</tr>';
 
   const h3 = '<tr>' + weeks.map((w, i) => cols[i].map((c, k) =>
@@ -6260,16 +6460,16 @@ function renderWorkEditor() {
       (c.opts ? weSel(c.opts, c.val, c.onSel) : '') +
       (c.opts ? `<div class="we-col-d">${weNum(c.dose, c.onDose)}` +
                 `<span class="we-cfg-u">${esc(c.unit || '')}</span></div>` : '') +
-      `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${i},${c.ci})" ` +
+      `<button type="button" class="we-all" onclick="weToggleAll('${kind}',${w.slot},${c.ci})" ` +
       `title="Tick or clear every plot in this column">all</button>` +
     '</th>').join('')).join('') + '</tr>';
 
   const rows = plots.map(pl => '<tr><td class="we-plot">' + esc(pl) + '</td>' +
     weeks.map((w, i) => cols[i].map((c, k) => {
-      const on = weTicked(kind, i, c.ci, pl);
+      const on = weTicked(kind, w.slot, c.ci, pl);
       return `<td class="${k === 0 && i ? 'grp' : ''}"><button type="button" ` +
         `class="we-tick${on ? ' on' : ''}" ` +
-        `onclick="weToggle('${kind}',${i},${c.ci},'${esc(pl)}')" ` +
+        `onclick="weToggle('${kind}',${w.slot},${c.ci},'${esc(pl)}')" ` +
         `aria-pressed="${on}">${on ? '&#10003;' : ''}</button></td>`;
     }).join('')).join('') + '</tr>').join('');
 
