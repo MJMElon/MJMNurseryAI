@@ -679,8 +679,15 @@
                 const survColor = survPct > 90 ? 'text-[#6aa83c]' : 'text-[#c07820]';
                 const cullDisplay = b.cullRate.toFixed(2);
 
+                // Whole row is the tap target now — the standalone View
+                // button repeated what the row itself already invites (tap
+                // a batch, see its detail). Delete stays a button of its
+                // own since it's a destructive action, not a navigation,
+                // and stops the row's own click from also firing on the
+                // same tap (event.stopPropagation()).
+                const batchNameEsc = (b.batch_name || '').replace(/'/g, "\\'");
                 body.insertAdjacentHTML('beforeend', `
-                    <tr class="hover:bg-[#f8f4ec] transition-colors batch-row">
+                    <tr class="hover:bg-[#f8f4ec] transition-colors batch-row cursor-pointer" onclick="openBatchDetail('${batchNameEsc}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){openBatchDetail('${batchNameEsc}')}">
                         <td class="text-[#3d2610] font-black tracking-wider text-base batch-id-cell">${b.batch_name}</td>
                         <td class="breed-cell">${b.breed_name || '—'}</td>
                         <td class="text-[#8a7a68] text-xs whitespace-nowrap">${age}</td>
@@ -698,12 +705,7 @@
                         <td class="${survColor} font-black text-sm">${survRate}</td>
                         <td class="text-[#c07820] font-black text-sm">${cullDisplay}%</td>
                         <td>
-                            <div class="flex items-center gap-2">
-                                <button onclick="openBatchDetail('${(b.batch_name || '').replace(/'/g, "\\'")}')" class="px-4 py-2 rounded-xl bg-white border border-[#e8dcc8] text-[#4a7a2e] font-bold text-[10px] uppercase tracking-widest hover:bg-[#6aa83c] hover:text-white hover:border-[#6aa83c] transition-colors shadow-sm flex items-center gap-2">
-                                    👁️ View
-                                </button>
-                                ${isAdmin ? `<button onclick="deleteBatchRecord('${b.batch_name.replace(/'/g,"\\'")}')" title="Admin only — permanently delete this batch" class="px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 font-bold text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-colors shadow-sm">🗑️</button>` : ''}
-                            </div>
+                            ${isAdmin ? `<button onclick="event.stopPropagation();deleteBatchRecord('${batchNameEsc}')" title="Admin only — permanently delete this batch" class="px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 font-bold text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-colors shadow-sm">🗑️</button>` : ''}
                         </td>
                     </tr>
                 `);
