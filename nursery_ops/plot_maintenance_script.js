@@ -1872,6 +1872,63 @@ function onNurseryChange() {
   renderAll();
   autoSyncRecords();
 }
+/* ── Ticking a box must not move the page ──────────────────────────────
+   Every tick re-renders its whole panel — deliberately, because a tick can
+   change another cell's "modified" mark and a surgical update would have to
+   know which. The cost is that the reader loses their place: in the work
+   editor, which is one long block per week, somebody ticking plots in week
+   4 was thrown back to week 1 after every single tick.
+
+   TWO KINDS OF BOX, and the second is the one that matters here.
+
+   A box that SURVIVES the render — only its contents replaced — can be put
+   back through the element itself. But renderWorkEditor() replaces
+   #we-body's innerHTML, which destroys the scrolling div inside it and
+   builds a new one; the old reference is detached and setting scrollTop on
+   it does nothing at all. So the offsets are also remembered against a
+   SELECTOR, and re-applied to whatever took the old element's place. That
+   is the whole reason the first attempt at this looked right and did
+   nothing.
+
+   Put back twice: the synchronous call covers the ordinary case, and the
+   rAF covers the one where the new markup is briefly shorter than the old —
+   the browser clamps the offset to the shorter content, and only once
+   layout has settled is the original reachable again. */
+const SCROLL_BOXES = ['.we-scroll', '.tbl-wrap', '.ss-wrap', '#we-modal .modal-body'];
+
+function keepingScroll(fn) {
+  const x = window.scrollX, y = window.scrollY;
+
+  // Boxes that will still be here afterwards, held by reference.
+  const live = [];
+  document.querySelectorAll('*').forEach(el => {
+    if (el.scrollTop || el.scrollLeft) live.push([el, el.scrollLeft, el.scrollTop]);
+  });
+  // And the same offsets held by selector, for the ones about to be rebuilt.
+  const bySel = [];
+  SCROLL_BOXES.forEach(sel => {
+    const el = document.querySelector(sel);
+    if (el && (el.scrollTop || el.scrollLeft)) bySel.push([sel, el.scrollLeft, el.scrollTop]);
+  });
+
+  fn();
+
+  const put = () => {
+    window.scrollTo(x, y);
+    live.forEach(([el, l, t]) => {
+      if (!el.isConnected) return;
+      el.scrollLeft = l; el.scrollTop = t;
+    });
+    bySel.forEach(([sel, l, t]) => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      el.scrollLeft = l; el.scrollTop = t;
+    });
+  };
+  put();
+  requestAnimationFrame(put);
+}
+
 function renderAll() {
   const m=getMonth(), n=getNursery(), lbl=NURSERY_LABELS[n];
   syncNurseryCircles();
@@ -5763,7 +5820,7 @@ function weToggle(kind, i, ci, plot, skipRender) {
   if (skipRender) return;
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
@@ -5777,7 +5834,7 @@ function weToggleAll(kind, i, ci) {
   plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
@@ -5913,7 +5970,7 @@ function weToggle(kind, i, ci, plot, skipRender) {
   if (skipRender) return;
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
@@ -5927,7 +5984,7 @@ function weToggleAll(kind, i, ci) {
   plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
@@ -5991,7 +6048,7 @@ function weToggle(kind, i, ci, plot, skipRender) {
   if (skipRender) return;
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
@@ -6005,7 +6062,7 @@ function weToggleAll(kind, i, ci) {
   plots.forEach(p => { if (weTicked(kind, i, ci, p) === all) weToggle(kind, i, ci, p, true); });
   persistStateSoon(n, m);
   autoSyncRecords();
-  renderWorkEditor();
+  keepingScroll(renderWorkEditor);
   renderSchedSummary();
   redrawSheet(kind);
 }
