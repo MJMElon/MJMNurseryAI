@@ -185,24 +185,42 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
    min-width is what keeps that promise on a narrow screen: below it the
    wrapper scrolls (.tbl-wrap is overflow-x:auto) rather than the columns
    quietly collapsing back into whatever fits. */
-.rec-table{table-layout:fixed;width:100%;min-width:1373px;}
-.rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;border-bottom:2px solid var(--border-strong);white-space:nowrap;}
+/* 1134px is the twelve columns added up. It was 1373 for ten wider ones,
+   which no longer fits beside the menu — see the colgroup, where the widths
+   and the reason for each of them live. */
+.rec-table{table-layout:fixed;width:100%;min-width:1134px;}
+/* The headings WRAP. They were nowrap, which in a 58px column does not make
+   the column wider — it makes "Nelos Case" and "Done Repair" print straight
+   through each other. Two short lines is what a narrow column of a wide table
+   looks like. The padding comes in with them: 14px each side of twelve
+   columns is 336px spent on air. */
+.rec-table thead th{background:#f2f7f4;color:var(--text-muted);font-weight:700;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:9px 8px;border-bottom:2px solid var(--border-strong);white-space:normal;line-height:1.3;vertical-align:bottom;}
 .rec-table thead th.th-left{text-align:left;}
-.rec-table tbody td{padding:10px 14px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
+.rec-table tbody td{padding:9px 8px;border-bottom:1px solid #eaf1ed;vertical-align:middle;}
 /* The date is one line, always. It is the column that gave the game away —
    "07 Aug 2026" over two lines in one nursery and one in another — and the
    fixed width above is chosen to hold it, so saying so here means a future
    change to that width fails loudly (an overflow) instead of quietly
    re-wrapping. Batch, Quantity and Audit are short and fixed-shape for the
    same reason. */
-.rec-table tbody td:nth-child(1),
+/* Batch, Quantity and Audit are short and fixed-shape, and stay on one line.
+   THE DATE NO LONGER DOES. It used to be the column that gave the game away —
+   "07 Aug 2026" over two lines in one nursery and one in another — and it was
+   given the width to hold it. Twelve columns do not leave that width, and a
+   date that wraps in every row wraps consistently, which is what the rule was
+   really protecting. */
 .rec-table tbody td:nth-child(5),
 .rec-table tbody td:nth-child(6),
 .rec-table tbody td:nth-child(9){white-space:nowrap;}
-/* Work type and remark are free text and may run long: wrap them rather
-   than letting them spill over the column beside them. */
+/* Free text, and now the date and the buttons too: wrap rather than spill
+   over the column beside. */
+.rec-table tbody td:nth-child(1),
 .rec-table tbody td:nth-child(2),
 .rec-table tbody td:nth-child(8){overflow-wrap:anywhere;}
+/* The row's buttons take two lines rather than one long one. `nowrap` on the
+   cell is what held the table 60px wider than it needed to be. */
+.rec-table tbody td:last-child{white-space:normal !important;}
+.rec-table tbody td:last-child .btn{margin:1px 1px 0 0;}
 /* A job worked over more than one day carries them all. The column is sized
    for "01 & 02 Jul 2026" on one line; a rarer three-day job is allowed the
    second line rather than being cut off, which is why this one opts back out
@@ -1000,34 +1018,27 @@ th.we-plot,td.we-plot{width:1%;min-width:96px;}
 @media(min-width:768px){
   .sm-frame{display:grid;grid-template-columns:212px minmax(0,1fr);
     gap:24px;align-items:start;}
-  /* Pulled back. The column keeps a rail rather than closing to nothing:
-     a handle with no bar under it is a button in the middle of a page, and
-     the eye has to be told where the menu WENT. */
-  .sm-frame.nav-hid{grid-template-columns:26px minmax(0,1fr);gap:14px;}
-  .sm-frame.nav-hid #sm-nav{
-    /* Not display:none. The bar keeps its place in the grid so the handle
-       above it keeps its position, and the tabs stay in the DOM so
-       switchTab and applyNopsAdminUI go on finding their buttons. */
-    visibility:hidden;pointer-events:none;height:0;overflow:hidden;}
+  /* Pulled back to a rail. The bar itself stays — it keeps its background,
+     its border and its handle, and only the tabs go. A menu that vanishes
+     leaves a button floating in an empty column with nothing to say what it
+     opens, which is what the first attempt at this did. */
+  .sm-frame.nav-hid{grid-template-columns:46px minmax(0,1fr);gap:14px;}
+  .sm-frame.nav-hid #sm-nav nav{display:none;}
 }
 
-/* The handle. Sits in the gap it is opening and closing, at the height of
-   the section title beside it, so it reads as belonging to the edge rather
-   than floating over the content. */
+/* The handle, at the top of the bar it belongs to.
+   NOT a sibling in a grid row of its own: that row pushed the whole bar 160
+   pixels down the page, which is the gap this replaces. */
 .sm-nav-toggle{display:none;}
 @media(min-width:768px){
-  .sm-nav-toggle{display:grid;place-items:center;position:sticky;top:84px;
-    z-index:5;width:26px;height:34px;margin:0;padding:0;
-    grid-column:1;grid-row:1;justify-self:end;align-self:start;
+  .sm-nav-toggle{display:grid;place-items:center;margin:0 0 10px auto;padding:0;
+    width:26px;height:28px;
     border:1px solid #ccfbf1;border-radius:9px;background:#f0fdfa;
     color:#0f766e;font-size:11px;line-height:1;cursor:pointer;
     transition:background .15s,color .15s;}
   .sm-nav-toggle:hover{background:#ccfbf1;color:#115e59;}
-  /* Collapsed the rail IS the handle, so it takes the whole width. */
-  .nav-hid .sm-nav-toggle{justify-self:stretch;}
-  /* The bar starts under the handle rather than beside it. */
-  #sm-nav{grid-column:1;grid-row:2;}
-  .sm-body{grid-column:2;grid-row:1 / span 2;}
+  /* On the rail it is the only thing there, so it sits in the middle. */
+  .nav-hid .sm-nav-toggle{margin:0 auto;}
 }
 
 #sm-nav{display:block;}
@@ -1049,8 +1060,21 @@ th.we-plot,td.we-plot{width:1%;min-width:96px;}
 #sm-nav .pn-tab:hover{background:#ccfbf1;}
 #sm-nav .pn-tab.is-on{background:#0f766e;color:#fff;}
 #sm-nav .pn-tab.is-on:hover{background:#115e59;}
-/* 84px clears the ribbon, which is sticky. */
-@media(min-width:768px){#sm-nav{position:sticky;top:84px;align-self:start;}}
+/* Stays put while the records scroll past it. 84px clears the ribbon, which
+   is sticky itself.
+
+   The height cap and its own scrollbar are what make "sticky" true rather
+   than nearly true: a bar taller than the window cannot stick — the browser
+   scrolls it until its bottom edge arrives, so the top of it walks off the
+   screen and the menu is gone exactly when somebody scrolling wants it. The
+   rail keeps its ground and paints itself, so it reads as a narrowed menu
+   rather than as a strip of page. */
+@media(min-width:768px){
+  #sm-nav{position:sticky;top:84px;align-self:start;
+    max-height:calc(100vh - 104px);overflow-y:auto;overflow-x:hidden;
+    padding:10px;border:1px solid #e6f4f0;border-radius:14px;
+    background:var(--bg-white);}
+}
 /* Phone: the column becomes a row above the content — a 212px column
    beside a table on a 412px screen leaves neither of them usable. */
 @media(max-width:767px){

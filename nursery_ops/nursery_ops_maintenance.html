@@ -29,18 +29,18 @@
          — same shape, different mechanism. Change one, change the other;
          the geometry is in plot_maintenance_styles.css beside a note
          saying the same. -->
-    <!-- Pull the bar out of the way.
-         The table beside it is twelve columns wide and the widest screen in
-         the office is still a screen; two hundred pixels of navigation that
-         nobody is using while reading a month of records is two hundred
-         pixels the records could have. Collapsed it leaves a rail with the
-         handle on it, so the way back is never gone — only narrow. The
-         choice is remembered per browser. -->
-    <button type="button" id="sm-nav-toggle" class="sm-nav-toggle"
-            onclick="toggleNav()" aria-controls="sm-nav" aria-expanded="true"
-            title="Hide the menu"><span id="sm-nav-toggle-ico">&#10094;</span></button>
-
     <aside id="sm-nav">
+      <!-- Pull the bar in and out.
+           INSIDE the bar, not above it: as a sibling it needed a grid row of
+           its own, and that row pushed the whole bar a hundred and sixty
+           pixels down the page — the menu began below the fold of its own
+           panel. It is part of the bar, so it lives in the bar.
+           Narrowed, the rail stays: the tabs go and the bar does not. A
+           menu that vanishes leaves a button floating in an empty column
+           with nothing to say what it opens. -->
+      <button type="button" id="sm-nav-toggle" class="sm-nav-toggle"
+              onclick="toggleNav()" aria-controls="sm-nav" aria-expanded="true"
+              title="Hide the menu"><span id="sm-nav-toggle-ico">&#10094;</span></button>
       <nav aria-label="Schedule &amp; Maintenance">
         <a class="pn-out" href="nursery_ops_dashboard.html">
           <span aria-hidden="true">&#8592;</span>
@@ -138,24 +138,31 @@
                  nursery draws identically. They are proportions, not pixels:
                  spare width is shared out among them, so the table still
                  fills a wide screen and still scrolls on a narrow one. -->
+            <!-- Sized to FIT beside the menu, not to look comfortable on its
+                 own. Twelve columns at the old widths came to 1513px in a
+                 1213px space, so the table scrolled sideways and the last
+                 three columns — the two new ticks among them — were off the
+                 edge unless the menu was pulled back. Every column has been
+                 cut to what it actually holds and the free text is allowed to
+                 wrap. -->
             <colgroup>
-              <col style="width:158px;"><!-- Date     — fits "01 & 02 Jul 2026" unwrapped -->
-              <col style="width:185px;"><!-- Work Type -->
-              <col style="width:250px;"><!-- Chemical — the pill ellipsises past this -->
-              <col style="width:62px;" ><!-- Plot     -->
-              <col style="width:105px;"><!-- Batch    -->
-              <col style="width:105px;"><!-- Quantity -->
-              <col style="width:112px;"><!-- Track Record -->
+              <col style="width:96px;" ><!-- Date     — "03 Sep 2026" over two lines is fine -->
+              <col style="width:112px;"><!-- Work Type -->
+              <col style="width:186px;"><!-- Chemical — the pill ellipsises past this -->
+              <col style="width:52px;" ><!-- Plot     -->
+              <col style="width:78px;" ><!-- Batch    -->
+              <col style="width:78px;" ><!-- Quantity -->
+              <col style="width:96px;" ><!-- Track Record -->
               <!-- Remark and Audit sat 125 and 105 apart in a table whose
                    spare width is shared out among the columns, so the wider
                    Remark took most of it and left a hand's breadth of nothing
                    between a dash and a verdict. Narrowed to what each holds:
                    Remark is usually empty, Audit is one word. -->
-              <col style="width:96px;" ><!-- Remark   -->
-              <col style="width:92px;" ><!-- Audit    -->
-              <col style="width:74px;" ><!-- Nelos Case  -->
-              <col style="width:74px;" ><!-- Done Repair -->
-              <col style="width:200px;"><!-- Check / Edit / Del -->
+              <col style="width:88px;" ><!-- Remark   -->
+              <col style="width:84px;" ><!-- Audit    -->
+              <col style="width:58px;" ><!-- Nelos Case  -->
+              <col style="width:58px;" ><!-- Done Repair -->
+              <col style="width:148px;"><!-- Check / Edit / Del — the buttons wrap -->
             </colgroup>
             <thead><tr>
               <th class="th-left"          data-i18n="rec.tarikh">Tarikh</th>

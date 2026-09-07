@@ -3908,7 +3908,7 @@ function renderRecords() {
         <td style="text-align:center;">${_auditCell(r)}</td>
         <td style="text-align:center;">${_flagCell(r, 'nelos', _auditFailed(r), t('rec.nelosNa'))}</td>
         <td style="text-align:center;">${_flagCell(r, 'repaired', !!r.nelos, t('rec.repairedNa'))}</td>
-        <td style="white-space:nowrap;">
+        <td>
           ${r.checked
             ? `<span class="rec-checked-badge" title="Checked — locked for normal users">✓ Checked</span>` +
               (isNopsAdmin
