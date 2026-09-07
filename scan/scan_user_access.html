@@ -9,6 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
 <script src="../shared/shared_access.js"></script>
+<!-- Which section sits in which location — Pre Nursery, Main Nursery, Estate.
+     The same file System Setting's Location card and the Team Board read, so
+     the nurseries offered here cannot drift from the ones on that card. -->
+<script src="../shared/shared_worker_locations.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { font-family:'Outfit', system-ui, sans-serif; }
@@ -229,7 +233,20 @@ const AREAS = [
 ];
 
 let profiles = [];        // everyone who holds the scan module
-let nurseries = [];       // distinct nursery names from shared_plots
+/* The nurseries this screen offers, in the order System Setting → Location
+   shows them: [{ code, name, value }].
+
+   They come from the SAME place that card does — operation_nurseries, plus the
+   sections the register has always had — and no longer from the distinct
+   nursery names on shared_plots. Plots are where work happens, not the list of
+   nurseries: a nursery with no plots yet could not be granted to anybody, and
+   PN and UNE were missing from this screen entirely for exactly that reason.
+
+   `code` is what a chip reads — PN, BNN, UNN1 — matching the Location card.
+   `value` is what a tick SAVES, and it is the register's own name ("UNN 1",
+   spaces and all) because that is what is already stored in every saved row.
+   Saving the code instead would be a silent rename of everybody's access. */
+let nurseries = [];
 let openUid = null;       // the row expanded right now
 let draft = null;         // that row's permissions, being edited
 
@@ -326,6 +343,16 @@ function areaOn(perms, key) {
   }
 }
 
+/* The same nursery is spelt differently in different places — the register
+   says "UNN 1", a saved row may say "UNN1". Compare on letters and digits
+   alone, so one tick governs both.
+
+   SHARED RULE. The phone has its own copy as `nurseryKey` in
+   Barcode_Counter src/lib/access.js. Change one, change the other. */
+function nurseryKey(name) {
+  return String(name == null ? '' : name).replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
 /** null means every nursery. */
 function areaNurseries(perms, key) {
   const per = perms.scan_area_nurseries || {};
@@ -393,7 +420,11 @@ function areaBlockHtml(area) {
   const on = areaOn(draft, area.key);
   const list = areaNurseries(draft, area.key);
   const all = list === null;
-  const chosen = new Set(all ? [] : list);
+  /* Matched on letters and digits alone, the same way the phone matches them
+     (Barcode_Counter src/lib/access.js `nurseryKey`). A row saved as "UNN 1"
+     and a chip valued "UNN1" are the same nursery, and a tick that failed to
+     show for one spelling would be taken away the moment Save was pressed. */
+  const chosen = new Set(all ? [] : list.map(nurseryKey));
   return `
     <div class="area-block ${on ? 'on' : ''}">
       <label class="flex items-start gap-3 cursor-pointer">
@@ -410,12 +441,14 @@ function areaBlockHtml(area) {
           <label class="nur ${all ? 'sel' : ''}">
             <input type="checkbox" data-anall="${area.key}" ${all ? 'checked' : ''}> All
           </label>
-          ${nurseries.map((n) => `
-            <label class="nur ${!all && chosen.has(n) ? 'sel' : ''}">
-              <input type="checkbox" data-narea="${area.key}" data-nname="${esc(n)}"
-                     ${!all && chosen.has(n) ? 'checked' : ''}>
-              ${esc(n)}
-            </label>`).join('')}
+          ${nurseries.map((n) => {
+            const sel = !all && chosen.has(nurseryKey(n.value));
+            return `
+            <label class="nur ${sel ? 'sel' : ''}" title="${esc(n.name)}">
+              <input type="checkbox" data-narea="${area.key}" data-nname="${esc(n.value)}"
+                     ${sel ? 'checked' : ''}>
+              ${esc(n.code)}
+            </label>`; }).join('')}
         </div>
       </div>
 
@@ -596,7 +629,7 @@ document.addEventListener('change', (e) => {
     const key = t.dataset.anall;
     draft.scan_area_nurseries = draft.scan_area_nurseries || {};
     if (t.checked) delete draft.scan_area_nurseries[key];
-    else draft.scan_area_nurseries[key] = nurseries.slice();
+    else draft.scan_area_nurseries[key] = nurseries.map((n) => n.value);
     return render();
   }
   if (t.dataset.narea) {
@@ -673,6 +706,61 @@ async function save() {
   flash('Saved for ' + (p.full_name || p.email || 'user'));
 }
 
+/* The nursery chips, built the way System Setting → Location builds its row.
+ *
+ * Four sources, and each is there because leaving it out loses something:
+ *
+ *   1. operation_nurseries — the register. This is the answer to "what
+ *      nurseries are there", and the whole point of the change.
+ *   2. KEEP_NURSERIES — the four sections the register files people under
+ *      whether or not the nursery table carries them. The table holds three
+ *      today and the register uses four; a screen showing only what came back
+ *      would be quietly missing one.
+ *   3. UNE — the Estate, same reasoning, and the Location card adds it the
+ *      same way.
+ *   4. Anything already saved on somebody's row. A nursery retired from the
+ *      register but still ticked for six people must stay visible, or an admin
+ *      cannot see what they hold and cannot take it away. Access nobody can
+ *      see is the thing this screen exists to prevent.
+ *
+ * Ordered by location — Pre Nursery, Main Nursery, Estate, then anything in
+ * none of them — so the row reads in the same order as the card it comes from.
+ */
+function buildNurseries(register, people) {
+  const LOC = window.MJMWorkerLocations;
+  const named = new Map();                          // code → register name
+  (register || []).forEach((n) => {
+    const c = LOC.code(n.name);
+    if (c) named.set(c, String(n.name || '').trim());
+  });
+
+  const codes = [];
+  const add = (c) => { if (c && !codes.includes(c)) codes.push(c); };
+  LOC.KEEP_NURSERIES.forEach((k) => add(k.code));
+  [...named.keys()].forEach(add);
+  add('UNE');
+
+  /* What people already hold, whatever the register says today. Kept under
+     its own name too, so the chip saves back exactly the spelling that is
+     already in the row rather than renaming it on the next Save. */
+  (people || []).forEach((p) => {
+    const per = (p.permissions || {}).scan_area_nurseries || {};
+    Object.keys(per).forEach((k) => {
+      if (!Array.isArray(per[k])) return;
+      per[k].forEach((name) => {
+        const c = LOC.code(name);
+        if (!c) return;
+        if (!named.has(c)) named.set(c, String(name).trim());
+        add(c);
+      });
+    });
+  });
+
+  const { locations, unplaced } = LOC.group(codes);
+  return locations.reduce((all, l) => all.concat(l.codes), []).concat(unplaced)
+    .map((c) => ({ code: c, name: named.get(c) || c, value: named.get(c) || c }));
+}
+
 /* ---- boot ---- */
 (async () => {
   try {
@@ -686,13 +774,12 @@ async function save() {
        above refuses to be the one that does it. */
     if (!MJMAccess.canScanArea('setting')) { $('forbidden').classList.remove('hidden'); return; }
 
-    const [plots, people] = await Promise.all([
-      _supabase.from('shared_plots').select('nursery_name'),
+    const [reg, people] = await Promise.all([
+      _supabase.from('operation_nurseries').select('name,license').order('name'),
       _supabase.from('shared_profiles').select('id, email, full_name, permissions')
         .order('full_name', { ascending: true }),
     ]);
 
-    nurseries = [...new Set(((plots && plots.data) || []).map((r) => r.nursery_name).filter(Boolean))].sort();
     // Only people the main User Access has opened the module for. Setting up
     // pages for somebody who cannot open the portal is a setting with no
     // effect, and a list of every account to scroll past.
@@ -700,6 +787,8 @@ async function save() {
       const lvl = ((p.permissions || {}).modules || {}).scan;
       return lvl && String(lvl).toLowerCase() !== 'none';
     });
+
+    nurseries = buildNurseries((reg && reg.data) || [], profiles);
 
     render();
     $('main').classList.remove('hidden');
