@@ -239,10 +239,27 @@ tr.jumlah-tr td{font-weight:700;font-size:12.5px;letter-spacing:0.4px;background
 .mc-value.a{color:#d97706;}
 .mc-value.r{color:var(--red);}
 .mc-value.b{color:var(--blue);}
+/* The rate under the number. A count on its own does not say whether it is
+   most of the month or a corner of it, which is the thing being read. */
+.mc-sub{font-size:11px;font-weight:700;color:var(--text-muted);margin-top:6px;letter-spacing:.02em;}
 .chk-btn{font-size:18px;cursor:pointer;transition:transform 0.1s;display:inline-block;text-align:center;width:100%;}
 .chk-btn:hover{transform:scale(1.25);}
 .chk-on{color:var(--green);}
 .chk-off{color:#c8dbd2;}
+/* A tick that does not apply yet — no verdict, or no case to close. A dot
+   rather than an empty cell, because an empty cell reads as a missing value
+   and this is a question that has not been reached. Not a button: it carries
+   its reason in the tooltip and nothing happens when it is pressed. */
+.chk-na{color:#dbe5e0;cursor:default;}
+.chk-na:hover{transform:none;}
+/* One walk, one button. Several on a row when several people worked the
+   job — they stack rather than squeezing onto one line. */
+.trk-btn{display:block;width:100%;margin:1px 0;padding:3px 6px;border-radius:8px;
+  border:1px solid #ccfbf1;background:#f0fdfa;color:#0f766e;
+  font-family:var(--font);font-size:10.5px;font-weight:800;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+  transition:background .15s,border-color .15s;}
+.trk-btn:hover{background:#ccfbf1;border-color:#5eead4;}
 
 /* ─── CHARTS ─── */
 .chart-block{background:var(--bg-white);border:1.5px solid var(--border);border-radius:var(--r-md);padding:16px 8px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
@@ -983,6 +1000,34 @@ th.we-plot,td.we-plot{width:1%;min-width:96px;}
 @media(min-width:768px){
   .sm-frame{display:grid;grid-template-columns:212px minmax(0,1fr);
     gap:24px;align-items:start;}
+  /* Pulled back. The column keeps a rail rather than closing to nothing:
+     a handle with no bar under it is a button in the middle of a page, and
+     the eye has to be told where the menu WENT. */
+  .sm-frame.nav-hid{grid-template-columns:26px minmax(0,1fr);gap:14px;}
+  .sm-frame.nav-hid #sm-nav{
+    /* Not display:none. The bar keeps its place in the grid so the handle
+       above it keeps its position, and the tabs stay in the DOM so
+       switchTab and applyNopsAdminUI go on finding their buttons. */
+    visibility:hidden;pointer-events:none;height:0;overflow:hidden;}
+}
+
+/* The handle. Sits in the gap it is opening and closing, at the height of
+   the section title beside it, so it reads as belonging to the edge rather
+   than floating over the content. */
+.sm-nav-toggle{display:none;}
+@media(min-width:768px){
+  .sm-nav-toggle{display:grid;place-items:center;position:sticky;top:84px;
+    z-index:5;width:26px;height:34px;margin:0;padding:0;
+    grid-column:1;grid-row:1;justify-self:end;align-self:start;
+    border:1px solid #ccfbf1;border-radius:9px;background:#f0fdfa;
+    color:#0f766e;font-size:11px;line-height:1;cursor:pointer;
+    transition:background .15s,color .15s;}
+  .sm-nav-toggle:hover{background:#ccfbf1;color:#115e59;}
+  /* Collapsed the rail IS the handle, so it takes the whole width. */
+  .nav-hid .sm-nav-toggle{justify-self:stretch;}
+  /* The bar starts under the handle rather than beside it. */
+  #sm-nav{grid-column:1;grid-row:2;}
+  .sm-body{grid-column:2;grid-row:1 / span 2;}
 }
 
 #sm-nav{display:block;}

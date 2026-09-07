@@ -1287,6 +1287,12 @@ const I18N = {
     'rec.auditBadTip':'The auditor checked this job and did not pass it',
     'rec.allJenis':'All Work Types', 'rec.allPlot':'All Plots', 'rec.filterDate':'Filter by date…',
     'rec.totalTasks':'Total Tasks', 'rec.gaiaDone':'Gaia Done', 'rec.gaiaPending':'Gaia Pending',
+    'rec.pendingTask':'Pending Task', 'rec.repairCase':'Total Repair Case',
+    'rec.doneOf':'{n} done \u00b7 {pct}%', 'rec.repairedOf':'{n} repaired \u00b7 {pct}%',
+    'rec.track':'Track Record', 'rec.trackView':'View track', 'rec.trackNone':'No walk was recorded for this job.',
+    'rec.nelos':'Nelos Case', 'rec.repaired':'Done Repair',
+    'rec.nelosNa':'A case is raised on Nelos when the auditor marks a job Unsatisfied. This one has not been.',
+    'rec.repairedNa':'Closed by the Field Conductor once the repair is done — after a case has been opened.',
     'rec.donePct':'Done %', 'rec.none':'No records found.',
     'jenis.pd':'P & D Spraying', 'jenis.interrow':'Interrow Spraying',
     'jenis.weeding':'Weeding', 'jenis.manuring':'Manuring',
@@ -1369,6 +1375,12 @@ const I18N = {
     'rec.auditBadTip':'Juruaudit telah memeriksa kerja ini dan tidak meluluskannya',
     'rec.allJenis':'Semua Jenis Kerja', 'rec.allPlot':'Semua Plot', 'rec.filterDate':'Tapis ikut tarikh…',
     'rec.totalTasks':'Jumlah Tugasan', 'rec.gaiaDone':'Gaia Selesai', 'rec.gaiaPending':'Gaia Belum',
+    'rec.pendingTask':'Tugasan Belum Siap', 'rec.repairCase':'Jumlah Kes Pembaikan',
+    'rec.doneOf':'{n} siap \u00b7 {pct}%', 'rec.repairedOf':'{n} dibaiki \u00b7 {pct}%',
+    'rec.track':'Rekod Laluan', 'rec.trackView':'Lihat laluan', 'rec.trackNone':'Tiada laluan direkodkan untuk kerja ini.',
+    'rec.nelos':'Kes Nelos', 'rec.repaired':'Pembaikan Selesai',
+    'rec.nelosNa':'Kes dibuka di Nelos apabila juruaudit menanda kerja Tidak Memuaskan. Kerja ini belum ditanda.',
+    'rec.repairedNa':'Ditutup oleh Field Conductor selepas pembaikan siap \u2014 selepas kes dibuka.',
     'rec.donePct':'% Selesai', 'rec.none':'Tiada rekod dijumpai.',
     'jenis.pd':'Penyemburan racun kulat dan serangga', 'jenis.interrow':'Meracun rumput secara selingan',
     'jenis.weeding':'Merumput', 'jenis.manuring':'Membaja',
@@ -1402,8 +1414,15 @@ const I18N = {
   },
 };
 let currentLang = localStorage.getItem('mjm_lang') || 'en';
-function t(key){
-  return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
+/* `vars` fills {name} placeholders, so a sentence with a number in it stays
+   ONE string per language and keeps its word order. Building it by
+   concatenation instead puts the English order into the Malay — and the two
+   do not agree about where a count goes. Optional: every existing caller
+   passes nothing and gets exactly what it always did. */
+function t(key, vars){
+  const s = (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
+  if (!vars) return s;
+  return s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? m : String(vars[k])));
 }
 /* Canonical BM jenis value → its translation key (for display only; stored value stays BM) */
 function jenisKey(j){
@@ -2015,8 +2034,13 @@ async function loadFieldRecords() {
     // Paged: the field writes roughly one row per plot per job per week, so
     // this table passes Supabase's 1000-row cap within a couple of months —
     // and a short read does not fail, it just quietly loses the newest work.
+    /* The GPS SUMMARY — how far, how many fixes, where it started — and never
+       gps_track itself. This reads a whole month of records, and a walk is a
+       thousand points; the line is fetched one record at a time when somebody
+       asks to see it (_openTrack). The summary is stored beside the track for
+       exactly this reason. */
     let res = await _mvFetchAll(() => _verifiedOnly(_supabase.from('nops_maint_field_records')
-      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at'))
+      .select('id, work_date, plot_name, work_type, jenis, batch_name, week_no, schedule_month, qty, worked_by, reported_by, verified_at, gps_lat, gps_lng, gps_points, gps_distance_m'))
       .order('id', { ascending: true }));
     // batch_name / week_no / schedule_month come from
     // shared/add_maint_field_batch.sql. Until that has been run the field is
@@ -2121,6 +2145,167 @@ function _auditCell(r) {
   return '<span style="color:var(--text-faint);">—</span>';
 }
 
+/* ══════════════════════════════════════════════════════════════
+   OPENING ONE WALK
+
+   Leaflet is a third of a megabyte and most people reading a month of records
+   never press this, so it arrives on the first press and not with the page.
+   Pinned and with the same integrity hashes operation_settings.html uses —
+   one version of Leaflet in this office, verified the same way.
+
+   The LINE is fetched here too, for the one record asked for. The month's
+   read deliberately carries only the summary; see loadFieldRecords.
+══════════════════════════════════════════════════════════════ */
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+const LEAFLET_CSS_SRI = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+const LEAFLET_JS_SRI  = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+
+let _leafletReady = null;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve(window.L);
+  if (_leafletReady) return _leafletReady;
+  _leafletReady = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = LEAFLET_CSS;
+    css.integrity = LEAFLET_CSS_SRI; css.crossOrigin = '';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = LEAFLET_JS; js.integrity = LEAFLET_JS_SRI; js.crossOrigin = '';
+    js.onload = () => resolve(window.L);
+    js.onerror = () => reject(new Error('Leaflet could not be loaded'));
+    document.head.appendChild(js);
+  });
+  return _leafletReady;
+}
+
+let _trkMap = null;
+
+function closeTrack() {
+  const box = document.getElementById('trk-modal');
+  if (box) box.classList.remove('open');
+  /* Destroyed, not hidden. Leaflet keeps listeners on a container it still
+     owns, and re-opening onto a live map draws the second track over the
+     first. */
+  if (_trkMap) { try { _trkMap.remove(); } catch (_) {} _trkMap = null; }
+}
+
+async function openTrack(id) {
+  const box = document.getElementById('trk-modal');
+  const body = document.getElementById('trk-body');
+  const note = document.getElementById('trk-note');
+  if (!box || !body) return;
+  closeTrack();
+  box.classList.add('open');
+  body.innerHTML = '';
+  if (note) note.textContent = t('common.loading') === 'common.loading' ? 'Loading…' : t('common.loading');
+
+  let row = null;
+  try {
+    const res = await _supabase.from('nops_maint_field_records')
+      .select('gps_track, gps_distance_m, gps_points, gps_started_at, gps_ended_at')
+      .eq('id', id).single();
+    if (res.error) throw res.error;
+    row = res.data;
+  } catch (e) {
+    if (note) note.textContent = 'Could not read the track — ' + (e.message || e);
+    return;
+  }
+
+  const pts = Array.isArray(row && row.gps_track) ? row.gps_track : [];
+  if (!pts.length) { if (note) note.textContent = t('rec.trackNone'); return; }
+
+  let L;
+  try { L = await loadLeaflet(); } catch (e) {
+    if (note) note.textContent = 'The map could not be loaded. ' + (e.message || '');
+    return;
+  }
+
+  const far = row.gps_distance_m != null
+    ? (row.gps_distance_m >= 1000 ? (row.gps_distance_m / 1000).toFixed(2) + ' km'
+                                  : Math.round(row.gps_distance_m) + ' m')
+    : '';
+  if (note) note.textContent = [far, row.gps_points ? row.gps_points + ' fixes' : '']
+    .filter(Boolean).join(' · ');
+
+  /* Stored as [lng, lat] — the order the phone writes and every other reader
+     of this column expects. Leaflet wants them the other way round. */
+  const latlngs = pts.map((p) => [p[1], p[0]]);
+  const map = L.map(body, { attributionControl: false });
+  _trkMap = map;
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    { maxZoom: 19, maxNativeZoom: 19 }).addTo(map);
+  const line = L.polyline(latlngs, { color: '#f43f5e', weight: 5, opacity: .95 }).addTo(map);
+  /* On the track, not on the country. Capped at the imagery's own limit
+     because a walk round one plot is small, and a track of a single fix has
+     no extent at all — without the cap fitBounds answers that with the
+     tightest zoom there is. Same rule as the phone's viewer. */
+  map.fitBounds(line.getBounds(), { padding: [28, 28], maxZoom: 19 });
+  setTimeout(() => map.invalidateSize(), 60);
+}
+
+/* Did the auditor fail this job? The one question three other things depend
+   on — the repair count on the summary, and both ticks at the end of the row.
+   Kept beside _auditCell so the two cannot come to different conclusions. */
+function _auditFailed(r) {
+  const ids = Array.isArray(r._fieldIds) && r._fieldIds.length ? r._fieldIds : [];
+  let found = ids.map((i) => maintAudits[String(i)]).filter(Boolean);
+  if (!found.length) found = [maintAudits[String(r.id)]].filter(Boolean);
+  return found.includes('Unsatisfactory');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE WALK, ON THE RECORDS THE CONDUCTOR HAS SIGNED
+
+   loadFieldRecords reads verified records only, so a track reaching this
+   column has already been through both hands the request names: the worker
+   who walked it and the Field Conductor who checked the work. An unverified
+   record is not evidence of anything and never gets here.
+
+   The cell offers a walk per record, because one job can be three workers
+   with three tracks and choosing one of them to show would be this page
+   deciding which man's morning counts.
+══════════════════════════════════════════════════════════════ */
+function _trackCell(r) {
+  const tr = Array.isArray(r._fieldTracks) ? r._fieldTracks : [];
+  if (!tr.length) return '<span style="color:var(--text-faint);">—</span>';
+  return tr.map((x) => {
+    const far = x.m != null ? (x.m >= 1000 ? (x.m / 1000).toFixed(2) + ' km'
+                                           : Math.round(x.m) + ' m') : '';
+    const tip = [x.who, far, x.n ? x.n + ' fixes' : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="trk-btn" onclick="openTrack(${x.id})"
+             title="${esc(tip || t('rec.trackView'))}">🛰️ ${esc(far || t('rec.trackView'))}</button>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AFTER AN UNSATISFIED VERDICT
+
+   Two ticks, in the order the work actually happens: the auditor opens a case
+   on Nelos, then the Field Conductor repairs the job and closes it.
+
+   They are kept HERE, on the maintenance row, and not read back from Nelos.
+   A Nelos case knows its plot and its subject; it does not know which of a
+   month's four rounds of spraying on that plot it was opened against, and
+   guessing would put a closed case against the wrong week's work. The tick is
+   the link, made by the person who made the case.
+
+   Neither is offered where it would mean nothing. Nelos Case only opens on a
+   job the auditor failed — there is no case to raise on work that passed —
+   and Done Repair only once a case exists, because closing a case nobody
+   opened is not a state this system should be able to record. Both say why
+   they are shut rather than being greyed out in silence.
+══════════════════════════════════════════════════════════════ */
+function _flagCell(r, field, on, why) {
+  if (!on) {
+    return `<span class="chk-btn chk-na" title="${esc(why)}">·</span>`;
+  }
+  const locked = _recLocked(r);
+  return `<span class="chk-btn ${r[field] ? 'chk-on' : 'chk-off'}${locked ? ' chk-locked' : ''}"
+           ${locked ? 'title="Checked — only an admin can change this"'
+                    : `onclick="togRec(${r.id},'${field}')"`}>${r[field] ? '☑' : '☐'}</span>`;
+}
+
 /* "Round 2: Daconil 50gm" → 2 */
 /* Which of the four Worker Record sheets a job belongs on. PAYROLL_TYPES
    already says it the other way round; this is that map inverted, built once
@@ -2215,6 +2400,16 @@ function _summariseFieldGroup(list) {
     batches: uniq(list.flatMap((f) => String(f.batch_name || '').split(',').map((x) => x.trim()))),
     workers: uniq(list.flatMap(_fieldCredits)),
     qty:     newest ? newest.qty : null,
+    /* The records in this group that carry a walk, newest first — one job can
+       be three workers and three tracks, and the Track Record cell offers
+       each of them rather than picking one and calling it the answer. The
+       LINE is not here: only the summary is read for the whole month, and the
+       thousand points of a walk are fetched for the one record somebody
+       opens. See _openTrack. */
+    tracks:  list.filter((f) => f.gps_points > 0 || f.gps_distance_m != null)
+                 .sort((a, b) => (b.id || 0) - (a.id || 0))
+                 .map((f) => ({ id: f.id, m: f.gps_distance_m, n: f.gps_points,
+                                who: (_fieldCredits(f) || [])[0] || '' })),
   };
 }
 
@@ -2294,6 +2489,7 @@ function applyFieldRecords(nursery, monthLbl) {
       if (r._fromFieldQty)   { r.qty    = null; delete r._fromFieldQty; }
       delete r._fieldDates;
       delete r._fieldIds;
+      delete r._fieldTracks;
       syncTicks(r, null);
       return;
     }
@@ -2303,6 +2499,8 @@ function applyFieldRecords(nursery, monthLbl) {
        link goes, so an unverified or deleted record cannot leave a verdict
        pointing at nothing. */
     r._fieldIds = g.ids.slice();
+    // The walks on those records, for the Track Record column.
+    r._fieldTracks = (g.tracks || []).slice();
     if (!r.tarikh || r.tarikh === '-' || r._fromFieldDate) {
       /* tarikh stays ONE date — the earliest. Everything downstream reads it
          as a date and would choke on a list: the month timeline, the Worker
@@ -2450,6 +2648,47 @@ function applyNopsAdminUI() {
    nothing has to keep a parallel list of which button is which. */
 function navTabFor(name) {
   return document.querySelector(`#sm-nav .pn-tab[onclick*="'${name}'"]`);
+}
+
+/* ── Pulling the side bar out of the way ──────────────────────────────
+   The Work Record table is twelve columns wide, and two hundred pixels of
+   navigation nobody is reading while going through a month of records is two
+   hundred pixels the records could have had.
+
+   Collapsed the bar keeps its place in the grid and only loses its width and
+   its visibility — never display:none. switchTab and applyNopsAdminUI both
+   reach for those buttons by id, and a bar that is not in the DOM is a page
+   that throws the first time somebody hides it and then switches panel.
+
+   Remembered per browser. Somebody who works with it closed opens it closed
+   tomorrow, which is the whole point of a preference. */
+const NAV_HIDDEN_KEY = 'mjm_maint_nav_hidden';
+
+function applyNav() {
+  const frame = document.querySelector('.sm-frame');
+  const btn = document.getElementById('sm-nav-toggle');
+  if (!frame) return;
+  let hidden = false;
+  try { hidden = localStorage.getItem(NAV_HIDDEN_KEY) === '1'; } catch (_) {}
+  frame.classList.toggle('nav-hid', hidden);
+  if (btn) {
+    btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+    btn.title = hidden ? 'Show the menu' : 'Hide the menu';
+    const ico = document.getElementById('sm-nav-toggle-ico');
+    if (ico) ico.innerHTML = hidden ? '&#10095;' : '&#10094;';
+  }
+}
+
+function toggleNav() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(NAV_HIDDEN_KEY) === '1'; } catch (_) {}
+  /* A browser with storage switched off still gets the toggle — it simply
+     forgets between visits, which is better than a button that does nothing
+     because it could not write down what it did. */
+  try { localStorage.setItem(NAV_HIDDEN_KEY, hidden ? '0' : '1'); } catch (_) {}
+  const frame = document.querySelector('.sm-frame');
+  if (frame) frame.classList.toggle('nav-hid', !hidden);
+  applyNav();
 }
 
 function switchTab(name, btn) {
@@ -3588,16 +3827,35 @@ function renderRecords() {
   // Metrics count only current nursery records
   const nurseryRecs = records.filter(r => nurseryPlots.includes(r.plot));
   const total  = nurseryRecs.length;
-  const gDone  = nurseryRecs.filter(r=>r.gaia).length;
-  const gPend  = total - gDone;
-  const pct    = total ? Math.round(gDone/total*100) : 0;
+  /* DONE means the field did it and the conductor signed it off.
+     _fieldIds is only ever set from loadFieldRecords, which reads verified
+     records and nothing else — so a linked row is work that has been through
+     both hands. The old Gaia tick still counts where somebody set it: it was
+     the only way to say "done" before the portal existed, and rows carrying
+     one are rows somebody answered. Nothing is taken away by reading it. */
+  const done   = nurseryRecs.filter(r => (Array.isArray(r._fieldIds) && r._fieldIds.length) || r.gaia).length;
+  const pend   = total - done;
+  const pct    = (n) => (total ? Math.round(n / total * 100) : 0);
+  /* A REPAIR CASE is a job the auditor failed. That is the whole of it: the
+     Nelos tick beside it records that somebody raised the case, and the
+     repair tick that it was closed, but the CASE exists the moment the
+     verdict does — counting the ticks instead would report a failure nobody
+     had got round to filing yet as no failure at all. */
+  const repair = nurseryRecs.filter(_auditFailed).length;
+  const fixed  = nurseryRecs.filter((r) => _auditFailed(r) && r.repaired).length;
 
   const _recMx = document.getElementById('rec-metrics');
   if (_recMx) _recMx.innerHTML=`
-    <div class="metric-card mc-blue" ><div class="mc-label">${t('rec.totalTasks')}</div><div class="mc-value b">${total}</div></div>
-    <div class="metric-card mc-green"><div class="mc-label">${t('rec.gaiaDone')}</div><div class="mc-value g">${gDone}</div></div>
-    <div class="metric-card mc-amber"><div class="mc-label">${t('rec.gaiaPending')}</div><div class="mc-value a">${gPend}</div></div>
-    <div class="metric-card mc-amber"><div class="mc-label">${t('rec.donePct')}</div><div class="mc-value a">${pct}%</div></div>
+    <div class="metric-card mc-blue"><div class="mc-label">${t('rec.totalTasks')}</div>
+      <div class="mc-value b">${total}</div>
+      <div class="mc-sub">${t('rec.doneOf', { n: done, pct: pct(done) })}</div></div>
+    <div class="metric-card mc-amber"><div class="mc-label">${t('rec.pendingTask')}</div>
+      <div class="mc-value a">${pend}</div>
+      <div class="mc-sub">${pct(pend)}%</div></div>
+    <div class="metric-card mc-red"><div class="mc-label">${t('rec.repairCase')}</div>
+      <div class="mc-value r">${repair}</div>
+      <div class="mc-sub">${repair ? t('rec.repairedOf', { n: fixed, pct: Math.round(fixed / repair * 100) })
+                                   : pct(repair) + '%'}</div></div>
   `;
 
   // Repopulate plot filter — only plots from current nursery that have records
@@ -3609,7 +3867,7 @@ function renderRecords() {
 
   const tbody = document.getElementById('rec-body');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:2.5rem;color:var(--text-faint);">${t('rec.none')}</td></tr>`;
     return;
   }
 
@@ -3627,13 +3885,13 @@ function renderRecords() {
   sortedPlots.forEach(plot => {
     const recs = plotGroups[plot];
     html += `<tr class="plot-group-row">
-      <td colspan="10" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
+      <td colspan="12" class="rec-group-cell" style="padding:12px 14px 9px;font-weight:700;letter-spacing:1px;
         text-transform:uppercase;color:var(--green-text);background:var(--green-light);
         border-top:2px solid var(--green-mid);border-bottom:1px solid var(--green-mid);">
         📍 Plot ${plot}
         <span class="rec-group-sub" style="font-weight:400;color:var(--text-muted);margin-left:8px;">
           ${recs.length} task${recs.length>1?'s':''} &nbsp;·&nbsp;
-          ${recs.filter(r=>r.gaia).length} Gaia ✓
+          ${recs.filter(r=>(Array.isArray(r._fieldIds)&&r._fieldIds.length)||r.gaia).length} done
         </span>
       </td>
     </tr>`;
@@ -3645,9 +3903,11 @@ function renderRecords() {
         <td style="text-align:center;font-weight:700;color:var(--green-text);">${r.plot}</td>
         <td style="text-align:center;color:var(--text-muted);">${r.batch||'—'}</td>
         <td style="text-align:center;font-weight:700;color:var(--text-head);">${_qtyCell(r)}</td>
-        <td style="text-align:center;"><span class="chk-btn ${r.gaia?'chk-on':'chk-off'}${(r.checked && !isNopsAdmin)?' chk-locked':''}" ${(r.checked && !isNopsAdmin)?'title="Checked — only an admin can change this"':`onclick="togRec(${r.id},'gaia')"`}>${r.gaia?'☑':'☐'}</span></td>
+        <td style="text-align:center;">${_trackCell(r)}</td>
         <td style="color:var(--text-muted);">${r.remark||'—'}</td>
         <td style="text-align:center;">${_auditCell(r)}</td>
+        <td style="text-align:center;">${_flagCell(r, 'nelos', _auditFailed(r), t('rec.nelosNa'))}</td>
+        <td style="text-align:center;">${_flagCell(r, 'repaired', !!r.nelos, t('rec.repairedNa'))}</td>
         <td style="white-space:nowrap;">
           ${r.checked
             ? `<span class="rec-checked-badge" title="Checked — locked for normal users">✓ Checked</span>` +
@@ -4583,6 +4843,8 @@ async function initDb() {
     const key = landing && landing.id.replace(/^tab-/, '');
     if (key) switchTab(key, navTabFor(key));
   } catch (_) {}
+  // Whichever way the bar was left last time.
+  try { applyNav(); } catch (_) {}
   /* The schedules build their dropdowns from `chemicals` and `fertilisers`,
      neither of which existed at first paint. */
   renderAll();
