@@ -160,7 +160,20 @@ const PAGES = [
 
        Signing off is different, and stays here. Verifying, correcting,
        removing and taking the month away are things one person may do and
-       the next may not, which is exactly what a per-person screen is for. */
+       the next may not, which is exactly what a per-person screen is for.
+
+       ── Do not put `record` back in this list without reading this ──
+
+       When Record work left it, the seeding below stopped writing the key —
+       and the phone was still reading it with canScan, which is all-or-
+       nothing per page: once a person's maintenance entry exists, a key not
+       named in it is OFF. So every row saved here afterwards lost Record Work
+       with no tick left anywhere to give it back, and switching it ON for the
+       company did nothing, because canScan reads the company's veto and not
+       its ON. The phone answers `record` through canMaintFn now, the same way
+       it answers the other six. Adding a tick here again would be an explicit
+       answer that beats the company switch — which is fine, but it is a
+       decision, not a tidy-up. */
     actions:[
       { key:'verify', label:'Verify work done',
         desc:'Sign off a record a worker made, so the office can see it was checked' },
