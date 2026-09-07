@@ -1432,7 +1432,7 @@
                                     <span>Main Plot</span>
                                     <span class="!whitespace-nowrap">Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
-                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled DOs excluded)">Sales</span>
+                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled and CAL-… calibration DOs excluded)">Sales</span>
                                     <span title="Auto: Transplanted − 2nd Culled − Sales − Transferred out">Balance</span>
                                     <span class="text-[#a83020]" title="Auto: 2nd Culled + Balance, with the rate below it">3rd Culled</span>
                                     <span>Drone Map</span>
@@ -6790,9 +6790,20 @@ Thank you.`;
                 // list below is every DO/line/qty that added up to that N,
                 // ordered by DO number so you can cross-check against the
                 // DO modal.
+                // A "CAL-…" DO number is a bulk stock calibration/correction,
+                // not a customer collection — operation_stock_sales.js's own
+                // Collection dashboard already excludes these from its
+                // "sold" totals (_isCalibrationDo()) for exactly that reason.
+                // This Sales figure never had the same exclusion, so a
+                // calibration DO touching this batch's plot was counted as
+                // a real sale here even though nothing left the nursery for
+                // a customer — inflating Sales, and with it Balance and
+                // 3rd Culled below (both are computed FROM Sales).
+                const _isCalDo = d => /^CAL-/i.test(String((d && d.do_number) || ''));
                 const _salesTrace = [];
                 ((doRes && doRes.data) || []).forEach(d => {
                     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
+                    if (_isCalDo(d)) return;
                     // How many collection lines does this DO actually carry?
                     let filled = 0;
                     for (let i = 1; i <= 5; i++) if (_normPlotKey(d[`plot_${i}`])) filled++;
