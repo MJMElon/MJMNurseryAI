@@ -54,6 +54,7 @@
   #t6-total-transplanted · #t6-total-culled · #t6-avg-cull-rate
   .t6-plot-row · .t6-balance(hidden) · .t6-culled-input · .t6-cull-rate-cell
   #t6-sales-modal — DOs behind a Sales figure (openT6SalesModal)
+  #t6-sales-tip   — hover tooltip, same data (showT6SalesTip)
   NOTE: .t6-balance is now a hidden input (auto = transplanted qty)
   ============================================================ -->
 <html lang="en">
@@ -238,6 +239,11 @@
             <div class="p-6" id="t6-sales-modal-body"></div>
         </div>
     </div>
+
+    <!-- Hover tooltip for a Sales figure: the same DO lines the modal shows,
+         at a glance. pointer-events:none so it never swallows the click that
+         opens the full modal. -->
+    <div id="t6-sales-tip" class="hidden fixed z-[9500] pointer-events-none bg-white border border-[#e8dcc8] rounded-2xl shadow-[0_12px_32px_rgba(26,21,13,0.25)] px-4 py-3 max-w-[340px]"></div>
 
     <div class="modal-backdrop">
         <div class="modal-window flex flex-col">
@@ -7153,8 +7159,8 @@ Thank you.`;
                                 <div class="text-[9px] font-black text-[#3a7ab4] uppercase lg:hidden mb-0.5">Sales</div>
                                 ${(p.salesDOs && p.salesDOs.length)
                                     ? `<button type="button" class="text-base font-black text-[#3a7ab4] underline decoration-dotted underline-offset-4 hover:text-[#1d5a94] cursor-pointer bg-transparent border-0 p-0 font-[inherit]"
-                                            title="${p.salesDOs.length} Delivery Note${p.salesDOs.length === 1 ? '' : 's'} — click to see which DOs make up this figure"
-                                            onclick="openT6SalesModal(${i})">${sales.toLocaleString()}</button>`
+                                            onmouseenter="showT6SalesTip(this, ${i})" onmouseleave="hideT6SalesTip()"
+                                            onclick="hideT6SalesTip(); openT6SalesModal(${i})">${sales.toLocaleString()}</button>`
                                     : `<div class="text-base font-black text-[#3a7ab4]">${sales.toLocaleString()}</div>`}
                             </div>
 
@@ -7401,6 +7407,53 @@ Thank you.`;
         }
         function closeT6SalesModal() {
             document.getElementById('t6-sales-modal').classList.add('hidden');
+        }
+
+        /* Hover version of the same breakdown: the DO lines appear the moment
+           the pointer rests on a Sales figure, no click needed. Long lists are
+           capped so the tip stays a tip — the modal (click) always has the
+           full list with links. */
+        function showT6SalesTip(anchorEl, rowIdx) {
+            const p = t6_plotData[rowIdx];
+            if (!p || !p.salesDOs || !p.salesDOs.length) return;
+            const rows = p.salesDOs.slice().sort((a, b) =>
+                String(a.doNumber || '').localeCompare(String(b.doNumber || ''), undefined, { numeric: true }));
+            const total = rows.reduce((s, r) => s + (r.qty || 0), 0);
+            const MAX = 8;
+            let html = `<div class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest mb-2">Sales — ${rows.length} Delivery Note${rows.length === 1 ? '' : 's'} · Plot ${_t6Esc(p.plot)}</div>`;
+            rows.slice(0, MAX).forEach(r => {
+                html += `
+                    <div class="flex items-baseline gap-2 py-0.5 text-[11px] whitespace-nowrap">
+                        <span class="font-black text-[#3a7ab4]">${_t6Esc(r.doNumber || '—')}</span>
+                        <span class="font-bold text-[#8a7a68]">${_t6FmtDate(r.date)}</span>
+                        <span class="font-bold text-[#3d2610] uppercase truncate max-w-[120px]">${_t6Esc(r.customer)}</span>
+                        <span class="ml-auto font-black text-[#3a7ab4]">${Number(r.qty || 0).toLocaleString()}${r.fallback ? '*' : ''}</span>
+                    </div>`;
+            });
+            if (rows.length > MAX) {
+                html += `<div class="text-[10px] font-black text-[#c07820] uppercase tracking-widest pt-1">+ ${rows.length - MAX} more…</div>`;
+            }
+            html += `
+                <div class="flex items-baseline gap-2 border-t border-[#e8dcc8] mt-1.5 pt-1.5 text-[11px]">
+                    <span class="font-black text-[#3d2610] uppercase tracking-widest text-[9px]">Total</span>
+                    <span class="ml-auto font-black text-[#3a7ab4]">${total.toLocaleString()}</span>
+                </div>
+                <div class="text-[9px] font-bold text-[#8a7a68] uppercase tracking-widest mt-1.5">Click for full details & DO links</div>`;
+            const tip = document.getElementById('t6-sales-tip');
+            tip.innerHTML = html;
+            tip.classList.remove('hidden');
+            // Below the figure, clamped to the viewport; above it when there
+            // is no room underneath.
+            const a = anchorEl.getBoundingClientRect();
+            const t = tip.getBoundingClientRect();
+            let left = Math.min(Math.max(8, a.left), window.innerWidth - t.width - 8);
+            let top  = a.bottom + 8;
+            if (top + t.height > window.innerHeight - 8) top = Math.max(8, a.top - t.height - 8);
+            tip.style.left = left + 'px';
+            tip.style.top  = top + 'px';
+        }
+        function hideT6SalesTip() {
+            document.getElementById('t6-sales-tip').classList.add('hidden');
         }
 
         /* One movement out of a plot: when, where to, how many. A plot can send
