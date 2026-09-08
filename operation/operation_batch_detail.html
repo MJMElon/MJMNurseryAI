@@ -53,6 +53,7 @@
   #t6-done-count · #t6-plot-count
   #t6-total-transplanted · #t6-total-culled · #t6-avg-cull-rate
   .t6-plot-row · .t6-balance(hidden) · .t6-culled-input · .t6-cull-rate-cell
+  #t6-sales-modal — DOs behind a Sales figure (openT6SalesModal)
   NOTE: .t6-balance is now a hidden input (auto = transplanted qty)
   ============================================================ -->
 <html lang="en">
@@ -219,6 +220,24 @@
 <body>
 
     <div id="toast-container"></div>
+
+    <!-- Tab 6 Sales click-through: the Customer Order Monitoring Delivery
+         Notes behind one plot's Sales figure. Sits ABOVE the page's own
+         modal-backdrop (z-10/20), below toasts (z-9999). -->
+    <div id="t6-sales-modal" class="hidden fixed inset-0 z-[9000] bg-[rgba(26,21,13,0.7)] backdrop-blur-sm overflow-y-auto flex justify-center items-start p-4 md:p-8" onclick="if (event.target === this) closeT6SalesModal()">
+        <div class="bg-[#f8f4ec] w-full max-w-2xl rounded-3xl shadow-2xl border border-[#e8dcc8] mt-8">
+            <div class="px-6 py-5 border-b border-[#e8dcc8] flex justify-between items-center bg-white rounded-t-3xl">
+                <div>
+                    <h3 class="text-lg font-black text-[#3d2610] uppercase tracking-widest" id="t6-sales-modal-title">Sales — Plot</h3>
+                    <p class="text-[10px] font-bold text-[#8a7a68] uppercase tracking-widest mt-0.5">Delivery Notes from Customer Order Monitoring (cancelled & CAL-… calibration DOs excluded)</p>
+                </div>
+                <button type="button" onclick="closeT6SalesModal()" class="w-9 h-9 rounded-full bg-[#f8f4ec] border border-[#e8dcc8] text-[#8a7a68] hover:text-[#a83020] hover:border-[#a83020] flex items-center justify-center shrink-0" title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6" id="t6-sales-modal-body"></div>
+        </div>
+    </div>
 
     <div class="modal-backdrop">
         <div class="modal-window flex flex-col">
@@ -1432,7 +1451,7 @@
                                     <span>Main Plot</span>
                                     <span class="!whitespace-nowrap">Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
-                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled and CAL-… calibration DOs excluded)">Sales</span>
+                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled and CAL-… calibration DOs excluded). Click a figure to see the DOs behind it.">Sales</span>
                                     <span title="Auto: Transplanted − 2nd Culled − Sales − Transferred out">Balance</span>
                                     <span class="text-[#a83020]" title="Auto: 2nd Culled + Balance, with the rate below it">3rd Culled</span>
                                     <span>Drone Map</span>
@@ -6753,8 +6772,9 @@ Thank you.`;
             //   balance = transplanted − 2nd culled (dead) − sales.
             const dead2Map = {}; // PLOT → 2nd-culling dead qty
             const salesMap = {}; // PLOT → sold qty from the D/O collection details
+            const salesDOsByPlot = {}; // PLOT → the DO lines behind that qty (feeds the Sales click-through modal)
             if (batchId) {
-                const [c2Res, doRes] = await Promise.all([
+                const [c2Res, doRes, alRes] = await Promise.all([
                     _supabase.from('shared_inventory_logs')
                         .select('plot_name, quantity_change')
                         .eq('batch_name', batchId)
@@ -6764,9 +6784,18 @@ Thank you.`;
                     // Collection Details" lines — plot_N / qty_N / batch_N —
                     // parsed exactly as the Summary report does.
                     _supabase.from('shared_do_records')
-                        .select('do_number, total_qty, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+                        .select('id, do_number, al_number, delivery_date, total_qty, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
+                        .then(r => r, () => ({ data: [] })),
+                    // Customer name lives on the linked Approval Letter, not the
+                    // DO row — same resolution the DO list itself does.
+                    _supabase.from('shared_al_orders')
+                        .select('al_number, customer_name')
                         .then(r => r, () => ({ data: [] }))
                 ]);
+                const custByAl = {};
+                ((alRes && alRes.data) || []).forEach(a => {
+                    if (a.al_number && !(a.al_number in custByAl)) custByAl[a.al_number] = a.customer_name || '';
+                });
                 ((c2Res && c2Res.data) || []).forEach(l => {
                     const k = String(l.plot_name || '').trim().toUpperCase();
                     if (k) dead2Map[k] = (dead2Map[k] || 0) + Math.abs(l.quantity_change || 0);
@@ -6816,6 +6845,18 @@ Thank you.`;
                         if (fallback) qty = Number(d.total_qty || 0); // single-line DO
                         if (!qty) { console.warn('[t6:sales] DO', d.do_number, 'line', i, 'has no qty — skipped'); continue; }
                         salesMap[plotKey] = (salesMap[plotKey] || 0) + qty;
+                        // Same rows the console trace logs, kept for the
+                        // click-through modal so the office can see WHICH
+                        // Customer Order Monitoring DOs make up a Sales figure
+                        // without opening DevTools.
+                        (salesDOsByPlot[plotKey] = salesDOsByPlot[plotKey] || []).push({
+                            doId:     d.id,
+                            doNumber: d.do_number,
+                            date:     d.delivery_date,
+                            customer: custByAl[d.al_number] || d.remark || '—',
+                            qty,
+                            fallback
+                        });
                         _salesTrace.push({
                             do: d.do_number, line: i, plot: plotKey, qty,
                             raw_batch: d[`batch_${i}`], status: d.status,
@@ -6918,6 +6959,7 @@ Thank you.`;
                         recordCount:   v.records,
                         dead2:         dead2Map[key] || 0,
                         sales:         salesMap[key] || 0,
+                        salesDOs:      salesDOsByPlot[key] || [],
                         savedBalance:  saved.balance ?? null,
                         savedCulled:   saved.culled  ?? null,
                         savedDocUrl:   saved.docUrl  ?? null,
@@ -7003,6 +7045,7 @@ Thank you.`;
                             destTypes:    Array.from(v.destTypes),
                             dead2:        dead2Map[key] || 0,
                             sales:        salesMap[key] || 0,
+                            salesDOs:     salesDOsByPlot[key] || [],
                             savedBalance: balance,
                             savedCulled:  culled,
                             savedDocUrl:  docUrl,
@@ -7104,10 +7147,15 @@ Thank you.`;
                                 <div class="text-base font-black text-[#a83020]">${dead2.toLocaleString()}</div>
                             </div>
 
-                            <!-- Sales — collected qty from collection bookings -->
+                            <!-- Sales — sold qty from Customer Order Monitoring DOs.
+                                 Clicking the figure opens the list of DOs behind it. -->
                             <div class="pt-1">
                                 <div class="text-[9px] font-black text-[#3a7ab4] uppercase lg:hidden mb-0.5">Sales</div>
-                                <div class="text-base font-black text-[#3a7ab4]">${sales.toLocaleString()}</div>
+                                ${(p.salesDOs && p.salesDOs.length)
+                                    ? `<button type="button" class="text-base font-black text-[#3a7ab4] underline decoration-dotted underline-offset-4 hover:text-[#1d5a94] cursor-pointer bg-transparent border-0 p-0 font-[inherit]"
+                                            title="${p.salesDOs.length} Delivery Note${p.salesDOs.length === 1 ? '' : 's'} — click to see which DOs make up this figure"
+                                            onclick="openT6SalesModal(${i})">${sales.toLocaleString()}</button>`
+                                    : `<div class="text-base font-black text-[#3a7ab4]">${sales.toLocaleString()}</div>`}
                             </div>
 
                             <!-- Balance — AUTO: transplanted − 2nd culled − sales − transferred out.
@@ -7284,6 +7332,75 @@ Thank you.`;
             const sales = p.sales || 0;
             const bal   = Math.max(0, (p.qty || 0) - dead2 - sales - (moved || 0));
             return { dead2, sales, bal, culled: dead2 + bal };
+        }
+
+        /* The DOs behind one plot row's Sales figure, on screen instead of in
+           the console. Each DO number links straight to its Manage/View modal
+           on the Customer Order Monitoring page (?manageDO= is handled there),
+           so a figure that looks wrong can be chased to its source in one
+           click. The listed rows are EXACTLY the ones summed into salesMap —
+           same data, no re-query — so the total here always equals the cell. */
+        function _t6Esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function _t6FmtDate(v) {
+            if (!v) return '—';
+            const d = new Date(v);
+            if (isNaN(d.getTime())) return _t6Esc(v);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+        function openT6SalesModal(rowIdx) {
+            const p = t6_plotData[rowIdx];
+            if (!p || !p.salesDOs || !p.salesDOs.length) return;
+            const rows = p.salesDOs.slice().sort((a, b) =>
+                String(a.doNumber || '').localeCompare(String(b.doNumber || ''), undefined, { numeric: true }));
+            const total = rows.reduce((s, r) => s + (r.qty || 0), 0);
+            document.getElementById('t6-sales-modal-title').innerText = `Sales — Plot ${p.plot}`;
+            let html = `
+                <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-[9px] font-black text-[#8a7a68] uppercase tracking-widest border-b border-[#e8dcc8]">
+                            <th class="py-2 pr-3">DO Number</th>
+                            <th class="py-2 pr-3">Delivery Date</th>
+                            <th class="py-2 pr-3">Customer</th>
+                            <th class="py-2 text-right">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            rows.forEach(r => {
+                const doCell = r.doId != null
+                    ? `<a href="operation_delivery.html?manageDO=${encodeURIComponent(r.doId)}" target="_blank" rel="noopener"
+                          class="font-black text-[#3a7ab4] underline decoration-dotted underline-offset-4 hover:text-[#1d5a94]"
+                          title="Open this DO in Customer Order Monitoring">${_t6Esc(r.doNumber || '—')}</a>`
+                    : `<span class="font-black text-[#3d2610]">${_t6Esc(r.doNumber || '—')}</span>`;
+                html += `
+                        <tr class="border-b border-[#efe7d8] text-sm">
+                            <td class="py-2.5 pr-3">${doCell}</td>
+                            <td class="py-2.5 pr-3 font-bold text-[#3d2610] whitespace-nowrap">${_t6FmtDate(r.date)}</td>
+                            <td class="py-2.5 pr-3 font-bold text-[#3d2610] uppercase">${_t6Esc(r.customer)}</td>
+                            <td class="py-2.5 text-right font-black text-[#3a7ab4] whitespace-nowrap">${Number(r.qty || 0).toLocaleString()}${r.fallback ? ' <span class="text-[9px] font-black text-[#c07820] uppercase" title="This DO line had no qty of its own — the DO’s total qty was used (single-line DO)">*</span>' : ''}</td>
+                        </tr>`;
+            });
+            html += `
+                    </tbody>
+                    <tfoot>
+                        <tr class="text-sm">
+                            <td colspan="3" class="py-3 font-black text-[#3d2610] uppercase tracking-widest text-[10px]">Total — matches the Sales figure</td>
+                            <td class="py-3 text-right font-black text-[#3a7ab4] text-base">${total.toLocaleString()}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                </div>`;
+            if (rows.some(r => r.fallback)) {
+                html += `<p class="mt-3 text-[10px] font-bold text-[#c07820]">* Qty taken from the DO's total qty because its only collection line had no qty keyed.</p>`;
+            }
+            document.getElementById('t6-sales-modal-body').innerHTML = html;
+            document.getElementById('t6-sales-modal').classList.remove('hidden');
+        }
+        function closeT6SalesModal() {
+            document.getElementById('t6-sales-modal').classList.add('hidden');
         }
 
         /* One movement out of a plot: when, where to, how many. A plot can send
