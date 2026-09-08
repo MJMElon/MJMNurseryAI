@@ -6699,6 +6699,32 @@ Thank you.`;
         // (see renderT6PlotRows) can show the same thing without DevTools.
         let t6_salesTraceByPlot = {};
 
+        // Supabase caps one request at 1000 rows. shared_do_records is long
+        // past that, so a plain .select() silently drops every DO after the
+        // first page — a DO for an older/quieter batch can vanish from Sales
+        // entirely while a newer batch's DO comes through fine, with no error
+        // anywhere to say why. shared_plot_movement.js already pages around
+        // this same limit on the same table; this is that pattern, local to
+        // this file since that module isn't loaded here.
+        async function _fetchAllRows(build, pageSize = 1000) {
+            const all = [];
+            for (let from = 0; ; from += pageSize) {
+                let data, error;
+                try {
+                    ({ data, error } = await build().range(from, from + pageSize - 1));
+                } catch (e) {
+                    // A network hiccup here shouldn't take the whole tab down —
+                    // same reasoning the plain .select() fallback had before.
+                    console.warn('[t6:sales] page fetch threw', e);
+                    break;
+                }
+                if (error) { console.warn('[t6:sales] page fetch failed', error); break; }
+                all.push(...(data || []));
+                if (!data || data.length < pageSize) break;
+            }
+            return all;
+        }
+
         async function syncTab6() {
             const batchId = document.getElementById('f-batchno').value.trim();
             t6_plotData = [];
@@ -6763,7 +6789,7 @@ Thank you.`;
             // doesn't keep showing the previous batch's breakdown.
             t6_salesTraceByPlot = {};
             if (batchId) {
-                const [c2Res, doRes, alRes] = await Promise.all([
+                const [c2Res, doRows, alRows] = await Promise.all([
                     _supabase.from('shared_inventory_logs')
                         .select('plot_name, quantity_change')
                         .eq('batch_name', batchId)
@@ -6771,24 +6797,27 @@ Thank you.`;
                     // Sales come from Customer Order Monitoring's Delivery Notes
                     // (shared_do_records). Each DO carries up to 5 "Nursery
                     // Collection Details" lines — plot_N / qty_N / batch_N —
-                    // parsed exactly as the Summary report does.
-                    _supabase.from('shared_do_records')
+                    // parsed exactly as the Summary report does. Paged in full
+                    // (see _fetchAllRows) — this table is well past the 1000-row
+                    // single-request cap.
+                    _fetchAllRows(() => _supabase.from('shared_do_records')
                         .select('do_number, al_number, total_qty, status, remark, plot_1, qty_1, batch_1, plot_2, qty_2, batch_2, plot_3, qty_3, batch_3, plot_4, qty_4, batch_4, plot_5, qty_5, batch_5')
-                        .then(r => r, () => ({ data: [] })),
+                        .order('id', { ascending: true })),
                     // A DO doesn't carry the customer's name itself — it lives on
                     // the Approval Letter it's linked to (same join Customer Order
                     // Monitoring and the DO List use). Fetched here only so the
-                    // Sales tooltip below can name whose order each line was.
-                    _supabase.from('shared_al_orders')
+                    // Sales tooltip below can name whose order each line was —
+                    // paged for the same reason as shared_do_records above.
+                    _fetchAllRows(() => _supabase.from('shared_al_orders')
                         .select('al_number, customer_name')
-                        .then(r => r, () => ({ data: [] }))
+                        .order('al_number', { ascending: true }))
                 ]);
                 ((c2Res && c2Res.data) || []).forEach(l => {
                     const k = String(l.plot_name || '').trim().toUpperCase();
                     if (k) dead2Map[k] = (dead2Map[k] || 0) + Math.abs(l.quantity_change || 0);
                 });
                 const alNameByNumber = {};
-                ((alRes && alRes.data) || []).forEach(a => {
+                (alRows || []).forEach(a => {
                     if (a.al_number) alNameByNumber[a.al_number] = a.customer_name || '';
                 });
 
@@ -6811,7 +6840,7 @@ Thank you.`;
                 // ordered by DO number so you can cross-check against the
                 // DO modal.
                 const _salesTrace = [];
-                ((doRes && doRes.data) || []).forEach(d => {
+                (doRows || []).forEach(d => {
                     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
                     // How many collection lines does this DO actually carry?
                     let filled = 0;
