@@ -6692,6 +6692,16 @@ Thank you.`;
         // ═══════════════════════════════════════════════════════
         let t6_plotDocs = {};   // { rowId: { name, base64 } }
         let t6_plotData = [];   // [{ plot, qty, destType }]
+        // { PLOT_KEY: [{do, line, qty, raw_batch, status, fallback_from_total_qty}] } —
+        // every DO line that fed a plot's Sales figure, keyed the same way
+        // salesMap is (_normPlotKey). Was only ever printed to the console
+        // as [t6:sales]; kept here too so the on-screen breakdown (see
+        // renderT6SalesBreakdown) can show the same thing without DevTools.
+        let t6_salesTraceByPlot = {};
+        // Which rows currently have their breakdown panel open — a Set of
+        // row indexes, so re-rendering (a save, a tab switch back) doesn't
+        // silently close a panel someone had open.
+        let t6_salesOpenRows = new Set();
 
         async function syncTab6() {
             const batchId = document.getElementById('f-batchno').value.trim();
@@ -6753,6 +6763,9 @@ Thank you.`;
             //   balance = transplanted − 2nd culled (dead) − sales.
             const dead2Map = {}; // PLOT → 2nd-culling dead qty
             const salesMap = {}; // PLOT → sold qty from the D/O collection details
+            // Reset so a batch with no DO lines (or before batchId is known)
+            // doesn't keep showing the previous batch's breakdown.
+            t6_salesTraceByPlot = {};
             if (batchId) {
                 const [c2Res, doRes] = await Promise.all([
                     _supabase.from('shared_inventory_logs')
@@ -6816,6 +6829,9 @@ Thank you.`;
                 // up to that plot's number".
                 const _byPlot = {};
                 _salesTrace.forEach(t => { (_byPlot[t.plot] = _byPlot[t.plot] || []).push(t); });
+                // Persist past this function so the on-screen breakdown panel
+                // (renderT6PlotRows) can show the same thing the console does.
+                t6_salesTraceByPlot = _byPlot;
                 Object.keys(_byPlot).forEach(plot => {
                     const rows = _byPlot[plot];
                     const total = rows.reduce((s, r) => s + r.qty, 0);
@@ -6907,6 +6923,10 @@ Thank you.`;
                         recordCount:   v.records,
                         dead2:         dead2Map[key] || 0,
                         sales:         salesMap[key] || 0,
+                        // Same key salesMap was looked up with — lets the
+                        // Sales breakdown panel find its DO trace without
+                        // recomputing (and risking a different answer).
+                        salesKey:      key,
                         savedBalance:  saved.balance ?? null,
                         savedCulled:   saved.culled  ?? null,
                         savedDocUrl:   saved.docUrl  ?? null,
@@ -6992,6 +7012,10 @@ Thank you.`;
                             destTypes:    Array.from(v.destTypes),
                             dead2:        dead2Map[key] || 0,
                             sales:        salesMap[key] || 0,
+                            // Same key salesMap was looked up with — lets the
+                            // Sales breakdown panel find its DO trace without
+                            // recomputing (and risking a different answer).
+                            salesKey:     key,
                             savedBalance: balance,
                             savedCulled:  culled,
                             savedDocUrl:  docUrl,
@@ -7066,6 +7090,16 @@ Thank you.`;
                 const autoCulled = _n.culled;
                 const cullVal  = autoCulled;
 
+                // Every DO line that fed this row's Sales figure — same data
+                // the [t6:sales] console diagnostic prints, kept here so the
+                // office can see "why does this plot show N sold" without
+                // opening DevTools. Empty when syncTab6() hasn't populated
+                // the trace yet (e.g. brand-new row, or before the DO fetch
+                // resolved) — the 🔍 toggle only shows up when there's
+                // something to show.
+                const salesTrace = t6_salesTraceByPlot[p.salesKey] || [];
+                const salesOpen  = t6_salesOpenRows.has(p.salesKey || rowId);
+
                 container.insertAdjacentHTML('beforeend', `
                     <div id="${rowId}" class="t6-plot-row border ${rowBg} rounded-xl overflow-hidden">
                         <div class="grid grid-cols-1 lg:grid-cols-[0.8fr_0.75fr_0.5fr_0.5fr_0.55fr_0.7fr_1.1fr] gap-2 p-4 items-start t-tidy">
@@ -7096,7 +7130,12 @@ Thank you.`;
                             <!-- Sales — collected qty from collection bookings -->
                             <div class="pt-1">
                                 <div class="text-[9px] font-black text-[#3a7ab4] uppercase lg:hidden mb-0.5">Sales</div>
-                                <div class="text-base font-black text-[#3a7ab4]">${sales.toLocaleString()}</div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="text-base font-black text-[#3a7ab4]">${sales.toLocaleString()}</div>
+                                    ${salesTrace.length ? `<button type="button" onclick="toggleT6SalesBreakdown(${i})"
+                                        title="Show which delivery orders make up this figure"
+                                        class="text-[12px] leading-none opacity-60 hover:opacity-100 transition-opacity">🔍</button>` : ''}
+                                </div>
                             </div>
 
                             <!-- Balance — AUTO: transplanted − 2nd culled − sales − transferred out.
@@ -7155,6 +7194,22 @@ Thank you.`;
                             </div>
 
                         </div>
+                        ${salesTrace.length ? `
+                        <div id="${rowId}-sales-body" class="${salesOpen ? '' : 'hidden'} border-t border-dashed border-[#bfe0f2] bg-[#f4faff] px-4 py-3">
+                            <div class="text-[10px] font-black text-[#3a7ab4] uppercase tracking-widest mb-2">🔍 Sales breakdown — ${salesTrace.length} DO line${salesTrace.length === 1 ? '' : 's'}</div>
+                            <div class="flex flex-col gap-1">
+                                ${salesTrace.map(t => `
+                                <div class="flex items-center justify-between gap-2 text-[12px] py-0.5">
+                                    <span class="font-bold text-[#3d2610]">${t.do || '—'}</span>
+                                    <span class="text-[#8a7a68] flex-1 text-right pr-2">${t.status || ''}${t.fallback_from_total_qty ? ' · from DO total qty' : ''}</span>
+                                    <span class="font-black text-[#3a7ab4] shrink-0">${(t.qty || 0).toLocaleString()}</span>
+                                </div>`).join('')}
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-[12px] mt-2 pt-2 border-t border-[#bfe0f2]">
+                                <span class="font-black text-[#3d2610] uppercase tracking-widest">Total</span>
+                                <span class="font-black text-[#3a7ab4]">${salesTrace.reduce((s, t) => s + (t.qty || 0), 0).toLocaleString()}</span>
+                            </div>
+                        </div>` : ''}
                         ${`
                         <div class="border-t border-dashed border-[#cfe9ef] bg-[#f7fdfe] px-4 py-3">
                             <div class="flex items-center justify-between gap-2">
@@ -7337,6 +7392,22 @@ Thank you.`;
             if (!body) return;
             const collapsed = body.classList.toggle('hidden');
             if (caret) caret.innerText = collapsed ? '▸' : '▾';
+        }
+
+        /* Display-only: shows which DO lines add up to a plot's Sales figure —
+           the same data the [t6:sales] console diagnostic prints. Touches no
+           calculation. Open/closed state is remembered by salesKey (falling
+           back to the row id) so a re-render — a save, a tab switch back —
+           doesn't silently close a panel someone had open. */
+        function toggleT6SalesBreakdown(rowIdx) {
+            const rowId = `t6-row-${rowIdx}`;
+            const body  = document.getElementById(`${rowId}-sales-body`);
+            if (!body) return;
+            const p   = t6_plotData[rowIdx];
+            const key = (p && p.salesKey) || rowId;
+            const collapsed = body.classList.toggle('hidden');
+            if (collapsed) t6_salesOpenRows.delete(key);
+            else            t6_salesOpenRows.add(key);
         }
 
         /* Transfers move living seedlings out of this plot, so they change the
