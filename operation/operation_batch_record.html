@@ -249,7 +249,7 @@
                     // batch_name column (the old query 400'd with
                     // "column shared_collection_bookings.batch_name does not exist").
                     // DOs are the actual delivery events and carry batch_N/qty_N.
-                    // Cancelled DOs and CAL- calibration DOs are excluded below.
+                    // Cancelled DOs are excluded below; CAL- calibration DOs count.
                     fetchAllRows(() => _supabase.from('shared_do_records')
                         .select('do_number,status,batch_1,qty_1,batch_2,qty_2,batch_3,qty_3,batch_4,qty_4,batch_5,qty_5')
                         .order('id', { ascending: true }))
@@ -373,13 +373,15 @@
                         if (r.batch_name) transplantQtyMap[r.batch_name] = (transplantQtyMap[r.batch_name] || 0) + (r.quantity_change || 0);
                     });
                     // Walk each DO's five batch/qty slots. Skip cancelled DOs
-                    // and CAL- calibration DOs (they are bulk stock corrections,
-                    // not real customer collections — same rule as the Order &
-                    // Collection chart).
+                    // only. CAL- calibration DOs COUNT here (asked for in
+                    // Sep 2026) — same rule as Batch Detail Tab 6's Sales
+                    // figure, so "collected" and Sales agree on when a batch
+                    // is sold out. (The Order & Collection chart in
+                    // operation_stock_sales.js still excludes CAL- from its
+                    // customer-collection totals — different question.)
                     const collectedMap = {};
                     (collectRes.data || []).forEach(d => {
                         if (/cancel/i.test(d.status || '')) return;
-                        if (/^CAL-/i.test(String(d.do_number || ''))) return;
                         for (let i = 1; i <= 5; i++) {
                             const b = d['batch_' + i];
                             const q = Number(d['qty_' + i] || 0);

@@ -230,7 +230,7 @@
             <div class="px-6 py-5 border-b border-[#e8dcc8] flex justify-between items-center bg-white rounded-t-3xl">
                 <div>
                     <h3 class="text-lg font-black text-[#3d2610] uppercase tracking-widest" id="t6-sales-modal-title">Sales — Plot</h3>
-                    <p class="text-[10px] font-bold text-[#8a7a68] uppercase tracking-widest mt-0.5">Delivery Notes from Customer Order Monitoring (cancelled & CAL-… calibration DOs excluded)</p>
+                    <p class="text-[10px] font-bold text-[#8a7a68] uppercase tracking-widest mt-0.5">Delivery Notes from Customer Order Monitoring, calibration DOs included (cancelled DOs excluded)</p>
                 </div>
                 <button type="button" onclick="closeT6SalesModal()" class="w-9 h-9 rounded-full bg-[#f8f4ec] border border-[#e8dcc8] text-[#8a7a68] hover:text-[#a83020] hover:border-[#a83020] flex items-center justify-center shrink-0" title="Close">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -1457,7 +1457,7 @@
                                     <span>Main Plot</span>
                                     <span class="!whitespace-nowrap">Transplanted</span>
                                     <span class="text-[#a83020]">2nd Culled</span>
-                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch (cancelled and CAL-… calibration DOs excluded). Click a figure to see the DOs behind it.">Sales</span>
+                                    <span class="text-[#3a7ab4]" title="Sold qty from Customer Order Monitoring - Delivery Note (DO) collection details, matched by plot + batch. CAL-… calibration DOs are included; only cancelled DOs are excluded. Click a figure to see the DOs behind it.">Sales</span>
                                     <span title="Auto: Transplanted − 2nd Culled − Sales − Transferred out">Balance</span>
                                     <span class="text-[#a83020]" title="Auto: 2nd Culled + Balance, with the rate below it">3rd Culled</span>
                                     <span>Drone Map</span>
@@ -6825,20 +6825,20 @@ Thank you.`;
                 // list below is every DO/line/qty that added up to that N,
                 // ordered by DO number so you can cross-check against the
                 // DO modal.
-                // A "CAL-…" DO number is a bulk stock calibration/correction,
-                // not a customer collection — operation_stock_sales.js's own
-                // Collection dashboard already excludes these from its
-                // "sold" totals (_isCalibrationDo()) for exactly that reason.
-                // This Sales figure never had the same exclusion, so a
-                // calibration DO touching this batch's plot was counted as
-                // a real sale here even though nothing left the nursery for
-                // a customer — inflating Sales, and with it Balance and
-                // 3rd Culled below (both are computed FROM Sales).
-                const _isCalDo = d => /^CAL-/i.test(String((d && d.do_number) || ''));
+                // "CAL-…" calibration DOs COUNT as sales here, on purpose
+                // (asked for in Sep 2026, undoing a short-lived exclusion).
+                // A calibration DO records stock that left a plot outside a
+                // normal customer collection; leaving it out made Sales lower
+                // than what actually departed, which inflated Balance and 3rd
+                // Culled below (both are computed FROM Sales). Note this is
+                // DIFFERENT from operation_stock_sales.js's Collection
+                // dashboard, which still excludes CAL- DOs from its "sold"
+                // totals (_isCalibrationDo()) — that screen answers "what did
+                // customers collect", this one answers "what is left standing
+                // in the plot". Only cancelled DOs are skipped.
                 const _salesTrace = [];
                 ((doRes && doRes.data) || []).forEach(d => {
                     if (d.status === 'Cancelled' || (d.remark && d.remark.includes('[CANCELLED]'))) return;
-                    if (_isCalDo(d)) return;
                     // How many collection lines does this DO actually carry?
                     let filled = 0;
                     for (let i = 1; i <= 5; i++) if (_normPlotKey(d[`plot_${i}`])) filled++;
